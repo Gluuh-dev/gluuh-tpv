@@ -62,7 +62,25 @@ pnpm --filter @servio/desktop dev
 | Pieza | Estado |
 |-------|--------|
 | Documentación (`docs/`) | ✅ Completa |
-| `packages/core` — VERIFACTU + impuestos | ✅ PoC funcional con tests |
+| `packages/core` — impuestos IVA/IGIC + VERIFACTU (huella, QR imagen, XML/SOAP) | ✅ Funcional, 12 tests (incluye vector AEAT) |
+| `apps/api` — endpoints fiscales (`/fiscal/preview`, `/fiscal/xml`, `/fiscal/enviar`) + write‑path `/sync/upload` | ✅ Compila y responde |
+| `apps/web` — TPV de demo (`/tpv`) con venta + ticket con QR | ✅ Funcional (verificado vía HTTP) |
 | `apps/api/db/schema.sql` — esquema BD | ✅ DDL completo (multi‑tenant + RLS) |
-| `apps/*` — apps cliente | 🟡 Esqueletos iniciales |
-| Integración pagos / sync / hardware | ⏳ Roadmap |
+| `packages/sync` — esquema + conector PowerSync | ✅ Tipado (requiere infra para correr) |
+| Cliente envío AEAT (mTLS) | ✅ Implementado (requiere certificado) |
+| `apps/desktop` / `apps/mobile` | 🟡 Esqueletos iniciales |
+| Pagos (Stripe/Redsys) / hardware ESC‑POS real | ⏳ Roadmap |
+
+### Probar las funcionalidades
+
+```bash
+pnpm --filter @servio/core test          # 12 tests (impuestos, VERIFACTU, QR, XML)
+pnpm --filter @servio/core build         # build dual ESM/CJS
+
+# TPV web (venta + ticket con QR):
+pnpm --filter @servio/web build && pnpm --filter @servio/web start   # http://localhost:3000/tpv
+
+# Backend fiscal:
+pnpm --filter @servio/core build && pnpm --filter @servio/api build
+pnpm --filter @servio/api start          # POST http://localhost:3001/fiscal/xml
+```

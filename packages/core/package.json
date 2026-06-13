@@ -14,6 +14,9 @@
     }
   },
   "files": ["dist"],
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.16.0",
+    "@types/qrcode": "^1.5.5",
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",

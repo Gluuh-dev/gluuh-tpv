@@ -19,6 +19,9 @@ export default function Home() {
     <main style={{ padding: 32, maxWidth: 640 }}>
       <h1>Servio TPV</h1>
       <p>Esqueleto del backoffice / TPV web. Ver <code>docs/</code>.</p>
+      <p>
+        👉 <a href="/tpv">Abrir el TPV de demostración</a> (venta + ticket con QR VERIFACTU).
+      </p>
       <h2>Demo motor fiscal (Canarias · IGIC)</h2>
       <table>
         <thead>
