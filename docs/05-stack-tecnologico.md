@@ -4,15 +4,17 @@
 
 ---
 
+> **🟢 Decisión del proyecto (junio 2026):** tras valorar las alternativas de abajo, el stack elegido es **Next.js + Supabase + Electron + Expo** (+ PowerSync para offline). Cambios respecto al análisis original: **Electron** en lugar de Tauri para el escritorio (ecosistema de hardware más maduro) y **Supabase** como **base de datos completa** (PostgreSQL gestionado + Auth + Realtime + Storage), manteniendo un mini‑servicio de confianza para el motor fiscal. El resto del análisis se conserva como contexto de la decisión.
+
 ## 1. Recomendación en una tabla
 
 | Capa | Elección principal | Alternativa | Razón corta |
 |------|--------------------|-------------|-------------|
 | **Web (backoffice + TPV navegador)** | **React + Next.js** | SvelteKit | Ecosistema admin maduro y comparte base con Tauri y RN |
-| **Escritorio Windows (TPV)** | **Tauri 2.0** (Rust + WebView, UI React) | Electron | Footprint mínimo + capa Rust ideal para hardware |
+| **Escritorio Windows (TPV)** | **Electron** ✅ *(elegido)* | Tauri 2.0 | Ecosistema de hardware más maduro y probado (ESC/POS, serialport, node‑hid) |
 | **Móvil (comanderas)** | **React Native + Expo** | Flutter | Reutiliza lógica/tipos del resto del stack TS |
 | **Backend** | **NestJS** (Node/TS) | Go · .NET | Mismo lenguaje, I/O suficiente, ecosistema |
-| **Base de datos** | **PostgreSQL** (shared schema + `tenant_id` + RLS) | — | RLS, JSONB, base de los motores de sync |
+| **Base de datos** | **Supabase** (PostgreSQL: shared schema + `tenant_id` + RLS) | — | Postgres gestionado + Auth + Realtime + Storage; el esquema corre tal cual |
 | **Offline / Sync** | **PowerSync** | ElectricSQL + TanStack DB | Hecho para «POS sin internet», bidireccional |
 | **Tiempo real** | **Socket.IO** (eventos) + PowerSync (datos) | Supabase Realtime · Ably | Integrado en NestJS, rooms por tenant |
 | **Hosting** | **Supabase + Fly.io/Render** → AWS | Railway | Coste bajo al arrancar, camino a escala |
@@ -40,7 +42,7 @@
 
 ## 3. Escritorio Windows (TPV principal)
 
-**Elección: Tauri 2.0** (UI React compartida + núcleo Rust).
+**Elección del proyecto: Electron** (carga la UI web + núcleo Node para hardware). *El análisis original recomendaba Tauri por footprint; se ha optado por Electron por la madurez de su ecosistema de hardware — `node-thermal-printer`, `serialport`, `node-hid` — que reduce el riesgo de integración del datáfono y la impresora ESC/POS. Tauri queda como alternativa válida.* Implementación en `apps/desktop` (proceso `main` + `preload` + puente `window.servio`).
 
 Requisitos duros: **offline real**, acceso a **impresora ESC/POS**, **cajón** (pulso por la impresora), **datáfono** (SDK por TCP/serie), **puerto serie/USB**.
 

@@ -30,6 +30,7 @@ Orden de lectura recomendado:
 | 11 | [Modelo de negocio y precios](11-modelo-de-negocio-y-precios.md) | Negocio | Planes, tarifas, go‑to‑market, unit economics |
 | 12 | [Seguridad y RGPD](12-seguridad-y-rgpd.md) | Desarrollo / Legal | Protección de datos, PCI, hardening |
 | 13 | [Roadmap, MVP y equipo](13-roadmap-mvp-y-equipo.md) | Dirección | Fases, plazos, equipo y presupuesto |
+| 14 | [Pantallas: kiosko, KDS, display, ofertas](14-pantallas-cliente-kiosko-y-kds.md) | Producto / Desarrollo | Autopedido estilo fast-food, cocina, estado del pedido, cartelería |
 
 ---
 
@@ -57,8 +58,8 @@ Atacamos los tres dolores del mercado español (offline, soporte, transparencia)
 
 | # | Decisión | Elección | Por qué |
 |---|----------|----------|---------|
-| 1 | **Stack de cliente** | Monorepo **TypeScript**: Next.js (web) + **Tauri** (Windows) + **React Native/Expo** (móvil) | Máxima reutilización de código y lógica de negocio entre las 4 plataformas con un solo lenguaje y equipo |
-| 2 | **Backend + datos** | **NestJS** + **PostgreSQL** multi‑tenant (`tenant_id` + RLS) | Coherencia TS, multi‑tenant simple y seguro, ecosistema maduro |
+| 1 | **Stack de cliente** | Monorepo **TypeScript**: Next.js (web) + **Electron** (Windows) + **React Native/Expo** (móvil) | Máxima reutilización de código y lógica de negocio entre las 4 plataformas con un solo lenguaje y equipo |
+| 2 | **Backend + datos** | **Supabase** (PostgreSQL multi‑tenant `tenant_id` + RLS, Auth, Realtime) + mini‑servicio fiscal | Backend gestionado, multi‑tenant simple y seguro, tiempo real para KDS/pantallas |
 | 3 | **Offline‑first** | **PowerSync** (Postgres ↔ SQLite local, bidireccional) | Es *el* punto donde mueren los proyectos de TPV; PowerSync está hecho para «POS sin internet» |
 | 4 | **Fiscalidad** | Motor **Verifactu + TicketBAI + IGIC/IVA** en el backend desde el día 1 | Es requisito legal y nuestro mayor diferenciador; no se puede añadir «después» |
 | 5 | **Pagos** | **Stripe** (Terminal + Tap to Pay + Connect + QR) como núcleo, **Redsys/Bizum** en paralelo | Time‑to‑market y modelo plataforma con Stripe; comisión mínima y confianza local con Redsys |
@@ -92,7 +93,7 @@ Detalle, plazos y presupuesto en **[13 — Roadmap, MVP y equipo](13-roadmap-mvp
 flowchart TB
     subgraph CLIENTES["Aplicaciones cliente (offline-first)"]
         WEB["🖥️ Web<br/>Backoffice + TPV navegador<br/>(Next.js)"]
-        DESK["💻 TPV Windows<br/>Barra / caja<br/>(Tauri)"]
+        DESK["💻 TPV Windows<br/>Barra / caja<br/>(Electron)"]
         MOB["📱 Comandera<br/>Android / iOS<br/>(React Native)"]
         KDS["👨‍🍳 KDS Cocina<br/>(pantalla)"]
     end

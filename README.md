@@ -17,7 +17,7 @@ servio-tpv/
 │   ├── api/         # Backend NestJS (API, motor fiscal, write path de sync)
 │   │   └── db/schema.sql   # ← Esquema PostgreSQL completo (multi-tenant + RLS)
 │   ├── web/         # Next.js (backoffice + TPV navegador)
-│   ├── desktop/     # Tauri (TPV de barra Windows; UI React + núcleo Rust)
+│   ├── desktop/     # Electron (TPV de barra Windows; carga la web + hardware)
 │   └── mobile/      # Expo / React Native (comandera Android/iOS)
 ├── packages/
 │   ├── core/        # ★ Lógica de negocio compartida: dominio, IVA/IGIC, VERIFACTU
@@ -36,7 +36,7 @@ El paquete **[`packages/core`](packages/core)** es el "cerebro" compartido por l
 ## Requisitos
 
 - **Node.js ≥ 20** y **pnpm 9** (`npm i -g pnpm`)
-- Para escritorio: **Rust** + toolchain de Tauri (ver [tauri.app](https://tauri.app))
+- Para escritorio: **Electron** (Node; ver [apps/desktop/README](apps/desktop/README.md))
 - Para móvil: **Expo** (`npx expo`)
 
 ## Puesta en marcha rápida
@@ -65,6 +65,8 @@ pnpm --filter @servio/desktop dev
 | `packages/core` — impuestos IVA/IGIC + VERIFACTU (huella, QR imagen, XML/SOAP) | ✅ Funcional, 12 tests (incluye vector AEAT) |
 | `apps/api` — endpoints fiscales (`/fiscal/preview`, `/fiscal/xml`, `/fiscal/enviar`) + write‑path `/sync/upload` | ✅ Compila y responde |
 | `apps/web` — TPV de demo (`/tpv`) con venta + ticket con QR | ✅ Funcional (verificado vía HTTP) |
+| `apps/web` — pantallas fast-food (`/kiosko`, `/kds`, `/pantalla`, `/ofertas`) | ✅ Funcional (flujo kiosko→cocina→display verificado) |
+| `packages/supabase` — cliente Supabase + `supabase/migrations/` | ✅ Esquema + cliente listos |
 | `apps/api/db/schema.sql` — esquema BD | ✅ DDL completo (multi‑tenant + RLS) |
 | `packages/sync` — esquema + conector PowerSync | ✅ Tipado (requiere infra para correr) |
 | Cliente envío AEAT (mTLS) | ✅ Implementado (requiere certificado) |
@@ -77,8 +79,9 @@ pnpm --filter @servio/desktop dev
 pnpm --filter @servio/core test          # 12 tests (impuestos, VERIFACTU, QR, XML)
 pnpm --filter @servio/core build         # build dual ESM/CJS
 
-# TPV web (venta + ticket con QR):
-pnpm --filter @servio/web build && pnpm --filter @servio/web start   # http://localhost:3000/tpv
+# Web: TPV + pantallas estilo fast-food:
+pnpm --filter @servio/web build && pnpm --filter @servio/web start
+#   /tpv  /kiosko  /kds  /pantalla  /ofertas   (en http://localhost:3000)
 
 # Backend fiscal:
 pnpm --filter @servio/core build && pnpm --filter @servio/api build

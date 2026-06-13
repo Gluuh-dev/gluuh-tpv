@@ -1,3 +1,7 @@
+-- Migración inicial de Supabase.
+-- ESPEJO de apps/api/db/schema.sql — mantener ambos sincronizados.
+-- Aplicar con: supabase db push   (o psql "$DATABASE_URL" -f este_archivo)
+
 -- =============================================================================
 --  Servio TPV — Esquema de base de datos (PostgreSQL)
 --  Multi-tenant: shared schema + tenant_id + Row-Level Security (RLS)
