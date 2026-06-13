@@ -1,0 +1,36 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Tauri / Rust
+apps/desktop/src-tauri/target/
+
+# Expo / React Native
+.expo/
+*.apk
+*.ipa
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+
+# Logs / cachés
+*.log
+.turbo/
+coverage/
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+.idea/

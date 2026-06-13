@@ -1,0 +1,18 @@
+{
+  "name": "@servio/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TPV de barra (Windows) con Tauri 2.0 — UI web + núcleo Rust para hardware.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "lint": "echo \"(lint pendiente)\"",
+    "typecheck": "echo \"(typecheck pendiente)\""
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

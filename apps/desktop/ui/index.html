@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Servio TPV</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; display: grid; place-items: center; height: 100vh; }
+      .card { text-align: center; }
+      button { font-size: 16px; padding: 12px 20px; margin-top: 16px; cursor: pointer; }
+      pre { color: #555; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Servio TPV</h1>
+      <p>Esqueleto del TPV de escritorio (Tauri). Ver <code>docs/</code>.</p>
+      <button id="print">Probar impresión (comando Rust)</button>
+      <pre id="out"></pre>
+    </div>
+    <script>
+      // En Tauri v2 con withGlobalTauri: true, invoke está en window.__TAURI__.core
+      const out = document.getElementById("out");
+      document.getElementById("print").addEventListener("click", async () => {
+        try {
+          const invoke = window.__TAURI__?.core?.invoke;
+          if (!invoke) { out.textContent = "Ejecuta dentro de Tauri (pnpm --filter @servio/desktop dev)"; return; }
+          const res = await invoke("imprimir_ticket", { contenido: "=== TICKET DE PRUEBA ===\nTotal: 19,00 EUR\n" });
+          out.textContent = "Respuesta del backend Rust: " + res;
+        } catch (e) {
+          out.textContent = "Error: " + e;
+        }
+      });
+    </script>
+  </body>
+</html>

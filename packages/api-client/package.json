@@ -1,0 +1,16 @@
+{
+  "name": "@servio/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "echo \"(lint pendiente)\"",
+    "typecheck": "echo \"(typecheck pendiente)\""
+  },
+  "dependencies": {
+    "@servio/core": "workspace:*"
+  }
+}

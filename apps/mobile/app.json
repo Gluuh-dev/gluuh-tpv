@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Servio Comandera",
+    "slug": "servio-comandera",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.servio.comandera"
+    },
+    "android": {
+      "package": "com.servio.comandera"
+    }
+  }
+}

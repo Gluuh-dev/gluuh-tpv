@@ -1,0 +1,26 @@
+{
+  "name": "@servio/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Backoffice + TPV en navegador (Next.js).",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@servio/core": "workspace:*",
+    "@servio/ui": "workspace:*",
+    "next": "^14.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.6.0"
+  }
+}
