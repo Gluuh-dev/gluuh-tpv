@@ -32,7 +32,7 @@ export default function PantallaCliente() {
 
   return (
     <main style={S.wrap}>
-      <header style={S.header}>🍔 Servio — Estado de tu pedido</header>
+      <header style={S.header}>🍔 Gluppo — Estado de tu pedido</header>
       <div style={S.cols}>
         <section style={S.col}>
           <h2 style={{ ...S.colTitle, color: "#f59e0b" }}>⏳ En preparación</h2>

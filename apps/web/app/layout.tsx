@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Servio TPV",
+  title: "Gluppo TPV",
   description: "Backoffice y TPV de hostelería",
 };
 

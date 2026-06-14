@@ -1,5 +1,5 @@
 /**
- * @servio/core — Lógica de negocio compartida por web, escritorio, móvil y backend.
+ * @gluppo/core — Lógica de negocio compartida por web, escritorio, móvil y backend.
  *
  * Contiene el "cerebro" del TPV que NO debe duplicarse entre plataformas:
  *  - Tipos de dominio (productos, comandas, facturas).

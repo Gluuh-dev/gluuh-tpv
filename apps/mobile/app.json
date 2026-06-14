@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Servio Comandera",
-    "slug": "servio-comandera",
+    "name": "Gluppo Comandera",
+    "slug": "gluppo-comandera",
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.servio.comandera"
+      "bundleIdentifier": "com.gluppo.comandera"
     },
     "android": {
-      "package": "com.servio.comandera"
+      "package": "com.gluppo.comandera"
     }
   }
 }

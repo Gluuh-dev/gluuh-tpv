@@ -30,7 +30,7 @@ flowchart LR
     O["🎉 Ofertas /ofertas"] -.cartelería.-> Pantalla((Pantallas del local))
 ```
 
-**Estados del pedido** (de [`@servio/core`](../packages/core/src/domain/operations.ts)): `PENDIENTE → EN_PREPARACION → LISTO → ENTREGADO`.
+**Estados del pedido** (de [`@gluppo/core`](../packages/core/src/domain/operations.ts)): `PENDIENTE → EN_PREPARACION → LISTO → ENTREGADO`.
 
 1. **Kiosko**: el cliente elige *comer aquí / para llevar*, monta el pedido, paga y recibe un **número** (A-37).
 2. **KDS**: la comanda aparece en cocina; el cocinero la avanza de estado con un toque.
@@ -94,7 +94,7 @@ En la BD esto es la columna `tipo_operacion` de `sales_order` ([schema](../apps/
 
 ## 9. Notas técnicas
 
-- **Aislamiento de `@servio/core` en cliente:** el `core` incluye `node:crypto` (VERIFACTU) y `qrcode`, que **no deben bundlearse en el navegador**. Las pantallas cliente usan tipos/labels locales ([`app/lib/estados.ts`](../apps/web/app/lib/estados.ts)); el cálculo fiscal/QR se hace en **route handlers** (servidor) — ver `app/api/ticket` y `app/api/pedidos`.
+- **Aislamiento de `@gluppo/core` en cliente:** el `core` incluye `node:crypto` (VERIFACTU) y `qrcode`, que **no deben bundlearse en el navegador**. Las pantallas cliente usan tipos/labels locales ([`app/lib/estados.ts`](../apps/web/app/lib/estados.ts)); el cálculo fiscal/QR se hace en **route handlers** (servidor) — ver `app/api/ticket` y `app/api/pedidos`.
 - **Tiempo real:** demo con polling; producción con **Supabase Realtime** (canales por `tenant_id`/`location_id`).
 - **Modo kiosko:** en Electron o en el navegador a pantalla completa; deshabilitar gestos/navegación para autoservicio.
 - **Multi‑pantalla en el local:** todas las superficies leen del mismo estado (BD), por lo que kiosko, KDS y display se mantienen coherentes en tiempo real.

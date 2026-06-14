@@ -143,7 +143,7 @@ export default function Kiosko() {
   return (
     <div style={S.cartaWrap}>
       <header style={S.header}>
-        <strong style={{ fontSize: 20 }}>🍔 Servio Kiosko</strong>
+        <strong style={{ fontSize: 20 }}>🍔 Gluppo Kiosko</strong>
         <span>{tipoConsumo === "LOCAL" ? "🍽️ Comer aquí" : "🛍️ Para llevar"}</span>
       </header>
 

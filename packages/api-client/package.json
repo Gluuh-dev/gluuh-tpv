@@ -1,5 +1,5 @@
 {
-  "name": "@servio/api-client",
+  "name": "@gluppo/api-client",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "typecheck": "echo \"(typecheck pendiente)\""
   },
   "dependencies": {
-    "@servio/core": "workspace:*"
+    "@gluppo/core": "workspace:*"
   }
 }

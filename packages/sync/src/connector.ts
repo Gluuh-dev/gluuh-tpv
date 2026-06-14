@@ -1,5 +1,5 @@
 /**
- * Conector PowerSync ↔ backend de Servio.
+ * Conector PowerSync ↔ backend de Gluppo.
  *
  * - fetchCredentials: obtiene el token y la URL del servicio PowerSync.
  * - uploadData: sube los cambios locales (cola de escritura) a NUESTRO backend
@@ -17,8 +17,8 @@ import type {
   PowerSyncBackendConnector,
 } from "@powersync/common";
 
-export interface ServioConnectorOptions {
-  /** URL base del API de Servio (NestJS). */
+export interface GluppoConnectorOptions {
+  /** URL base del API de Gluppo (NestJS). */
   apiUrl: string;
   /** URL del servicio PowerSync. */
   powersyncUrl: string;
@@ -26,8 +26,8 @@ export interface ServioConnectorOptions {
   getToken: () => Promise<string>;
 }
 
-export class ServioConnector implements PowerSyncBackendConnector {
-  constructor(private readonly opts: ServioConnectorOptions) {}
+export class GluppoConnector implements PowerSyncBackendConnector {
+  constructor(private readonly opts: GluppoConnectorOptions) {}
 
   async fetchCredentials() {
     const token = await this.opts.getToken();

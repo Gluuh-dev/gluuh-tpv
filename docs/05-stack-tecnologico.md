@@ -42,7 +42,7 @@
 
 ## 3. Escritorio Windows (TPV principal)
 
-**Elección del proyecto: Electron** (carga la UI web + núcleo Node para hardware). *El análisis original recomendaba Tauri por footprint; se ha optado por Electron por la madurez de su ecosistema de hardware — `node-thermal-printer`, `serialport`, `node-hid` — que reduce el riesgo de integración del datáfono y la impresora ESC/POS. Tauri queda como alternativa válida.* Implementación en `apps/desktop` (proceso `main` + `preload` + puente `window.servio`).
+**Elección del proyecto: Electron** (carga la UI web + núcleo Node para hardware). *El análisis original recomendaba Tauri por footprint; se ha optado por Electron por la madurez de su ecosistema de hardware — `node-thermal-printer`, `serialport`, `node-hid` — que reduce el riesgo de integración del datáfono y la impresora ESC/POS. Tauri queda como alternativa válida.* Implementación en `apps/desktop` (proceso `main` + `preload` + puente `window.gluppo`).
 
 Requisitos duros: **offline real**, acceso a **impresora ESC/POS**, **cajón** (pulso por la impresora), **datáfono** (SDK por TCP/serie), **puerto serie/USB**.
 
@@ -79,7 +79,7 @@ Requisitos duros: **offline real**, acceso a **impresora ESC/POS**, **cajón** (
 **Elección: «Todo TypeScript» en monorepo Turborepo + pnpm.**
 
 ```
-servio/  (monorepo Turborepo + pnpm)
+gluppo/  (monorepo Turborepo + pnpm)
 ├── packages/
 │   ├── core/          # Dominio: tipos, validación (Zod), cálculo de cuenta,
 │   │                  # IVA/IGIC, máquina de estados de comanda, fiscalidad

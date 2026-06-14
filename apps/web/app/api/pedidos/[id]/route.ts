@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { EstadoPreparacion } from "@servio/core";
+import type { EstadoPreparacion } from "@gluppo/core";
 import { actualizarEstado } from "../../../lib/pedidosStore";
 
 export const runtime = "nodejs";

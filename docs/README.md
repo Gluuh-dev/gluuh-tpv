@@ -3,7 +3,7 @@
 > **Proyecto:** Sistema TPV (Terminal Punto de Venta) integral para bares y restaurantes.
 > **Alcance:** Web (backoffice + TPV en navegador) · App de escritorio Windows (TPV de barra) · App Android e iOS (comanderas) · Backend SaaS multi‑tenant en la nube.
 > **Mercado objetivo:** España (con especial atención a Canarias / IGIC, dado el origen del proyecto en La Palma) y, en una segunda fase, resto de la UE.
-> **Nombre provisional del producto:** **«Servio»** *(pendiente de decidir — ver candidatos abajo)*.
+> **Nombre provisional del producto:** **«Gluppo»** *(pendiente de decidir — ver candidatos abajo)*.
 > **Fecha de la documentación:** junio de 2026.
 
 ---
@@ -31,6 +31,7 @@ Orden de lectura recomendado:
 | 12 | [Seguridad y RGPD](12-seguridad-y-rgpd.md) | Desarrollo / Legal | Protección de datos, PCI, hardening |
 | 13 | [Roadmap, MVP y equipo](13-roadmap-mvp-y-equipo.md) | Dirección | Fases, plazos, equipo y presupuesto |
 | 14 | [Pantallas: kiosko, KDS, display, ofertas](14-pantallas-cliente-kiosko-y-kds.md) | Producto / Desarrollo | Autopedido estilo fast-food, cocina, estado del pedido, cartelería |
+| 15 | [Cuentas y servicios](15-cuentas-y-servicios.md) | Dirección / Operaciones | Altas necesarias (dominio, GitHub, Supabase, Stripe, AEAT, stores…) |
 
 ---
 
@@ -135,11 +136,11 @@ flowchart TB
 
 ## 3. Nombre del producto (decisión pendiente)
 
-El nombre es decisión del propietario. A lo largo de la documentación se usa el provisional **«Servio»** por legibilidad. Candidatos a valorar (comprobar disponibilidad de dominio `.com`/`.es` y marca):
+El nombre es decisión del propietario. A lo largo de la documentación se usa el provisional **«Gluppo»** por legibilidad. Candidatos a valorar (comprobar disponibilidad de dominio `.com`/`.es` y marca):
 
 | Candidato | Idea | Notas |
 |-----------|------|-------|
-| **Servio** | De «servicio» / servir | Corto, brandable, internacional |
+| **Gluppo** | De «servicio» / servir | Corto, brandable, internacional |
 | **Comandero** | El que toma comandas | Muy descriptivo en ES, difícil de registrar |
 | **Mesalia** | De «mesa» | Femenino, suave, libre probablemente |
 | **Barra** | La barra del bar | Simple y memorable, genérico |

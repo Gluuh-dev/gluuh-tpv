@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
  * Comandera (esqueleto). Aquí se construye el flujo del camarero:
  * plano de mesas → carta → comanda → enviar a cocina → cobro en mesa (docs/10 §1).
  *
- * NOTA sobre fiscalidad en el dispositivo: el cálculo de impuestos de @servio/core
+ * NOTA sobre fiscalidad en el dispositivo: el cálculo de impuestos de @gluppo/core
  * (tax.ts) es JS puro y se puede reutilizar tal cual. El motor VERIFACTU
  * (verifactu.ts) usa `node:crypto`, que NO existe en React Native; para generar
  * la huella SHA-256 en la comandera offline hay que usar un crypto compatible
@@ -14,7 +14,7 @@ import { StyleSheet, Text, View } from "react-native";
 export default function App() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Servio Comandera</Text>
+      <Text style={styles.title}>Gluppo Comandera</Text>
       <Text style={styles.subtitle}>Esqueleto · ver docs/</Text>
       <StatusBar style="auto" />
     </View>

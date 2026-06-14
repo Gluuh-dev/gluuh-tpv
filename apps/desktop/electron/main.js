@@ -1,24 +1,24 @@
-// Servio TPV — proceso principal de Electron.
+// Gluppo TPV — proceso principal de Electron.
 // Carga la aplicación web (Next.js) y expone el hardware local del TPV:
 // impresora ESC/POS, cajón portamonedas y datáfono. Ver docs/10 y docs/05.
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 
 // URL de la web a cargar (en dev, el servidor Next; en prod, el despliegue).
-const SERVIO_URL = process.env.SERVIO_URL || "http://localhost:3000/tpv";
+const GLUPPO_URL = process.env.GLUPPO_URL || "http://localhost:3000/tpv";
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "Servio TPV",
+    title: "Gluppo TPV",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-  win.loadURL(SERVIO_URL);
+  win.loadURL(GLUPPO_URL);
 }
 
 /**
@@ -26,7 +26,7 @@ function createWindow() {
  * los bytes ESC/POS a la impresora (USB/serie/red) con `node-thermal-printer` o
  * `serialport`, y se abre el cajón con la secuencia `ESC p`. Ver docs/10 §3.
  */
-ipcMain.handle("servio:imprimir-ticket", async (_event, contenido) => {
+ipcMain.handle("gluppo:imprimir-ticket", async (_event, contenido) => {
   console.log(`[impresion] ${String(contenido ?? "").length} bytes recibidos`);
   // TODO: serializar a ESC/POS, imprimir y disparar el cajón.
   return { ok: true, simulado: true };

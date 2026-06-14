@@ -8,7 +8,7 @@ import {
   LEYENDA_VERIFACTU,
   type LineaFiscal,
   type Territorio,
-} from "@servio/core";
+} from "@gluppo/core";
 
 // El motor VERIFACTU usa node:crypto → este handler debe ejecutarse en Node.
 export const runtime = "nodejs";

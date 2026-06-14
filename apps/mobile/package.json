@@ -1,5 +1,5 @@
 {
-  "name": "@servio/mobile",
+  "name": "@gluppo/mobile",
   "version": "0.0.0",
   "private": true,
   "description": "Comandera (Android/iOS) con Expo / React Native.",

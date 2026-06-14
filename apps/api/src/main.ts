@@ -8,7 +8,7 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`Servio API escuchando en http://localhost:${port}`);
+  console.log(`Gluppo API escuchando en http://localhost:${port}`);
 }
 
 void bootstrap();

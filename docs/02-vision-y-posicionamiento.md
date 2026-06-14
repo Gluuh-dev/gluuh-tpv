@@ -55,7 +55,7 @@ Expansión: resto de territorio común (Verifactu) → País Vasco (módulo Tick
 
 ### 4.1 *Statement* de posicionamiento
 
-> Para **bares y restaurantes de España** que están **hartos de TPV caros, opacos y que se caen sin internet**, **«Servio»** es un **TPV todo‑en‑uno (web, Windows, Android, iOS)** que **cumple Verifactu/TicketBAI de serie, funciona sin internet y se paga sin permanencia ni sorpresas**. A diferencia de **Toast/Square (no cumplen la ley española) y de los nacionales (caídas, soporte y precios opacos)**, nosotros ofrecemos **fiabilidad offline, cumplimiento legal y transparencia total con soporte humano en español**.
+> Para **bares y restaurantes de España** que están **hartos de TPV caros, opacos y que se caen sin internet**, **«Gluppo»** es un **TPV todo‑en‑uno (web, Windows, Android, iOS)** que **cumple Verifactu/TicketBAI de serie, funciona sin internet y se paga sin permanencia ni sorpresas**. A diferencia de **Toast/Square (no cumplen la ley española) y de los nacionales (caídas, soporte y precios opacos)**, nosotros ofrecemos **fiabilidad offline, cumplimiento legal y transparencia total con soporte humano en español**.
 
 ### 4.2 Los cinco diferenciadores núcleo
 
@@ -67,7 +67,7 @@ Expansión: resto de territorio común (Verifactu) → País Vasco (módulo Tick
 
 ### 4.3 Matriz «nosotros vs. el mercado»
 
-| Criterio | Toast/Square (intl.) | Glop/ICG/Revo (ES) | **Servio (nosotros)** |
+| Criterio | Toast/Square (intl.) | Glop/ICG/Revo (ES) | **Gluppo (nosotros)** |
 |----------|----------------------|--------------------|-----------------------|
 | Cumplimiento Verifactu/TicketBAI | ❌ / ⚠️ | ✅ | ✅ **+ IGIC + multiterritorial** |
 | Offline real | ⚠️ | ✅ (los de licencia) | ✅ **local‑first en todas las plataformas** |

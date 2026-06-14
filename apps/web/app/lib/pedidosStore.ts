@@ -7,7 +7,7 @@
  * Se guarda en globalThis para sobrevivir al hot-reload en desarrollo.
  */
 
-import type { EstadoPreparacion, TipoOperacion } from "@servio/core";
+import type { EstadoPreparacion, TipoOperacion } from "@gluppo/core";
 
 export interface PedidoItem {
   nombre: string;
@@ -33,9 +33,9 @@ interface Store {
   siguienteNumero: number;
 }
 
-const g = globalThis as unknown as { __servioPedidos?: Store };
-const store: Store = g.__servioPedidos ?? { pedidos: [], siguienteNumero: 1 };
-g.__servioPedidos = store;
+const g = globalThis as unknown as { __gluppoPedidos?: Store };
+const store: Store = g.__gluppoPedidos ?? { pedidos: [], siguienteNumero: 1 };
+g.__gluppoPedidos = store;
 
 export function crearPedido(input: {
   items: PedidoItem[];

@@ -1,5 +1,5 @@
 {
-  "name": "@servio/desktop",
+  "name": "@gluppo/desktop",
   "version": "0.0.0",
   "private": true,
   "description": "TPV de barra (Windows) con Electron — carga la web y gestiona el hardware local (impresora ESC/POS, cajón, datáfono).",

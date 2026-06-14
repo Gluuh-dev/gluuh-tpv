@@ -1,4 +1,4 @@
-# @servio/desktop — TPV de barra (Electron)
+# @gluppo/desktop — TPV de barra (Electron)
 
 Aplicación de escritorio (Windows) del TPV principal. **Electron** carga la
 aplicación web (Next.js) y aporta lo que el navegador no puede: acceso al
@@ -9,23 +9,23 @@ funcionamiento robusto en barra. Ver [docs/05](../../docs/05-stack-tecnologico.m
 
 ```bash
 # 1) Arranca la web (en otra terminal):
-pnpm --filter @servio/web dev          # http://localhost:3000
+pnpm --filter @gluppo/web dev          # http://localhost:3000
 
 # 2) Arranca el escritorio (carga la web):
-pnpm --filter @servio/desktop dev
+pnpm --filter @gluppo/desktop dev
 # o apuntando a otra URL:
-SERVIO_URL=http://localhost:3000/tpv pnpm --filter @servio/desktop dev
+GLUPPO_URL=http://localhost:3000/tpv pnpm --filter @gluppo/desktop dev
 ```
 
 ## Hardware
 
-El puente está en `electron/preload.js` (expone `window.servio`) y la lógica en
-`electron/main.js` (`ipcMain.handle("servio:imprimir-ticket", …)`).
+El puente está en `electron/preload.js` (expone `window.gluppo`) y la lógica en
+`electron/main.js` (`ipcMain.handle("gluppo:imprimir-ticket", …)`).
 
 Desde la web:
 
 ```ts
-await window.servio.imprimirTicket(textoEscPos);
+await window.gluppo.imprimirTicket(textoEscPos);
 ```
 
 > El handler de impresión es un **esqueleto** (registra y simula). La impresión

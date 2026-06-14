@@ -14,14 +14,14 @@ import {
   type LineaFiscal,
   type SistemaInformatico,
   type Territorio,
-} from "@servio/core";
+} from "@gluppo/core";
 import { AeatService } from "./aeat.service";
 
 /** Identidad de nuestro software de facturación (declaración responsable, docs/07 §3.5). */
 const SISTEMA_INFORMATICO: SistemaInformatico = {
-  nombreRazon: "Servio Software SL",
+  nombreRazon: "Gluppo Software SL",
   nif: "B99999999",
-  nombreSistemaInformatico: "Servio TPV",
+  nombreSistemaInformatico: "Gluppo TPV",
   idSistemaInformatico: "01",
   version: "1.0",
   numeroInstalacion: "0001",
