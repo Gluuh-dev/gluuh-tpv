@@ -5,7 +5,7 @@ import { SyncModule } from "./sync/sync.module";
 /**
  * Módulo raíz del backend.
  *
- * Monta el módulo fiscal (motor VERIFACTU/impuestos sobre @gluppo/core) y el
+ * Monta el módulo fiscal (motor VERIFACTU/impuestos sobre @gluuh/core) y el
  * módulo de sincronización (write-path de PowerSync). Próximos módulos: auth,
  * pedidos, pagos, informes. Ver docs/04-arquitectura-tecnica.md.
  */

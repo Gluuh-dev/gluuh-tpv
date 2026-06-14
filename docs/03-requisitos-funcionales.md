@@ -10,7 +10,7 @@
 
 ```mermaid
 mindmap
-  root((Gluppo TPV))
+  root((Gluuh TPV))
     Venta
       TPV táctil
       Comandera móvil

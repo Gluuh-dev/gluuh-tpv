@@ -3,7 +3,7 @@
 > **Proyecto:** Sistema TPV (Terminal Punto de Venta) integral para bares y restaurantes.
 > **Alcance:** Web (backoffice + TPV en navegador) · App de escritorio Windows (TPV de barra) · App Android e iOS (comanderas) · Backend SaaS multi‑tenant en la nube.
 > **Mercado objetivo:** España (con especial atención a Canarias / IGIC, dado el origen del proyecto en La Palma) y, en una segunda fase, resto de la UE.
-> **Nombre provisional del producto:** **«Gluppo»** *(pendiente de decidir — ver candidatos abajo)*.
+> **Marca:** **Gluuh** (marca paraguas, ya registrada). **Este producto: Gluuh TPV.** Familia con **Gluuh Campo** (análisis de facturas del campo).
 > **Fecha de la documentación:** junio de 2026.
 
 ---
@@ -134,20 +134,16 @@ flowchart TB
 
 ---
 
-## 3. Nombre del producto (decisión pendiente)
+## 3. Marca: Gluuh (paraguas) y familia de productos
 
-El nombre es decisión del propietario. A lo largo de la documentación se usa el provisional **«Gluppo»** por legibilidad. Candidatos a valorar (comprobar disponibilidad de dominio `.com`/`.es` y marca):
+**Gluuh** es la **marca paraguas** (dominio `gluuh.com`, correo y redes **ya registrados**). Los productos se nombran como familia:
 
-| Candidato | Idea | Notas |
-|-----------|------|-------|
-| **Gluppo** | De «servicio» / servir | Corto, brandable, internacional |
-| **Comandero** | El que toma comandas | Muy descriptivo en ES, difícil de registrar |
-| **Mesalia** | De «mesa» | Femenino, suave, libre probablemente |
-| **Barra** | La barra del bar | Simple y memorable, genérico |
-| **Tikket** | De ticket | Fintech‑friendly, evoca facturación |
-| **Tornapay** | Pago / vuelta | Si se quiere acentuar la parte de pagos |
+| Producto | Qué es | Estado |
+|----------|--------|--------|
+| **Gluuh Campo** | Análisis de facturas del campo | Existente |
+| **Gluuh TPV** | Este proyecto: TPV de hostelería | En desarrollo |
 
-> **Acción:** elegir nombre antes del MVP (afecta a dominio, marca, branding de las apps y stores). Ver **[02 — Visión y posicionamiento](02-vision-y-posicionamiento.md)**.
+En el código, el scope de paquetes es **`@gluuh/*`** y los identificadores **`com.gluuh.tpv`** / **`com.gluuh.comandera`**. Dominio sugerido para el TPV: **`tpv.gluuh.com`** (subdominio del dominio que ya tienes — sin coste de dominio nuevo). Cuentas a crear/reutilizar en **[15 — Cuentas y servicios](15-cuentas-y-servicios.md)**.
 
 ---
 

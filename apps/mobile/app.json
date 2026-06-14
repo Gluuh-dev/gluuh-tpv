@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Gluppo Comandera",
-    "slug": "gluppo-comandera",
+    "name": "Gluuh Comandera",
+    "slug": "gluuh-comandera",
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gluppo.comandera"
+      "bundleIdentifier": "com.gluuh.comandera"
     },
     "android": {
-      "package": "com.gluppo.comandera"
+      "package": "com.gluuh.comandera"
     }
   }
 }

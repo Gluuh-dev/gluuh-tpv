@@ -3,7 +3,7 @@
 -- Aplicar con: supabase db push   (o psql "$DATABASE_URL" -f este_archivo)
 
 -- =============================================================================
---  Gluppo TPV — Esquema de base de datos (PostgreSQL)
+--  Gluuh TPV — Esquema de base de datos (PostgreSQL)
 --  Multi-tenant: shared schema + tenant_id + Row-Level Security (RLS)
 --  Ver docs/06-base-de-datos-y-sincronizacion.md y docs/07 (fiscalidad)
 --
@@ -515,10 +515,10 @@ CREATE POLICY tenant_self ON tenant
 -- =============================================================================
 --  8. ROL DE APLICACIÓN (ejecutar como superusuario en el setup)
 -- =============================================================================
--- CREATE ROLE gluppo_app LOGIN PASSWORD '***';   -- NO superusuario, NO BYPASSRLS
--- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gluppo_app;
+-- CREATE ROLE gluuh_app LOGIN PASSWORD '***';   -- NO superusuario, NO BYPASSRLS
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gluuh_app;
 -- ALTER DEFAULT PRIVILEGES IN SCHEMA public
---   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gluppo_app;
+--   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gluuh_app;
 --
 -- En cada petición/transacción la aplicación ejecuta:
 --   SET LOCAL app.tenant_id = '<uuid-del-tenant-del-JWT>';

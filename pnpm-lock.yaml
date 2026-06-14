@@ -17,7 +17,7 @@ importers:
 
   apps/api:
     dependencies:
-      '@gluppo/core':
+      '@gluuh/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@nestjs/common':
@@ -79,10 +79,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@gluppo/core':
+      '@gluuh/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@gluppo/ui':
+      '@gluuh/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       next:
@@ -110,7 +110,7 @@ importers:
 
   packages/api-client:
     dependencies:
-      '@gluppo/core':
+      '@gluuh/core':
         specifier: workspace:*
         version: link:../core
 

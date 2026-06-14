@@ -1,11 +1,11 @@
-# @gluppo/sync — Sincronización offline-first (PowerSync)
+# @gluuh/sync — Sincronización offline-first (PowerSync)
 
 Esquema y conector compartidos para el modo **offline-first** del TPV. Ver el diseño completo en [docs/06](../../docs/06-base-de-datos-y-sincronizacion.md).
 
 ## Qué hay aquí
 
 - **`schema.ts`** — esquema de la base de datos **local (SQLite)** de cada dispositivo (subconjunto operativo: carta, mesas, comandas, pagos). PowerSync mantiene esta copia local sincronizada con PostgreSQL.
-- **`connector.ts`** — `GluppoConnector`: obtiene credenciales y **sube los cambios locales a nuestro backend** (que valida tenant/permisos/fiscalidad antes de persistir). Si la subida falla, reintenta (clave offline).
+- **`connector.ts`** — `GluuhConnector`: obtiene credenciales y **sube los cambios locales a nuestro backend** (que valida tenant/permisos/fiscalidad antes de persistir). Si la subida falla, reintenta (clave offline).
 
 ## Cómo se usa (por plataforma)
 
@@ -14,11 +14,11 @@ La base de datos concreta es específica de plataforma; el esquema y el conector
 ```ts
 // Escritorio / Web (@powersync/web)
 import { PowerSyncDatabase } from "@powersync/web";
-import { AppSchema, GluppoConnector } from "@gluppo/sync";
+import { AppSchema, GluuhConnector } from "@gluuh/sync";
 
-const db = new PowerSyncDatabase({ schema: AppSchema, database: { dbFilename: "gluppo.db" } });
-await db.connect(new GluppoConnector({
-  apiUrl: "https://api.gluppo.app",
+const db = new PowerSyncDatabase({ schema: AppSchema, database: { dbFilename: "gluuh.db" } });
+await db.connect(new GluuhConnector({
+  apiUrl: "https://api.gluuh.app",
   powersyncUrl: "https://<tu-instancia>.powersync.journeyapps.com",
   getToken: async () => obtenerJwt(),
 }));

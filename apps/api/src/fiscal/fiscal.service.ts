@@ -14,14 +14,14 @@ import {
   type LineaFiscal,
   type SistemaInformatico,
   type Territorio,
-} from "@gluppo/core";
+} from "@gluuh/core";
 import { AeatService } from "./aeat.service";
 
 /** Identidad de nuestro software de facturación (declaración responsable, docs/07 §3.5). */
 const SISTEMA_INFORMATICO: SistemaInformatico = {
-  nombreRazon: "Gluppo Software SL",
+  nombreRazon: "Gluuh Software SL",
   nif: "B99999999",
-  nombreSistemaInformatico: "Gluppo TPV",
+  nombreSistemaInformatico: "Gluuh TPV",
   idSistemaInformatico: "01",
   version: "1.0",
   numeroInstalacion: "0001",

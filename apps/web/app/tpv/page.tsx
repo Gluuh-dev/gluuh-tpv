@@ -93,7 +93,7 @@ export default function TpvPage() {
 
   return (
     <main style={S.main}>
-      <h1 style={{ gridColumn: "1 / -1", margin: 0 }}>Gluppo TPV — demo</h1>
+      <h1 style={{ gridColumn: "1 / -1", margin: 0 }}>Gluuh TPV — demo</h1>
 
       {/* Catálogo */}
       <section style={S.panel}>

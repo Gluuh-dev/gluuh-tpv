@@ -1,5 +1,5 @@
 {
-  "name": "@gluppo/api-client",
+  "name": "@gluuh/api-client",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "typecheck": "echo \"(typecheck pendiente)\""
   },
   "dependencies": {
-    "@gluppo/core": "workspace:*"
+    "@gluuh/core": "workspace:*"
   }
 }

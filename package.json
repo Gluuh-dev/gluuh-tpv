@@ -1,5 +1,5 @@
 {
-  "name": "gluppo-tpv",
+  "name": "gluuh-tpv",
   "version": "0.0.0",
   "private": true,
   "description": "Plataforma TPV de hostelería (web + Windows + Android/iOS + backend). Monorepo.",
@@ -13,8 +13,8 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "core:demo": "pnpm --filter @gluppo/core demo",
-    "core:test": "pnpm --filter @gluppo/core test"
+    "core:demo": "pnpm --filter @gluuh/core demo",
+    "core:test": "pnpm --filter @gluuh/core test"
   },
   "devDependencies": {
     "turbo": "^2.1.0",

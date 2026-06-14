@@ -10,9 +10,9 @@ import {
 import { calcularImpuestosIncluidos } from "./tax.js";
 
 const sistemaInformatico = {
-  nombreRazon: "Gluppo Software SL",
+  nombreRazon: "Gluuh Software SL",
   nif: "B99999999",
-  nombreSistemaInformatico: "Gluppo TPV",
+  nombreSistemaInformatico: "Gluuh TPV",
   idSistemaInformatico: "01",
   version: "1.0",
   numeroInstalacion: "0001",

@@ -1,6 +1,6 @@
 /**
  * Estados de preparación para las pantallas (cliente-safe: sin dependencias de
- * Node). Espeja a @gluppo/core (operations.ts) pero sin importar el barrel del
+ * Node). Espeja a @gluuh/core (operations.ts) pero sin importar el barrel del
  * core (que incluye node:crypto/qrcode y no debe ir al bundle del navegador).
  */
 

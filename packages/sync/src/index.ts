@@ -1,5 +1,5 @@
 /**
- * @gluppo/sync — Esquema y conector de sincronización offline-first (PowerSync).
+ * @gluuh/sync — Esquema y conector de sincronización offline-first (PowerSync).
  * Compartido por escritorio (@powersync/web) y móvil (@powersync/react-native).
  * Ver docs/06-base-de-datos-y-sincronizacion.md.
  */

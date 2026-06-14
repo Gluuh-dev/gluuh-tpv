@@ -1,5 +1,5 @@
 {
-  "name": "@gluppo/api",
+  "name": "@gluuh/api",
   "version": "0.0.0",
   "private": true,
   "description": "Backend NestJS: API, motor fiscal y write-path de sincronización.",
@@ -14,7 +14,7 @@
     "@nestjs/common": "^10.4.0",
     "@nestjs/core": "^10.4.0",
     "@nestjs/platform-express": "^10.4.0",
-    "@gluppo/core": "workspace:*",
+    "@gluuh/core": "workspace:*",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

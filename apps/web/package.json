@@ -1,5 +1,5 @@
 {
-  "name": "@gluppo/web",
+  "name": "@gluuh/web",
   "version": "0.0.0",
   "private": true,
   "description": "Backoffice + TPV en navegador (Next.js).",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gluppo/core": "workspace:*",
-    "@gluppo/ui": "workspace:*",
+    "@gluuh/core": "workspace:*",
+    "@gluuh/ui": "workspace:*",
     "next": "^14.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

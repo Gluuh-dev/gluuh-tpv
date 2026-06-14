@@ -1,6 +1,6 @@
-# Supabase — base de datos de Gluppo
+# Supabase — base de datos de Gluuh
 
-**Sí: toda la base de datos puede ser Supabase.** Supabase es **PostgreSQL gestionado** + **Auth** + **Realtime** + **Storage** + **Edge Functions**. El esquema de Gluppo (multi‑tenant con RLS) corre tal cual. Ver [docs/05 §7](../docs/05-stack-tecnologico.md) y [docs/06](../docs/06-base-de-datos-y-sincronizacion.md).
+**Sí: toda la base de datos puede ser Supabase.** Supabase es **PostgreSQL gestionado** + **Auth** + **Realtime** + **Storage** + **Edge Functions**. El esquema de Gluuh (multi‑tenant con RLS) corre tal cual. Ver [docs/05 §7](../docs/05-stack-tecnologico.md) y [docs/06](../docs/06-base-de-datos-y-sincronizacion.md).
 
 ## Qué cubre Supabase y qué no
 
@@ -48,8 +48,8 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role>     # SOLO servidor (motor fiscal/admin
 Uso desde el cliente:
 
 ```ts
-import { createGluppoClient } from "@gluppo/supabase";
-const supabase = createGluppoClient({
+import { createGluuhClient } from "@gluuh/supabase";
+const supabase = createGluuhClient({
   url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
   anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 });

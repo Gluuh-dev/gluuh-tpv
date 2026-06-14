@@ -1,5 +1,5 @@
 /**
- * @gluppo/hardware — Abstracción de impresora / cajón / datáfono (ESC/POS).
+ * @gluuh/hardware — Abstracción de impresora / cajón / datáfono (ESC/POS).
  *
  * Placeholder del esqueleto. Define la interfaz común que implementan los
  * distintos backends de hardware (Rust en Tauri, SDK nativo en móvil, ePOS/
@@ -23,4 +23,4 @@ export interface Printer {
   imprimir(job: PrintJob): Promise<void>;
 }
 
-export const HARDWARE_PACKAGE = "@gluppo/hardware";
+export const HARDWARE_PACKAGE = "@gluuh/hardware";

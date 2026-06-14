@@ -1,7 +1,7 @@
-import { calcularImpuestosIncluidos, formatImporte } from "@gluppo/core";
+import { calcularImpuestosIncluidos, formatImporte } from "@gluuh/core";
 
 /**
- * Página de inicio (Server Component). Demuestra el uso compartido de @gluppo/core
+ * Página de inicio (Server Component). Demuestra el uso compartido de @gluuh/core
  * en web: calcula el desglose de IGIC de un ticket de ejemplo (Canarias).
  * Es solo un esqueleto; el backoffice y el TPV reales se construyen aquí.
  */
@@ -17,7 +17,7 @@ export default function Home() {
 
   return (
     <main style={{ padding: 32, maxWidth: 640 }}>
-      <h1>Gluppo TPV</h1>
+      <h1>Gluuh TPV</h1>
       <p>Esqueleto del backoffice / TPV web. Ver <code>docs/</code>.</p>
       <h2>Pantallas de demostración</h2>
       <ul style={{ lineHeight: 2 }}>

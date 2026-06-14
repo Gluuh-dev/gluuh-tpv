@@ -1,18 +1,18 @@
-# Gluppo TPV — Plataforma de hostelería
+# Gluuh TPV — Plataforma de hostelería
 
 Monorepo de la plataforma TPV (Terminal Punto de Venta) para bares y restaurantes:
 **web** (backoffice + TPV navegador), **escritorio Windows** (TPV de barra), **Android/iOS** (comanderas) y **backend SaaS** multi‑tenant.
 
 > 📚 **Toda la documentación del proyecto está en [`docs/`](docs/README.md)** — investigación de mercado, arquitectura, fiscalidad (Verifactu/IGIC), pagos, hardware, modelo de negocio y roadmap.
 
-> `Gluppo` es un **nombre provisional** (ver [docs/README.md §3](docs/README.md)).
+> **Gluuh** es la marca paraguas (ya registrada); este producto es **Gluuh TPV**, de la familia de **Gluuh Campo**. Ver [docs/README.md §3](docs/README.md).
 
 ---
 
 ## Estructura del monorepo
 
 ```
-gluppo-tpv/
+gluuh-tpv/
 ├── apps/
 │   ├── api/         # Backend NestJS (API, motor fiscal, write path de sync)
 │   │   └── db/schema.sql   # ← Esquema PostgreSQL completo (multi-tenant + RLS)
@@ -49,10 +49,10 @@ pnpm core:test          # ejecuta los tests de VERIFACTU (incluye el vector ofic
 pnpm core:demo          # demo: genera factura, hash encadenado y URL del QR
 
 # Desarrollo por app:
-pnpm --filter @gluppo/api dev
-pnpm --filter @gluppo/web dev
-pnpm --filter @gluppo/mobile start
-pnpm --filter @gluppo/desktop dev
+pnpm --filter @gluuh/api dev
+pnpm --filter @gluuh/web dev
+pnpm --filter @gluuh/mobile start
+pnpm --filter @gluuh/desktop dev
 ```
 
 > Las apps (`web`, `mobile`, `desktop`) son **esqueletos mínimos** listos para construir encima. El núcleo de valor implementado hoy es **`packages/core`** (fiscalidad + dominio) y el **esquema de base de datos** (`apps/api/db/schema.sql`). Ver el [roadmap](docs/13-roadmap-mvp-y-equipo.md).
@@ -76,14 +76,14 @@ pnpm --filter @gluppo/desktop dev
 ### Probar las funcionalidades
 
 ```bash
-pnpm --filter @gluppo/core test          # 12 tests (impuestos, VERIFACTU, QR, XML)
-pnpm --filter @gluppo/core build         # build dual ESM/CJS
+pnpm --filter @gluuh/core test          # 12 tests (impuestos, VERIFACTU, QR, XML)
+pnpm --filter @gluuh/core build         # build dual ESM/CJS
 
 # Web: TPV + pantallas estilo fast-food:
-pnpm --filter @gluppo/web build && pnpm --filter @gluppo/web start
+pnpm --filter @gluuh/web build && pnpm --filter @gluuh/web start
 #   /tpv  /kiosko  /kds  /pantalla  /ofertas   (en http://localhost:3000)
 
 # Backend fiscal:
-pnpm --filter @gluppo/core build && pnpm --filter @gluppo/api build
-pnpm --filter @gluppo/api start          # POST http://localhost:3001/fiscal/xml
+pnpm --filter @gluuh/core build && pnpm --filter @gluuh/api build
+pnpm --filter @gluuh/api start          # POST http://localhost:3001/fiscal/xml
 ```
