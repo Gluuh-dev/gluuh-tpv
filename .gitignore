@@ -34,3 +34,6 @@ coverage/
 .DS_Store
 Thumbs.db
 .idea/
+
+# Supabase CLI (temporales)
+supabase/.temp/
