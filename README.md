@@ -81,7 +81,7 @@ pnpm --filter @gluuh/core build         # build dual ESM/CJS
 
 # Web: TPV + pantallas estilo fast-food:
 pnpm --filter @gluuh/web build && pnpm --filter @gluuh/web start
-#   /tpv  /kiosko  /kds  /pantalla  /ofertas   (en http://localhost:3000)
+#   /tpv  /kiosko  /kds  /pantalla  /ofertas   (en http://localhost:3100)
 
 # Backend fiscal:
 pnpm --filter @gluuh/core build && pnpm --filter @gluuh/api build
