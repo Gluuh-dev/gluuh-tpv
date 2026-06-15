@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode, type ComponentType } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, Users, BookOpen, BarChart3, Settings,
+  LayoutDashboard, Users, BookOpen, BarChart3, Settings, LayoutGrid,
   ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
@@ -14,6 +14,7 @@ interface NavItem { href: string; label: string; icon: ComponentType<{ className
 const GESTION: NavItem[] = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/carta", label: "Carta", icon: BookOpen },
+  { href: "/sala", label: "Sala", icon: LayoutGrid },
   { href: "/empleados", label: "Empleados", icon: Users },
   { href: "/informes", label: "Informes", icon: BarChart3 },
   { href: "/ajustes", label: "Ajustes", icon: Settings },
