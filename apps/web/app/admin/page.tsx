@@ -71,8 +71,8 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-border bg-white px-6 py-3">
-        <div className="flex items-center gap-2 font-semibold"><span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 font-bold text-white">G</span> Gluuh · Administración de plataforma</div>
+      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
+        <div className="flex items-center gap-2 font-semibold"><span className="grid h-8 w-8 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span> Gluuh · Administración de plataforma</div>
         <Button variant="ghost" onClick={async () => { await sb.auth.signOut(); router.replace("/login"); }}><LogOut className="h-4 w-4" /> Salir</Button>
       </header>
 

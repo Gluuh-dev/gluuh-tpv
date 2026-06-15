@@ -46,10 +46,20 @@ export default function PantallaCliente() {
     /* eslint-disable-next-line */
   }, []);
 
-  if (estado === "cargando") return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">Cargando…</div>;
+  if (estado === "cargando") return (
+    <div className="dark grid min-h-screen place-items-center bg-background text-muted-foreground">
+      Cargando…
+    </div>
+  );
   if (estado === "sin-sesion") return (
-    <div className="grid min-h-screen place-items-center bg-slate-950 p-6 text-center text-white">
-      <div><h1 className="text-2xl font-bold">Pantalla sin configurar</h1><p className="mt-2 text-slate-400">Inicia sesión con la cuenta del restaurante.</p><a href="/login" className="mt-5 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-slate-900">Iniciar sesión</a></div>
+    <div className="dark grid min-h-screen place-items-center bg-background p-6 text-center text-foreground">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Pantalla sin configurar</h1>
+        <p className="mt-2 text-muted-foreground">Inicia sesión con la cuenta del restaurante.</p>
+        <a href="/login" className="mt-5 inline-block rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground">
+          Iniciar sesión
+        </a>
+      </div>
     </div>
   );
 
@@ -57,32 +67,52 @@ export default function PantallaCliente() {
   const listos = pedidos.filter((p) => p.estado_preparacion === "LISTO");
 
   return (
-    <main className="flex min-h-screen flex-col bg-slate-950 text-white">
-      <header className="flex items-center justify-center gap-3 py-6 text-center" style={{ background: brand.color_secundario }}>
-        {brand.logo_url && <img src={brand.logo_url} alt="" className="h-10 w-auto object-contain" />}
-        <span className="text-3xl font-extrabold tracking-tight">{empresa || "Estado de tu pedido"}</span>
-      </header>
-      <div className="grid flex-1 grid-cols-2">
-        <section className="flex flex-col items-center p-8">
-          <h2 className="mb-6 text-3xl font-bold text-amber-400">⏳ En preparación</h2>
-          <div className="flex flex-wrap justify-center gap-5">
-            {preparando.length === 0 && <span className="text-5xl text-slate-700">—</span>}
-            {preparando.map((p) => (
-              <div key={p.id} className="grid h-28 w-36 place-items-center rounded-2xl border-2 border-amber-500/40 bg-slate-900 text-5xl font-black text-amber-400">A-{p.numero_pedido}</div>
-            ))}
-          </div>
-        </section>
-        <section className="flex flex-col items-center border-l-2 border-slate-800 p-8">
-          <h2 className="mb-6 text-3xl font-bold text-emerald-400">✅ Listos para recoger</h2>
-          <div className="flex flex-wrap justify-center gap-5">
-            {listos.length === 0 && <span className="text-5xl text-slate-700">—</span>}
-            {listos.map((p) => (
-              <div key={p.id} className="grid h-28 w-36 animate-pulse place-items-center rounded-2xl bg-emerald-600 text-5xl font-black text-white">A-{p.numero_pedido}</div>
-            ))}
-          </div>
-        </section>
-      </div>
-      <footer className="py-3 text-center text-sm text-slate-500">Actualización en tiempo real · {empresa}</footer>
-    </main>
+    <div className="dark">
+      <main className="flex min-h-screen flex-col bg-background text-foreground">
+        {/* Cabecera con color de marca del tenant (dato del tenant, no paleta Tailwind) */}
+        <header className="flex items-center justify-center gap-3 py-6 text-center" style={{ background: brand.color_secundario }}>
+          {brand.logo_url && <img src={brand.logo_url} alt="" className="h-10 w-auto object-contain" />}
+          <span className="text-3xl font-extrabold tracking-tight">{empresa || "Estado de tu pedido"}</span>
+        </header>
+        <div className="grid flex-1 grid-cols-2">
+          <section className="flex flex-col items-center p-8">
+            <h2 className="mb-6 text-3xl font-bold" style={{ color: "hsl(var(--chart-4))" }}>⏳ En preparación</h2>
+            <div className="flex flex-wrap justify-center gap-5">
+              {preparando.length === 0 && (
+                <span className="text-5xl text-muted-foreground">—</span>
+              )}
+              {preparando.map((p) => (
+                <div
+                  key={p.id}
+                  className="grid h-28 w-36 place-items-center rounded-lg border-2 border-border bg-card text-5xl font-black tabular-nums"
+                  style={{ color: "hsl(var(--chart-4))" }}
+                >
+                  A-{p.numero_pedido}
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="flex flex-col items-center border-l border-border p-8">
+            <h2 className="mb-6 text-3xl font-bold" style={{ color: "hsl(var(--chart-2))" }}>✅ Listos para recoger</h2>
+            <div className="flex flex-wrap justify-center gap-5">
+              {listos.length === 0 && (
+                <span className="text-5xl text-muted-foreground">—</span>
+              )}
+              {listos.map((p) => (
+                <div
+                  key={p.id}
+                  className="grid h-28 w-36 animate-pulse place-items-center rounded-lg bg-primary text-5xl font-black tabular-nums text-primary-foreground"
+                >
+                  A-{p.numero_pedido}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+        <footer className="border-t border-border py-3 text-center text-sm text-muted-foreground">
+          Actualización en tiempo real · {empresa}
+        </footer>
+      </main>
+    </div>
   );
 }

@@ -57,38 +57,63 @@ export default function Cocina() {
     cargar();
   }
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-slate-900 text-slate-300">Cargando…</div>;
+  if (loading) return (
+    <div className="dark grid min-h-screen place-items-center bg-background text-muted-foreground">
+      Cargando…
+    </div>
+  );
 
   return (
-    <main className="min-h-screen bg-slate-900 text-white">
-      <header className="flex items-center justify-between bg-slate-800 px-6 py-3">
-        <strong>👨‍🍳 Cocina</strong>
-        <span className="text-sm text-slate-400">{pedidos.length} pedidos · tiempo real</span>
-      </header>
-      <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {pedidos.length === 0 && <p className="text-slate-400">No hay comandas en cocina.</p>}
-        {pedidos.map((p) => {
-          const titulo = p.restaurant_table?.nombre ?? (p.numero_pedido ? `A-${p.numero_pedido}` : "Pedido");
-          const sig = SIGUIENTE[p.estado_preparacion];
-          return (
-            <div key={p.id} className="rounded-xl bg-slate-800 p-4" style={{ borderTop: `5px solid ${COLOR[p.estado_preparacion]}` }}>
-              <div className="mb-1 flex items-center justify-between">
-                <strong className="text-lg">{titulo}</strong>
-                <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: COLOR[p.estado_preparacion] }}>{LABEL[p.estado_preparacion]}</span>
+    <div className="dark">
+      <main className="min-h-screen bg-background text-foreground">
+        <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
+          <strong className="text-lg font-semibold tracking-tight">Cocina</strong>
+          <span className="text-sm text-muted-foreground tabular-nums">{pedidos.length} pedidos · tiempo real</span>
+        </header>
+        <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {pedidos.length === 0 && (
+            <p className="col-span-full text-muted-foreground">No hay comandas en cocina.</p>
+          )}
+          {pedidos.map((p) => {
+            const titulo = p.restaurant_table?.nombre ?? (p.numero_pedido ? `A-${p.numero_pedido}` : "Pedido");
+            const sig = SIGUIENTE[p.estado_preparacion];
+            return (
+              <div
+                key={p.id}
+                className="rounded-lg border border-border bg-card p-4 shadow-sm"
+                style={{ borderTopColor: COLOR[p.estado_preparacion], borderTopWidth: 4 }}
+              >
+                <div className="mb-1 flex items-center justify-between">
+                  <strong className="text-lg font-semibold">{titulo}</strong>
+                  <span
+                    className="rounded-md px-2 py-0.5 text-xs font-medium text-white"
+                    style={{ background: COLOR[p.estado_preparacion] }}
+                  >
+                    {LABEL[p.estado_preparacion]}
+                  </span>
+                </div>
+                <div className="mb-2 text-xs text-muted-foreground tabular-nums">
+                  {p.canal} · hace {minutos(p.created_at)} min
+                </div>
+                <ul className="mb-3 space-y-0.5 text-sm">
+                  {p.order_line.map((l, i) => (
+                    <li key={i}><b>{l.cantidad}×</b> {l.nombre}</li>
+                  ))}
+                </ul>
+                {sig && (
+                  <button
+                    onClick={() => avanzar(p)}
+                    className="w-full rounded-md py-2 text-sm font-medium text-white"
+                    style={{ background: COLOR[sig] }}
+                  >
+                    → {LABEL[sig]}
+                  </button>
+                )}
               </div>
-              <div className="mb-2 text-xs text-slate-400">{p.canal} · hace {minutos(p.created_at)} min</div>
-              <ul className="mb-3 space-y-0.5 text-sm">
-                {p.order_line.map((l, i) => <li key={i}><b>{l.cantidad}×</b> {l.nombre}</li>)}
-              </ul>
-              {sig && (
-                <button onClick={() => avanzar(p)} className="w-full rounded-lg py-2 text-sm font-medium text-white" style={{ background: COLOR[sig] }}>
-                  → {LABEL[sig]}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </main>
+            );
+          })}
+        </div>
+      </main>
+    </div>
   );
 }

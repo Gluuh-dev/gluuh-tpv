@@ -28,7 +28,7 @@ export default function SolicitarAcceso() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-linear-to-b from-slate-50 to-slate-100 p-6">
+    <main className="grid min-h-screen place-items-center bg-background p-6">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">← Gluuh TPV</Link>
         <Card>

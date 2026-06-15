@@ -92,27 +92,33 @@ export default function Comandera() {
     }
   }
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-slate-900 text-slate-300">Cargando…</div>;
+  if (loading) return (
+    <div className="dark grid min-h-screen place-items-center bg-background text-muted-foreground">
+      Cargando…
+    </div>
+  );
 
-  // ---- PIN ----
+  /* ---- PIN ---- */
   if (!empleado) {
     const teclas = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "OK"];
     return (
-      <div className="grid min-h-screen place-items-center bg-slate-900 p-6 text-white">
+      <div className="dark grid min-h-screen place-items-center bg-background p-6 text-foreground">
         <div className="w-full max-w-xs text-center">
-          <h1 className="text-xl font-semibold">Comandera</h1>
-          <p className="mb-4 text-sm text-slate-400">Introduce tu PIN</p>
+          <h1 className="text-xl font-semibold tracking-tight">Comandera</h1>
+          <p className="mb-4 text-sm text-muted-foreground">Introduce tu PIN</p>
           <div className="mb-4 flex justify-center gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <span key={i} className={`h-4 w-4 rounded-full ${i < pin.length ? "bg-brand-500" : "bg-slate-700"}`} />
+              <span key={i} className={`h-4 w-4 rounded-full ${i < pin.length ? "bg-brand" : "bg-muted"}`} />
             ))}
           </div>
-          {pinError && <p className="mb-2 text-sm text-red-400">{pinError}</p>}
+          {pinError && <p className="mb-2 text-sm text-destructive">{pinError}</p>}
           <div className="grid grid-cols-3 gap-3">
             {teclas.map((t) => (
-              <button key={t}
+              <button
+                key={t}
                 onClick={() => { if (t === "C") setPin(""); else if (t === "OK") comprobarPin(); else if (pin.length < 8) setPin(pin + t); }}
-                className={`h-16 rounded-xl text-2xl font-semibold ${t === "OK" ? "bg-brand-600" : "bg-slate-800 hover:bg-slate-700"}`}>
+                className={`h-16 rounded-md text-2xl font-semibold ${t === "OK" ? "bg-brand text-brand-foreground" : "bg-card text-foreground hover:bg-accent"}`}
+              >
                 {t}
               </button>
             ))}
@@ -122,22 +128,36 @@ export default function Comandera() {
     );
   }
 
-  // ---- MESAS ----
+  /* ---- MESAS ---- */
   if (!mesa) {
     return (
-      <div className="min-h-screen bg-slate-100">
-        <header className="flex items-center justify-between bg-slate-900 px-5 py-3 text-white">
-          <strong>Mesas</strong>
-          <span className="text-sm text-slate-300">{empleado.nombre} · <button className="underline" onClick={() => setEmpleado(null)}>cambiar</button></span>
+      <div className="min-h-screen bg-background text-foreground">
+        <header className="flex items-center justify-between border-b border-border bg-card px-5 py-3">
+          <strong className="font-semibold">Mesas</strong>
+          <span className="text-sm text-muted-foreground">
+            {empleado.nombre} ·{" "}
+            <button className="underline" onClick={() => setEmpleado(null)}>cambiar</button>
+          </span>
         </header>
         <div className="p-5">
-          {mesas.length === 0 && <div className="card text-slate-500">No hay mesas. Créalas en <b>Sala</b> (panel).</div>}
+          {mesas.length === 0 && (
+            <div className="card text-muted-foreground">No hay mesas. Créalas en <b>Sala</b> (panel).</div>
+          )}
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
             {mesas.map((m) => (
-              <button key={m.id} onClick={() => setMesa(m)}
-                className={`grid h-24 place-items-center rounded-2xl border-2 text-center font-semibold ${m.estado === "LIBRE" ? "border-slate-200 bg-white" : "border-amber-300 bg-amber-50 text-amber-700"}`}>
+              <button
+                key={m.id}
+                onClick={() => setMesa(m)}
+                className={`grid h-24 place-items-center rounded-lg border-2 text-center font-semibold ${
+                  m.estado === "LIBRE"
+                    ? "border-border bg-card text-foreground"
+                    : "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                }`}
+              >
                 {m.nombre}
-                <span className="text-xs font-normal text-slate-400">{m.estado === "LIBRE" ? "Libre" : "Ocupada"}</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {m.estado === "LIBRE" ? "Libre" : "Ocupada"}
+                </span>
               </button>
             ))}
           </div>
@@ -146,55 +166,78 @@ export default function Comandera() {
     );
   }
 
-  // ---- COMANDA ----
+  /* ---- COMANDA ---- */
   const productos = prods.filter((p) => p.category_id === catSel);
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100">
-      <header className="flex items-center justify-between bg-slate-900 px-5 py-3 text-white">
-        <button onClick={() => { setMesa(null); setComanda({}); }} className="text-sm text-slate-300">← Mesas</button>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="flex items-center justify-between border-b border-border bg-card px-5 py-3">
+        <button
+          onClick={() => { setMesa(null); setComanda({}); }}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Mesas
+        </button>
         <strong>{mesa.nombre}</strong>
-        <span className="text-sm text-slate-300">{empleado.nombre}</span>
+        <span className="text-sm text-muted-foreground">{empleado.nombre}</span>
       </header>
 
       <div className="flex flex-1 flex-col md:flex-row">
+        {/* Carta */}
         <div className="flex-1 p-4">
           <div className="mb-3 flex flex-wrap gap-2">
             {cats.map((c) => (
-              <button key={c.id} onClick={() => setCatSel(c.id)} className={`rounded-full px-3 py-1.5 text-sm ${catSel === c.id ? "bg-brand-600 text-white" : "bg-white"}`}>{c.nombre}</button>
+              <button
+                key={c.id}
+                onClick={() => setCatSel(c.id)}
+                className={`rounded-md px-3 py-1.5 text-sm ${catSel === c.id ? "bg-brand text-brand-foreground" : "bg-muted text-foreground hover:bg-accent"}`}
+              >
+                {c.nombre}
+              </button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {productos.map((p) => (
-              <button key={p.id} onClick={() => add(p.id)} className="rounded-xl border border-slate-200 bg-white p-3 text-left">
+              <button
+                key={p.id}
+                onClick={() => add(p.id)}
+                className="rounded-md border border-border bg-card p-3 text-left shadow-sm hover:bg-accent"
+              >
                 <div className="font-medium">{p.nombre}</div>
-                <div className="text-sm text-rose-600">{eur(p.precio)}</div>
+                <div className="text-sm tabular-nums text-destructive">{eur(p.precio)}</div>
               </button>
             ))}
-            {productos.length === 0 && <p className="col-span-full text-slate-400">Sin productos en esta categoría.</p>}
+            {productos.length === 0 && (
+              <p className="col-span-full text-muted-foreground">Sin productos en esta categoría.</p>
+            )}
           </div>
         </div>
 
-        <aside className="flex w-full flex-col border-t border-slate-200 bg-white p-4 md:w-80 md:border-l md:border-t-0">
+        {/* Panel de comanda */}
+        <aside className="flex w-full flex-col border-t border-border bg-card p-4 md:w-80 md:border-l md:border-t-0">
           <h2 className="mb-2 font-medium">Comanda</h2>
           <div className="flex-1 space-y-1 overflow-y-auto">
-            {unidades === 0 && <p className="text-slate-400">Toca productos para añadir.</p>}
+            {unidades === 0 && <p className="text-muted-foreground">Toca productos para añadir.</p>}
             {Object.entries(comanda).map(([id, q]) => {
               const p = prods.find((x) => x.id === id)!;
               return (
                 <div key={id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="flex-1">{p.nombre}</span>
-                  <button onClick={() => sub(id)} className="h-7 w-7 rounded bg-slate-100">−</button>
-                  <span className="w-5 text-center">{q}</span>
-                  <button onClick={() => add(id)} className="h-7 w-7 rounded bg-slate-100">+</button>
-                  <span className="w-16 text-right">{eur(p.precio * q)}</span>
+                  <button onClick={() => sub(id)} className="h-7 w-7 rounded-md bg-muted text-foreground">−</button>
+                  <span className="w-5 text-center tabular-nums">{q}</span>
+                  <button onClick={() => add(id)} className="h-7 w-7 rounded-md bg-muted text-foreground">+</button>
+                  <span className="w-16 text-right tabular-nums">{eur(p.precio * q)}</span>
                 </div>
               );
             })}
           </div>
-          <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 font-semibold">
+          <div className="mt-2 flex justify-between border-t border-border pt-2 font-semibold tabular-nums">
             <span>Total</span><span>{eur(total)}</span>
           </div>
-          <button onClick={enviar} disabled={!unidades || enviando} className="btn-primary mt-3 w-full py-3 text-base disabled:opacity-50">
+          <button
+            onClick={enviar}
+            disabled={!unidades || enviando}
+            className="btn-primary mt-3 w-full py-3 text-base disabled:opacity-50"
+          >
             {enviando ? "Enviando…" : "Enviar a cocina"}
           </button>
         </aside>

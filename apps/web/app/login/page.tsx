@@ -53,7 +53,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span>
-          Gluuh <span className="text-slate-400">TPV</span>
+          Gluuh <span className="text-muted-foreground">TPV</span>
         </div>
         <Card>
           <CardHeader>

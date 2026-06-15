@@ -104,20 +104,40 @@ export default function TPV() {
 
   function reset() { setComanda({}); setMesa(null); setBarra(false); setTicket(null); }
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Cargando…</div>;
+  if (loading) return (
+    <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">
+      Cargando…
+    </div>
+  );
 
-  // Selección mesa/barra
+  /* ---- Selección mesa/barra ---- */
   if (!mesa && !barra) {
     return (
-      <div className="min-h-screen bg-slate-100">
-        <header className="flex items-center justify-between bg-slate-900 px-6 py-3 text-white"><strong>TPV</strong><a href="/dashboard" className="text-sm text-slate-300">← Panel</a></header>
+      <div className="min-h-screen bg-background">
+        <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
+          <strong className="font-semibold">TPV</strong>
+          <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">← Panel</a>
+        </header>
         <div className="p-5">
           <button onClick={() => setBarra(true)} className="btn-primary mb-4">🍺 Barra / venta directa</button>
-          {mesas.length === 0 && <div className="card text-slate-500">No hay mesas. Créalas en <b>Sala</b> o usa Barra.</div>}
+          {mesas.length === 0 && (
+            <div className="card text-muted-foreground">No hay mesas. Créalas en <b>Sala</b> o usa Barra.</div>
+          )}
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
             {mesas.map((m) => (
-              <button key={m.id} onClick={() => setMesa(m)} className={`grid h-24 place-items-center rounded-2xl border-2 font-semibold ${m.estado === "LIBRE" ? "border-slate-200 bg-white" : "border-amber-300 bg-amber-50 text-amber-700"}`}>
-                {m.nombre}<span className="text-xs font-normal text-slate-400">{m.estado === "LIBRE" ? "Libre" : "Ocupada"}</span>
+              <button
+                key={m.id}
+                onClick={() => setMesa(m)}
+                className={`grid h-24 place-items-center rounded-lg border-2 font-semibold ${
+                  m.estado === "LIBRE"
+                    ? "border-border bg-card text-foreground"
+                    : "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                }`}
+              >
+                {m.nombre}
+                <span className="text-xs font-normal text-muted-foreground">
+                  {m.estado === "LIBRE" ? "Libre" : "Ocupada"}
+                </span>
               </button>
             ))}
           </div>
@@ -128,50 +148,106 @@ export default function TPV() {
 
   const productos = prods.filter((p) => p.category_id === catSel);
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100">
-      <header className="flex items-center justify-between bg-slate-900 px-6 py-3 text-white">
-        <button onClick={reset} className="text-sm text-slate-300">← Mesas</button>
-        <strong>{mesa ? mesa.nombre : "Barra"}</strong><span className="w-12" />
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
+        <button onClick={reset} className="text-sm text-muted-foreground hover:text-foreground">← Mesas</button>
+        <strong>{mesa ? mesa.nombre : "Barra"}</strong>
+        <span className="w-12" />
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
+        {/* Carta */}
         <div className="flex-1 p-4">
           <div className="mb-3 flex flex-wrap gap-2">
-            {cats.map((c) => <button key={c.id} onClick={() => setCatSel(c.id)} className={`rounded-full px-3 py-1.5 text-sm ${catSel === c.id ? "bg-brand-600 text-white" : "bg-white"}`}>{c.nombre}</button>)}
+            {cats.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCatSel(c.id)}
+                className={`rounded-md px-3 py-1.5 text-sm ${catSel === c.id ? "bg-brand text-brand-foreground" : "bg-muted text-foreground hover:bg-accent"}`}
+              >
+                {c.nombre}
+              </button>
+            ))}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {productos.map((p) => <button key={p.id} onClick={() => add(p.id)} className="rounded-xl border border-slate-200 bg-white p-3 text-left"><div className="font-medium">{p.nombre}</div><div className="text-sm text-rose-600">{eur(p.precio)}</div></button>)}
-            {productos.length === 0 && <p className="col-span-full text-slate-400">Sin productos. Añade carta en el panel.</p>}
+            {productos.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => add(p.id)}
+                className="rounded-md border border-border bg-card p-3 text-left shadow-sm hover:bg-accent"
+              >
+                <div className="font-medium">{p.nombre}</div>
+                <div className="text-sm tabular-nums text-destructive">{eur(p.precio)}</div>
+              </button>
+            ))}
+            {productos.length === 0 && (
+              <p className="col-span-full text-muted-foreground">Sin productos. Añade carta en el panel.</p>
+            )}
           </div>
         </div>
-        <aside className="flex w-full flex-col border-t border-slate-200 bg-white p-4 md:w-96 md:border-l md:border-t-0">
+
+        {/* Cuenta / ticket */}
+        <aside className="flex w-full flex-col border-t border-border bg-card p-4 md:w-96 md:border-l md:border-t-0">
           <h2 className="mb-2 font-medium">Cuenta</h2>
           <div className="flex-1 space-y-1 overflow-y-auto">
-            {unidades === 0 && <p className="text-slate-400">Añade productos.</p>}
-            {Object.entries(comanda).map(([id, q]) => { const p = prods.find((x) => x.id === id)!; return (
-              <div key={id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex-1">{p.nombre}</span>
-                <button onClick={() => sub(id)} className="h-7 w-7 rounded bg-slate-100">−</button><span className="w-5 text-center">{q}</span><button onClick={() => add(id)} className="h-7 w-7 rounded bg-slate-100">+</button>
-                <span className="w-16 text-right">{eur(p.precio * q)}</span>
-              </div>); })}
+            {unidades === 0 && <p className="text-muted-foreground">Añade productos.</p>}
+            {Object.entries(comanda).map(([id, q]) => {
+              const p = prods.find((x) => x.id === id)!;
+              return (
+                <div key={id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex-1">{p.nombre}</span>
+                  <button onClick={() => sub(id)} className="h-7 w-7 rounded-md bg-muted text-foreground">−</button>
+                  <span className="w-5 text-center tabular-nums">{q}</span>
+                  <button onClick={() => add(id)} className="h-7 w-7 rounded-md bg-muted text-foreground">+</button>
+                  <span className="w-16 text-right tabular-nums">{eur(p.precio * q)}</span>
+                </div>
+              );
+            })}
           </div>
-          <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-lg font-semibold"><span>Total</span><span>{eur(total)}</span></div>
-          <button onClick={enviarCocina} disabled={!unidades || busy} className="btn-ghost mt-3 w-full disabled:opacity-50">Enviar a cocina</button>
+          <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-semibold tabular-nums">
+            <span>Total</span><span>{eur(total)}</span>
+          </div>
+          <button
+            onClick={enviarCocina}
+            disabled={!unidades || busy}
+            className="btn-ghost mt-3 w-full disabled:opacity-50"
+          >
+            Enviar a cocina
+          </button>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            {["Efectivo", "Tarjeta", "Bizum"].map((m) => <button key={m} onClick={() => cobrar(m)} disabled={!unidades || busy} className="btn-primary disabled:opacity-50">{m}</button>)}
+            {["Efectivo", "Tarjeta", "Bizum"].map((m) => (
+              <button
+                key={m}
+                onClick={() => cobrar(m)}
+                disabled={!unidades || busy}
+                className="btn-primary disabled:opacity-50"
+              >
+                {m}
+              </button>
+            ))}
           </div>
         </aside>
       </div>
 
       {ticket && (
-        <div className="fixed inset-0 z-10 grid place-items-center bg-black/40 p-4" onClick={reset}>
-          <div className="w-full max-w-xs rounded-2xl bg-white p-5 text-center font-mono text-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-10 grid place-items-center bg-foreground/40 p-4" onClick={reset}>
+          <div
+            className="w-full max-w-xs rounded-lg border border-border bg-card p-5 text-center font-mono text-sm shadow-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-2 text-base font-semibold">Ticket cobrado ✅</div>
-            {ticket.impuestos.desglose.map((d) => <div key={d.tipo} className="flex justify-between"><span>{ticket.impuestos.impuesto} {d.tipo}%</span><span>{eur(d.cuota)}</span></div>)}
-            <div className="my-1 flex justify-between border-t border-slate-200 pt-1 font-semibold"><span>TOTAL</span><span>{eur(ticket.impuestos.importeTotal)}</span></div>
+            {ticket.impuestos.desglose.map((d) => (
+              <div key={d.tipo} className="flex justify-between">
+                <span>{ticket.impuestos.impuesto} {d.tipo}%</span>
+                <span className="tabular-nums">{eur(d.cuota)}</span>
+              </div>
+            ))}
+            <div className="my-1 flex justify-between border-t border-border pt-1 font-semibold tabular-nums">
+              <span>TOTAL</span><span>{eur(ticket.impuestos.importeTotal)}</span>
+            </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={ticket.verifactu.qrDataUrl} alt="QR" className="mx-auto my-2 h-32 w-32" />
             <div className="font-semibold">{ticket.verifactu.leyenda}</div>
-            <div className="text-xs text-slate-400">{ticket.numSerieFactura}</div>
+            <div className="text-xs text-muted-foreground">{ticket.numSerieFactura}</div>
             <button onClick={reset} className="btn-primary mt-3 w-full">Nueva venta</button>
           </div>
         </div>

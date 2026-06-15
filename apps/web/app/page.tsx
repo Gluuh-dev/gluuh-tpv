@@ -27,11 +27,11 @@ const PANTALLAS = [
 export default function Home() {
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2 text-lg font-semibold">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span>
-            Gluuh <span className="text-slate-400">TPV</span>
+            Gluuh <span className="text-muted-foreground">TPV</span>
           </div>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost"><Link href="/login">Iniciar sesión</Link></Button>
@@ -45,7 +45,7 @@ export default function Home() {
         <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
           <ShieldCheck className="h-4 w-4" /> Compatible con VERIFACTU · IGIC e IVA
         </span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
           El TPV de hostelería que <span className="text-primary">no te deja tirado</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
@@ -97,7 +97,7 @@ export default function Home() {
       </section>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        <strong className="text-slate-700">Gluuh</strong> · familia Gluuh Campo · Gluuh TPV
+        <strong className="text-foreground">Gluuh</strong> · familia Gluuh Campo · Gluuh TPV
       </footer>
     </div>
   );
