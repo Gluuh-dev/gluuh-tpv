@@ -8,7 +8,7 @@
  * para subir el IVA de hostelería al 21 %). Ver docs/07-facturacion-y-cumplimiento-legal.md §7.
  */
 
-import type { Territorio, RegimenConsumo, LineaImpuesto } from "../domain/types.js";
+import type { Territorio, LineaImpuesto } from "../domain/types.js";
 
 export type Impuesto = "IVA" | "IGIC" | "IPSI";
 
@@ -18,46 +18,6 @@ export const IMPUESTO_POR_TERRITORIO: Record<Territorio, Impuesto> = {
   CEUTA_MELILLA: "IPSI",
 };
 
-/** Tipos de IVA (%) — territorio común. */
-export const TIPOS_IVA = {
-  GENERAL: 21,
-  RESTAURACION: 10, // servicio de hostelería
-  REDUCIDO: 10,
-  SUPERREDUCIDO: 4,
-  CERO: 0,
-} as const;
-
-/** Tipos de IGIC (%) — Canarias. */
-export const TIPOS_IGIC = {
-  GENERAL: 7,
-  INCREMENTADO: 15, // p. ej. bebidas alcohólicas para llevar
-  REDUCIDO: 5, // p. ej. refrescos azucarados
-  RESTAURACION: 7,
-  CERO: 0,
-} as const;
-
-/**
- * Devuelve el tipo impositivo aplicable a un producto de hostelería según
- * territorio, régimen de consumo y si es bebida alcohólica.
- *
- * NOTA: la tributación del *take-away* tiene matices (ver docs/07 §7). Esta
- * función cubre los casos principales; afinar con asesoría fiscal.
- */
-export function tipoHosteleria(
-  territorio: Territorio,
-  regimen: RegimenConsumo,
-  esAlcohol = false,
-): number {
-  if (territorio === "CANARIAS") {
-    // Dentro del servicio: 7 %. Alcohol para llevar (venta suelta): 15 %.
-    if (esAlcohol && regimen === "PARA_LLEVAR") return TIPOS_IGIC.INCREMENTADO;
-    return TIPOS_IGIC.RESTAURACION; // 7 %
-  }
-  // Península / Baleares
-  if (regimen === "LOCAL") return TIPOS_IVA.RESTAURACION; // 10 %
-  // Para llevar: comida preparada 10 %; bebida alcohólica suelta 21 %.
-  return esAlcohol ? TIPOS_IVA.GENERAL : TIPOS_IVA.RESTAURACION;
-}
 
 export interface LineaFiscal {
   /** Importe total de la línea (PVP, impuesto INCLUIDO), en euros. */

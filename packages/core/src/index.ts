@@ -14,6 +14,7 @@ export * from "./domain/types.js";
 export * from "./domain/order-state.js";
 export * from "./domain/operations.js";
 export * from "./fiscal/tax.js";
+export * from "./fiscal/tax-rates.js";
 export * from "./fiscal/verifactu.js";
 export * from "./fiscal/qr.js";
 export * from "./fiscal/verifactu-xml.js";
