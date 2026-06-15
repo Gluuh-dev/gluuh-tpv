@@ -93,7 +93,7 @@ export default function Personalizar() {
           <h1 className="text-2xl font-semibold">Personalización</h1>
           <p className="text-sm text-muted-foreground">Tu marca y tus ofertas, tal y como las verán tus clientes en kiosko, display y cartelería.</p>
         </div>
-        {msg && <Badge variant="success">{msg}</Badge>}
+        {msg && <Badge className="bg-emerald-100 text-emerald-700">{msg}</Badge>}
       </div>
 
       {/* ---------- MARCA ---------- */}
@@ -124,7 +124,7 @@ export default function Personalizar() {
         {/* Vista previa kiosko */}
         <div>
           <Label className="mb-1 block">Vista previa del kiosko</Label>
-          <div className="grid h-[320px] place-items-center rounded-2xl p-6 text-center shadow-inner" style={{ background: marca.color_primario, color: fg }}>
+          <div className="grid h-[320px] place-items-center rounded-2xl p-6 text-center ring-1 ring-black/10" style={{ background: marca.color_primario, color: fg }}>
             <div>
               {marca.logo_url ? <img src={marca.logo_url} alt="" className="mx-auto h-16 w-auto object-contain" /> : <div className="text-5xl">🍔</div>}
               <div className="mt-3 text-2xl font-bold">{marca.kiosko_titulo || marca.nombre_comercial || "Bienvenido"}</div>

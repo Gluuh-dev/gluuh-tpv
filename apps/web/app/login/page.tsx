@@ -33,7 +33,7 @@ export default function Login() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-gradient-to-b from-slate-50 to-slate-100 p-6">
+    <main className="grid min-h-screen place-items-center bg-linear-to-b from-slate-50 to-slate-100 p-6">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span>
