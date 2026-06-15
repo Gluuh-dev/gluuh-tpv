@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Armchair } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 
 interface Room { id: string; nombre: string; orden: number }
 interface Mesa { id: string; nombre: string; room_id: string; estado: string }
@@ -46,15 +49,15 @@ export default function Sala() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Sala</h1>
-          <p className="text-slate-500">Define tus salas y mesas. El TPV y la comandera trabajan sobre ellas.</p>
+          <p className="text-muted-foreground">Define tus salas y mesas. El TPV y la comandera trabajan sobre ellas.</p>
         </div>
         <form onSubmit={addSala} className="flex gap-2">
-          <input className="input w-48" placeholder="Nueva sala (Terraza…)" value={nuevaSala} onChange={(e) => setNuevaSala(e.target.value)} />
-          <button className="btn-primary whitespace-nowrap"><Plus className="h-4 w-4" /> Sala</button>
+          <Input className="w-48" placeholder="Nueva sala (Terraza…)" value={nuevaSala} onChange={(e) => setNuevaSala(e.target.value)} />
+          <Button className="whitespace-nowrap"><Plus className="h-4 w-4" /> Sala</Button>
         </form>
       </div>
 
-      {rooms.length === 0 && <div className="card text-slate-400">Crea tu primera sala (p. ej. «Salón» o «Terraza»).</div>}
+      {rooms.length === 0 && <Card className="p-5 text-muted-foreground">Crea tu primera sala (p. ej. «Salón» o «Terraza»).</Card>}
 
       <div className="space-y-5">
         {rooms.map((room) => (
@@ -90,27 +93,27 @@ function SalaCard({ room, mesas, onDelete, onChange }: { room: Room; mesas: Mesa
   }
 
   return (
-    <div className="card">
+    <Card className="p-5">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-medium">{room.nombre} <span className="text-slate-400">· {mesas.length} mesas</span></h2>
-        <button onClick={onDelete} className="text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+        <h2 className="font-medium">{room.nombre} <span className="text-muted-foreground">· {mesas.length} mesas</span></h2>
+        <button onClick={onDelete} className="text-slate-400 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {mesas.map((m) => (
-          <div key={m.id} className="group relative grid h-16 w-16 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-center text-xs font-medium">
+          <div key={m.id} className="group relative grid h-16 w-16 place-items-center rounded-xl border border-border bg-muted/40 text-center text-xs font-medium">
             <Armchair className="absolute right-1 top-1 h-3 w-3 text-slate-300" />
             {m.nombre}
-            <button onClick={() => delMesa(m.id)} className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 place-items-center rounded-full bg-red-500 text-white group-hover:grid">×</button>
+            <button onClick={() => delMesa(m.id)} className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 place-items-center rounded-full bg-destructive text-white group-hover:grid">×</button>
           </div>
         ))}
       </div>
 
       <form onSubmit={addMesa} className="mt-3 flex items-center gap-2">
-        <input className="input w-40" placeholder="Mesa…" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        <button className="btn-primary"><Plus className="h-4 w-4" /> Mesa</button>
-        <button type="button" onClick={addVarias} className="btn-ghost">+ varias</button>
+        <Input className="w-40" placeholder="Mesa…" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        <Button><Plus className="h-4 w-4" /> Mesa</Button>
+        <Button type="button" variant="outline" onClick={addVarias}>+ varias</Button>
       </form>
-    </div>
+    </Card>
   );
 }

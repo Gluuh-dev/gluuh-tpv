@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const TERRITORIOS = [
   { v: "PENINSULA_BALEARES", t: "Península / Baleares (IVA)" },
@@ -55,25 +60,34 @@ export default function Ajustes() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Ajustes</h1>
-        <p className="text-slate-500">Datos fiscales del local (necesarios para la facturación VERIFACTU).</p>
+        <p className="text-muted-foreground">Datos fiscales del local (necesarios para la facturación VERIFACTU).</p>
       </div>
-      <form className="card space-y-4" onSubmit={guardar}>
-        <div><label className="label">Nombre de la empresa</label><input className="input" value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div><label className="label">Nombre del local</label><input className="input" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
-          <div><label className="label">CIF/NIF</label><input className="input" value={f.cif} onChange={(e) => setF({ ...f, cif: e.target.value })} placeholder="B12345678" /></div>
-        </div>
-        <div><label className="label">Razón social</label><input className="input" value={f.razon_social} onChange={(e) => setF({ ...f, razon_social: e.target.value })} /></div>
-        <div><label className="label">Dirección</label><input className="input" value={f.direccion} onChange={(e) => setF({ ...f, direccion: e.target.value })} /></div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div><label className="label">Territorio fiscal</label><select className="input" value={f.territorio_fiscal} onChange={(e) => setF({ ...f, territorio_fiscal: e.target.value })}>{TERRITORIOS.map((t) => <option key={t.v} value={t.v}>{t.t}</option>)}</select></div>
-          <div><label className="label">Serie de factura</label><input className="input" value={f.serie_factura} onChange={(e) => setF({ ...f, serie_factura: e.target.value })} /></div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="btn-primary" disabled={saving}>{saving ? "Guardando…" : "Guardar"}</button>
-          {msg && <span className="text-sm text-emerald-600">{msg}</span>}
-        </div>
-      </form>
+      <Card>
+        <CardContent className="pt-6">
+          <form className="space-y-4" onSubmit={guardar}>
+            <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label>Nombre del local</Label><Input value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>CIF/NIF</Label><Input value={f.cif} onChange={(e) => setF({ ...f, cif: e.target.value })} placeholder="B12345678" /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Razón social</Label><Input value={f.razon_social} onChange={(e) => setF({ ...f, razon_social: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Dirección</Label><Input value={f.direccion} onChange={(e) => setF({ ...f, direccion: e.target.value })} /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label>Territorio fiscal</Label>
+                <Select value={f.territorio_fiscal} onValueChange={(v) => setF({ ...f, territorio_fiscal: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{TERRITORIOS.map((t) => <SelectItem key={t.v} value={t.v}>{t.t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Serie de factura</Label><Input value={f.serie_factura} onChange={(e) => setF({ ...f, serie_factura: e.target.value })} /></div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
+              {msg && <span className="text-sm text-emerald-600">{msg}</span>}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

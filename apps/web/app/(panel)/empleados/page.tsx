@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Empleado { id: string; nombre: string; email: string | null; rol: string; activo: boolean }
 
@@ -48,40 +55,51 @@ export default function Empleados() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Empleados</h1>
-        <p className="text-slate-500">Crea camareros y cocina con su PIN. Cada acción quedará registrada a su nombre.</p>
+        <p className="text-muted-foreground">Crea camareros y cocina con su PIN. Cada acción quedará registrada a su nombre.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Lista */}
-        <div className="card lg:col-span-2 overflow-hidden p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
-              <tr><th className="px-4 py-3 font-medium">Nombre</th><th className="px-4 py-3 font-medium">Rol</th><th className="px-4 py-3 font-medium">Estado</th><th></th></tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {lista.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Aún no hay empleados. Crea el primero →</td></tr>}
-              {lista.map((emp) => (
-                <tr key={emp.id}>
-                  <td className="px-4 py-3"><div className="font-medium">{emp.nombre}</div>{emp.email && <div className="text-xs text-slate-400">{emp.email}</div>}</td>
-                  <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{emp.rol}</span></td>
-                  <td className="px-4 py-3">{emp.activo ? <span className="text-emerald-600">Activo</span> : <span className="text-slate-400">Inactivo</span>}</td>
-                  <td className="px-4 py-3 text-right"><button onClick={() => toggle(emp)} className="text-xs text-brand-600 hover:underline">{emp.activo ? "Desactivar" : "Activar"}</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card className="lg:col-span-2">
+          <CardContent className="px-0 py-0">
+            <Table>
+              <TableHeader>
+                <TableRow><TableHead>Nombre</TableHead><TableHead>Rol</TableHead><TableHead>Estado</TableHead><TableHead></TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {lista.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Aún no hay empleados. Crea el primero →</TableCell></TableRow>}
+                {lista.map((emp) => (
+                  <TableRow key={emp.id}>
+                    <TableCell><div className="font-medium">{emp.nombre}</div>{emp.email && <div className="text-xs text-muted-foreground">{emp.email}</div>}</TableCell>
+                    <TableCell><Badge variant="secondary">{emp.rol}</Badge></TableCell>
+                    <TableCell>{emp.activo ? <span className="text-emerald-600">Activo</span> : <span className="text-muted-foreground">Inactivo</span>}</TableCell>
+                    <TableCell className="text-right"><button onClick={() => toggle(emp)} className="text-xs text-primary hover:underline">{emp.activo ? "Desactivar" : "Activar"}</button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
         {/* Alta */}
-        <form className="card space-y-3 self-start" onSubmit={crear}>
-          <h2 className="flex items-center gap-2 font-medium"><UserPlus className="h-4 w-4" /> Nuevo empleado</h2>
-          <div><label className="label">Nombre</label><input className="input" required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ana García" /></div>
-          <div><label className="label">Email (opcional)</label><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div><label className="label">Rol</label><select className="input" value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value })}>{ROLES.map((r) => <option key={r.v} value={r.v}>{r.t}</option>)}</select></div>
-          <div><label className="label">PIN (4+ dígitos)</label><input className="input" required minLength={4} inputMode="numeric" value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} placeholder="1234" /></div>
-          <button className="btn-primary w-full" disabled={guardando}>{guardando ? "Creando…" : "Crear empleado"}</button>
-          {msg && <p className={`text-sm ${msg.tipo === "ok" ? "text-emerald-600" : "text-red-600"}`}>{msg.txt}</p>}
-        </form>
+        <Card className="self-start">
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UserPlus className="h-4 w-4" /> Nuevo empleado</CardTitle></CardHeader>
+          <CardContent>
+            <form className="space-y-3" onSubmit={crear}>
+              <div className="space-y-1.5"><Label>Nombre</Label><Input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ana García" /></div>
+              <div className="space-y-1.5"><Label>Email (opcional)</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Rol</Label>
+                <Select value={form.rol} onValueChange={(v) => setForm({ ...form, rol: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{ROLES.map((r) => <SelectItem key={r.v} value={r.v}>{r.t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>PIN (4+ dígitos)</Label><Input required minLength={4} inputMode="numeric" value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} placeholder="1234" /></div>
+              <Button className="w-full" disabled={guardando}>{guardando ? "Creando…" : "Crear empleado"}</Button>
+              {msg && <p className={`text-sm ${msg.tipo === "ok" ? "text-emerald-600" : "text-destructive"}`}>{msg.txt}</p>}
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

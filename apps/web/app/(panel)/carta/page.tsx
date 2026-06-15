@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Categoria { id: string; nombre: string; orden: number }
 interface Producto { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; es_alcohol: boolean; disponible: boolean }
@@ -52,15 +56,15 @@ export default function Carta() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Carta</h1>
-          <p className="text-slate-500">Categorías y productos de tu carta. Las pantallas (TPV, kiosko) leen de aquí.</p>
+          <p className="text-muted-foreground">Categorías y productos de tu carta. Las pantallas (TPV, kiosko) leen de aquí.</p>
         </div>
         <form onSubmit={addCat} className="flex gap-2">
-          <input className="input w-48" placeholder="Nueva categoría" value={nuevaCat} onChange={(e) => setNuevaCat(e.target.value)} />
-          <button className="btn-primary whitespace-nowrap"><Plus className="h-4 w-4" /> Categoría</button>
+          <Input className="w-48" placeholder="Nueva categoría" value={nuevaCat} onChange={(e) => setNuevaCat(e.target.value)} />
+          <Button className="whitespace-nowrap"><Plus className="h-4 w-4" /> Categoría</Button>
         </form>
       </div>
 
-      {cats.length === 0 && <div className="card text-slate-400">Crea tu primera categoría para empezar.</div>}
+      {cats.length === 0 && <Card className="p-5 text-muted-foreground">Crea tu primera categoría para empezar.</Card>}
 
       <div className="space-y-5">
         {cats.map((cat) => (
@@ -101,31 +105,34 @@ function CategoriaCard({ cat, productos, onDeleteCat, onDeleteProd, onToggle, on
   }
 
   return (
-    <div className="card p-0">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-        <h2 className="font-medium">{cat.nombre} <span className="text-slate-400">· {productos.length}</span></h2>
-        <button onClick={onDeleteCat} className="text-slate-400 hover:text-red-600" title="Eliminar categoría"><Trash2 className="h-4 w-4" /></button>
+    <Card className="overflow-hidden">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <h2 className="font-medium">{cat.nombre} <span className="text-muted-foreground">· {productos.length}</span></h2>
+        <button onClick={onDeleteCat} className="text-slate-400 hover:text-destructive" title="Eliminar categoría"><Trash2 className="h-4 w-4" /></button>
       </div>
 
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-border">
         {productos.map((p) => (
           <div key={p.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
             <span className="flex-1">{p.nombre}{p.es_alcohol && <span className="ml-2 text-xs text-amber-600">alcohol</span>}</span>
             <span className="w-16 text-right tabular-nums">{eur(p.precio)}</span>
-            <span className="w-14 text-right text-slate-400">{p.tipo_impositivo}%</span>
-            <button onClick={() => onToggle(p)} className={`w-20 text-right text-xs ${p.disponible ? "text-emerald-600" : "text-slate-400"}`}>{p.disponible ? "Disponible" : "Agotado"}</button>
-            <button onClick={() => onDeleteProd(p.id)} className="text-slate-300 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+            <span className="w-14 text-right text-muted-foreground">{p.tipo_impositivo}%</span>
+            <button onClick={() => onToggle(p)} className={`w-20 text-right text-xs ${p.disponible ? "text-emerald-600" : "text-muted-foreground"}`}>{p.disponible ? "Disponible" : "Agotado"}</button>
+            <button onClick={() => onDeleteProd(p.id)} className="text-slate-300 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
           </div>
         ))}
       </div>
 
-      <form onSubmit={addProd} className="flex flex-wrap items-end gap-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-        <input className="input w-44" placeholder="Producto" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
-        <input className="input w-24" placeholder="Precio" inputMode="decimal" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })} />
-        <select className="input w-24" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>{TIPOS.map((t) => <option key={t} value={t}>{t}%</option>)}</select>
-        <label className="flex items-center gap-1 text-sm text-slate-600"><input type="checkbox" checked={f.alcohol} onChange={(e) => setF({ ...f, alcohol: e.target.checked })} /> alcohol</label>
-        <button className="btn-primary" disabled={saving}><Plus className="h-4 w-4" /> Añadir</button>
+      <form onSubmit={addProd} className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/40 px-5 py-3">
+        <Input className="w-44" placeholder="Producto" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
+        <Input className="w-24" placeholder="Precio" inputMode="decimal" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })} />
+        <Select value={f.tipo} onValueChange={(v) => setF({ ...f, tipo: v })}>
+          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+          <SelectContent>{TIPOS.map((t) => <SelectItem key={t} value={String(t)}>{t}%</SelectItem>)}</SelectContent>
+        </Select>
+        <label className="flex items-center gap-1 text-sm text-muted-foreground"><input type="checkbox" checked={f.alcohol} onChange={(e) => setF({ ...f, alcohol: e.target.checked })} /> alcohol</label>
+        <Button disabled={saving}><Plus className="h-4 w-4" /> Añadir</Button>
       </form>
-    </div>
+    </Card>
   );
 }
