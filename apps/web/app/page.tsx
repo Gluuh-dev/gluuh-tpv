@@ -33,7 +33,7 @@ export default function Home() {
           </div>
           <nav className="flex items-center gap-2">
             <Link href="/login" className="btn-ghost">Iniciar sesión</Link>
-            <Link href="/registro" className="btn-primary">Crear cuenta</Link>
+            <Link href="/registro" className="btn-primary">Solicitar acceso</Link>
           </nav>
         </div>
       </header>
@@ -51,7 +51,7 @@ export default function Home() {
           Funciona sin internet, sin permanencia y con tu marca.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/registro" className="btn-primary px-6 py-3 text-base">Crear cuenta gratis <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/registro" className="btn-primary px-6 py-3 text-base">Solicitar demo <ArrowRight className="h-4 w-4" /></Link>
           <Link href="/login" className="btn-ghost px-6 py-3 text-base">Ya tengo cuenta</Link>
         </div>
       </section>

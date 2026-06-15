@@ -3,61 +3,38 @@
 import { useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 
-export default function Registro() {
-  const [empresa, setEmpresa] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [estado, setEstado] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
-  const [cargando, setCargando] = useState(false);
+// Registro NO público: las cuentas las crea el administrador de Gluuh.
+// Esta página recoge solicitudes de acceso/contacto.
+export default function SolicitarAcceso() {
+  const [f, setF] = useState({ nombre: "", email: "", telefono: "", mensaje: "" });
+  const [estado, setEstado] = useState<{ t: "ok" | "err"; x: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    setCargando(true);
-    setEstado(null);
-    const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { empresa_nombre: empresa } },
+    setBusy(true); setEstado(null);
+    const { error } = await supabaseBrowser().from("contact_request").insert({
+      nombre: f.nombre, email: f.email, telefono: f.telefono, mensaje: f.mensaje,
     });
-    setCargando(false);
-    if (error) setEstado({ tipo: "error", msg: error.message });
-    else
-      setEstado({
-        tipo: "ok",
-        msg: "¡Empresa creada! Si la confirmación de correo está activada, revisa tu email; si no, ya puedes iniciar sesión.",
-      });
+    setBusy(false);
+    if (error) setEstado({ t: "err", x: error.message });
+    else { setEstado({ t: "ok", x: "¡Gracias! Te contactaremos para darte de alta." }); setF({ nombre: "", email: "", telefono: "", mensaje: "" }); }
   }
 
   return (
-    <main style={S.wrap}>
-      <form style={S.card} onSubmit={onSubmit}>
-        <h1 style={S.h1}>Crear cuenta de empresa</h1>
-        <p style={S.sub}>Gluuh TPV · una cuenta por restaurante</p>
-        <label style={S.label}>Nombre de la empresa
-          <input style={S.input} value={empresa} onChange={(e) => setEmpresa(e.target.value)} required placeholder="Bar La Palma" />
-        </label>
-        <label style={S.label}>Email
-          <input style={S.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="admin@tubar.com" />
-        </label>
-        <label style={S.label}>Contraseña
-          <input style={S.input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-        </label>
-        <button style={S.btn} disabled={cargando}>{cargando ? "Creando…" : "Crear empresa"}</button>
-        {estado && <p style={{ color: estado.tipo === "ok" ? "#16a34a" : "#dc2626", fontSize: 14 }}>{estado.msg}</p>}
-        <p style={S.foot}>¿Ya tienes cuenta? <a href="/login">Inicia sesión</a></p>
+    <main className="grid min-h-screen place-items-center p-6">
+      <form className="card w-full max-w-md space-y-3" onSubmit={enviar}>
+        <a href="/" className="text-sm text-slate-400">← Gluuh TPV</a>
+        <h1 className="text-2xl font-semibold">Solicitar acceso</h1>
+        <p className="text-sm text-slate-500">El alta la gestiona nuestro equipo. Déjanos tus datos y te contactamos.</p>
+        <div><label className="label">Nombre / restaurante</label><input className="input" required value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
+        <div><label className="label">Email</label><input className="input" type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
+        <div><label className="label">Teléfono</label><input className="input" value={f.telefono} onChange={(e) => setF({ ...f, telefono: e.target.value })} /></div>
+        <div><label className="label">¿Qué necesitas?</label><textarea className="input" rows={3} value={f.mensaje} onChange={(e) => setF({ ...f, mensaje: e.target.value })} /></div>
+        <button className="btn-primary w-full" disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</button>
+        {estado && <p className={`text-sm ${estado.t === "ok" ? "text-emerald-600" : "text-red-600"}`}>{estado.x}</p>}
+        <p className="text-center text-sm text-slate-500">¿Ya tienes cuenta? <a href="/login" className="text-brand-600">Inicia sesión</a></p>
       </form>
     </main>
   );
 }
-
-const S: Record<string, React.CSSProperties> = {
-  wrap: { minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "system-ui, sans-serif", padding: 24 },
-  card: { display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 380, border: "1px solid #e5e5e5", borderRadius: 16, padding: 24 },
-  h1: { margin: 0, fontSize: 22 },
-  sub: { margin: "0 0 8px", color: "#666", fontSize: 14 },
-  label: { display: "flex", flexDirection: "column", gap: 4, fontSize: 14, color: "#333" },
-  input: { padding: 10, border: "1px solid #ccc", borderRadius: 8, fontSize: 15 },
-  btn: { padding: 12, border: "none", borderRadius: 10, background: "#4f46e5", color: "#fff", fontWeight: 700, cursor: "pointer", marginTop: 4 },
-  foot: { fontSize: 13, color: "#666", textAlign: "center", margin: 0 },
-};
