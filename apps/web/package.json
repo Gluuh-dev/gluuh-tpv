@@ -4,7 +4,7 @@
   "private": true,
   "description": "Backoffice + TPV en navegador (Next.js).",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3100",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

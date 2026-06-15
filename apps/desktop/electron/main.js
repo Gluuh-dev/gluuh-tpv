@@ -5,7 +5,7 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 
 // URL de la web a cargar (en dev, el servidor Next; en prod, el despliegue).
-const GLUUH_URL = process.env.GLUUH_URL || "http://localhost:3000/tpv";
+const GLUUH_URL = process.env.GLUUH_URL || "http://localhost:3100/tpv";
 
 function createWindow() {
   const win = new BrowserWindow({
