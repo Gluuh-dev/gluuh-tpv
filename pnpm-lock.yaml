@@ -57,6 +57,12 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@react-native-async-storage/async-storage':
+        specifier: ^3.1.1
+        version: 3.1.1(react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.108.1
       expo:
         specifier: ~51.0.28
         version: 51.0.39(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
@@ -69,6 +75,9 @@ importers:
       react-native:
         specifier: 0.74.5
         version: 0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0)
+      react-native-url-polyfill:
+        specifier: ^3.0.0
+        version: 3.0.0(react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0))
     devDependencies:
       '@babel/core':
         specifier: ^7.24.0
@@ -1691,6 +1700,12 @@ packages:
 
   '@powersync/common@1.54.0':
     resolution: {integrity: sha512-/gzitw4iQL4UI7ILf7TUzCy/cfbDJGU3/aiN/ciaLtDd2Uts3wYARVKclSW0OJhPPisKCX0E8Ev/iZGQPbTgDA==}
+
+  '@react-native-async-storage/async-storage@3.1.1':
+    resolution: {integrity: sha512-z+PnLz1n6ECKhgoHZHkfc+dijXZEyZnNFSajbtE0NEbsJhmX8x9GlOeiMQIKX2E4DUqPSgfIh4FYBv1M49KgPQ==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
 
   '@react-native-community/cli-clean@13.6.9':
     resolution: {integrity: sha512-7Dj5+4p9JggxuVNOjPbduZBAP1SUgNhLKVw5noBUzT/3ZpUZkDM+RCSwyoyg8xKWoE4OrdUAXwAFlMcFDPKykA==}
@@ -3576,6 +3591,9 @@ packages:
     resolution: {integrity: sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==}
     engines: {node: '>=0.10.0'}
 
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
+
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
@@ -4912,6 +4930,11 @@ packages:
 
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
+
+  react-native-url-polyfill@3.0.0:
+    resolution: {integrity: sha512-aA5CiuUCUb/lbrliVCJ6lZ17/RpNJzvTO/C7gC/YmDQhTUoRD5q5HlJfwLWcxz4VgAhHwXKzhxH+wUN24tAdqg==}
+    peerDependencies:
+      react-native: '*'
 
   react-native@0.74.5:
     resolution: {integrity: sha512-Bgg2WvxaGODukJMTZFTZBNMKVaROHLwSb8VAGEdrlvKwfb1hHg/3aXTUICYk7dwgAnb+INbGMwnF8yeAgIUmqw==}
@@ -7847,6 +7870,12 @@ snapshots:
       event-iterator: 2.0.0
       js-logger: 1.6.1
 
+  '@react-native-async-storage/async-storage@3.1.1(react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)':
+    dependencies:
+      idb: 8.0.3
+      react: 18.2.0
+      react-native: 0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0)
+
   '@react-native-community/cli-clean@13.6.9':
     dependencies:
       '@react-native-community/cli-tools': 13.6.9
@@ -10233,6 +10262,8 @@ snapshots:
     dependencies:
       safer-buffer: 2.1.2
 
+  idb@8.0.3: {}
+
   ieee754@1.2.1: {}
 
   ignore@5.3.2: {}
@@ -11630,6 +11661,11 @@ snapshots:
   react-is@17.0.2: {}
 
   react-is@18.3.1: {}
+
+  react-native-url-polyfill@3.0.0(react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0)):
+    dependencies:
+      react-native: 0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0)
+      whatwg-url-without-unicode: 8.0.0-3
 
   react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0):
     dependencies:
