@@ -6,6 +6,7 @@ import { Building2, UserPlus, LogOut } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -83,7 +84,7 @@ export default function Admin() {
               <form onSubmit={crear} className="space-y-3">
                 <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input required value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>Email de acceso</Label><Input type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Contraseña inicial</Label><Input required minLength={6} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Contraseña inicial</Label><PasswordInput required minLength={6} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
                 <Button className="w-full" disabled={busy}>{busy ? "Creando…" : "Crear empresa"}</Button>
                 {msg && <p className={`text-sm ${msg.t === "ok" ? "text-emerald-600" : "text-destructive"}`}>{msg.x}</p>}
               </form>

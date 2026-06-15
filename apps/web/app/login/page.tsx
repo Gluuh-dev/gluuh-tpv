@@ -8,13 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-function traducir(msg: string) {
-  if (/invalid login credentials/i.test(msg)) return "Email o contraseña incorrectos.";
-  if (/email not confirmed/i.test(msg)) return "La cuenta no está confirmada todavía.";
-  if (/rate limit/i.test(msg)) return "Demasiados intentos. Espera un momento.";
-  return msg;
-}
+import { PasswordInput } from "@/components/ui/password-input";
+import { traducirErrorAuth } from "@/lib/auth-errors";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -28,7 +23,7 @@ export default function Login() {
     setError("");
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email, password });
     setCargando(false);
-    if (error) setError(traducir(error.message));
+    if (error) setError(traducirErrorAuth(error.message));
     else window.location.href = "/dashboard";
   }
 
@@ -52,7 +47,7 @@ export default function Login() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password">Contraseña</Label>
-                <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <PasswordInput id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
               <Button type="submit" className="w-full" disabled={cargando}>
                 <LogIn className="h-4 w-4" /> {cargando ? "Entrando…" : "Entrar"}
