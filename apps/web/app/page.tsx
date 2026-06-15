@@ -3,6 +3,8 @@ import {
   WifiOff, ShieldCheck, Smartphone, ChefHat, Tag, MonitorSmartphone,
   ArrowRight, ShoppingCart, Store, Megaphone,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 const FEATURES = [
   { icon: WifiOff, title: "Funciona sin internet", desc: "Local-first: cobra, comanda e imprime aunque caiga la red. La caja nunca para." },
@@ -25,16 +27,15 @@ const PANTALLAS = [
 export default function Home() {
   return (
     <div className="min-h-screen">
-      {/* Barra superior */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2 text-lg font-semibold">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 font-bold text-white">G</span>
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span>
             Gluuh <span className="text-slate-400">TPV</span>
           </div>
           <nav className="flex items-center gap-2">
-            <Link href="/login" className="btn-ghost">Iniciar sesión</Link>
-            <Link href="/registro" className="btn-primary">Solicitar acceso</Link>
+            <Button asChild variant="ghost"><Link href="/login">Iniciar sesión</Link></Button>
+            <Button asChild><Link href="/registro">Solicitar acceso</Link></Button>
           </nav>
         </div>
       </header>
@@ -45,15 +46,15 @@ export default function Home() {
           <ShieldCheck className="h-4 w-4" /> Compatible con VERIFACTU · IGIC e IVA
         </span>
         <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-          El TPV de hostelería que <span className="text-brand-600">no te deja tirado</span>
+          El TPV de hostelería que <span className="text-primary">no te deja tirado</span>
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
+        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
           Vende, cobra y factura legalmente — en barra, en mesa y desde el móvil.
           Funciona sin internet, sin permanencia y con tu marca.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/registro" className="btn-primary px-6 py-3 text-base">Solicitar demo <ArrowRight className="h-4 w-4" /></Link>
-          <Link href="/login" className="btn-ghost px-6 py-3 text-base">Ya tengo cuenta</Link>
+          <Button asChild size="lg"><Link href="/registro">Solicitar demo <ArrowRight className="h-4 w-4" /></Link></Button>
+          <Button asChild size="lg" variant="outline"><Link href="/login">Ya tengo cuenta</Link></Button>
         </div>
       </section>
 
@@ -61,11 +62,11 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-6 pb-8">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="card">
+            <Card key={title} className="p-5">
               <span className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon className="h-5 w-5" /></span>
               <h3 className="text-base font-semibold">{title}</h3>
-              <p className="mt-1 text-sm text-slate-600">{desc}</p>
-            </div>
+              <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
+            </Card>
           ))}
         </div>
       </section>
@@ -74,29 +75,28 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="text-center">
           <h2 className="text-2xl font-semibold">Una plataforma, todas las pantallas</h2>
-          <p className="mt-1 text-slate-600">Barra, sala, cocina, kiosko y cartelería — cada restaurante con sus datos y su marca.</p>
+          <p className="mt-1 text-muted-foreground">Barra, sala, cocina, kiosko y cartelería — cada restaurante con sus datos y su marca.</p>
         </div>
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {PANTALLAS.map(({ icon: Icon, label, desc }) => (
-            <div key={label} className="card">
+            <Card key={label} className="p-5">
               <span className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon className="h-5 w-5" /></span>
               <h3 className="text-base font-semibold">{label}</h3>
-              <p className="mt-1 text-sm text-slate-600">{desc}</p>
-            </div>
+              <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
+            </Card>
           ))}
         </div>
-        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-8 text-center">
+        <Card className="mt-8 p-8 text-center">
           <h3 className="text-lg font-semibold">¿Lo quieres para tu restaurante?</h3>
-          <p className="mt-1 text-slate-600">El alta la gestiona nuestro equipo. Te damos acceso y configuramos tu marca.</p>
+          <p className="mt-1 text-muted-foreground">El alta la gestiona nuestro equipo. Te damos acceso y configuramos tu marca.</p>
           <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Link href="/registro" className="btn-primary px-6 py-3 text-base">Solicitar acceso <ArrowRight className="h-4 w-4" /></Link>
-            <Link href="/login" className="btn-ghost px-6 py-3 text-base">Ya tengo cuenta</Link>
+            <Button asChild size="lg"><Link href="/registro">Solicitar acceso <ArrowRight className="h-4 w-4" /></Link></Button>
+            <Button asChild size="lg" variant="outline"><Link href="/login">Ya tengo cuenta</Link></Button>
           </div>
-        </div>
+        </Card>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-500">
+      <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
         <strong className="text-slate-700">Gluuh</strong> · familia Gluuh Campo · Gluuh TPV
       </footer>
     </div>

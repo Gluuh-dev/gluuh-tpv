@@ -9,6 +9,7 @@ import {
   Palette, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
 
 interface NavItem { href: string; label: string; icon: LucideIcon }
 
@@ -75,7 +76,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           <div className="font-medium">{info?.empresa}</div>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-slate-600">{info?.nombre || info?.email} · <span className="text-slate-400">{info?.rol}</span></span>
-            <button onClick={salir} className="btn-ghost"><LogOut className="h-4 w-4" /> Salir</button>
+            <Button variant="ghost" size="sm" onClick={salir}><LogOut className="h-4 w-4" /> Salir</Button>
           </div>
         </header>
         <main className="flex-1 p-6">{children}</main>

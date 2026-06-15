@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, UserPlus, LogOut } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Empresa { id: string; nombre: string; plan: string; email_admin: string | null; created_at: string }
 interface Lead { id: string; nombre: string | null; email: string | null; telefono: string | null; mensaje: string | null; created_at: string }
@@ -56,56 +61,64 @@ export default function Admin() {
     cargar();
   }
 
-  if (estado === "cargando") return <div className="grid min-h-screen place-items-center text-slate-500">Cargando…</div>;
+  if (estado === "cargando") return <div className="grid min-h-screen place-items-center text-muted-foreground">Cargando…</div>;
   if (estado === "no-auth") return (
     <div className="grid min-h-screen place-items-center p-6 text-center">
-      <div className="card max-w-sm"><h1 className="text-lg font-semibold">Acceso restringido</h1><p className="mt-2 text-slate-500">Esta zona es solo para el administrador de Gluuh.</p><a href="/login" className="btn-primary mt-4 inline-flex">Iniciar sesión</a></div>
+      <Card className="max-w-sm p-6"><h1 className="text-lg font-semibold">Acceso restringido</h1><p className="mt-2 text-muted-foreground">Esta zona es solo para el administrador de Gluuh.</p><Button className="mt-4" onClick={() => router.replace("/login")}>Iniciar sesión</Button></Card>
     </div>
   );
 
   return (
     <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+      <header className="flex items-center justify-between border-b border-border bg-white px-6 py-3">
         <div className="flex items-center gap-2 font-semibold"><span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 font-bold text-white">G</span> Gluuh · Administración de plataforma</div>
-        <button className="btn-ghost" onClick={async () => { await sb.auth.signOut(); router.replace("/login"); }}><LogOut className="h-4 w-4" /> Salir</button>
+        <Button variant="ghost" onClick={async () => { await sb.auth.signOut(); router.replace("/login"); }}><LogOut className="h-4 w-4" /> Salir</Button>
       </header>
 
       <div className="mx-auto max-w-5xl space-y-8 p-6">
         <div className="grid gap-6 lg:grid-cols-3">
-          <form onSubmit={crear} className="card space-y-3">
-            <h2 className="flex items-center gap-2 font-medium"><UserPlus className="h-4 w-4" /> Nueva empresa</h2>
-            <div><label className="label">Nombre de la empresa</label><input className="input" required value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
-            <div><label className="label">Email de acceso</label><input className="input" type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
-            <div><label className="label">Contraseña inicial</label><input className="input" required minLength={6} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
-            <button className="btn-primary w-full" disabled={busy}>{busy ? "Creando…" : "Crear empresa"}</button>
-            {msg && <p className={`text-sm ${msg.t === "ok" ? "text-emerald-600" : "text-red-600"}`}>{msg.x}</p>}
-          </form>
+          <Card className="lg:col-span-1">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UserPlus className="h-4 w-4" /> Nueva empresa</CardTitle></CardHeader>
+            <CardContent>
+              <form onSubmit={crear} className="space-y-3">
+                <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input required value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Email de acceso</Label><Input type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Contraseña inicial</Label><Input required minLength={6} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
+                <Button className="w-full" disabled={busy}>{busy ? "Creando…" : "Crear empresa"}</Button>
+                {msg && <p className={`text-sm ${msg.t === "ok" ? "text-emerald-600" : "text-destructive"}`}>{msg.x}</p>}
+              </form>
+            </CardContent>
+          </Card>
 
-          <div className="card lg:col-span-2 overflow-hidden p-0">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 font-medium"><Building2 className="h-4 w-4" /> Empresas ({empresas.length})</div>
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-500"><tr><th className="px-4 py-2 font-medium">Empresa</th><th className="px-4 py-2 font-medium">Acceso</th><th className="px-4 py-2 font-medium">Plan</th><th className="px-4 py-2 font-medium">Alta</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {empresas.map((e) => (
-                  <tr key={e.id}><td className="px-4 py-2">{e.nombre}</td><td className="px-4 py-2 text-slate-500">{e.email_admin}</td><td className="px-4 py-2">{e.plan}</td><td className="px-4 py-2 text-slate-400">{new Date(e.created_at).toLocaleDateString("es-ES")}</td></tr>
+          <Card className="lg:col-span-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4" /> Empresas ({empresas.length})</CardTitle></CardHeader>
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Acceso</TableHead><TableHead>Plan</TableHead><TableHead>Alta</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {empresas.map((e) => (
+                    <TableRow key={e.id}><TableCell className="font-medium">{e.nombre}</TableCell><TableCell className="text-muted-foreground">{e.email_admin}</TableCell><TableCell>{e.plan}</TableCell><TableCell className="text-muted-foreground">{new Date(e.created_at).toLocaleDateString("es-ES")}</TableCell></TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Solicitudes de acceso ({leads.length})</CardTitle></CardHeader>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Contacto</TableHead><TableHead>Mensaje</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {leads.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-muted-foreground">Sin solicitudes.</TableCell></TableRow>}
+                {leads.map((l) => (
+                  <TableRow key={l.id}><TableCell>{l.nombre}</TableCell><TableCell className="text-muted-foreground">{l.email} {l.telefono}</TableCell><TableCell>{l.mensaje}</TableCell><TableCell className="text-muted-foreground">{new Date(l.created_at).toLocaleDateString("es-ES")}</TableCell></TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="card overflow-hidden p-0">
-          <div className="border-b border-slate-100 px-4 py-3 font-medium">Solicitudes de acceso ({leads.length})</div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500"><tr><th className="px-4 py-2 font-medium">Nombre</th><th className="px-4 py-2 font-medium">Contacto</th><th className="px-4 py-2 font-medium">Mensaje</th><th className="px-4 py-2 font-medium">Fecha</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {leads.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">Sin solicitudes.</td></tr>}
-              {leads.map((l) => (
-                <tr key={l.id}><td className="px-4 py-2">{l.nombre}</td><td className="px-4 py-2 text-slate-500">{l.email} {l.telefono}</td><td className="px-4 py-2">{l.mensaje}</td><td className="px-4 py-2 text-slate-400">{new Date(l.created_at).toLocaleDateString("es-ES")}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

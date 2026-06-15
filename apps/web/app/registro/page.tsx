@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Registro NO público: las cuentas las crea el administrador de Gluuh.
 // Esta página recoge solicitudes de acceso/contacto.
@@ -22,19 +28,27 @@ export default function SolicitarAcceso() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center p-6">
-      <form className="card w-full max-w-md space-y-3" onSubmit={enviar}>
-        <a href="/" className="text-sm text-slate-400">← Gluuh TPV</a>
-        <h1 className="text-2xl font-semibold">Solicitar acceso</h1>
-        <p className="text-sm text-slate-500">El alta la gestiona nuestro equipo. Déjanos tus datos y te contactamos.</p>
-        <div><label className="label">Nombre / restaurante</label><input className="input" required value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
-        <div><label className="label">Email</label><input className="input" type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
-        <div><label className="label">Teléfono</label><input className="input" value={f.telefono} onChange={(e) => setF({ ...f, telefono: e.target.value })} /></div>
-        <div><label className="label">¿Qué necesitas?</label><textarea className="input" rows={3} value={f.mensaje} onChange={(e) => setF({ ...f, mensaje: e.target.value })} /></div>
-        <button className="btn-primary w-full" disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</button>
-        {estado && <p className={`text-sm ${estado.t === "ok" ? "text-emerald-600" : "text-red-600"}`}>{estado.x}</p>}
-        <p className="text-center text-sm text-slate-500">¿Ya tienes cuenta? <a href="/login" className="text-brand-600">Inicia sesión</a></p>
-      </form>
+    <main className="grid min-h-screen place-items-center bg-gradient-to-b from-slate-50 to-slate-100 p-6">
+      <div className="w-full max-w-md">
+        <Link href="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">← Gluuh TPV</Link>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Solicitar acceso</CardTitle>
+            <CardDescription>El alta la gestiona nuestro equipo. Déjanos tus datos y te contactamos.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={enviar}>
+              <div className="space-y-1.5"><Label>Nombre / restaurante</Label><Input required value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Email</Label><Input type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Teléfono</Label><Input value={f.telefono} onChange={(e) => setF({ ...f, telefono: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>¿Qué necesitas?</Label><Textarea rows={3} value={f.mensaje} onChange={(e) => setF({ ...f, mensaje: e.target.value })} /></div>
+              <Button className="w-full" disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</Button>
+              {estado && <p className={`text-sm ${estado.t === "ok" ? "text-emerald-600" : "text-destructive"}`}>{estado.x}</p>}
+            </form>
+          </CardContent>
+        </Card>
+        <p className="mt-6 text-center text-sm text-muted-foreground">¿Ya tienes cuenta? <Link href="/login" className="font-medium text-primary hover:underline">Inicia sesión</Link></p>
+      </div>
     </main>
   );
 }
