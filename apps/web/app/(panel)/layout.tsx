@@ -22,7 +22,7 @@ const GESTION: NavItem[] = [
 const OPERATIVA: NavItem[] = [
   { href: "/tpv", label: "TPV", icon: ShoppingCart },
   { href: "/comandera", label: "Comandera", icon: Smartphone },
-  { href: "/kds", label: "Cocina (KDS)", icon: ChefHat },
+  { href: "/cocina", label: "Cocina (KDS)", icon: ChefHat },
   { href: "/kiosko", label: "Kiosko", icon: Store },
   { href: "/pantalla", label: "Display", icon: MonitorSmartphone },
   { href: "/ofertas", label: "Ofertas", icon: Megaphone },
