@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShoppingCart, ChefHat, Store, MonitorSmartphone, Users, BookOpen } from "lucide-react";
+import { ShoppingCart, ChefHat, Store, MonitorSmartphone, Users, BookOpen, type LucideIcon } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 
 export default function Dashboard() {
@@ -55,7 +55,7 @@ export default function Dashboard() {
   );
 }
 
-function Stat({ label, value, icon: Icon, href }: { label: string; value: number | string; icon: React.ComponentType<{ className?: string }>; href?: string }) {
+function Stat({ label, value, icon: Icon, href }: { label: string; value: number | string; icon: LucideIcon; href?: string }) {
   const body = (
     <div className="card flex items-center justify-between">
       <div>
