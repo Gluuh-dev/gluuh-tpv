@@ -16,7 +16,7 @@ export default function Login() {
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email, password });
     setCargando(false);
     if (error) setError(error.message);
-    else window.location.href = "/panel";
+    else window.location.href = "/dashboard";
   }
 
   return (

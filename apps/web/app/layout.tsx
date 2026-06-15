@@ -1,14 +1,15 @@
+import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
   title: "Gluuh TPV",
-  description: "Backoffice y TPV de hostelería",
+  description: "TPV de hostelería — gestión, comandas y cocina",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es">
-      <body style={{ fontFamily: "system-ui, sans-serif", margin: 0 }}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
