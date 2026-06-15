@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, BookOpen, BarChart3, Settings, LayoutGrid,
-  ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut,
+  ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut, Smartphone,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 
@@ -21,6 +21,7 @@ const GESTION: NavItem[] = [
 ];
 const OPERATIVA: NavItem[] = [
   { href: "/tpv", label: "TPV", icon: ShoppingCart },
+  { href: "/comandera", label: "Comandera", icon: Smartphone },
   { href: "/kds", label: "Cocina (KDS)", icon: ChefHat },
   { href: "/kiosko", label: "Kiosko", icon: Store },
   { href: "/pantalla", label: "Display", icon: MonitorSmartphone },
