@@ -1,59 +1,78 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { textoSobre } from "../lib/branding";
+
+interface Offer {
+  id: string; titulo: string; descripcion: string | null; precio: string | null;
+  media_tipo: "EMOJI" | "IMAGEN" | "VIDEO"; media_url: string | null; emoji: string | null; color: string;
+}
 
 /**
- * Cartelería digital de ofertas (digital signage) para pantallas del local.
- * Rota promociones automáticamente. En producción, las promos vienen de Supabase
- * y se pueden programar por franja horaria. Ver docs/14.
+ * Cartelería digital (digital signage). Autenticada: rota SOLO las ofertas de la
+ * empresa de la sesión. Soporta emoji, imagen o vídeo a pantalla completa.
  */
-const OFERTAS = [
-  { emoji: "🍔", titulo: "Menú Clásico", desc: "Hamburguesa + patatas + bebida", precio: "9,90 €", bg: "#e11d48" },
-  { emoji: "🍺", titulo: "Hora feliz", desc: "2ª cerveza al 50% · de 18 a 20 h", precio: "", bg: "#f59e0b" },
-  { emoji: "🍦", titulo: "Postre gratis", desc: "En menús dobles, hoy", precio: "0 €", bg: "#7c3aed" },
-  { emoji: "🥤", titulo: "Refill de refresco", desc: "Rellena tu vaso sin coste", precio: "", bg: "#0ea5e9" },
-];
-
 export default function Ofertas() {
+  const sb = supabaseBrowser();
+  const [estado, setEstado] = useState<"cargando" | "sin-sesion" | "vacio" | "ok">("cargando");
+  const [ofertas, setOfertas] = useState<Offer[]>([]);
   const [i, setI] = useState(0);
+
   useEffect(() => {
-    const t = setInterval(() => setI((v) => (v + 1) % OFERTAS.length), 4000);
-    return () => clearInterval(t);
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { setEstado("sin-sesion"); return; }
+      const { data } = await sb.from("offer").select("id,titulo,descripcion,precio,media_tipo,media_url,emoji,color").eq("activa", true).order("orden");
+      const list = (data as Offer[]) ?? [];
+      setOfertas(list);
+      setEstado(list.length ? "ok" : "vacio");
+    })();
+    /* eslint-disable-next-line */
   }, []);
 
-  const o = OFERTAS[i]!;
+  useEffect(() => {
+    if (ofertas.length < 2) return;
+    const t = setInterval(() => setI((v) => (v + 1) % ofertas.length), 6000);
+    return () => clearInterval(t);
+  }, [ofertas.length]);
+
+  if (estado === "cargando") return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">Cargando…</div>;
+  if (estado === "sin-sesion") return (
+    <div className="grid min-h-screen place-items-center bg-slate-950 p-6 text-center text-white">
+      <div><h1 className="text-2xl font-bold">Cartelería sin configurar</h1><p className="mt-2 text-slate-400">Inicia sesión con la cuenta del restaurante.</p><a href="/login" className="mt-5 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-slate-900">Iniciar sesión</a></div>
+    </div>
+  );
+  if (estado === "vacio") return (
+    <div className="grid min-h-screen place-items-center bg-slate-950 p-6 text-center text-white">
+      <div><div className="text-6xl">🖼️</div><h1 className="mt-3 text-2xl font-bold">Sin ofertas todavía</h1><p className="mt-2 text-slate-400">Crea ofertas en Panel → Personalización.</p><a href="/personalizar" className="mt-5 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-slate-900">Crear ofertas</a></div>
+    </div>
+  );
+
+  const o = ofertas[i]!;
+  const fg = textoSobre(o.color);
   return (
-    <main style={{ ...S.wrap, background: o.bg }}>
-      <div style={S.card}>
-        <div style={{ fontSize: 140 }}>{o.emoji}</div>
-        <h1 style={S.titulo}>{o.titulo}</h1>
-        <p style={S.desc}>{o.desc}</p>
-        {o.precio && <div style={S.precio}>{o.precio}</div>}
+    <main className="relative grid min-h-screen place-items-center overflow-hidden" style={{ background: o.color, color: fg, transition: "background .6s" }}>
+      {o.media_tipo === "VIDEO" && o.media_url && (
+        <video key={o.id} src={o.media_url} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
+      )}
+      {o.media_tipo === "IMAGEN" && o.media_url && (
+        <img key={o.id} src={o.media_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      )}
+      {o.media_tipo !== "EMOJI" && o.media_url && <div className="absolute inset-0 bg-black/35" />}
+
+      <div className="relative z-10 px-6 text-center">
+        {o.media_tipo === "EMOJI" && <div style={{ fontSize: 140 }}>{o.emoji || "🍔"}</div>}
+        <h1 className="text-6xl font-black drop-shadow sm:text-7xl">{o.titulo}</h1>
+        {o.descripcion && <p className="mt-3 text-2xl sm:text-3xl drop-shadow">{o.descripcion}</p>}
+        {o.precio && <div className="mt-6 inline-block rounded-2xl bg-white/95 px-8 py-3 text-5xl font-black text-slate-900 shadow-lg">{o.precio}</div>}
       </div>
-      <div style={S.dots}>
-        {OFERTAS.map((_, k) => (
-          <span key={k} style={{ ...S.dot, opacity: k === i ? 1 : 0.4 }} />
-        ))}
-      </div>
+
+      {ofertas.length > 1 && (
+        <div className="absolute bottom-8 z-10 flex gap-3">
+          {ofertas.map((_, k) => <span key={k} className="h-3 w-3 rounded-full bg-white" style={{ opacity: k === i ? 1 : 0.4 }} />)}
+        </div>
+      )}
     </main>
   );
 }
-
-const S: Record<string, React.CSSProperties> = {
-  wrap: {
-    minHeight: "100vh",
-    color: "#fff",
-    fontFamily: "system-ui, sans-serif",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "background 0.6s",
-  },
-  card: { textAlign: "center" },
-  titulo: { fontSize: 64, margin: "8px 0", fontWeight: 900 },
-  desc: { fontSize: 28 },
-  precio: { fontSize: 80, fontWeight: 900, marginTop: 16 },
-  dots: { display: "flex", gap: 12, position: "absolute", bottom: 40 },
-  dot: { width: 16, height: 16, borderRadius: 999, background: "#fff", display: "inline-block" },
-};

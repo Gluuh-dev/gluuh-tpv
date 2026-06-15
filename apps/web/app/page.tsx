@@ -13,12 +13,13 @@ const FEATURES = [
   { icon: Tag, title: "Precio honesto", desc: "Sin permanencia, sin alta, precios públicos. Lo contrario al mercado." },
 ];
 
-const DEMOS = [
-  { href: "/tpv", label: "TPV", icon: ShoppingCart },
-  { href: "/kiosko", label: "Kiosko", icon: Store },
-  { href: "/kds", label: "Cocina (KDS)", icon: ChefHat },
-  { href: "/pantalla", label: "Display", icon: MonitorSmartphone },
-  { href: "/ofertas", label: "Ofertas", icon: Megaphone },
+const PANTALLAS = [
+  { icon: ShoppingCart, label: "TPV de barra", desc: "Cobro rápido, división de cuenta y ticket con QR fiscal." },
+  { icon: Smartphone, label: "Comandera", desc: "El camarero toma nota desde el móvil con su PIN." },
+  { icon: Store, label: "Kiosko de autopedido", desc: "Tus clientes piden y pagan solos, con tu marca." },
+  { icon: ChefHat, label: "Cocina (KDS)", desc: "Las comandas llegan a cocina en tiempo real." },
+  { icon: MonitorSmartphone, label: "Display de pedidos", desc: "Pantalla de “preparando / listo” para la sala." },
+  { icon: Megaphone, label: "Cartelería y ofertas", desc: "Promos con imagen o vídeo, programables por cliente." },
 ];
 
 export default function Home() {
@@ -69,19 +70,28 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Demos */}
+      {/* Pantallas */}
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-          <h2 className="text-2xl font-semibold">Míralo en acción</h2>
-          <p className="mt-1 text-slate-600">Pantallas de demostración (datos de ejemplo).</p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            {DEMOS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium hover:bg-slate-100">
-                <Icon className="h-4 w-4 text-brand-600" /> {label}
-              </Link>
-            ))}
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold">Una plataforma, todas las pantallas</h2>
+          <p className="mt-1 text-slate-600">Barra, sala, cocina, kiosko y cartelería — cada restaurante con sus datos y su marca.</p>
+        </div>
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {PANTALLAS.map(({ icon: Icon, label, desc }) => (
+            <div key={label} className="card">
+              <span className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon className="h-5 w-5" /></span>
+              <h3 className="text-base font-semibold">{label}</h3>
+              <p className="mt-1 text-sm text-slate-600">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-8 text-center">
+          <h3 className="text-lg font-semibold">¿Lo quieres para tu restaurante?</h3>
+          <p className="mt-1 text-slate-600">El alta la gestiona nuestro equipo. Te damos acceso y configuramos tu marca.</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Link href="/registro" className="btn-primary px-6 py-3 text-base">Solicitar acceso <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/login" className="btn-ghost px-6 py-3 text-base">Ya tengo cuenta</Link>
           </div>
-          <p className="mt-4 text-xs text-slate-400">Flujo completo: pide en <code>/kiosko</code>, gestiónalo en <code>/kds</code> y míralo en <code>/pantalla</code>.</p>
         </div>
       </section>
 

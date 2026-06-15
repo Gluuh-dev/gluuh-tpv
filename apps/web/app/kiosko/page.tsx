@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShoppingBag, Utensils, Plus, Minus, ArrowRight, Check } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { BRANDING_DEFAULT, leerBranding, textoSobre, type Branding } from "../lib/branding";
 
 interface Cat { id: string; nombre: string }
 interface Prod { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null }
@@ -12,6 +13,7 @@ const eur = (n: number) => Number(n).toFixed(2) + " €";
 export default function Kiosko() {
   const sb = supabaseBrowser();
   const [estado, setEstado] = useState<"cargando" | "sin-sesion" | "ok">("cargando");
+  const [brand, setBrand] = useState<Branding>(BRANDING_DEFAULT);
   const [empresa, setEmpresa] = useState("");
   const [cats, setCats] = useState<Cat[]>([]);
   const [prods, setProds] = useState<Prod[]>([]);
@@ -26,12 +28,14 @@ export default function Kiosko() {
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { setEstado("sin-sesion"); return; }
-      const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
-      const [{ data: c }, { data: p }] = await Promise.all([
+      const [{ data: t }, b, { data: c }, { data: p }] = await Promise.all([
+        sb.from("tenant").select("nombre").limit(1).maybeSingle(),
+        leerBranding(sb),
         sb.from("category").select("id,nombre,orden").order("orden"),
         sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id").eq("disponible", true).order("nombre"),
       ]);
-      setEmpresa(t?.nombre ?? "");
+      setBrand(b);
+      setEmpresa(b.nombre_comercial || t?.nombre || "");
       setCats((c as Cat[]) ?? []);
       setProds((p as Prod[]) ?? []);
       setCatSel((c as Cat[])?.[0]?.id ?? null);
@@ -40,10 +44,12 @@ export default function Kiosko() {
     /* eslint-disable-next-line */
   }, []);
 
+  const c = brand.color_primario;
+  const fg = textoSobre(c);
   const total = useMemo(() => Object.entries(carrito).reduce((s, [id, q]) => s + (prods.find((p) => p.id === id)?.precio ?? 0) * q, 0), [carrito, prods]);
   const unidades = Object.values(carrito).reduce((s, q) => s + q, 0);
-  const add = (id: string) => setCarrito((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
-  const sub = (id: string) => setCarrito((c) => { const n = (c[id] ?? 0) - 1; const { [id]: _, ...r } = c; return n > 0 ? { ...c, [id]: n } : r; });
+  const add = (id: string) => setCarrito((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 }));
+  const sub = (id: string) => setCarrito((m) => { const n = (m[id] ?? 0) - 1; const { [id]: _, ...r } = m; return n > 0 ? { ...m, [id]: n } : r; });
 
   async function pagar() {
     setBusy(true);
@@ -56,22 +62,26 @@ export default function Kiosko() {
   }
   function reiniciar() { setCarrito({}); setNumero(null); setTipoConsumo("LOCAL"); setPaso("inicio"); }
 
-  if (estado === "cargando") return <div className="grid min-h-screen place-items-center bg-rose-600 text-white">Cargando…</div>;
+  const Logo = () => brand.logo_url
+    ? <img src={brand.logo_url} alt="" className="mx-auto h-24 w-auto object-contain" />
+    : <div className="text-6xl">🍔</div>;
+
+  if (estado === "cargando") return <div className="grid min-h-screen place-items-center bg-slate-900 text-white">Cargando…</div>;
   if (estado === "sin-sesion") return (
-    <div className="grid min-h-screen place-items-center bg-rose-600 p-6 text-center text-white">
-      <div><Utensils className="mx-auto h-12 w-12" /><h1 className="mt-3 text-2xl font-bold">Kiosko sin configurar</h1><p className="mt-2 opacity-90">Inicia sesión en este dispositivo con la cuenta del restaurante.</p><a href="/login" className="mt-5 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-rose-600">Iniciar sesión</a></div>
+    <div className="grid min-h-screen place-items-center p-6 text-center text-white" style={{ background: c }}>
+      <div><Utensils className="mx-auto h-12 w-12" /><h1 className="mt-3 text-2xl font-bold">Kiosko sin configurar</h1><p className="mt-2 opacity-90">Inicia sesión en este dispositivo con la cuenta del restaurante.</p><a href="/login" className="mt-5 inline-block rounded-xl bg-white px-6 py-3 font-semibold" style={{ color: c }}>Iniciar sesión</a></div>
     </div>
   );
 
   if (paso === "inicio") return (
-    <div className="grid min-h-screen place-items-center bg-rose-600 p-6 text-center text-white">
+    <div className="grid min-h-screen place-items-center p-6 text-center" style={{ background: c, color: fg }}>
       <div>
-        <div className="text-6xl">🍔</div>
-        <h1 className="mt-4 text-4xl font-bold">{empresa || "Bienvenido"}</h1>
-        <p className="mt-1 text-lg opacity-90">Haz tu pedido aquí</p>
+        <Logo />
+        <h1 className="mt-4 text-4xl font-bold">{brand.kiosko_titulo || empresa || "Bienvenido"}</h1>
+        <p className="mt-1 text-lg opacity-90">{brand.kiosko_subtitulo || "Haz tu pedido aquí"}</p>
         <div className="mt-10 flex flex-wrap justify-center gap-5">
-          <button onClick={() => { setTipoConsumo("LOCAL"); setPaso("carta"); }} className="flex h-48 w-48 flex-col items-center justify-center gap-3 rounded-3xl bg-white text-rose-600"><Utensils className="h-14 w-14" /><span className="text-2xl font-bold">Comer aquí</span></button>
-          <button onClick={() => { setTipoConsumo("PARA_LLEVAR"); setPaso("carta"); }} className="flex h-48 w-48 flex-col items-center justify-center gap-3 rounded-3xl bg-white text-rose-600"><ShoppingBag className="h-14 w-14" /><span className="text-2xl font-bold">Para llevar</span></button>
+          <button onClick={() => { setTipoConsumo("LOCAL"); setPaso("carta"); }} className="flex h-48 w-48 flex-col items-center justify-center gap-3 rounded-3xl bg-white" style={{ color: c }}><Utensils className="h-14 w-14" /><span className="text-2xl font-bold">Comer aquí</span></button>
+          <button onClick={() => { setTipoConsumo("PARA_LLEVAR"); setPaso("carta"); }} className="flex h-48 w-48 flex-col items-center justify-center gap-3 rounded-3xl bg-white" style={{ color: c }}><ShoppingBag className="h-14 w-14" /><span className="text-2xl font-bold">Para llevar</span></button>
         </div>
       </div>
     </div>
@@ -108,20 +118,20 @@ export default function Kiosko() {
   const productos = prods.filter((p) => p.category_id === catSel);
   return (
     <div className="flex min-h-screen flex-col bg-slate-100">
-      <header className="flex items-center justify-between bg-rose-600 px-5 py-3 text-white">
-        <strong className="text-lg">🍔 {empresa}</strong>
+      <header className="flex items-center justify-between px-5 py-3" style={{ background: c, color: fg }}>
+        <strong className="flex items-center gap-2 text-lg">{brand.logo_url ? <img src={brand.logo_url} alt="" className="h-7 w-auto object-contain" /> : "🍔"} {empresa}</strong>
         <span className="text-sm">{tipoConsumo === "LOCAL" ? "🍽️ Comer aquí" : "🛍️ Para llevar"}</span>
       </header>
       <div className="grid flex-1 grid-cols-[150px_1fr_320px]">
         <nav className="flex flex-col overflow-y-auto border-r border-slate-200 bg-white">
-          {cats.map((c) => <button key={c.id} onClick={() => setCatSel(c.id)} className={`border-b border-slate-100 px-3 py-4 text-left text-sm ${catSel === c.id ? "bg-rose-600 font-semibold text-white" : "hover:bg-slate-50"}`}>{c.nombre}</button>)}
+          {cats.map((cat) => <button key={cat.id} onClick={() => setCatSel(cat.id)} className="border-b border-slate-100 px-3 py-4 text-left text-sm" style={catSel === cat.id ? { background: c, color: fg, fontWeight: 600 } : undefined}>{cat.nombre}</button>)}
         </nav>
         <section className="grid content-start gap-3 overflow-y-auto p-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))" }}>
           {productos.map((p) => (
             <button key={p.id} onClick={() => add(p.id)} className="relative rounded-2xl border border-slate-200 bg-white p-4 text-center">
               <div className="text-4xl">🍽️</div>
               <div className="mt-1 font-medium leading-tight">{p.nombre}</div>
-              <div className="font-bold text-rose-600">{eur(p.precio)}</div>
+              <div className="font-bold" style={{ color: c }}>{eur(p.precio)}</div>
               {carrito[p.id] ? <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-emerald-600 text-sm font-bold text-white">{carrito[p.id]}</span> : null}
             </button>
           ))}
@@ -141,7 +151,7 @@ export default function Kiosko() {
               </div>); })}
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-slate-900 pt-2 text-xl font-bold"><span>TOTAL</span><span>{eur(total)}</span></div>
-          <button onClick={() => setPaso("pago")} disabled={!unidades} className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-rose-600 py-4 text-lg font-bold text-white disabled:opacity-40">Pagar <ArrowRight className="h-5 w-5" /></button>
+          <button onClick={() => setPaso("pago")} disabled={!unidades} className="mt-3 flex items-center justify-center gap-2 rounded-xl py-4 text-lg font-bold disabled:opacity-40" style={{ background: c, color: fg }}>Pagar <ArrowRight className="h-5 w-5" /></button>
         </aside>
       </div>
     </div>

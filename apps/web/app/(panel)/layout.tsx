@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Users, BookOpen, BarChart3, Settings, LayoutGrid,
   ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut, Smartphone,
-  type LucideIcon,
+  Palette, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 
@@ -17,6 +17,7 @@ const GESTION: NavItem[] = [
   { href: "/carta", label: "Carta", icon: BookOpen },
   { href: "/sala", label: "Sala", icon: LayoutGrid },
   { href: "/empleados", label: "Empleados", icon: Users },
+  { href: "/personalizar", label: "Personalización", icon: Palette },
   { href: "/informes", label: "Informes", icon: BarChart3 },
   { href: "/ajustes", label: "Ajustes", icon: Settings },
 ];
