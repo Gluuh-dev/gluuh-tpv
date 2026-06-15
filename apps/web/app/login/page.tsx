@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { LogIn } from "lucide-react";
+import { LogIn, Fingerprint } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/ui/password-input";
 import { traducirErrorAuth } from "@/lib/auth-errors";
+import { entrarConPasskey, passkeysSoportadas } from "@/lib/passkeys";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [conPasskey, setConPasskey] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,6 +30,20 @@ export default function Login() {
     setCargando(false);
     if (error) setError(traducirErrorAuth(error.message));
     else window.location.href = "/dashboard";
+  }
+
+  async function onPasskey() {
+    setConPasskey(true);
+    setError("");
+    try {
+      const { error } = await entrarConPasskey(supabaseBrowser());
+      if (error) setError(traducirErrorAuth(error.message));
+      else window.location.href = "/dashboard";
+    } catch (e) {
+      setError("No se pudo usar la passkey en este dispositivo.");
+    } finally {
+      setConPasskey(false);
+    }
   }
 
   return (
@@ -54,6 +73,17 @@ export default function Login() {
               </Button>
               {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
             </form>
+
+            {mounted && passkeysSoportadas() && (
+              <>
+                <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="h-px flex-1 bg-border" /> o <span className="h-px flex-1 bg-border" />
+                </div>
+                <Button type="button" variant="outline" className="w-full" onClick={onPasskey} disabled={conPasskey}>
+                  <Fingerprint className="h-4 w-4" /> {conPasskey ? "Esperando…" : "Entrar con huella / Face ID"}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
         <p className="mt-6 text-center text-sm text-muted-foreground">

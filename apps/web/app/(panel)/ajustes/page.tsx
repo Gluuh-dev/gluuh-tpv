@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Fingerprint } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { registrarPasskey, passkeysSoportadas } from "@/lib/passkeys";
 
 const TERRITORIOS = [
   { v: "PENINSULA_BALEARES", t: "Península / Baleares (IVA)" },
@@ -23,6 +25,21 @@ export default function Ajustes() {
   const [f, setF] = useState({ empresa: "", nombre: "", direccion: "", cif: "", razon_social: "", territorio_fiscal: "PENINSULA_BALEARES", serie_factura: "F" });
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pkMsg, setPkMsg] = useState("");
+  const [pkBusy, setPkBusy] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  async function onRegistrarPasskey() {
+    setPkBusy(true); setPkMsg("");
+    try {
+      const { error } = await registrarPasskey(sb);
+      setPkMsg(error ? `Error: ${error.message}` : "Passkey registrada ✓ Ya puedes entrar con huella/Face ID.");
+    } catch {
+      setPkMsg("Tu dispositivo no permitió crear la passkey.");
+    } finally { setPkBusy(false); }
+  }
 
   useEffect(() => {
     (async () => {
@@ -88,6 +105,23 @@ export default function Ajustes() {
           </form>
         </CardContent>
       </Card>
+
+      {mounted && passkeysSoportadas() && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><Fingerprint className="h-4 w-4" /> Seguridad · acceso rápido</CardTitle>
+            <CardDescription>Registra una passkey para entrar con huella, Face ID o Windows Hello en este dispositivo, sin escribir la contraseña.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" onClick={onRegistrarPasskey} disabled={pkBusy}>
+                <Fingerprint className="h-4 w-4" /> {pkBusy ? "Registrando…" : "Registrar passkey"}
+              </Button>
+              {pkMsg && <span className="text-sm text-muted-foreground">{pkMsg}</span>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
