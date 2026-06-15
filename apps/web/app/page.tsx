@@ -19,6 +19,11 @@ export default function Home() {
     <main style={{ padding: 32, maxWidth: 640 }}>
       <h1>Gluuh TPV</h1>
       <p>Esqueleto del backoffice / TPV web. Ver <code>docs/</code>.</p>
+      <h2>Acceso (multiempresa)</h2>
+      <ul style={{ lineHeight: 2 }}>
+        <li>🏢 <a href="/registro">Crear cuenta de empresa</a> — alta self-service</li>
+        <li>🔑 <a href="/login">Iniciar sesión</a> → <a href="/panel">/panel</a></li>
+      </ul>
       <h2>Pantallas de demostración</h2>
       <ul style={{ lineHeight: 2 }}>
         <li>🧾 <a href="/tpv">TPV</a> — venta + ticket con QR VERIFACTU</li>
