@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CLASES_FISCALES, ivaAuto, nombreImpuesto } from "@/lib/fiscal-clases";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface Familia { id: string; nombre: string; orden: number; color: string }
 interface Categoria { id: string; nombre: string; orden: number; family_id: string | null }
@@ -72,10 +74,10 @@ export default function Carta() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Carta</h1>
-        <p className="text-muted-foreground">Familias → categorías → productos. El {nombreImpuesto(territorio)} se calcula automáticamente por la clase fiscal de cada producto.</p>
-      </div>
+      <PageHeader
+        title="Carta"
+        description={`Familias → categorías → productos. El ${nombreImpuesto(territorio)} se calcula automáticamente por la clase fiscal de cada producto.`}
+      />
 
       {/* Altas rápidas */}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -96,16 +98,21 @@ export default function Carta() {
         </form>
       </div>
 
-      {grupos.length === 0 && <Card className="p-5 text-muted-foreground">Crea tu primera familia y categoría para empezar.</Card>}
+      {grupos.length === 0 && (
+        <EmptyState
+          title="Sin familias ni categorías"
+          description="Crea tu primera familia y categoría para empezar a organizar los productos de tu carta."
+        />
+      )}
 
       {grupos.map((g) => (
         <section key={g.familia?.id ?? "sinfam"} className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full" style={{ background: g.familia?.color ?? "#cbd5e1" }} />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{g.familia?.nombre ?? "Sin familia"}</h2>
-            {g.familia && <button onClick={() => delFamilia(g.familia!.id)} className="text-slate-300 hover:text-destructive" title="Eliminar familia"><Trash2 className="h-3.5 w-3.5" /></button>}
+            {g.familia && <button onClick={() => delFamilia(g.familia!.id)} className="text-muted-foreground/50 hover:text-destructive" title="Eliminar familia"><Trash2 className="h-3.5 w-3.5" /></button>}
           </div>
-          {g.cats.length === 0 && <p className="pl-5 text-sm text-slate-400">Sin categorías en esta familia.</p>}
+          {g.cats.length === 0 && <p className="pl-5 text-sm text-muted-foreground">Sin categorías en esta familia.</p>}
           {g.cats.map((cat) => (
             <CategoriaCard
               key={cat.id}
@@ -154,7 +161,7 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
     <Card className="ml-5 overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <h3 className="font-medium">{cat.nombre} <span className="text-muted-foreground">· {productos.length}</span></h3>
-        <button onClick={onDeleteCat} className="text-slate-400 hover:text-destructive" title="Eliminar categoría"><Trash2 className="h-4 w-4" /></button>
+        <button onClick={onDeleteCat} className="text-muted-foreground/60 hover:text-destructive" title="Eliminar categoría"><Trash2 className="h-4 w-4" /></button>
       </div>
 
       <div className="divide-y divide-border">
@@ -165,7 +172,7 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
             <span className="w-14 text-right text-muted-foreground">{p.tipo_impositivo}%</span>
             <span className="w-16 text-right tabular-nums">{eur(p.precio)}</span>
             <button onClick={() => onToggle(p)} className={`w-20 text-right text-xs ${p.disponible ? "text-emerald-600" : "text-muted-foreground"}`}>{p.disponible ? "Disponible" : "Agotado"}</button>
-            <button onClick={() => onDeleteProd(p.id)} className="text-slate-300 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+            <button onClick={() => onDeleteProd(p.id)} className="text-muted-foreground/50 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
           </div>
         ))}
       </div>

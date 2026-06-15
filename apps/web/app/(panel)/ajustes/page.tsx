@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { registrarPasskey, passkeysSoportadas } from "@/lib/passkeys";
+import { PageHeader } from "@/components/ui/page-header";
 
 const TERRITORIOS = [
   { v: "PENINSULA_BALEARES", t: "Península / Baleares (IVA)" },
@@ -75,10 +76,10 @@ export default function Ajustes() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Ajustes</h1>
-        <p className="text-muted-foreground">Datos fiscales del local (necesarios para la facturación VERIFACTU).</p>
-      </div>
+      <PageHeader
+        title="Ajustes"
+        description="Datos fiscales del local (necesarios para la facturación VERIFACTU)."
+      />
       <Card>
         <CardContent className="pt-6">
           <form className="space-y-4" onSubmit={guardar}>

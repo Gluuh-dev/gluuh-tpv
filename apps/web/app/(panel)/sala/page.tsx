@@ -6,6 +6,8 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface Room { id: string; nombre: string; orden: number }
 interface Mesa { id: string; nombre: string; room_id: string; estado: string }
@@ -46,18 +48,23 @@ export default function Sala() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Sala</h1>
-          <p className="text-muted-foreground">Define tus salas y mesas. El TPV y la comandera trabajan sobre ellas.</p>
-        </div>
-        <form onSubmit={addSala} className="flex gap-2">
-          <Input className="w-48" placeholder="Nueva sala (Terraza…)" value={nuevaSala} onChange={(e) => setNuevaSala(e.target.value)} />
-          <Button className="whitespace-nowrap"><Plus className="h-4 w-4" /> Sala</Button>
-        </form>
-      </div>
+      <PageHeader
+        title="Sala"
+        description="Define tus salas y mesas. El TPV y la comandera trabajan sobre ellas."
+        actions={
+          <form onSubmit={addSala} className="flex gap-2">
+            <Input className="w-48" placeholder="Nueva sala (Terraza…)" value={nuevaSala} onChange={(e) => setNuevaSala(e.target.value)} />
+            <Button className="whitespace-nowrap"><Plus className="h-4 w-4" /> Sala</Button>
+          </form>
+        }
+      />
 
-      {rooms.length === 0 && <Card className="p-5 text-muted-foreground">Crea tu primera sala (p. ej. «Salón» o «Terraza»).</Card>}
+      {rooms.length === 0 && (
+        <EmptyState
+          title="Sin salas todavía"
+          description="Crea tu primera sala (p. ej. «Salón» o «Terraza») para añadir mesas."
+        />
+      )}
 
       <div className="space-y-5">
         {rooms.map((room) => (
@@ -96,13 +103,13 @@ function SalaCard({ room, mesas, onDelete, onChange }: { room: Room; mesas: Mesa
     <Card className="p-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-medium">{room.nombre} <span className="text-muted-foreground">· {mesas.length} mesas</span></h2>
-        <button onClick={onDelete} className="text-slate-400 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+        <button onClick={onDelete} className="text-muted-foreground/60 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {mesas.map((m) => (
           <div key={m.id} className="group relative grid h-16 w-16 place-items-center rounded-xl border border-border bg-muted/40 text-center text-xs font-medium">
-            <Armchair className="absolute right-1 top-1 h-3 w-3 text-slate-300" />
+            <Armchair className="absolute right-1 top-1 h-3 w-3 text-muted-foreground/40" />
             {m.nombre}
             <button onClick={() => delMesa(m.id)} className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 place-items-center rounded-full bg-destructive text-white group-hover:grid">×</button>
           </div>

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface Empleado { id: string; nombre: string; email: string | null; rol: string; activo: boolean }
 
@@ -53,10 +54,10 @@ export default function Empleados() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Empleados</h1>
-        <p className="text-muted-foreground">Crea camareros y cocina con su PIN. Cada acción quedará registrada a su nombre.</p>
-      </div>
+      <PageHeader
+        title="Empleados"
+        description="Crea camareros y cocina con su PIN. Cada acción quedará registrada a su nombre."
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Lista */}

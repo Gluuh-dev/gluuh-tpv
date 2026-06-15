@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface Offer {
   id: string; titulo: string; descripcion: string | null; precio: string | null;
@@ -88,13 +90,11 @@ export default function Personalizar() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Personalización</h1>
-          <p className="text-sm text-muted-foreground">Tu marca y tus ofertas, tal y como las verán tus clientes en kiosko, display y cartelería.</p>
-        </div>
-        {msg && <Badge className="bg-emerald-100 text-emerald-700">{msg}</Badge>}
-      </div>
+      <PageHeader
+        title="Personalización"
+        description="Tu marca y tus ofertas, tal y como las verán tus clientes en kiosko, display y cartelería."
+        actions={msg ? <Badge className="bg-emerald-100 text-emerald-700">{msg}</Badge> : undefined}
+      />
 
       {/* ---------- MARCA ---------- */}
       <section className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -145,7 +145,12 @@ export default function Personalizar() {
           <Button onClick={addOferta}><Plus className="h-4 w-4" /> Nueva oferta</Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {ofertas.length === 0 && <p className="py-6 text-center text-muted-foreground">Aún no hay ofertas. Crea la primera.</p>}
+          {ofertas.length === 0 && (
+            <EmptyState
+              title="Sin ofertas todavía"
+              description="Crea la primera oferta para mostrarla en bucle en la pantalla de ofertas."
+            />
+          )}
 
           {ofertas.map((o) => (
             <div key={o.id} className="grid gap-4 rounded-xl border border-border p-4 lg:grid-cols-[110px_1fr_auto]">
@@ -173,7 +178,7 @@ export default function Personalizar() {
                   ? <Input placeholder="Emoji 🍔" value={o.emoji ?? ""} onChange={(e) => patch(o.id, { emoji: e.target.value })} />
                   : <Button asChild variant="outline" className="cursor-pointer"><label><ImageIcon className="h-4 w-4" /> {o.media_url ? "Cambiar archivo" : "Subir archivo"}<input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => onMediaOferta(o, e)} /></label></Button>}
                 <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">Color</span><input type="color" value={o.color} onChange={(e) => patch(o.id, { color: e.target.value })} className="h-9 w-10 rounded border border-input" /></div>
-                <div className="flex items-center gap-2"><GripVertical className="h-4 w-4 text-slate-300" /><span className="text-xs text-muted-foreground">Orden</span><Input type="number" className="w-20" value={o.orden} onChange={(e) => patch(o.id, { orden: Number(e.target.value) })} /></div>
+                <div className="flex items-center gap-2"><GripVertical className="h-4 w-4 text-muted-foreground/40" /><span className="text-xs text-muted-foreground">Orden</span><Input type="number" className="w-20" value={o.orden} onChange={(e) => patch(o.id, { orden: Number(e.target.value) })} /></div>
               </div>
 
               {/* Acciones */}

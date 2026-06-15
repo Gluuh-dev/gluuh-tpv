@@ -7,6 +7,8 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 const eur = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 
@@ -73,21 +75,19 @@ export default function Dashboard() {
   const hoy = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{empresa || "Inicio"}</h1>
-          <p className="text-sm capitalize text-muted-foreground">{hoy}</p>
-        </div>
-        <Button asChild><Link href="/tpv"><ShoppingCart className="h-4 w-4" /> Abrir TPV</Link></Button>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <PageHeader
+        title={empresa || "Inicio"}
+        description={hoy}
+        actions={<Button asChild><Link href="/tpv"><ShoppingCart className="h-4 w-4" /> Abrir TPV</Link></Button>}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={TrendingUp} label="Ventas hoy" value={loading ? "…" : eur(k.ventas)} />
-        <Kpi icon={Receipt} label="Tickets" value={loading ? "…" : String(k.tickets)} />
-        <Kpi icon={Coins} label="Ticket medio" value={loading ? "…" : eur(k.medio)} />
-        <Kpi icon={Armchair} label="Mesas" value={loading ? "…" : `${k.ocupadas}/${k.mesas}`} hint={k.mesas ? `${k.mesas - k.ocupadas} libres` : undefined} />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Ventas hoy" value={loading ? "…" : eur(k.ventas)} />
+        <StatCard icon={<Receipt className="h-4 w-4" />} label="Tickets" value={loading ? "…" : String(k.tickets)} />
+        <StatCard icon={<Coins className="h-4 w-4" />} label="Ticket medio" value={loading ? "…" : eur(k.medio)} />
+        <StatCard icon={<Armchair className="h-4 w-4" />} label="Mesas" value={loading ? "…" : `${k.ocupadas}/${k.mesas}`} hint={k.mesas ? `${k.mesas - k.ocupadas} libres` : undefined} />
       </div>
 
       {/* Ventas por hora */}
@@ -164,19 +164,6 @@ export default function Dashboard() {
           </Link>
         ))}
       </div>
-    </div>
-  );
-}
-
-function Kpi({ icon: Icon, label, value, hint }: { icon: typeof TrendingUp; label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-xl bg-muted/60 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
-      {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
 }

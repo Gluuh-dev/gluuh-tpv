@@ -5,6 +5,8 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 interface Venta {
   id: string;
@@ -49,14 +51,14 @@ export default function Informes() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Informes</h1>
-        <p className="text-muted-foreground">Resumen de ventas (en tiempo real desde tu base de datos).</p>
-      </div>
+      <PageHeader
+        title="Informes"
+        description="Resumen de ventas (en tiempo real desde tu base de datos)."
+      />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label} className="p-5"><div className="text-sm text-muted-foreground">{s.label}</div><div className="text-2xl font-semibold">{s.value}</div></Card>
+          <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
       </div>
 
