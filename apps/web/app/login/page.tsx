@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/ui/password-input";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { traducirErrorAuth } from "@/lib/auth-errors";
 import { entrarConPasskey, passkeysSoportadas } from "@/lib/passkeys";
 
@@ -47,7 +48,8 @@ export default function Login() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-linear-to-b from-slate-50 to-slate-100 p-6">
+    <main className="relative grid min-h-screen place-items-center bg-background p-6 text-foreground">
+      <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span>
