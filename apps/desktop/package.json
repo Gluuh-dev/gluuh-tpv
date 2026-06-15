@@ -11,6 +11,6 @@
     "typecheck": "echo \"(typecheck pendiente)\""
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^42.4.0"
   }
 }

@@ -3,6 +3,8 @@
     "module": "commonjs",
     "target": "ES2021",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "types": ["node"],
     "outDir": "./dist",
     "rootDir": "./src",
     "experimentalDecorators": true,
