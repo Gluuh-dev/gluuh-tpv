@@ -29,18 +29,26 @@ const NAV_GROUPS: NavGroup[] = [
     { href: "/pantalla", label: "Display", icon: MonitorSmartphone, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/ofertas", label: "Ofertas", icon: Megaphone, roles: ["PROPIETARIO", "ENCARGADO"] },
   ] },
-  { id: "carta", title: "Carta y sala", icon: BookOpen, items: [
-    { href: "/carta", label: "Carta", icon: BookOpen, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/menus", label: "Menús", icon: UtensilsCrossed, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/sala", label: "Sala y mesas", icon: LayoutGrid, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/personalizar", label: "Personalización", icon: Palette, roles: ["PROPIETARIO"] },
+  { id: "catalogo", title: "Catálogo", icon: BookOpen, items: [
+    { href: "/carta", label: "Carta (familias, productos)", icon: BookOpen, roles: ["PROPIETARIO", "ENCARGADO"] },
+    { href: "/menus", label: "Menús y combos", icon: UtensilsCrossed, roles: ["PROPIETARIO", "ENCARGADO"] },
   ] },
-  { id: "gestion", title: "Gestión", icon: BarChart3, items: [
+  { id: "sala", title: "Sala", icon: LayoutGrid, items: [
+    { href: "/sala", label: "Salas y mesas", icon: LayoutGrid, roles: ["PROPIETARIO", "ENCARGADO"] },
+  ] },
+  { id: "tarifas", title: "Tarifas y precios", icon: CreditCard, items: [
     { href: "/formas-pago", label: "Formas de pago", icon: CreditCard, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/descuentos", label: "Descuentos", icon: Percent, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/empleados", label: "Empleados", icon: Users, roles: ["PROPIETARIO", "ENCARGADO"] },
+  ] },
+  { id: "personal", title: "Personal", icon: Users, items: [
+    { href: "/empleados", label: "Empleados y PIN", icon: Users, roles: ["PROPIETARIO", "ENCARGADO"] },
+  ] },
+  { id: "analisis", title: "Análisis", icon: BarChart3, items: [
     { href: "/informes", label: "Informes", icon: BarChart3, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/ajustes", label: "Ajustes", icon: Settings, roles: ["PROPIETARIO"] },
+  ] },
+  { id: "config", title: "Configuración", icon: Settings, items: [
+    { href: "/personalizar", label: "Marca y ofertas", icon: Palette, roles: ["PROPIETARIO"] },
+    { href: "/ajustes", label: "Datos fiscales y local", icon: Settings, roles: ["PROPIETARIO"] },
   ] },
 ];
 
