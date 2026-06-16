@@ -4,52 +4,73 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, Users, BookOpen, BarChart3, Settings, LayoutGrid,
-  ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut, Smartphone,
-  Palette, PanelLeftClose, PanelLeft, UtensilsCrossed, CreditCard, Percent, Wallet, type LucideIcon,
+  LayoutDashboard, BarChart3, ShoppingCart, LogOut,
+  PanelLeftClose, PanelLeft, Landmark, Package, Wrench, Info, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type Rol = "PROPIETARIO" | "ENCARGADO" | "CAMARERO" | "COCINA";
-interface NavItem { href: string; label: string; icon: LucideIcon; roles?: Rol[] }
-interface NavGroup { id: string; title: string; icon: LucideIcon; items: NavItem[] }
+interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean }
+interface NavSection { title?: string; items: NavLink[] }
+interface NavEntry { id: string; title: string; icon: LucideIcon; sections: NavSection[] }
 
-// roles? ausente = visible para todos
-const NAV_GROUPS: NavGroup[] = [
-  { id: "inicio", title: "Inicio", icon: LayoutDashboard, items: [
-    { href: "/dashboard", label: "Resumen", icon: LayoutDashboard, roles: ["PROPIETARIO", "ENCARGADO"] },
+const GEST: Rol[] = ["PROPIETARIO", "ENCARGADO"];
+const PROP: Rol[] = ["PROPIETARIO"];
+
+// Menú principal estilo Ágora. soon: página aún no construida.
+const NAV: NavEntry[] = [
+  { id: "inicio", title: "Inicio", icon: LayoutDashboard, sections: [
+    { items: [{ href: "/dashboard", label: "Resumen", roles: GEST }] },
   ] },
-  { id: "operativa", title: "Operativa", icon: ShoppingCart, items: [
-    { href: "/tpv", label: "TPV", icon: ShoppingCart, roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"] },
-    { href: "/comandera", label: "Comandera", icon: Smartphone, roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"] },
-    { href: "/cocina", label: "Cocina (KDS)", icon: ChefHat, roles: ["PROPIETARIO", "ENCARGADO", "COCINA"] },
-    { href: "/kiosko", label: "Kiosko", icon: Store, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/pantalla", label: "Display", icon: MonitorSmartphone, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/ofertas", label: "Ofertas", icon: Megaphone, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/caja", label: "Caja", icon: Wallet, roles: ["PROPIETARIO", "ENCARGADO"] },
+  { id: "operativa", title: "Operativa", icon: ShoppingCart, sections: [
+    { title: "Venta", items: [
+      { href: "/tpv", label: "TPV", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"] },
+      { href: "/comandera", label: "Comandera", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"] },
+    ] },
+    { title: "Pantallas", items: [
+      { href: "/cocina", label: "Cocina (KDS)", roles: ["PROPIETARIO", "ENCARGADO", "COCINA"] },
+      { href: "/kiosko", label: "Kiosko", roles: GEST },
+      { href: "/pantalla", label: "Display", roles: GEST },
+      { href: "/ofertas", label: "Ofertas", roles: GEST },
+    ] },
+    { title: "Caja", items: [{ href: "/caja", label: "Control de caja", roles: GEST }] },
   ] },
-  { id: "catalogo", title: "Catálogo", icon: BookOpen, items: [
-    { href: "/carta", label: "Carta (familias, productos)", icon: BookOpen, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/menus", label: "Menús y combos", icon: UtensilsCrossed, roles: ["PROPIETARIO", "ENCARGADO"] },
+  { id: "admin", title: "Administración", icon: Landmark, sections: [
+    { title: "General", items: [{ href: "/ajustes", label: "Empresa y local", roles: PROP }] },
+    { title: "Usuarios", items: [
+      { href: "/empleados", label: "Empleados y PIN", roles: GEST },
+      { label: "Perfiles y permisos", roles: PROP, soon: true },
+    ] },
+    { title: "Catálogo", items: [
+      { href: "/carta", label: "Familias y productos", roles: GEST },
+      { href: "/menus", label: "Menús y combos", roles: GEST },
+      { label: "Alérgenos", roles: GEST, soon: true },
+    ] },
+    { title: "Sala", items: [{ href: "/sala", label: "Salas y mesas", roles: GEST }] },
+    { title: "Tarifas y precios", items: [
+      { href: "/formas-pago", label: "Formas de pago", roles: GEST },
+      { href: "/descuentos", label: "Descuentos", roles: GEST },
+      { label: "Impuestos", roles: PROP, soon: true },
+      { label: "Tarifas y promociones", roles: GEST, soon: true },
+    ] },
+    { title: "Marca", items: [{ href: "/personalizar", label: "Personalización", roles: PROP }] },
   ] },
-  { id: "sala", title: "Sala", icon: LayoutGrid, items: [
-    { href: "/sala", label: "Salas y mesas", icon: LayoutGrid, roles: ["PROPIETARIO", "ENCARGADO"] },
+  { id: "compras", title: "Compras y Stocks", icon: Package, sections: [
+    { title: "General", items: [{ label: "Almacenes", roles: GEST, soon: true }, { label: "Proveedores", roles: GEST, soon: true }] },
+    { title: "Compras", items: [{ label: "Pedidos a proveedor", roles: GEST, soon: true }, { label: "Albaranes y facturas", roles: GEST, soon: true }] },
+    { title: "Stock", items: [{ label: "Inventario y mermas", roles: GEST, soon: true }, { label: "Escandallos", roles: GEST, soon: true }] },
   ] },
-  { id: "tarifas", title: "Tarifas y precios", icon: CreditCard, items: [
-    { href: "/formas-pago", label: "Formas de pago", icon: CreditCard, roles: ["PROPIETARIO", "ENCARGADO"] },
-    { href: "/descuentos", label: "Descuentos", icon: Percent, roles: ["PROPIETARIO", "ENCARGADO"] },
+  { id: "herramientas", title: "Herramientas", icon: Wrench, sections: [
+    { title: "VERI*FACTU", items: [{ label: "Visor Verifactu", roles: PROP, soon: true }] },
+    { title: "Impresión", items: [{ label: "Impresoras", roles: GEST, soon: true }] },
   ] },
-  { id: "personal", title: "Personal", icon: Users, items: [
-    { href: "/empleados", label: "Empleados y PIN", icon: Users, roles: ["PROPIETARIO", "ENCARGADO"] },
+  { id: "informes", title: "Informes", icon: BarChart3, sections: [
+    { items: [{ href: "/informes", label: "Informes", roles: GEST }] },
   ] },
-  { id: "analisis", title: "Análisis", icon: BarChart3, items: [
-    { href: "/informes", label: "Informes", icon: BarChart3, roles: ["PROPIETARIO", "ENCARGADO"] },
-  ] },
-  { id: "config", title: "Configuración", icon: Settings, items: [
-    { href: "/personalizar", label: "Marca y ofertas", icon: Palette, roles: ["PROPIETARIO"] },
-    { href: "/ajustes", label: "Datos fiscales y local", icon: Settings, roles: ["PROPIETARIO"] },
+  { id: "ayuda", title: "Ayuda", icon: Info, sections: [
+    { items: [{ label: "Documentación", soon: true }] },
   ] },
 ];
 
@@ -61,7 +82,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [info, setInfo] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [grupo, setGrupo] = useState<string>("inicio");
+  const [entrada, setEntrada] = useState("inicio");
   const [abierto, setAbierto] = useState(true);
   const [railOpen, setRailOpen] = useState(false);
 
@@ -77,72 +98,74 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     })();
   }, [router]);
 
-  // grupo activo según la ruta
+  // entrada activa según ruta
   useEffect(() => {
-    const g = NAV_GROUPS.find((gr) => gr.items.some((i) => i.href === pathname));
-    if (g) setGrupo(g.id);
+    const e = NAV.find((n) => n.sections.some((s) => s.items.some((i) => i.href === pathname)));
+    if (e) setEntrada(e.id);
   }, [pathname]);
 
-  // navegación filtrada por rol
-  const grupos = useMemo(() => {
+  // filtra por rol; oculta secciones/entradas vacías
+  const nav = useMemo(() => {
     const rol = info?.rol ?? "PROPIETARIO";
-    return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => puede(rol, i.roles)) })).filter((g) => g.items.length > 0);
+    return NAV.map((e) => ({
+      ...e,
+      sections: e.sections.map((s) => ({ ...s, items: s.items.filter((i) => puede(rol, i.roles)) })).filter((s) => s.items.length > 0),
+    })).filter((e) => e.sections.length > 0);
   }, [info?.rol]);
 
-  const grupoActivo = grupos.find((g) => g.id === grupo) ?? grupos[0];
+  const activa = nav.find((e) => e.id === entrada) ?? nav[0];
 
-  async function salir() {
-    await supabaseBrowser().auth.signOut();
-    router.replace("/login");
-  }
-  function abrirGrupo(g: NavGroup) {
-    setGrupo(g.id);
-    setAbierto(true);
-    if (!g.items.some((i) => i.href === pathname)) router.push(g.items[0]!.href);
+  async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
+  function abrirEntrada(e: NavEntry) {
+    setEntrada(e.id); setAbierto(true);
+    const primera = e.sections.flatMap((s) => s.items).find((i) => i.href);
+    if (primera?.href && !e.sections.some((s) => s.items.some((i) => i.href === pathname))) router.push(primera.href);
   }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Rail principal (expandible: iconos ↔ iconos + etiquetas) */}
-      <nav className={`flex shrink-0 flex-col gap-1 border-r border-border bg-card py-3 transition-all ${railOpen ? "w-52 px-3" : "w-16 items-center"}`}>
+      {/* Menú principal (rail) */}
+      <nav className={`flex shrink-0 flex-col gap-1 border-r border-border bg-card py-3 transition-all ${railOpen ? "w-56 px-3" : "w-16 items-center"}`}>
         <div className={`mb-2 flex items-center gap-2 ${railOpen ? "px-1" : ""}`}>
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</div>
           {railOpen && <span className="font-semibold">Gluuh <span className="text-muted-foreground">TPV</span></span>}
         </div>
-        {grupos.map((g) => {
-          const Icon = g.icon;
-          const activo = g.id === grupoActivo?.id;
+        {nav.map((e) => {
+          const Icon = e.icon;
+          const act = e.id === activa?.id;
           return (
-            <button key={g.id} onClick={() => abrirGrupo(g)} title={g.title}
-              className={`flex h-11 items-center gap-3 rounded-lg transition-colors ${railOpen ? "px-3" : "w-11 justify-center"} ${activo ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-              <Icon className="h-5 w-5 shrink-0" />
-              {railOpen && <span className="text-sm font-medium">{g.title}</span>}
+            <button key={e.id} onClick={() => abrirEntrada(e)} title={e.title}
+              className={`flex h-11 items-center gap-3 rounded-lg transition-colors ${railOpen ? "px-3" : "w-11 justify-center"} ${act ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+              <Icon className="h-5 w-5 shrink-0" />{railOpen && <span className="text-sm font-medium">{e.title}</span>}
             </button>
           );
         })}
-        <button onClick={() => setRailOpen((v) => !v)} title={railOpen ? "Contraer menú" : "Expandir menú"}
+        <button onClick={() => setRailOpen((v) => !v)} title={railOpen ? "Contraer" : "Expandir"}
           className={`mt-auto flex h-10 items-center gap-3 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${railOpen ? "px-3" : "w-11 justify-center"}`}>
-          {railOpen ? <PanelLeftClose className="h-5 w-5 shrink-0" /> : <PanelLeft className="h-5 w-5 shrink-0" />}
-          {railOpen && <span className="text-sm">Contraer</span>}
+          {railOpen ? <PanelLeftClose className="h-5 w-5 shrink-0" /> : <PanelLeft className="h-5 w-5 shrink-0" />}{railOpen && <span className="text-sm">Contraer</span>}
         </button>
       </nav>
 
-      {/* Submenú al lado (del grupo activo) */}
-      {abierto && grupoActivo && (
-        <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-card md:flex">
-          <div className="flex h-16 items-center px-4 text-base font-semibold">{grupoActivo.title}</div>
-          <div className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4 text-sm">
-            {grupoActivo.items.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href;
-              return (
-                <Link key={href} href={href}
-                  className={`flex h-9 items-center gap-3 rounded-md px-3 transition-colors ${active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                  <Icon className="h-4 w-4 shrink-0" /> {label}
-                </Link>
-              );
-            })}
+      {/* Submenú al lado (secciones + páginas de la entrada activa) */}
+      {abierto && activa && (
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
+          <div className="flex h-16 items-center px-4 text-base font-semibold">{activa.title}</div>
+          <div className="flex-1 space-y-4 overflow-y-auto px-3 pb-4 text-sm">
+            {activa.sections.map((s, si) => (
+              <div key={si} className="space-y-0.5">
+                {s.title && <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.title}</div>}
+                {s.items.map((i) => i.href ? (
+                  <Link key={i.label} href={i.href}
+                    className={`flex h-9 items-center rounded-md px-3 transition-colors ${pathname === i.href ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>{i.label}</Link>
+                ) : (
+                  <div key={i.label} className="flex h-9 items-center justify-between rounded-md px-3 text-muted-foreground/50" title="Próximamente">
+                    {i.label}<span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">pronto</span>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
           <div className="border-t border-border p-3 text-xs text-muted-foreground">
             <div className="truncate font-medium text-foreground">{info?.empresa}</div>
@@ -158,12 +181,12 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             <Button variant="ghost" size="icon" aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>
               {abierto ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
             </Button>
-            <span className="font-medium">{grupoActivo?.title}</span>
+            <span className="font-medium">{activa?.title}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="hidden text-muted-foreground sm:inline">{info?.nombre || info?.email}</span>
             <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={salir}><LogOut className="h-4 w-4" /> Salir</Button>
+            <Button variant="ghost" size="sm" onClick={salir}><LogOut className="h-4 w-4" /> Cerrar sesión</Button>
           </div>
         </header>
         <main className="flex-1 p-6">{children}</main>
