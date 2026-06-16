@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CLASES_FISCALES, ivaAuto, nombreImpuesto } from "@/lib/fiscal-clases";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ProductoDialog } from "@/components/producto-dialog";
 
 interface Familia { id: string; nombre: string; orden: number; color: string }
 interface Categoria { id: string; nombre: string; orden: number; family_id: string | null }
@@ -172,6 +173,7 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
             <span className="w-14 text-right text-muted-foreground">{p.tipo_impositivo}%</span>
             <span className="w-16 text-right tabular-nums">{eur(p.precio)}</span>
             <button onClick={() => onToggle(p)} className={`w-20 text-right text-xs ${p.disponible ? "text-emerald-600" : "text-muted-foreground"}`}>{p.disponible ? "Disponible" : "Agotado"}</button>
+            <ProductoDialog producto={p} onSaved={onAdded} />
             <button onClick={() => onDeleteProd(p.id)} className="text-muted-foreground/50 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
           </div>
         ))}
