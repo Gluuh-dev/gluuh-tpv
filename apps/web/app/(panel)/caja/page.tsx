@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, Lock } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ export default function Caja() {
   async function abrir(e: React.FormEvent) {
     e.preventDefault();
     await sb.from("cash_session").insert({ tenant_id: tenantId, location_id: locationId, abierta_por: userId, fondo_inicial: Number(fondo) || 0 });
-    setFondo(""); cargar();
+    setFondo(""); cargar(); toast.success("Caja abierta");
   }
   async function addMov(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +68,8 @@ export default function Caja() {
     const contado = Number(txt.replace(",", ".")) || 0;
     await sb.from("cash_session").update({ cerrada_en: new Date().toISOString(), total_efectivo: contado, descuadre: contado - teorico }).eq("id", sesion.id);
     cargar();
+    const d = contado - teorico;
+    toast.success(`Cierre Z guardado · descuadre ${eur(d)}`);
   }
 
   if (loading) return <div className="text-muted-foreground">Cargando…</div>;

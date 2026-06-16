@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Plus, Trash2, X } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ export default function Menus() {
     e.preventDefault();
     if (!nm.nombre.trim()) return;
     await sb.from("menu").insert({ tenant_id: tenantId, nombre: nm.nombre.trim(), precio: Number(nm.precio) || 0, clase_fiscal: nm.clase, orden: menus.length });
-    setNm({ nombre: "", precio: "", clase: "REDUCIDO" }); cargar();
+    setNm({ nombre: "", precio: "", clase: "REDUCIDO" }); cargar(); toast.success("Menú creado");
   }
   async function delMenu(id: string) { if (confirm("¿Eliminar menú?")) { await sb.from("menu").delete().eq("id", id); cargar(); } }
   async function addGrupo(menu_id: string, nombre: string) {

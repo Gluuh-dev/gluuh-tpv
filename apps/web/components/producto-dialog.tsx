@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import { Pencil, Upload } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { subirMedia } from "@/app/lib/branding";
@@ -45,6 +46,7 @@ export function ProductoDialog({ producto, onSaved }: Props) {
     setBusy(true);
     await sb.from("product").update({ descripcion: f.descripcion || null, codigo_barras: f.codigo_barras || null, foto_url: f.foto_url || null, alergenos: f.alergenos }).eq("id", producto.id);
     setBusy(false); setOpen(false); onSaved();
+    toast.success("Ficha de producto guardada");
   }
 
   return (
