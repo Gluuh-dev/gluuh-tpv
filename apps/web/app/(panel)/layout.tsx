@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, BarChart3, ShoppingCart, LogOut,
+  LayoutDashboard, BarChart3, ShoppingCart, LogOut, ExternalLink,
   PanelLeftClose, PanelLeft, Landmark, Package, Wrench, Info, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type Rol = "PROPIETARIO" | "ENCARGADO" | "CAMARERO" | "COCINA";
-interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean }
+interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean; blank?: boolean }
 interface NavSection { title?: string; items: NavLink[] }
 interface NavEntry { id: string; title: string; icon: LucideIcon; sections: NavSection[] }
 
@@ -26,14 +26,14 @@ const NAV: NavEntry[] = [
   ] },
   { id: "operativa", title: "Operativa", icon: ShoppingCart, sections: [
     { title: "Venta", items: [
-      { href: "/tpv", label: "TPV", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"] },
-      { href: "/comandera", label: "Comandera", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"] },
+      { href: "/tpv", label: "TPV", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"], blank: true },
+      { href: "/comandera", label: "Comandera", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"], blank: true },
     ] },
     { title: "Pantallas", items: [
-      { href: "/cocina", label: "Cocina (KDS)", roles: ["PROPIETARIO", "ENCARGADO", "COCINA"] },
-      { href: "/kiosko", label: "Kiosko", roles: GEST },
-      { href: "/pantalla", label: "Display", roles: GEST },
-      { href: "/ofertas", label: "Ofertas", roles: GEST },
+      { href: "/cocina", label: "Cocina (KDS)", roles: ["PROPIETARIO", "ENCARGADO", "COCINA"], blank: true },
+      { href: "/kiosko", label: "Kiosko", roles: GEST, blank: true },
+      { href: "/pantalla", label: "Display", roles: GEST, blank: true },
+      { href: "/ofertas", label: "Ofertas", roles: GEST, blank: true },
     ] },
     { title: "Caja", items: [{ href: "/caja", label: "Control de caja", roles: GEST }] },
   ] },
@@ -116,11 +116,8 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const activa = nav.find((e) => e.id === entrada) ?? nav[0];
 
   async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
-  function abrirEntrada(e: NavEntry) {
-    setEntrada(e.id); setAbierto(true);
-    const primera = e.sections.flatMap((s) => s.items).find((i) => i.href);
-    if (primera?.href && !e.sections.some((s) => s.items.some((i) => i.href === pathname))) router.push(primera.href);
-  }
+  // Solo abre el submenú; NO navega (las páginas se abren al pulsarlas).
+  function abrirEntrada(e: NavEntry) { setEntrada(e.id); setAbierto(true); }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>;
 
@@ -156,14 +153,17 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             {activa.sections.map((s, si) => (
               <div key={si} className="space-y-0.5">
                 {s.title && <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.title}</div>}
-                {s.items.map((i) => i.href ? (
-                  <Link key={i.label} href={i.href}
-                    className={`flex h-9 items-center rounded-md px-3 transition-colors ${pathname === i.href ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>{i.label}</Link>
-                ) : (
-                  <div key={i.label} className="flex h-9 items-center justify-between rounded-md px-3 text-muted-foreground/50" title="Próximamente">
-                    {i.label}<span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">pronto</span>
-                  </div>
-                ))}
+                {s.items.map((i) => {
+                  if (!i.href) return (
+                    <div key={i.label} className="flex h-9 items-center justify-between rounded-md px-3 text-muted-foreground/50" title="Próximamente">
+                      {i.label}<span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">pronto</span>
+                    </div>
+                  );
+                  const cls = `flex h-9 items-center justify-between rounded-md px-3 transition-colors ${pathname === i.href ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`;
+                  return i.blank
+                    ? <a key={i.label} href={i.href} target="_blank" rel="noreferrer" className={cls}>{i.label}<ExternalLink className="h-3.5 w-3.5 opacity-50" /></a>
+                    : <Link key={i.label} href={i.href} className={cls}>{i.label}</Link>;
+                })}
               </div>
             ))}
           </div>
