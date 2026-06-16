@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Users, BookOpen, BarChart3, Settings, LayoutGrid,
   ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut, Smartphone,
-  Palette, PanelLeftClose, PanelLeft, UtensilsCrossed, type LucideIcon,
+  Palette, PanelLeftClose, PanelLeft, UtensilsCrossed, CreditCard, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
     { href: "/personalizar", label: "Personalización", icon: Palette, roles: ["PROPIETARIO"] },
   ] },
   { id: "gestion", title: "Gestión", icon: BarChart3, items: [
+    { href: "/formas-pago", label: "Formas de pago", icon: CreditCard, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/empleados", label: "Empleados", icon: Users, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/informes", label: "Informes", icon: BarChart3, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/ajustes", label: "Ajustes", icon: Settings, roles: ["PROPIETARIO"] },
