@@ -8,6 +8,7 @@ import {
   PanelLeftClose, PanelLeft, Landmark, Package, Wrench, Info, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { useUI } from "../lib/ui-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -134,8 +135,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const [info, setInfo] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [entrada, setEntrada] = useState("inicio");
-  const [abierto, setAbierto] = useState(true);
-  const [railOpen, setRailOpen] = useState(false);
+  const { railOpen, menuOpen, toggleRail, toggleMenu, setMenuOpen } = useUI();
 
   useEffect(() => {
     const sb = supabaseBrowser();
@@ -168,15 +168,15 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   function abrirEntrada(e: NavEntry) {
     setEntrada(e.id);
     if (e.direct) { const h = e.sections[0]?.items[0]?.href; if (h) router.push(h); return; }
-    setAbierto(true);
+    setMenuOpen(true);
   }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>;
 
-  const verSubmenu = abierto && activa && !activa.direct;
+  const verSubmenu = menuOpen && activa && !activa.direct;
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Menú principal (rail) */}
       <nav className={`flex shrink-0 flex-col gap-1 border-r border-border bg-card py-3 transition-all ${railOpen ? "w-56 px-3" : "w-16 items-center"}`}>
         <div className={`mb-2 flex items-center gap-2 ${railOpen ? "px-1" : ""}`}>
@@ -193,7 +193,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             </button>
           );
         })}
-        <button onClick={() => setRailOpen((v) => !v)} title={railOpen ? "Contraer" : "Expandir"}
+        <button onClick={toggleRail} title={railOpen ? "Contraer" : "Expandir"}
           className={`mt-auto flex h-10 items-center gap-3 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${railOpen ? "px-3" : "w-11 justify-center"}`}>
           {railOpen ? <PanelLeftClose className="h-5 w-5 shrink-0" /> : <PanelLeft className="h-5 w-5 shrink-0" />}{railOpen && <span className="text-sm">Contraer</span>}
         </button>
@@ -233,8 +233,8 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4">
           <div className="flex items-center gap-2">
             {!activa?.direct && (
-              <Button variant="ghost" size="icon" aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>
-                {abierto ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+              <Button variant="ghost" size="icon" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} onClick={toggleMenu}>
+                {menuOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
               </Button>
             )}
             <span className="font-medium">{activa?.title}</span>
@@ -245,7 +245,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             <Button variant="ghost" size="sm" onClick={salir}><LogOut className="h-4 w-4" /> Cerrar sesión</Button>
           </div>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );
