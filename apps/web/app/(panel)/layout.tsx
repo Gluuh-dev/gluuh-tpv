@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Users, BookOpen, BarChart3, Settings, LayoutGrid,
   ShoppingCart, ChefHat, Store, MonitorSmartphone, Megaphone, LogOut, Smartphone,
-  Palette, PanelLeftClose, PanelLeft, type LucideIcon,
+  Palette, PanelLeftClose, PanelLeft, UtensilsCrossed, type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ const NAV_GROUPS: NavGroup[] = [
   ] },
   { id: "carta", title: "Carta y sala", icon: BookOpen, items: [
     { href: "/carta", label: "Carta", icon: BookOpen, roles: ["PROPIETARIO", "ENCARGADO"] },
+    { href: "/menus", label: "Menús", icon: UtensilsCrossed, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/sala", label: "Sala y mesas", icon: LayoutGrid, roles: ["PROPIETARIO", "ENCARGADO"] },
     { href: "/personalizar", label: "Personalización", icon: Palette, roles: ["PROPIETARIO"] },
   ] },
