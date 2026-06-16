@@ -9,6 +9,7 @@ import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type Rol } from "../lib/nav";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AssistantPanel } from "@/components/assistant-panel";
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol }
 
@@ -130,6 +131,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         </header>
         <main className="flex-1 overflow-y-auto p-5">{children}</main>
       </div>
+      <AssistantPanel />
     </div>
   );
 }
