@@ -37,3 +37,6 @@ Thumbs.db
 
 # Supabase CLI (temporales)
 supabase/.temp/
+
+# Estado local de agentes Claude (worktrees, etc.)
+.claude/
