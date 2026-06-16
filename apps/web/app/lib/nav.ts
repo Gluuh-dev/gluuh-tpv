@@ -35,8 +35,8 @@ export const NAV: NavEntry[] = [
   { id: "admin", title: "Administración", icon: Landmark, index: "/administracion", sections: [
     { title: "General", items: [
       { href: "/ajustes", label: "Empresa y local", roles: PROP },
-      s("Series", PROP), s("Configuración global", PROP), s("Plantillas de ticket"),
-      s("Plantillas de etiquetas"), s("Periodos de servicio"), s("Tipos de clientes"),
+      { href: "/series", label: "Series", roles: PROP }, s("Configuración global", PROP), s("Plantillas de ticket"),
+      s("Plantillas de etiquetas"), s("Periodos de servicio"), { href: "/tipos-cliente", label: "Tipos de clientes", roles: GEST },
       { href: "/clientes", label: "Clientes", roles: GEST }, s("Puntos de venta", PROP),
     ] },
     { title: "Usuarios", items: [
@@ -49,18 +49,18 @@ export const NAV: NavEntry[] = [
     ] },
     { title: "Tarifas y precios", items: [
       { href: "/impuestos", label: "Impuestos", roles: PROP }, { href: "/formas-pago", label: "Formas de pago", roles: GEST },
-      s("Centros de venta"), s("Tarifas"), s("Promociones"),
+      { href: "/centros-venta", label: "Centros de venta", roles: GEST }, s("Tarifas"), s("Promociones"),
       { href: "/descuentos", label: "Descuentos", roles: GEST },
     ] },
     { title: "Comandas", items: [
       s("Plantillas de comandas"), s("Notas de preparación"), s("Motivos de cancelación"),
-      s("Tipos de preparación"), s("Órdenes de preparación"),
+      s("Tipos de preparación"), s("Órdenes de preparación"), { href: "/motivos-cancelacion", label: "Motivos de cancelación", roles: GEST },
       { href: "/cocina", label: "Monitores de cocina", roles: GEST, blank: true },
     ] },
     { title: "Entradas", items: [s("Plantillas de entradas"), s("Entradas")] },
   ] },
   { id: "compras", title: "Compras y Stocks", icon: Package, index: "/compras", sections: [
-    { title: "General", items: [{ href: "/almacenes", label: "Almacenes", roles: GEST }, { href: "/proveedores", label: "Proveedores", roles: GEST }, s("Unidades de medida")] },
+    { title: "General", items: [{ href: "/almacenes", label: "Almacenes", roles: GEST }, { href: "/proveedores", label: "Proveedores", roles: GEST }, { href: "/unidades", label: "Unidades de medida", roles: GEST }] },
     { title: "Compras", items: [s("Pedidos a proveedor"), s("Albaranes de entrada"), s("Facturas de proveedor")] },
     { title: "Control de stock", items: [
       s("Regularización de inventario"), s("Variaciones de stock"), s("Fabricaciones (escandallos)"),
