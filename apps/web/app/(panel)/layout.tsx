@@ -51,6 +51,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [grupo, setGrupo] = useState<string>("inicio");
   const [abierto, setAbierto] = useState(true);
+  const [railOpen, setRailOpen] = useState(false);
 
   useEffect(() => {
     const sb = supabaseBrowser();
@@ -92,19 +93,28 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Rail principal (iconos) */}
-      <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-border bg-card py-3">
-        <div className="mb-2 grid h-9 w-9 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</div>
+      {/* Rail principal (expandible: iconos ↔ iconos + etiquetas) */}
+      <nav className={`flex shrink-0 flex-col gap-1 border-r border-border bg-card py-3 transition-all ${railOpen ? "w-52 px-3" : "w-16 items-center"}`}>
+        <div className={`mb-2 flex items-center gap-2 ${railOpen ? "px-1" : ""}`}>
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</div>
+          {railOpen && <span className="font-semibold">Gluuh <span className="text-muted-foreground">TPV</span></span>}
+        </div>
         {grupos.map((g) => {
           const Icon = g.icon;
           const activo = g.id === grupoActivo?.id;
           return (
             <button key={g.id} onClick={() => abrirGrupo(g)} title={g.title}
-              className={`grid h-11 w-11 place-items-center rounded-lg transition-colors ${activo ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-              <Icon className="h-5 w-5" />
+              className={`flex h-11 items-center gap-3 rounded-lg transition-colors ${railOpen ? "px-3" : "w-11 justify-center"} ${activo ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+              <Icon className="h-5 w-5 shrink-0" />
+              {railOpen && <span className="text-sm font-medium">{g.title}</span>}
             </button>
           );
         })}
+        <button onClick={() => setRailOpen((v) => !v)} title={railOpen ? "Contraer menú" : "Expandir menú"}
+          className={`mt-auto flex h-10 items-center gap-3 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${railOpen ? "px-3" : "w-11 justify-center"}`}>
+          {railOpen ? <PanelLeftClose className="h-5 w-5 shrink-0" /> : <PanelLeft className="h-5 w-5 shrink-0" />}
+          {railOpen && <span className="text-sm">Contraer</span>}
+        </button>
       </nav>
 
       {/* Submenú al lado (del grupo activo) */}
