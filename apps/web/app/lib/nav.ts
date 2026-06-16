@@ -37,7 +37,7 @@ export const NAV: NavEntry[] = [
       { href: "/ajustes", label: "Empresa y local", roles: PROP },
       s("Series", PROP), s("Configuración global", PROP), s("Plantillas de ticket"),
       s("Plantillas de etiquetas"), s("Periodos de servicio"), s("Tipos de clientes"),
-      s("Clientes"), s("Puntos de venta", PROP),
+      { href: "/clientes", label: "Clientes", roles: GEST }, s("Puntos de venta", PROP),
     ] },
     { title: "Usuarios", items: [
       s("Perfiles y permisos", PROP), { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
@@ -48,7 +48,7 @@ export const NAV: NavEntry[] = [
       { href: "/menus", label: "Menús", roles: GEST }, s("Alérgenos"), s("Etiquetas de productos"),
     ] },
     { title: "Tarifas y precios", items: [
-      s("Impuestos", PROP), { href: "/formas-pago", label: "Formas de pago", roles: GEST },
+      { href: "/impuestos", label: "Impuestos", roles: PROP }, { href: "/formas-pago", label: "Formas de pago", roles: GEST },
       s("Centros de venta"), s("Tarifas"), s("Promociones"),
       { href: "/descuentos", label: "Descuentos", roles: GEST },
     ] },
@@ -60,7 +60,7 @@ export const NAV: NavEntry[] = [
     { title: "Entradas", items: [s("Plantillas de entradas"), s("Entradas")] },
   ] },
   { id: "compras", title: "Compras y Stocks", icon: Package, index: "/compras", sections: [
-    { title: "General", items: [s("Almacenes"), s("Proveedores"), s("Unidades de medida")] },
+    { title: "General", items: [{ href: "/almacenes", label: "Almacenes", roles: GEST }, { href: "/proveedores", label: "Proveedores", roles: GEST }, s("Unidades de medida")] },
     { title: "Compras", items: [s("Pedidos a proveedor"), s("Albaranes de entrada"), s("Facturas de proveedor")] },
     { title: "Control de stock", items: [
       s("Regularización de inventario"), s("Variaciones de stock"), s("Fabricaciones (escandallos)"),
