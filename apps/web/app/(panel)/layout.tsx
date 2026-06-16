@@ -14,20 +14,22 @@ import { ThemeToggle } from "@/components/theme-toggle";
 type Rol = "PROPIETARIO" | "ENCARGADO" | "CAMARERO" | "COCINA";
 interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean; blank?: boolean }
 interface NavSection { title?: string; items: NavLink[] }
-interface NavEntry { id: string; title: string; icon: LucideIcon; sections: NavSection[] }
+interface NavEntry { id: string; title: string; icon: LucideIcon; sections: NavSection[]; direct?: boolean }
 
 const GEST: Rol[] = ["PROPIETARIO", "ENCARGADO"];
 const PROP: Rol[] = ["PROPIETARIO"];
+const VENTA: Rol[] = ["PROPIETARIO", "ENCARGADO", "CAMARERO"];
+const s = (label: string, roles: Rol[] = GEST): NavLink => ({ label, roles, soon: true }); // placeholder "pronto"
 
-// Menú principal estilo Ágora. soon: página aún no construida.
+// Menú estilo Ágora. Páginas reales con href; el resto marcado soon.
 const NAV: NavEntry[] = [
-  { id: "inicio", title: "Inicio", icon: LayoutDashboard, sections: [
-    { items: [{ href: "/dashboard", label: "Resumen", roles: GEST }] },
+  { id: "inicio", title: "Inicio", icon: LayoutDashboard, direct: true, sections: [
+    { items: [{ href: "/dashboard", label: "Inicio", roles: GEST }] },
   ] },
   { id: "operativa", title: "Operativa", icon: ShoppingCart, sections: [
     { title: "Venta", items: [
-      { href: "/tpv", label: "TPV", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"], blank: true },
-      { href: "/comandera", label: "Comandera", roles: ["PROPIETARIO", "ENCARGADO", "CAMARERO"], blank: true },
+      { href: "/tpv", label: "TPV", roles: VENTA, blank: true },
+      { href: "/comandera", label: "Comandera", roles: VENTA, blank: true },
     ] },
     { title: "Pantallas", items: [
       { href: "/cocina", label: "Cocina (KDS)", roles: ["PROPIETARIO", "ENCARGADO", "COCINA"], blank: true },
@@ -38,40 +40,89 @@ const NAV: NavEntry[] = [
     { title: "Caja", items: [{ href: "/caja", label: "Control de caja", roles: GEST }] },
   ] },
   { id: "admin", title: "Administración", icon: Landmark, sections: [
-    { title: "General", items: [{ href: "/ajustes", label: "Empresa y local", roles: PROP }] },
+    { title: "General", items: [
+      { href: "/ajustes", label: "Empresa y local", roles: PROP },
+      s("Series", PROP), s("Configuración global", PROP), s("Plantillas de ticket"),
+      s("Plantillas de etiquetas"), s("Periodos de servicio"), s("Tipos de clientes"),
+      s("Clientes"), s("Puntos de venta", PROP),
+    ] },
     { title: "Usuarios", items: [
-      { href: "/empleados", label: "Empleados y PIN", roles: GEST },
-      { label: "Perfiles y permisos", roles: PROP, soon: true },
+      s("Perfiles y permisos", PROP), { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
     ] },
     { title: "Catálogo", items: [
-      { href: "/carta", label: "Familias y productos", roles: GEST },
-      { href: "/menus", label: "Menús y combos", roles: GEST },
-      { label: "Alérgenos", roles: GEST, soon: true },
+      s("Grupos mayores"), { href: "/carta", label: "Familias", roles: GEST },
+      { href: "/carta", label: "Categorías", roles: GEST }, { href: "/carta", label: "Productos", roles: GEST },
+      { href: "/menus", label: "Menús", roles: GEST }, s("Alérgenos"), s("Etiquetas de productos"),
     ] },
-    { title: "Sala", items: [{ href: "/sala", label: "Salas y mesas", roles: GEST }] },
     { title: "Tarifas y precios", items: [
-      { href: "/formas-pago", label: "Formas de pago", roles: GEST },
+      s("Impuestos", PROP), { href: "/formas-pago", label: "Formas de pago", roles: GEST },
+      s("Centros de venta"), s("Tarifas"), s("Promociones"),
       { href: "/descuentos", label: "Descuentos", roles: GEST },
-      { label: "Impuestos", roles: PROP, soon: true },
-      { label: "Tarifas y promociones", roles: GEST, soon: true },
     ] },
-    { title: "Marca", items: [{ href: "/personalizar", label: "Personalización", roles: PROP }] },
+    { title: "Comandas", items: [
+      s("Plantillas de comandas"), s("Notas de preparación"), s("Motivos de cancelación"),
+      s("Tipos de preparación"), s("Órdenes de preparación"),
+      { href: "/cocina", label: "Monitores de cocina", roles: GEST, blank: true },
+    ] },
+    { title: "Entradas", items: [s("Plantillas de entradas"), s("Entradas")] },
   ] },
   { id: "compras", title: "Compras y Stocks", icon: Package, sections: [
-    { title: "General", items: [{ label: "Almacenes", roles: GEST, soon: true }, { label: "Proveedores", roles: GEST, soon: true }] },
-    { title: "Compras", items: [{ label: "Pedidos a proveedor", roles: GEST, soon: true }, { label: "Albaranes y facturas", roles: GEST, soon: true }] },
-    { title: "Stock", items: [{ label: "Inventario y mermas", roles: GEST, soon: true }, { label: "Escandallos", roles: GEST, soon: true }] },
+    { title: "General", items: [s("Almacenes"), s("Proveedores"), s("Unidades de medida")] },
+    { title: "Compras", items: [s("Pedidos a proveedor"), s("Albaranes de entrada"), s("Facturas de proveedor")] },
+    { title: "Control de stock", items: [
+      s("Regularización de inventario"), s("Variaciones de stock"), s("Fabricaciones (escandallos)"),
+      s("Histórico de movimientos"), s("Cierres de almacén"),
+    ] },
+    { title: "Herramientas", items: [s("Exportar productos"), s("Aplicación web almacén")] },
   ] },
   { id: "herramientas", title: "Herramientas", icon: Wrench, sections: [
-    { title: "VERI*FACTU", items: [{ label: "Visor Verifactu", roles: PROP, soon: true }] },
-    { title: "Impresión", items: [{ label: "Impresoras", roles: GEST, soon: true }] },
+    { title: "Visualización", items: [
+      s("Ordenar familias y categorías"), s("Ordenar productos"), s("Configuración de botones"),
+      s("Acciones personalizadas"), s("Planos de mesas"),
+    ] },
+    { title: "Precios", items: [
+      s("Exportar precios (Excel)"), s("Importar precios (Excel)"), s("Modificación global de precios"),
+      s("Ajustar márgenes"), s("Programación de tarifas"),
+    ] },
+    { title: "VERI*FACTU", items: [s("Visor de Verifactu", PROP), s("Configuración Verifactu", PROP)] },
+    { title: "Control de efectivo", items: [{ href: "/caja", label: "Caja", roles: GEST }, s("Configuración de caja", PROP)] },
+    { title: "Pasarela de pago", items: [s("Configuración de pago"), s("Cobro en mesa")] },
+    { title: "Cartas digitales", items: [
+      { href: "/personalizar", label: "Marca y cartelería", roles: PROP }, s("Traducciones"),
+      s("Pago y pedidos (QR)"), s("Generar QRs"),
+    ] },
+    { title: "Otros", items: [s("Copias de seguridad", PROP), s("Auditoría", PROP)] },
   ] },
   { id: "informes", title: "Informes", icon: BarChart3, sections: [
-    { items: [{ href: "/informes", label: "Informes", roles: GEST }] },
+    { title: "Resumen", items: [{ href: "/informes", label: "Panel de informes", roles: GEST }] },
+    { title: "Análisis", items: [s("Análisis de ventas"), s("Análisis de compras"), s("Análisis de stocks")] },
+    { title: "Ventas", items: [
+      s("Evolución de ventas"), s("Comparativa interanual"), s("Resumen fiscal"), s("Invitaciones"),
+      s("Reservas"), s("Documento 347"),
+    ] },
+    { title: "Catálogo", items: [
+      s("Familias y productos"), s("Márgenes por familia"), s("Menú engineering"),
+      s("Top 50 productos"), s("Ventas diarias"), s("Alérgenos por producto"),
+    ] },
+    { title: "Usuarios", items: [
+      s("Rendimiento de usuarios"), s("Productos por usuario"), s("Descuentos por usuario"),
+      s("Cancelaciones por usuario"), s("Propinas por usuario"), s("Asistencia"),
+    ] },
+    { title: "Caja", items: [
+      s("Formas de pago"), s("Movimientos de caja"), s("Cobros pendientes"),
+      s("Propinas por forma de pago"), s("Transacciones con tarjeta"),
+    ] },
+    { title: "Clientes", items: [s("Ventas a cliente"), s("Facturas por cliente"), s("Impuestos por cliente")] },
+    { title: "Almacén", items: [
+      s("Compras por proveedor"), s("Stock por producto"), s("Compras y ventas por producto"),
+      s("Valoración de mermas"), s("Pagos pendientes"),
+    ] },
+    { title: "Cocina", items: [s("Tiempos de preparación")] },
+    { title: "Diarios", items: [
+      s("Diario de facturas"), s("Diario de pedidos"), s("Diario de cierres de caja"), s("Diario de ventas"),
+    ] },
   ] },
-  { id: "ayuda", title: "Ayuda", icon: Info, sections: [
-    { items: [{ label: "Documentación", soon: true }] },
-  ] },
+  { id: "ayuda", title: "Ayuda", icon: Info, sections: [{ items: [s("Documentación", GEST)] }] },
 ];
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol }
@@ -98,28 +149,31 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     })();
   }, [router]);
 
-  // entrada activa según ruta
   useEffect(() => {
-    const e = NAV.find((n) => n.sections.some((s) => s.items.some((i) => i.href === pathname)));
+    const e = NAV.find((n) => n.sections.some((sec) => sec.items.some((i) => i.href === pathname)));
     if (e) setEntrada(e.id);
   }, [pathname]);
 
-  // filtra por rol; oculta secciones/entradas vacías
   const nav = useMemo(() => {
     const rol = info?.rol ?? "PROPIETARIO";
     return NAV.map((e) => ({
       ...e,
-      sections: e.sections.map((s) => ({ ...s, items: s.items.filter((i) => puede(rol, i.roles)) })).filter((s) => s.items.length > 0),
+      sections: e.sections.map((sec) => ({ ...sec, items: sec.items.filter((i) => puede(rol, i.roles)) })).filter((sec) => sec.items.length > 0),
     })).filter((e) => e.sections.length > 0);
   }, [info?.rol]);
 
   const activa = nav.find((e) => e.id === entrada) ?? nav[0];
 
   async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
-  // Solo abre el submenú; NO navega (las páginas se abren al pulsarlas).
-  function abrirEntrada(e: NavEntry) { setEntrada(e.id); setAbierto(true); }
+  function abrirEntrada(e: NavEntry) {
+    setEntrada(e.id);
+    if (e.direct) { const h = e.sections[0]?.items[0]?.href; if (h) router.push(h); return; }
+    setAbierto(true);
+  }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>;
+
+  const verSubmenu = abierto && activa && !activa.direct;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -145,24 +199,24 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         </button>
       </nav>
 
-      {/* Submenú al lado (secciones + páginas de la entrada activa) */}
-      {abierto && activa && (
+      {/* Submenú al lado */}
+      {verSubmenu && (
         <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
           <div className="flex h-16 items-center px-4 text-base font-semibold">{activa.title}</div>
           <div className="flex-1 space-y-4 overflow-y-auto px-3 pb-4 text-sm">
-            {activa.sections.map((s, si) => (
+            {activa.sections.map((sec, si) => (
               <div key={si} className="space-y-0.5">
-                {s.title && <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.title}</div>}
-                {s.items.map((i) => {
+                {sec.title && <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{sec.title}</div>}
+                {sec.items.map((i, ii) => {
                   if (!i.href) return (
-                    <div key={i.label} className="flex h-9 items-center justify-between rounded-md px-3 text-muted-foreground/50" title="Próximamente">
+                    <div key={ii} className="flex h-9 items-center justify-between rounded-md px-3 text-muted-foreground/50" title="Próximamente">
                       {i.label}<span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">pronto</span>
                     </div>
                   );
                   const cls = `flex h-9 items-center justify-between rounded-md px-3 transition-colors ${pathname === i.href ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`;
                   return i.blank
-                    ? <a key={i.label} href={i.href} target="_blank" rel="noreferrer" className={cls}>{i.label}<ExternalLink className="h-3.5 w-3.5 opacity-50" /></a>
-                    : <Link key={i.label} href={i.href} className={cls}>{i.label}</Link>;
+                    ? <a key={ii} href={i.href} target="_blank" rel="noreferrer" className={cls}>{i.label}<ExternalLink className="h-3.5 w-3.5 opacity-50" /></a>
+                    : <Link key={ii} href={i.href} className={cls}>{i.label}</Link>;
                 })}
               </div>
             ))}
@@ -178,9 +232,11 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>
-              {abierto ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-            </Button>
+            {!activa?.direct && (
+              <Button variant="ghost" size="icon" aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>
+                {abierto ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+              </Button>
+            )}
             <span className="font-medium">{activa?.title}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
