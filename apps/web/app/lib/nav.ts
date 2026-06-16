@@ -35,21 +35,21 @@ export const NAV: NavEntry[] = [
   { id: "admin", title: "Administración", icon: Landmark, index: "/administracion", sections: [
     { title: "General", items: [
       { href: "/ajustes", label: "Empresa y local", roles: PROP },
-      { href: "/series", label: "Series", roles: PROP }, s("Configuración global", PROP), s("Plantillas de ticket"),
-      s("Plantillas de etiquetas"), s("Periodos de servicio"), { href: "/tipos-cliente", label: "Tipos de clientes", roles: GEST },
-      { href: "/clientes", label: "Clientes", roles: GEST }, s("Puntos de venta", PROP),
+      { href: "/series", label: "Series", roles: PROP }, s("Configuración global", PROP), { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST },
+      s("Plantillas de etiquetas"), { href: "/periodos-servicio", label: "Periodos de servicio", roles: GEST }, { href: "/tipos-cliente", label: "Tipos de clientes", roles: GEST },
+      { href: "/clientes", label: "Clientes", roles: GEST }, { href: "/puntos-venta", label: "Puntos de venta", roles: PROP },
     ] },
     { title: "Usuarios", items: [
-      s("Perfiles y permisos", PROP), { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
+      { href: "/perfiles", label: "Perfiles y permisos", roles: PROP }, { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
     ] },
     { title: "Catálogo", items: [
-      s("Grupos mayores"), { href: "/carta", label: "Familias", roles: GEST },
+      { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST }, { href: "/carta", label: "Familias", roles: GEST },
       { href: "/carta", label: "Categorías", roles: GEST }, { href: "/carta", label: "Productos", roles: GEST },
-      { href: "/menus", label: "Menús", roles: GEST }, s("Alérgenos"), s("Etiquetas de productos"),
+      { href: "/menus", label: "Menús", roles: GEST }, { href: "/alergenos", label: "Alérgenos", roles: GEST }, { href: "/etiquetas", label: "Etiquetas de productos", roles: GEST },
     ] },
     { title: "Tarifas y precios", items: [
       { href: "/impuestos", label: "Impuestos", roles: PROP }, { href: "/formas-pago", label: "Formas de pago", roles: GEST },
-      { href: "/centros-venta", label: "Centros de venta", roles: GEST }, s("Tarifas"), s("Promociones"),
+      { href: "/centros-venta", label: "Centros de venta", roles: GEST }, { href: "/tarifas", label: "Tarifas", roles: GEST }, { href: "/promociones", label: "Promociones", roles: GEST },
       { href: "/descuentos", label: "Descuentos", roles: GEST },
     ] },
     { title: "Comandas", items: [
