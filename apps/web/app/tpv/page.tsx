@@ -232,6 +232,32 @@ export default function TPV() {
       const orderId = await crearOrden("COBRADA", "ENTREGADO");
       if (orderId) await sb.from("payment").insert({ order_id: orderId, metodo, importe: Math.round(total * 100) / 100, client_id: crypto.randomUUID() });
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
+
+      // ── Persistencia VERIFACTU (best-effort: si falla, el ticket del flujo actual sigue) ──
+      try {
+        const tok = (await sb.auth.getSession()).data.session?.access_token;
+        const fr = await fetch("/api/factura", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+          },
+          body: JSON.stringify({
+            orderId,
+            lineas: lineasComanda().map((l) => ({ precio: l.precio, tipo: l.tipo, cantidad: l.cantidad })),
+          }),
+        });
+        const fj = await fr.json();
+        if (fj?.ok) {
+          // Si la persistencia tiene éxito, enriquece el ticket con datos reales de la factura
+          t.numSerieFactura = fj.numSerieFactura ?? t.numSerieFactura;
+          if (fj.qrDataUrl) t.verifactu.qrDataUrl = fj.qrDataUrl;
+          if (fj.huella) t.verifactu.huella = fj.huella;
+        }
+      } catch {
+        // best-effort: si /api/factura falla (p.ej. migración no aplicada), el ticket sigue con /api/ticket
+      }
+
       setTicket(t);
     } finally { setBusy(false); setModalPagos(false); }
   }
