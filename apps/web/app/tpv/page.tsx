@@ -65,6 +65,7 @@ export default function TPV() {
   const [comanda, setComanda] = useState<Record<string, number>>({});
   const [descuentos, setDescuentos] = useState<Record<string, ModoDescuento>>({});
   const [preciosManuales, setPreciosManuales] = useState<Record<string, number>>({});
+  const [notas, setNotas] = useState<Record<string, string>>({});
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [busy, setBusy]     = useState(false);
 
@@ -158,6 +159,7 @@ export default function TPV() {
       setComanda((c) => { const { [lineaSel]: _, ...r } = c; return r; });
       setDescuentos((d) => { const { [lineaSel]: _, ...r } = d; return r; });
       setPreciosManuales((m) => { const { [lineaSel]: _, ...r } = m; return r; });
+      setNotas((n) => { const { [lineaSel]: _, ...r } = n; return r; });
       setLineaSel(null); setBuffer(""); return;
     }
     if (k === "DTO%") {
@@ -222,6 +224,7 @@ export default function TPV() {
     const lineas = lineasComanda().map((l) => ({
       product_id: l.id, nombre: l.nombre,
       cantidad: l.cantidad, precio_unitario: l.precio, tipo_impositivo: l.tipo,
+      notas: notas[l.id]?.trim() || null,
     }));
     const totalRedondeado = Math.round(total * 100) / 100;
 
@@ -248,7 +251,7 @@ export default function TPV() {
   // Abre una mesa y carga su cuenta (líneas) si la tiene.
   async function abrirMesa(m: Mesa) {
     setMesa(m); setBarra(false); setTicket(null);
-    setComanda({}); setDescuentos({}); setPreciosManuales({});
+    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({});
     setBuffer(""); setLineaSel(null); setVistaProds(false);
     setOrdenAbiertaId(null);
 
@@ -261,16 +264,19 @@ export default function TPV() {
     setOrdenAbiertaId(oid);
 
     const { data: lns } = await sb.from("order_line")
-      .select("product_id,cantidad,precio_unitario").eq("order_id", oid);
+      .select("product_id,cantidad,precio_unitario,notas").eq("order_id", oid);
     const comandaCargada: Record<string, number> = {};
     const precios: Record<string, number> = {};
-    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number }[]) {
+    const notasCargadas: Record<string, string> = {};
+    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null }[]) {
       if (!l.product_id || !prods.some((p) => p.id === l.product_id)) continue;
       comandaCargada[l.product_id] = (comandaCargada[l.product_id] ?? 0) + Number(l.cantidad);
       precios[l.product_id] = Number(l.precio_unitario);
+      if (l.notas) notasCargadas[l.product_id] = l.notas;
     }
     setComanda(comandaCargada);
     setPreciosManuales(precios);
+    setNotas(notasCargadas);
   }
 
   async function enviarCocina(estadoPrep: string) {
@@ -289,7 +295,8 @@ export default function TPV() {
     if (mesa && unidades > 0) {
       setBusy(true);
       try {
-        await crearOrden("ABIERTA", "PENDIENTE");
+        // Auto-marchar: al salir de la mesa sin marchar, se envía a cocina.
+        await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
         await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
         await recargarMesas();
       } finally { setBusy(false); }
@@ -359,7 +366,7 @@ export default function TPV() {
   }
 
   function reset() {
-    setComanda({}); setDescuentos({}); setPreciosManuales({});
+    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({});
     setMesa(null); setBarra(false); setTicket(null);
     setBuffer(""); setLineaSel(null); setVistaProds(false);
     setOrdenAbiertaId(null);
@@ -469,13 +476,18 @@ export default function TPV() {
                   }`}
                 >
                   <span className="w-8 text-right tabular-nums font-medium">{q}</span>
-                  <span className="flex-1 truncate pl-1">
-                    {p.nombre}
-                    {(desc || pm) && (
-                      <span className={`ml-1 text-[10px] ${sel ? "opacity-80" : "text-muted-foreground"}`}>
-                        {pm ? `P:${eur(pm)}` : ""}
-                        {desc ? (desc.tipo === "PCT" ? ` -${desc.valor}%` : ` -${eur(desc.valor)}`) : ""}
-                      </span>
+                  <span className="flex-1 min-w-0 pl-1">
+                    <span className="block truncate">
+                      {p.nombre}
+                      {(desc || pm) && (
+                        <span className={`ml-1 text-[10px] ${sel ? "opacity-80" : "text-muted-foreground"}`}>
+                          {pm ? `P:${eur(pm)}` : ""}
+                          {desc ? (desc.tipo === "PCT" ? ` -${desc.valor}%` : ` -${eur(desc.valor)}`) : ""}
+                        </span>
+                      )}
+                    </span>
+                    {notas[id] && (
+                      <span className={`block truncate text-[10px] ${sel ? "opacity-80" : "text-amber-600 dark:text-amber-400"}`}>✎ {notas[id]}</span>
                     )}
                   </span>
                   <span className="w-12 text-right tabular-nums">{eur(pe)}</span>
@@ -484,6 +496,44 @@ export default function TPV() {
               );
             })}
           </div>
+
+          {/* Editor de la línea seleccionada: cantidad, nota, eliminar */}
+          {lineaSel ? (() => {
+            const sel = lineaSel;
+            const q = comanda[sel];
+            const p = prods.find((x) => x.id === sel);
+            if (q === undefined || !p) return null;
+            return (
+              <div className="space-y-2 border-t border-border bg-muted/40 p-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="truncate font-medium">{p.nombre}</span>
+                  <span className="tabular-nums text-muted-foreground">{q} ud</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => sub(sel)} className="h-8 flex-1 rounded-md border border-border bg-card text-lg leading-none hover:bg-accent">−</button>
+                  <button onClick={() => setComanda((c) => ({ ...c, [sel]: (c[sel] ?? 0) + 1 }))} className="h-8 flex-1 rounded-md border border-border bg-card text-lg leading-none hover:bg-accent">+</button>
+                  <button
+                    onClick={() => {
+                      setComanda((c) => { const { [sel]: _, ...r } = c; return r; });
+                      setDescuentos((d) => { const { [sel]: _, ...r } = d; return r; });
+                      setPreciosManuales((m) => { const { [sel]: _, ...r } = m; return r; });
+                      setNotas((n) => { const { [sel]: _, ...r } = n; return r; });
+                      setLineaSel(null);
+                    }}
+                    className="h-8 flex-1 rounded-md border border-rose-300 bg-rose-50 text-xs font-medium text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+                <input
+                  value={notas[sel] ?? ""}
+                  onChange={(e) => setNotas((n) => ({ ...n, [sel]: e.target.value }))}
+                  placeholder="Nota para cocina (p. ej. sin cebolla)"
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+              </div>
+            );
+          })() : null}
 
           {/* Total */}
           <div className="border-t border-border px-3 py-2">
