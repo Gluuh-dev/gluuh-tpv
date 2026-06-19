@@ -58,7 +58,11 @@ export default function TPV() {
   const [rooms, setRooms]         = useState<Room[]>([]);
   const [reservas, setReservas]   = useState<Reserva[]>([]);
   const [elementos, setElementos] = useState<Elemento[]>([]);
-  const [vistaSala, setVistaSala] = useState<string>("");  // room id o "RESERVAS"
+  const [vistaSala, setVistaSala] = useState<string>("");  // room id, "RESERVAS" o "LLEVAR"
+  /* Para llevar (cuenta sin mesa, con nombre + teléfono) */
+  const [llevar, setLlevar] = useState<{ nombre: string; telefono: string } | null>(null);
+  const [llevarList, setLlevarList] = useState<{ id: string; cliente_nombre: string; cliente_telefono: string | null; total: number }[]>([]);
+  const [nuevoLlevar, setNuevoLlevar] = useState({ nombre: "", telefono: "" });
   const [reservaPop, setReservaPop] = useState<Mesa | null>(null);  // popover de reservas de mesa
   const [resForm, setResForm] = useState<{ id: string | null; nombre: string; personas: string; hora: string }>({ id: null, nombre: "", personas: "", hora: "" });
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,6 +141,7 @@ export default function TPV() {
       setReservas((rsv as Reserva[]) ?? []);
       setElementos((els as Elemento[]) ?? []);
       setVistaSala((rms as Room[])?.[0]?.id ?? "");
+      await recargarLlevar();
       setLoading(false);
     })();
     /* eslint-disable-next-line */
@@ -274,6 +279,41 @@ export default function TPV() {
     setReservas((data as Reserva[]) ?? []);
   }
 
+  async function recargarLlevar() {
+    const { data } = await sb.from("sales_order")
+      .select("id,cliente_nombre,cliente_telefono,total,created_at")
+      .is("table_id", null).not("cliente_nombre", "is", null)
+      .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
+      .order("created_at", { ascending: false });
+    setLlevarList((data as { id: string; cliente_nombre: string; cliente_telefono: string | null; total: number; created_at: string }[]) ?? []);
+  }
+
+  function nuevoParaLlevar() {
+    if (!nuevoLlevar.nombre.trim()) return;
+    setMesa(null); setBarra(false); setTicket(null); setOrdenAbiertaId(null);
+    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({});
+    setBuffer(""); setLineaSel(null); setVistaProds(false);
+    setLlevar({ nombre: nuevoLlevar.nombre.trim(), telefono: nuevoLlevar.telefono.trim() });
+    setNuevoLlevar({ nombre: "", telefono: "" });
+  }
+
+  async function abrirLlevar(o: { id: string; cliente_nombre: string; cliente_telefono: string | null }) {
+    setMesa(null); setBarra(false); setTicket(null);
+    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({});
+    setBuffer(""); setLineaSel(null); setVistaProds(false);
+    setLlevar({ nombre: o.cliente_nombre, telefono: o.cliente_telefono ?? "" });
+    setOrdenAbiertaId(o.id);
+    const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas").eq("order_id", o.id);
+    const cmd: Record<string, number> = {}, pr: Record<string, number> = {}, nt: Record<string, string> = {};
+    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null }[]) {
+      if (!l.product_id || !prods.some((p) => p.id === l.product_id)) continue;
+      cmd[l.product_id] = (cmd[l.product_id] ?? 0) + Number(l.cantidad);
+      pr[l.product_id] = Number(l.precio_unitario);
+      if (l.notas) nt[l.product_id] = l.notas;
+    }
+    setComanda(cmd); setPreciosManuales(pr); setNotas(nt);
+  }
+
   /* ── Reserva de mesa por pulsación larga ── */
   function onPressStart(m: Mesa) {
     longPressed.current = false;
@@ -332,6 +372,7 @@ export default function TPV() {
         location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId,
         canal: "TPV", tipo_operacion: "VENTA", estado, estado_preparacion: estadoPrep,
         total: totalRedondeado, client_id: crypto.randomUUID(),
+        cliente_nombre: llevar?.nombre ?? null, cliente_telefono: llevar?.telefono ?? null,
       }).select("id").single();
       if (!order) return null;
       orderId = (order as { id: string }).id;
@@ -387,13 +428,14 @@ export default function TPV() {
 
   // Guardar la cuenta de la mesa y volver a la lista (en barra solo limpia).
   async function volver() {
-    if (mesa && unidades > 0) {
+    if ((mesa || llevar) && unidades > 0) {
       setBusy(true);
       try {
-        // Auto-marchar: al salir de la mesa sin marchar, se envía a cocina.
+        // Auto-marchar: al salir sin marchar, se envía a cocina/barra.
         await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
-        await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
+        if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
         await recargarMesas();
+        await recargarLlevar();
       } finally { setBusy(false); }
     }
     reset();
@@ -430,6 +472,7 @@ export default function TPV() {
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
       setOrdenAbiertaId(null);
       await recargarMesas();
+      await recargarLlevar();
 
       // ── Persistencia VERIFACTU: DESACTIVADA hasta el final (pagos en prueba) ──
       if (VERIFACTU_ACTIVO) {
@@ -465,7 +508,7 @@ export default function TPV() {
     setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({});
     setMesa(null); setBarra(false); setTicket(null);
     setBuffer(""); setLineaSel(null); setVistaProds(false);
-    setOrdenAbiertaId(null);
+    setOrdenAbiertaId(null); setLlevar(null);
   }
 
   function salirOperario() {
@@ -614,7 +657,7 @@ export default function TPV() {
   }
 
   /* ── Selección mesa/barra: menú lateral de salas + plano a pantalla ── */
-  if (!mesa && !barra) {
+  if (!mesa && !barra && !llevar) {
     const mesasSala = mesas.filter((m) => m.room_id === vistaSala);
     return (
       <div className="flex h-screen flex-col bg-background text-foreground">
@@ -641,6 +684,12 @@ export default function TPV() {
             >
               Reservas{reservas.length > 0 ? ` (${reservas.length})` : ""}
             </button>
+            <button
+              onClick={() => setVistaSala("LLEVAR")}
+              className={`rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${vistaSala === "LLEVAR" ? "bg-brand text-brand-foreground" : "hover:bg-accent"}`}
+            >
+              Para llevar{llevarList.length > 0 ? ` (${llevarList.length})` : ""}
+            </button>
             <div className="mt-auto space-y-1 border-t border-border pt-2">
               <button onClick={() => setBarra(true)} className="w-full rounded-md bg-brand px-3 py-2 text-sm font-semibold text-brand-foreground">Barra / directa</button>
               <button onClick={salirOperario} className="w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent">Salir</button>
@@ -649,7 +698,28 @@ export default function TPV() {
 
           {/* Plano / contenido */}
           <main className="relative min-w-0 flex-1 overflow-auto bg-muted/20">
-            {vistaSala === "RESERVAS" ? (
+            {vistaSala === "LLEVAR" ? (
+              <div className="mx-auto max-w-2xl space-y-4 p-4">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="mb-2 font-semibold">Nuevo pedido para llevar</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <input value={nuevoLlevar.nombre} onChange={(e) => setNuevoLlevar((s) => ({ ...s, nombre: e.target.value }))} placeholder="Nombre del cliente" className="min-w-40 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
+                    <input value={nuevoLlevar.telefono} onChange={(e) => setNuevoLlevar((s) => ({ ...s, telefono: e.target.value }))} placeholder="Teléfono" inputMode="tel" className="w-40 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
+                    <button onClick={nuevoParaLlevar} disabled={!nuevoLlevar.nombre.trim()} className="btn-primary disabled:opacity-50">Crear</button>
+                  </div>
+                </div>
+                {llevarList.length === 0 && <div className="card text-center text-muted-foreground">Sin pedidos para llevar abiertos.</div>}
+                {llevarList.map((o) => (
+                  <button key={o.id} onClick={() => abrirLlevar(o)} className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-left hover:bg-accent">
+                    <div className="min-w-0">
+                      <div className="font-medium">🛍 {o.cliente_nombre}</div>
+                      {o.cliente_telefono && <div className="text-xs text-muted-foreground">{o.cliente_telefono}</div>}
+                    </div>
+                    <span className="font-semibold tabular-nums">{eur(Number(o.total))}</span>
+                  </button>
+                ))}
+              </div>
+            ) : vistaSala === "RESERVAS" ? (
               <div className="mx-auto max-w-2xl space-y-2 p-4">
                 {reservas.length === 0 && <div className="card text-center text-muted-foreground">Sin reservas.</div>}
                 {reservas.map((r) => (
@@ -745,7 +815,7 @@ export default function TPV() {
         />
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
-            <span className="text-base font-semibold">{mesa ? mesa.nombre : "Barra"}</span>
+            <span className="text-base font-semibold">{mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra"}</span>
             <span className="text-xs text-muted-foreground">{new Date().toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}</span>
           </div>
           <span className="text-sm text-muted-foreground">{new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -1142,7 +1212,7 @@ export default function TPV() {
           </div>
           <div className="my-1 border-t border-dashed border-black" />
           <div>{new Date().toLocaleString("es-ES")}</div>
-          <div className="flex justify-between"><span>{mesa ? mesa.nombre : "Barra"}</span><span>Atiende: {operario?.nombre}</span></div>
+          <div className="flex justify-between"><span>{mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra"}</span><span>Atiende: {operario?.nombre}</span></div>
           {VERIFACTU_ACTIVO && <div>Factura: {ticket.numSerieFactura}</div>}
           <div className="my-1 border-t border-dashed border-black" />
           {lineasComanda().map((l) => (
