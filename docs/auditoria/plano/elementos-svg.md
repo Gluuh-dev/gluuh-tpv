@@ -256,3 +256,65 @@ con una pantalla pequeña marcada. currentColor. Sin texto.
   fijan el footprint; `pos_x/pos_y` la posición (snapping a 40).
 - **Editor de plano** (pendiente): paleta con estos elementos, arrastrar y soltar con snapping
   a la rejilla; cada elemento conoce su footprint en celdas.
+
+---
+
+## 7. Prompt de lámina conjunta (varios elementos + cuadrícula detrás)
+
+> Genera **una sola imagen** con varios elementos colocados sobre la rejilla **visible**.
+> Útil como muestrario / referencia de estilo y de footprints.
+
+**Lienzo:** 20×12 celdas → viewBox `0 0 800 480` (1 celda = 40 px).
+
+```
+Ilustración vectorial PLANA, vista CENITAL (planta de un restaurante), estilo flat limpio,
+en una sola imagen de 800x480 (viewBox 0 0 800 480).
+
+FONDO — CUADRÍCULA visible:
+- Fondo blanco hueso (#fbfaf8).
+- Líneas finas cada 40px (1 celda) en gris claro #e3e1dc, grosor 1.
+- Líneas más marcadas cada 200px (módulo 5×5 celdas) en gris #c9c6bf, grosor 1.5.
+- La cuadrícula cubre todo el lienzo y queda DETRÁS de todos los elementos.
+
+ELEMENTOS (vista cenital, flat, esquinas redondeadas 8px, trazo 2px; mesas con relleno
+#f5f1ea y borde gris #5b6066; sillas como rectángulos redondeados gris #5b6066 opacity 0.45;
+madera #8a5a2b; verdes #2f9e44/#2b8a3e). Todo ALINEADO a la rejilla (snapping a 40px):
+
+- BARRA recta de madera ocupando 5×1 celdas en la fila superior izquierda (x=40,y=40, 200x40),
+  con franja clara #a9743a arriba.
+- MESA CUADRADA de 4 sillas (cuerpo 80x80 en x=40,y=160; una silla centrada en cada lado).
+- MESA CUADRADA de 4 sillas (cuerpo 80x80 en x=200,y=160).
+- MESA DOBLE rectangular vertical de 6 (cuerpo 80x160 en x=360,y=120; 1 silla en cada extremo
+  + 2 sillas por lado).
+- MESA REDONDA de 8 (círculo radio 52 centrado en x=600,y=200; 8 sillas cada 45°).
+- PUERTA con arco de apertura discontinuo (80x40 en x=40,y=400).
+- 2 MACETAS con planta (40x40) en esquinas (x=720,y=40 y x=720,y=400).
+- 1 PALMERA cenital (80x80 en x=600,y=380).
+- PARED gris #9aa0a6 formando el contorno del local (marco) por el borde del lienzo,
+  con el hueco de la puerta.
+
+Sin texto, sin números, sin sombras fuertes. Que se aprecie cómo cada elemento ocupa un número
+entero de celdas de la cuadrícula.
+```
+
+**Variante "muestrario etiquetado":** igual que arriba pero añadiendo, debajo de cada elemento,
+una etiqueta pequeña con su nombre y footprint (p. ej. `mesa_doble_6 · 2×4`) para usarlo como
+catálogo visual. (Aquí sí se permite texto.)
+
+**Arranque del fondo (cuadrícula) en SVG:**
+```svg
+<svg viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="480" fill="#fbfaf8"/>
+  <defs>
+    <pattern id="c1" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#e3e1dc" stroke-width="1"/>
+    </pattern>
+    <pattern id="c5" width="200" height="200" patternUnits="userSpaceOnUse">
+      <path d="M200 0H0V200" fill="none" stroke="#c9c6bf" stroke-width="1.5"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="480" fill="url(#c1)"/>
+  <rect width="800" height="480" fill="url(#c5)"/>
+  <!-- … aquí van los elementos … -->
+</svg>
+```
