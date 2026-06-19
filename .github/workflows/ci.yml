@@ -6,13 +6,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Placeholders para que `next build` pueda prerenderizar (crea el cliente
-    # Supabase en build, pero no hace peticiones reales). La clave publishable
-    # es pública; estos valores ficticios solo evitan "supabaseUrl is required".
-    # Si en el futuro el build necesita datos reales, sustituir por secrets.
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder-anon-key
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
