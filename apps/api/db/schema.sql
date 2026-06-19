@@ -475,6 +475,34 @@ BEGIN
 END$$;
 
 -- =============================================================================
+--  setting — configuración clave/valor por ámbito (GLOBAL/LOCAL/DEVICE).
+--  Helpers setting_get()/setting_set() en supabase/migrations/0023_setting.sql.
+-- =============================================================================
+CREATE TABLE setting (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  scope       text NOT NULL CHECK (scope IN ('GLOBAL','LOCAL','DEVICE')),
+  location_id uuid REFERENCES location(id) ON DELETE CASCADE,
+  device_id   uuid REFERENCES device(id)   ON DELETE CASCADE,
+  key         text NOT NULL,
+  value       jsonb,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT setting_scope_target_chk CHECK (
+    (scope = 'GLOBAL' AND location_id IS NULL AND device_id IS NULL) OR
+    (scope = 'LOCAL'  AND location_id IS NOT NULL AND device_id IS NULL) OR
+    (scope = 'DEVICE' AND device_id  IS NOT NULL)
+  )
+);
+CREATE UNIQUE INDEX setting_global_uq ON setting (tenant_id, key) WHERE scope = 'GLOBAL';
+CREATE UNIQUE INDEX setting_local_uq  ON setting (tenant_id, location_id, key) WHERE scope = 'LOCAL';
+CREATE UNIQUE INDEX setting_device_uq ON setting (tenant_id, device_id, key) WHERE scope = 'DEVICE';
+CREATE INDEX setting_tenant_key_idx ON setting (tenant_id, key);
+CREATE TRIGGER trg_set_tenant BEFORE INSERT ON setting
+  FOR EACH ROW EXECUTE FUNCTION set_tenant_id();
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON setting
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- =============================================================================
 --  7. ROW-LEVEL SECURITY (aislamiento por tenant)
 --     Se aplica a todas las tablas con tenant_id. La app conecta con un rol
 --     SIN BYPASSRLS y fija  SET app.tenant_id  en cada transacción.
@@ -487,7 +515,7 @@ BEGIN
     'modifier','product_allergen','ingredient','recipe_item','stock_move','room',
     'restaurant_table','sales_order','order_line','order_event','payment','invoice',
     'tax_line','verifactu_record','ticketbai_record','cash_session','cash_move',
-    'customer','reservation','online_order'
+    'customer','reservation','online_order','setting'
   ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
