@@ -71,6 +71,8 @@ export default function TPV() {
 
   /* ── Modal pagos ── */
   const [modalPagos, setModalPagos] = useState(false);
+  const [modalEfectivo, setModalEfectivo] = useState(false);
+  const [entregado, setEntregado] = useState("");
 
   /* ── Carga inicial ── */
   useEffect(() => {
@@ -505,7 +507,7 @@ export default function TPV() {
       <footer className="flex-none border-t border-border bg-card px-2 py-2">
         <div className="flex flex-wrap gap-1.5">
           <button
-            onClick={() => cobrar("Efectivo")}
+            onClick={() => { setEntregado(""); setModalEfectivo(true); }}
             disabled={!unidades || busy}
             className="btn-primary disabled:opacity-50"
           >
@@ -569,6 +571,55 @@ export default function TPV() {
                 </button>
               ))}
               <button onClick={() => setModalPagos(false)} className="btn-ghost w-full mt-1">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal cobro en efectivo (con cálculo de cambio) ── */}
+      {modalEfectivo && (
+        <div className="fixed inset-0 z-20 grid place-items-center bg-foreground/40 p-4" onClick={() => setModalEfectivo(false)}>
+          <div className="w-full max-w-xs rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 font-semibold">Cobro en efectivo</h3>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Total a cobrar: <b className="text-foreground tabular-nums">{total.toFixed(2)} €</b>
+            </p>
+
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Entregado</label>
+            <input
+              type="number" inputMode="decimal" min={0} step="0.01"
+              value={entregado}
+              onChange={(e) => setEntregado(e.target.value)}
+              placeholder={total.toFixed(2)}
+              className="mb-3 w-full rounded-md border border-border bg-background px-3 py-2 text-right text-lg tabular-nums outline-none focus:border-brand"
+            />
+
+            <div className="mb-3 grid grid-cols-5 gap-1.5">
+              <button onClick={() => setEntregado(total.toFixed(2))} className="btn-ghost text-xs">Exacto</button>
+              {[5, 10, 20, 50].map((b) => (
+                <button key={b} onClick={() => setEntregado(String(b))} className="btn-ghost text-xs">{b}€</button>
+              ))}
+            </div>
+
+            {(() => {
+              const cambio = Number(entregado) - total;
+              const ok = entregado !== "" && cambio >= 0;
+              return (
+                <div className={`mb-4 rounded-md px-3 py-2 text-center text-sm ${ok ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}`}>
+                  Cambio: <b className="tabular-nums">{ok ? cambio.toFixed(2) + " €" : "—"}</b>
+                </div>
+              );
+            })()}
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { setModalEfectivo(false); cobrar("Efectivo"); }}
+                disabled={busy}
+                className="btn-primary w-full disabled:opacity-50"
+              >
+                Cobrar {total.toFixed(2)} €
+              </button>
+              <button onClick={() => setModalEfectivo(false)} className="btn-ghost w-full">Cancelar</button>
             </div>
           </div>
         </div>
