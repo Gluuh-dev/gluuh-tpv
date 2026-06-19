@@ -230,7 +230,20 @@ export default function TPV() {
       });
       const t = await res.json();
       const orderId = await crearOrden("COBRADA", "ENTREGADO");
-      if (orderId) await sb.from("payment").insert({ order_id: orderId, metodo, importe: Math.round(total * 100) / 100, client_id: crypto.randomUUID() });
+      if (orderId) {
+        // El esquema exige el método en MAYÚSCULAS (CHECK de payment); normalizamos
+        // la etiqueta de la UI ("Efectivo") al valor del enum ('EFECTIVO').
+        const metodoDb =
+          ({ Efectivo: "EFECTIVO", Tarjeta: "TARJETA", Bizum: "BIZUM", QR: "QR", Wallet: "WALLET" } as Record<string, string>)[metodo] ??
+          metodo.toUpperCase();
+        const { error: payErr } = await sb.from("payment").insert({
+          order_id: orderId,
+          metodo: metodoDb,
+          importe: Math.round(total * 100) / 100,
+          client_id: crypto.randomUUID(),
+        });
+        if (payErr) console.error("No se registró el pago:", payErr.message);
+      }
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
 
       // ── Persistencia VERIFACTU (best-effort: si falla, el ticket del flujo actual sigue) ──
