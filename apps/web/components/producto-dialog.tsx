@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Pencil, Upload } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { subirMedia } from "@/app/lib/branding";
+import { ESTACIONES, ESTACION_LABEL, estacionDe } from "@/app/lib/estaciones";
 import { ALERGENOS } from "@/lib/alergenos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,18 +20,18 @@ export function ProductoDialog({ producto, onSaved }: Props) {
   const [open, setOpen] = React.useState(false);
   const [tenantId, setTenantId] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const [f, setF] = React.useState({ descripcion: "", codigo_barras: "", foto_url: "", alergenos: [] as string[] });
+  const [f, setF] = React.useState({ descripcion: "", codigo_barras: "", foto_url: "", alergenos: [] as string[], estacion: "COCINA" });
 
   React.useEffect(() => {
     if (!open) return;
     (async () => {
       const [{ data: t }, { data: p }] = await Promise.all([
         sb.from("tenant").select("id").limit(1).maybeSingle(),
-        sb.from("product").select("descripcion,codigo_barras,foto_url,alergenos").eq("id", producto.id).maybeSingle(),
+        sb.from("product").select("descripcion,codigo_barras,foto_url,alergenos,estacion").eq("id", producto.id).maybeSingle(),
       ]);
       setTenantId((t as { id: string } | null)?.id ?? "");
-      const d = (p as { descripcion?: string; codigo_barras?: string; foto_url?: string; alergenos?: string[] } | null) ?? {};
-      setF({ descripcion: d.descripcion ?? "", codigo_barras: d.codigo_barras ?? "", foto_url: d.foto_url ?? "", alergenos: d.alergenos ?? [] });
+      const d = (p as { descripcion?: string; codigo_barras?: string; foto_url?: string; alergenos?: string[]; estacion?: string } | null) ?? {};
+      setF({ descripcion: d.descripcion ?? "", codigo_barras: d.codigo_barras ?? "", foto_url: d.foto_url ?? "", alergenos: d.alergenos ?? [], estacion: estacionDe(d.estacion) });
     })();
     /* eslint-disable-next-line */
   }, [open]);
@@ -44,7 +45,7 @@ export function ProductoDialog({ producto, onSaved }: Props) {
   }
   async function guardar() {
     setBusy(true);
-    await sb.from("product").update({ descripcion: f.descripcion || null, codigo_barras: f.codigo_barras || null, foto_url: f.foto_url || null, alergenos: f.alergenos }).eq("id", producto.id);
+    await sb.from("product").update({ descripcion: f.descripcion || null, codigo_barras: f.codigo_barras || null, foto_url: f.foto_url || null, alergenos: f.alergenos, estacion: f.estacion }).eq("id", producto.id);
     setBusy(false); setOpen(false); onSaved();
     toast.success("Ficha de producto guardada");
   }
@@ -67,6 +68,17 @@ export function ProductoDialog({ producto, onSaved }: Props) {
                 {f.foto_url && <img src={f.foto_url} alt="" className="h-9 w-9 rounded object-cover" />}
               </div>
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Estación de preparación</Label>
+            <select
+              value={f.estacion}
+              onChange={(e) => setF({ ...f, estacion: e.target.value })}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {ESTACIONES.map((s) => <option key={s} value={s}>{ESTACION_LABEL[s]}</option>)}
+            </select>
+            <p className="text-xs text-muted-foreground">Bebidas → Barra · Comidas → Cocina · Tapas frías → Camarero · Ninguna no se manda a preparar.</p>
           </div>
           <div>
             <Label className="mb-1.5 block">Alérgenos</Label>

@@ -4,8 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { COLOR, LABEL, SIGUIENTE, type EstadoPrep } from "../lib/estados";
+import { estacionDe } from "../lib/estaciones";
 
-interface Linea { nombre: string; cantidad: number }
+interface Linea { nombre: string; cantidad: number; estacion: string | null; notas: string | null }
+type Filtro = "COCINA" | "BARRA" | "CAMARERO" | "TODAS";
+const FILTROS: { k: Filtro; label: string }[] = [
+  { k: "COCINA", label: "Cocina" }, { k: "BARRA", label: "Barra" },
+  { k: "CAMARERO", label: "Camarero" }, { k: "TODAS", label: "Todas" },
+];
 interface Pedido {
   id: string;
   numero_pedido: number | null;
@@ -23,11 +29,12 @@ export default function Cocina() {
   const router = useRouter();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState<Filtro>("COCINA");
 
   const cargar = useCallback(async () => {
     const { data } = await sb
       .from("sales_order")
-      .select("id,numero_pedido,canal,estado_preparacion,created_at,order_line(nombre,cantidad),restaurant_table(nombre)")
+      .select("id,numero_pedido,canal,estado_preparacion,created_at,order_line(nombre,cantidad,estacion,notas),restaurant_table(nombre)")
       .eq("estado", "ENVIADA_COCINA")
       .neq("estado_preparacion", "ENTREGADO")
       .order("created_at", { ascending: true });
@@ -63,20 +70,36 @@ export default function Cocina() {
     </div>
   );
 
+  const visibles = pedidos.filter((p) => filtro === "TODAS" || p.order_line.some((l) => estacionDe(l.estacion) === filtro));
+
   return (
     <div className="dark">
       <main className="min-h-screen bg-background text-foreground">
-        <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
-          <strong className="text-lg font-semibold tracking-tight">Cocina</strong>
-          <span className="text-sm text-muted-foreground tabular-nums">{pedidos.length} pedidos · tiempo real</span>
+        <header className="border-b border-border bg-card px-6 py-3">
+          <div className="flex items-center justify-between">
+            <strong className="text-lg font-semibold tracking-tight">Preparación</strong>
+            <span className="text-sm text-muted-foreground tabular-nums">{visibles.length} comandas · tiempo real</span>
+          </div>
+          <div className="mt-2 flex gap-2">
+            {FILTROS.map((f) => (
+              <button
+                key={f.k}
+                onClick={() => setFiltro(f.k)}
+                className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${filtro === f.k ? "bg-primary text-primary-foreground" : "border border-border hover:bg-accent"}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </header>
         <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {pedidos.length === 0 && (
-            <p className="col-span-full text-muted-foreground">No hay comandas en cocina.</p>
+          {visibles.length === 0 && (
+            <p className="col-span-full text-muted-foreground">No hay comandas en {FILTROS.find((f) => f.k === filtro)?.label.toLowerCase()}.</p>
           )}
-          {pedidos.map((p) => {
+          {visibles.map((p) => {
             const titulo = p.restaurant_table?.nombre ?? (p.numero_pedido ? `A-${p.numero_pedido}` : "Pedido");
             const sig = SIGUIENTE[p.estado_preparacion];
+            const lineas = filtro === "TODAS" ? p.order_line : p.order_line.filter((l) => estacionDe(l.estacion) === filtro);
             return (
               <div
                 key={p.id}
@@ -96,8 +119,11 @@ export default function Cocina() {
                   {p.canal} · hace {minutos(p.created_at)} min
                 </div>
                 <ul className="mb-3 space-y-0.5 text-sm">
-                  {p.order_line.map((l, i) => (
-                    <li key={i}><b>{l.cantidad}×</b> {l.nombre}</li>
+                  {lineas.map((l, i) => (
+                    <li key={i}>
+                      <b>{l.cantidad}×</b> {l.nombre}
+                      {l.notas && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">✎ {l.notas}</span>}
+                    </li>
                   ))}
                 </ul>
                 {sig && (

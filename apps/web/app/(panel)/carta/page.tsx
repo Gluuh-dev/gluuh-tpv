@@ -9,13 +9,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CLASES_FISCALES, ivaAuto, nombreImpuesto } from "@/lib/fiscal-clases";
+import { ESTACIONES, ESTACION_LABEL, estacionDe } from "@/app/lib/estaciones";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProductoDialog } from "@/components/producto-dialog";
 
 interface Familia { id: string; nombre: string; orden: number; color: string }
 interface Categoria { id: string; nombre: string; orden: number; family_id: string | null }
-interface Producto { id: string; nombre: string; precio: number; tipo_impositivo: number; clase_fiscal: string; category_id: string | null; es_alcohol: boolean; disponible: boolean }
+interface Producto { id: string; nombre: string; precio: number; tipo_impositivo: number; clase_fiscal: string; category_id: string | null; es_alcohol: boolean; disponible: boolean; estacion: string | null }
 
 const eur = (n: number) => Number(n).toFixed(2) + " €";
 const SIN_FAMILIA = "__none__";
@@ -35,7 +36,7 @@ export default function Carta() {
       sb.from("location").select("territorio_fiscal").limit(1).maybeSingle(),
       sb.from("family").select("id,nombre,orden,color").order("orden"),
       sb.from("category").select("id,nombre,orden,family_id").order("orden"),
-      sb.from("product").select("id,nombre,precio,tipo_impositivo,clase_fiscal,category_id,es_alcohol,disponible").order("nombre"),
+      sb.from("product").select("id,nombre,precio,tipo_impositivo,clase_fiscal,category_id,es_alcohol,disponible,estacion").order("nombre"),
     ]);
     if (loc?.territorio_fiscal) setTerritorio(loc.territorio_fiscal);
     setFamilias((fam as Familia[]) ?? []);
@@ -137,7 +138,7 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
   onDeleteProd: (id: string) => void; onToggle: (p: Producto) => void; onAdded: () => void;
 }) {
   const sb = supabaseBrowser();
-  const [f, setF] = useState({ nombre: "", precio: "", clase: "REDUCIDO", alcohol: false });
+  const [f, setF] = useState({ nombre: "", precio: "", clase: "REDUCIDO", alcohol: false, estacion: "COCINA" });
   const [saving, setSaving] = useState(false);
   const ivaPrev = ivaAuto(f.clase, territorio);
 
@@ -148,15 +149,15 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
     await sb.from("product").insert({
       nombre: f.nombre.trim(), precio: Number(f.precio),
       clase_fiscal: f.clase, tipo_impositivo: ivaAuto(f.clase, territorio),
-      category_id: cat.id, es_alcohol: f.alcohol, disponible: true,
+      category_id: cat.id, es_alcohol: f.alcohol, disponible: true, estacion: f.estacion,
     });
     setSaving(false);
-    setF({ nombre: "", precio: "", clase: "REDUCIDO", alcohol: false });
+    setF({ nombre: "", precio: "", clase: "REDUCIDO", alcohol: false, estacion: "COCINA" });
     onAdded();
   }
 
-  // IVA automático: si es alcohol → General (21% / IGIC 7%)
-  function setAlcohol(on: boolean) { setF((s) => ({ ...s, alcohol: on, clase: on ? "GENERAL" : s.clase })); }
+  // IVA automático: si es alcohol → General; y por defecto a Barra (bebida).
+  function setAlcohol(on: boolean) { setF((s) => ({ ...s, alcohol: on, clase: on ? "GENERAL" : s.clase, estacion: on ? "BARRA" : s.estacion })); }
 
   return (
     <Card className="ml-5 overflow-hidden">
@@ -170,6 +171,7 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
           <div key={p.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
             <span className="flex-1">{p.nombre}{p.es_alcohol && <span className="ml-2 text-xs text-amber-600">alcohol</span>}</span>
             <Badge variant="secondary" className="font-normal">{p.clase_fiscal?.toLowerCase()}</Badge>
+            <Badge variant="outline" className="font-normal">{ESTACION_LABEL[estacionDe(p.estacion)]}</Badge>
             <span className="w-14 text-right text-muted-foreground">{p.tipo_impositivo}%</span>
             <span className="w-16 text-right tabular-nums">{eur(p.precio)}</span>
             <button onClick={() => onToggle(p)} className={`w-20 text-right text-xs ${p.disponible ? "text-emerald-600" : "text-muted-foreground"}`}>{p.disponible ? "Disponible" : "Agotado"}</button>
@@ -185,6 +187,10 @@ function CategoriaCard({ cat, productos, territorio, onDeleteCat, onDeleteProd, 
         <Select value={f.clase} onValueChange={(v) => setF({ ...f, clase: v })}>
           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>{CLASES_FISCALES.map((c) => <SelectItem key={c.v} value={c.v}>{c.t}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={f.estacion} onValueChange={(v) => setF({ ...f, estacion: v })}>
+          <SelectTrigger className="w-32" title="A dónde se manda al marchar"><SelectValue /></SelectTrigger>
+          <SelectContent>{ESTACIONES.map((s) => <SelectItem key={s} value={s}>{ESTACION_LABEL[s]}</SelectItem>)}</SelectContent>
         </Select>
         <span className="text-xs text-muted-foreground" title="Calculado automáticamente por territorio">{nombreImpuesto(territorio)} auto: <b>{ivaPrev}%</b></span>
         <label className="flex items-center gap-1 text-sm text-muted-foreground"><input type="checkbox" checked={f.alcohol} onChange={(e) => setAlcohol(e.target.checked)} /> alcohol</label>

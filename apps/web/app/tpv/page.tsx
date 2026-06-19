@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { estacionDe } from "../lib/estaciones";
 import { Utensils } from "lucide-react";
 
 /* ─── Tipos ─── */
@@ -12,7 +13,7 @@ interface Reserva { id: string; table_id: string | null; fecha_hora: string; com
 interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number }
 interface Family { id: string; nombre: string; color: string }
 interface Cat    { id: string; nombre: string; orden: number; family_id: string | null }
-interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null }
+interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null }
 interface Ticket {
   impuestos: { impuesto: string; desglose: { tipo: number; base: number; cuota: number }[]; importeTotal: number };
   verifactu: { huella: string; qrDataUrl: string; leyenda: string };
@@ -120,7 +121,7 @@ export default function TPV() {
       const [{ data: f }, { data: c }, { data: p }] = await Promise.all([
         sb.from("family").select("id,nombre,color").order("orden"),
         sb.from("category").select("id,nombre,orden,family_id").order("orden"),
-        sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id").eq("disponible", true).order("nombre"),
+        sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id,estacion").eq("disponible", true).order("nombre"),
       ]);
       setFamilies((f as Family[]) ?? []);
       setCats((c as Cat[]) ?? []);
@@ -184,7 +185,7 @@ export default function TPV() {
   function lineasComanda() {
     return Object.entries(comanda).map(([id, cantidad]) => {
       const p = prods.find((x) => x.id === id)!;
-      return { id, nombre: p.nombre, cantidad, precio: precioEfectivo(id), tipo: p.tipo_impositivo };
+      return { id, nombre: p.nombre, cantidad, precio: precioEfectivo(id), tipo: p.tipo_impositivo, estacion: estacionDe(p.estacion) };
     });
   }
 
@@ -318,7 +319,7 @@ export default function TPV() {
     const lineas = lineasComanda().map((l) => ({
       product_id: l.id, nombre: l.nombre,
       cantidad: l.cantidad, precio_unitario: l.precio, tipo_impositivo: l.tipo,
-      notas: notas[l.id]?.trim() || null,
+      notas: notas[l.id]?.trim() || null, estacion: l.estacion,
     }));
     const totalRedondeado = Math.round(total * 100) / 100;
 

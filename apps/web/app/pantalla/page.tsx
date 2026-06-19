@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { BRANDING_DEFAULT, leerBranding, type Branding } from "../lib/branding";
 import type { EstadoPrep } from "../lib/estados";
+import { estacionDe } from "../lib/estaciones";
 
-interface Pedido { id: string; numero_pedido: number | null; estado_preparacion: EstadoPrep }
+interface Pedido { id: string; numero_pedido: number | null; estado_preparacion: EstadoPrep; order_line: { estacion: string | null }[] }
 
 /**
  * Display para el cliente (pantalla grande del local), estilo fast-food.
@@ -22,12 +23,14 @@ export default function PantallaCliente() {
   const cargar = useCallback(async () => {
     const { data } = await sb
       .from("sales_order")
-      .select("id,numero_pedido,estado_preparacion")
+      .select("id,numero_pedido,estado_preparacion,order_line(estacion)")
       .eq("estado", "ENVIADA_COCINA")
       .neq("estado_preparacion", "ENTREGADO")
       .not("numero_pedido", "is", null)
       .order("numero_pedido", { ascending: true });
-    setPedidos((data as Pedido[]) ?? []);
+    // La pantalla del cliente muestra SOLO comidas (pedidos con líneas de cocina).
+    const rows = (data as unknown as Pedido[]) ?? [];
+    setPedidos(rows.filter((p) => p.order_line?.some((l) => estacionDe(l.estacion) === "COCINA")));
   }, [sb]);
 
   useEffect(() => {
