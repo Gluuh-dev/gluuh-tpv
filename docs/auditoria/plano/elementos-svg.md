@@ -339,9 +339,11 @@ Sin texto.
 
 ```
 Una sola imagen, vista estrictamente CENITAL (desde arriba, 90°, proyección ortográfica,
-SIN perspectiva). Fondo TRANSPARENTE: sin cuadrícula, sin suelo, sin alfombras, sin
-ninguna superficie debajo. Estilo ilustración PLANA y limpia, mismo grosor de línea y
-misma escala relativa en todo, sombras muy sutiles o ninguna.
+SIN perspectiva). FONDO de un único color liso MAGENTA puro (#FF00FF), totalmente
+uniforme y plano, tipo croma, para poder recortar/extraer los elementos con facilidad
+(ese color no aparece en ningún objeto). Sin cuadrícula, sin suelo, sin alfombras, sin
+sombras proyectadas sobre el fondo. Estilo ilustración PLANA y limpia, mismo grosor de
+línea y misma escala relativa en todo, sombras muy sutiles o ninguna.
 
 Coloca UN ÚNICO ejemplar de cada uno de estos objetos, separados entre sí y bien
 espaciados para que cada uno se distinga, en una cuadrícula imaginaria de huecos
