@@ -39,6 +39,9 @@ function EstadoBadge({ estado }: { estado: string }) {
 export default function VisorVerifactuPage() {
   const [loading, setLoading] = useState(true);
   const [facturas, setFacturas] = useState<InvoiceRow[]>([]);
+  // Integridad de cadena (verificada en servidor; node:crypto no corre en navegador)
+  const [cadena, setCadena] = useState<Record<string, { ok: boolean }>>({});
+  const [cadenaOk, setCadenaOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     const sb = supabaseBrowser();
@@ -50,6 +53,27 @@ export default function VisorVerifactuPage() {
         .limit(200);
       setFacturas((data as InvoiceRow[] | null) ?? []);
       setLoading(false);
+
+      // Verificación de la cadena VERIFACTU (best-effort)
+      const { data: { session } } = await sb.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      try {
+        const res = await fetch("/api/verifactu/verificar", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const j = (await res.json()) as {
+          ok: boolean;
+          todoOk?: boolean;
+          porFactura?: Record<string, { ok: boolean }>;
+        };
+        if (j.ok) {
+          setCadena(j.porFactura ?? {});
+          setCadenaOk(Boolean(j.todoOk));
+        }
+      } catch {
+        /* best-effort: si falla la verificación, la tabla sigue mostrándose */
+      }
     })();
   }, []);
 
@@ -63,7 +87,7 @@ export default function VisorVerifactuPage() {
         description="Registro de facturas encadenadas (huella SHA-256) según el sistema VERIFACTU de la AEAT."
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
           icon={<FileText className="h-4 w-4" />}
           label="Nº facturas"
@@ -73,6 +97,12 @@ export default function VisorVerifactuPage() {
           icon={<Coins className="h-4 w-4" />}
           label="Importe total"
           value={loading ? "…" : eur(importeTotal)}
+        />
+        <StatCard
+          icon={<ShieldCheck className="h-4 w-4" />}
+          label="Cadena íntegra"
+          value={cadenaOk === null ? "…" : cadenaOk ? "Sí" : "Revisar"}
+          hint={cadenaOk === false ? "Hay facturas que no verifican" : undefined}
         />
       </div>
 
@@ -93,17 +123,20 @@ export default function VisorVerifactuPage() {
                   <TableHead className="text-right">Importe €</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Huella</TableHead>
+                  <TableHead>Cadena</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                       Cargando…
                     </TableCell>
                   </TableRow>
                 )}
-                {facturas.map((f) => (
+                {facturas.map((f) => {
+                  const c = cadena[f.num_serie_factura];
+                  return (
                   <TableRow key={f.num_serie_factura}>
                     <TableCell className="font-mono text-xs tabular-nums">
                       {f.num_serie_factura}
@@ -118,8 +151,18 @@ export default function VisorVerifactuPage() {
                     <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
                       {f.huella.slice(0, 8)}…
                     </TableCell>
+                    <TableCell>
+                      {c === undefined ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : c.ok ? (
+                        <span className="text-green-600 dark:text-green-400" title="Huella y enlace verificados">✓</span>
+                      ) : (
+                        <span className="text-red-600 dark:text-red-400" title="No verifica: revisar">✗</span>
+                      )}
+                    </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
