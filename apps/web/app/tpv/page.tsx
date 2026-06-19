@@ -106,6 +106,7 @@ export default function TPV() {
   const [modalEfectivo, setModalEfectivo] = useState(false);
   const [entregado, setEntregado] = useState("");
   const [propina, setPropina] = useState("");
+  const [mixto, setMixto] = useState<Record<string, string>>({});
 
   /* ── Carga inicial ── */
   useEffect(() => {
@@ -441,7 +442,7 @@ export default function TPV() {
     reset();
   }
 
-  async function cobrar(metodo: string, propina = 0) {
+  async function cobrar(metodo: string, propina = 0, mixto?: { metodo: string; importe: number }[]) {
     if (!unidades) return;
     setBusy(true);
     try {
@@ -455,18 +456,15 @@ export default function TPV() {
       const t = await res.json();
       const orderId = await crearOrden("COBRADA", "ENTREGADO");
       if (orderId) {
-        // El esquema exige el método en MAYÚSCULAS (CHECK de payment); normalizamos
-        // la etiqueta de la UI ("Efectivo") al valor del enum ('EFECTIVO').
-        const metodoDb =
-          ({ Efectivo: "EFECTIVO", Tarjeta: "TARJETA", Bizum: "BIZUM", QR: "QR", Wallet: "WALLET" } as Record<string, string>)[metodo] ??
-          metodo.toUpperCase();
-        const { error: payErr } = await sb.from("payment").insert({
-          order_id: orderId,
-          metodo: metodoDb,
-          importe: Math.round(total * 100) / 100,
-          propina: Math.round((propina || 0) * 100) / 100,
-          client_id: crypto.randomUUID(),
-        });
+        // El esquema exige el método en MAYÚSCULAS (CHECK de payment); normalizamos.
+        const norm = (m: string) => (({ Efectivo: "EFECTIVO", Tarjeta: "TARJETA", Bizum: "BIZUM", QR: "QR", Wallet: "WALLET" } as Record<string, string>)[m] ?? m.toUpperCase());
+        const prop = Math.round((propina || 0) * 100) / 100;
+        const pagos = (mixto && mixto.length)
+          ? mixto.map((p, i) => ({ metodo: norm(p.metodo), importe: Math.round(p.importe * 100) / 100, propina: i === 0 ? prop : 0 }))
+          : [{ metodo: norm(metodo), importe: Math.round(total * 100) / 100, propina: prop }];
+        const { error: payErr } = await sb.from("payment").insert(
+          pagos.map((p) => ({ order_id: orderId, ...p, client_id: crypto.randomUUID() })),
+        );
         if (payErr) console.error("No se registró el pago:", payErr.message);
       }
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
@@ -1031,7 +1029,7 @@ export default function TPV() {
             Cobrar Efectivo
           </button>
           <button
-            onClick={() => { setPropina(""); setModalPagos(true); }}
+            onClick={() => { setPropina(""); setMixto({}); setModalPagos(true); }}
             disabled={!unidades || busy}
             className="btn-ghost disabled:opacity-50"
           >
@@ -1110,6 +1108,47 @@ export default function TPV() {
                   {m}
                 </button>
               ))}
+
+              {/* Pago mixto: reparte el total entre métodos */}
+              <div className="mt-2 border-t border-border pt-3">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pago mixto</p>
+                {["Efectivo", "Tarjeta", "Bizum"].map((m) => (
+                  <div key={m} className="mb-1.5 flex items-center gap-2">
+                    <span className="w-20 text-sm">{m}</span>
+                    <input
+                      type="number" inputMode="decimal" min={0} step="0.01"
+                      value={mixto[m] ?? ""}
+                      onChange={(e) => setMixto((s) => ({ ...s, [m]: e.target.value }))}
+                      placeholder="0.00"
+                      className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-brand"
+                    />
+                  </div>
+                ))}
+                {(() => {
+                  const suma = ["Efectivo", "Tarjeta", "Bizum"].reduce((s, m) => s + (Number(mixto[m]) || 0), 0);
+                  const falta = Math.round((total - suma) * 100) / 100;
+                  const cuadra = Math.abs(falta) < 0.005 && suma > 0;
+                  return (
+                    <>
+                      <div className={`mb-2 text-center text-xs ${cuadra ? "text-green-600" : "text-muted-foreground"}`}>
+                        {cuadra ? "Cuadra ✓" : falta > 0 ? `Falta ${eur(falta)}` : `Sobra ${eur(-falta)}`}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const arr = ["Efectivo", "Tarjeta", "Bizum"].map((m) => ({ metodo: m, importe: Number(mixto[m]) || 0 })).filter((p) => p.importe > 0);
+                          setModalPagos(false);
+                          cobrar(arr[0]?.metodo ?? "Efectivo", Number(propina) || 0, arr);
+                        }}
+                        disabled={busy || !cuadra}
+                        className="btn-primary w-full disabled:opacity-50"
+                      >
+                        Cobrar mixto
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+
               <button onClick={() => setModalPagos(false)} className="btn-ghost w-full mt-1">Cancelar</button>
             </div>
           </div>
