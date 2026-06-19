@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Utensils } from "lucide-react";
@@ -8,7 +8,7 @@ import { Utensils } from "lucide-react";
 /* ─── Tipos ─── */
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
 interface Room   { id: string; nombre: string; orden: number }
-interface Reserva { id: string; fecha_hora: string; comensales: number; estado: string; notas: string | null }
+interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null }
 interface Family { id: string; nombre: string; color: string }
 interface Cat    { id: string; nombre: string; orden: number; family_id: string | null }
 interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null }
@@ -56,6 +56,10 @@ export default function TPV() {
   const [rooms, setRooms]         = useState<Room[]>([]);
   const [reservas, setReservas]   = useState<Reserva[]>([]);
   const [vistaSala, setVistaSala] = useState<string>("");  // room id o "RESERVAS"
+  const [reservaPop, setReservaPop] = useState<Mesa | null>(null);  // popover de reserva de mesa
+  const [horaResv, setHoraResv]   = useState("");
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
   const [families, setFamilies]   = useState<Family[]>([]);
   const [cats, setCats]           = useState<Cat[]>([]);
   const [prods, setProds]         = useState<Prod[]>([]);
@@ -123,7 +127,7 @@ export default function TPV() {
       await recargarMesas();
       const [{ data: rms }, { data: rsv }] = await Promise.all([
         sb.from("room").select("id,nombre,orden").order("orden"),
-        sb.from("reservation").select("id,fecha_hora,comensales,estado,notas").order("fecha_hora"),
+        sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas").order("fecha_hora"),
       ]);
       setRooms((rms as Room[]) ?? []);
       setReservas((rsv as Reserva[]) ?? []);
@@ -159,6 +163,18 @@ export default function TPV() {
     [comanda, precioEfectivo],
   );
   const unidades = Object.values(comanda).reduce((s, q) => s + q, 0);
+
+  /* ── Reserva próxima por mesa (para pintarla en el plano) ── */
+  const reservaMesa = useMemo(() => {
+    const out: Record<string, Reserva> = {};
+    for (const r of reservas) {
+      if (!r.table_id || r.estado === "CANCELADA") continue;
+      const prev = out[r.table_id];
+      if (!prev || r.fecha_hora < prev.fecha_hora) out[r.table_id] = r;
+    }
+    return out;
+  }, [reservas]);
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
   /* ── Lineas para cobro y cocina (precio efectivo) ── */
   function lineasComanda() {
@@ -246,6 +262,45 @@ export default function TPV() {
     const tot: Record<string, number> = {};
     for (const k of Object.keys(ultima)) tot[k] = ultima[k]!.total;
     setTotalesMesa(tot);
+  }
+
+  async function recargarReservas() {
+    const { data } = await sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas").order("fecha_hora");
+    setReservas((data as Reserva[]) ?? []);
+  }
+
+  /* ── Reserva de mesa por pulsación larga ── */
+  function onPressStart(m: Mesa) {
+    longPressed.current = false;
+    pressTimer.current = setTimeout(() => {
+      longPressed.current = true;
+      setHoraResv(reservaMesa[m.id] ? hhmm(reservaMesa[m.id]!.fecha_hora) : "");
+      setReservaPop(m);
+    }, 450);
+  }
+  function onPressEnd() { if (pressTimer.current) clearTimeout(pressTimer.current); }
+  function onMesaClick(m: Mesa) {
+    if (longPressed.current) { longPressed.current = false; return; }  // fue pulsación larga
+    abrirMesa(m);
+  }
+  function fechaHoy(hm: string): string {
+    const [h, mi] = hm.split(":").map(Number);
+    const d = new Date(); d.setHours(h ?? 0, mi ?? 0, 0, 0);
+    return d.toISOString();
+  }
+  async function crearReserva(m: Mesa) {
+    if (!horaResv) return;
+    await sb.from("reservation").insert({ location_id: locationId, table_id: m.id, fecha_hora: fechaHoy(horaResv), comensales: m.capacidad || 2, estado: "CONFIRMADA" });
+    setReservaPop(null); await recargarReservas();
+  }
+  async function cambiarReserva(r: Reserva) {
+    if (!horaResv) return;
+    await sb.from("reservation").update({ fecha_hora: fechaHoy(horaResv) }).eq("id", r.id);
+    setReservaPop(null); await recargarReservas();
+  }
+  async function quitarReserva(r: Reserva) {
+    await sb.from("reservation").delete().eq("id", r.id);
+    setReservaPop(null); await recargarReservas();
   }
 
   // Crea o REUTILIZA la cuenta abierta de la mesa (un único pedido por mesa).
@@ -491,9 +546,13 @@ export default function TPV() {
     return (
       <button
         key={m.id}
-        onClick={() => abrirMesa(m)}
+        onClick={() => onMesaClick(m)}
+        onPointerDown={() => onPressStart(m)}
+        onPointerUp={onPressEnd}
+        onPointerLeave={onPressEnd}
+        onContextMenu={(e) => e.preventDefault()}
         style={{ left: x, top: y }}
-        className={`absolute flex flex-col items-center transition-transform hover:scale-[1.04] ${ocupada ? "text-amber-700 dark:text-amber-400" : "text-foreground"}`}
+        className={`absolute flex select-none flex-col items-center transition-transform hover:scale-[1.04] ${ocupada ? "text-amber-700 dark:text-amber-400" : "text-foreground"}`}
       >
         <div className="flex gap-1">{Array.from({ length: perSide }).map((_, k) => <span key={k} className={chair} />)}</div>
         <div
@@ -504,6 +563,11 @@ export default function TPV() {
           <span className="mt-0.5 text-[11px] font-medium leading-none">{ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}</span>
         </div>
         <div className="flex gap-1">{Array.from({ length: bottom }).map((_, k) => <span key={k} className={chair} />)}</div>
+        {reservaMesa[m.id] && (
+          <span className="mt-1 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+            🕑 {hhmm(reservaMesa[m.id]!.fecha_hora)}
+          </span>
+        )}
       </button>
     );
   }
@@ -553,6 +617,7 @@ export default function TPV() {
                       <div className="font-medium">
                         {new Date(r.fecha_hora).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                         <span className="ml-2 text-muted-foreground">· {r.comensales} pax</span>
+                        {r.table_id && <span className="ml-2 text-muted-foreground">· {mesas.find((mm) => mm.id === r.table_id)?.nombre ?? "mesa"}</span>}
                       </div>
                       {r.notas && <div className="truncate text-xs text-muted-foreground">{r.notas}</div>}
                     </div>
@@ -561,7 +626,10 @@ export default function TPV() {
                 ))}
               </div>
             ) : (
-              <div className="relative h-full min-h-[600px] w-full" style={{ minWidth: 900 }}>
+              <div
+                className="relative h-full min-h-[600px] w-full"
+                style={{ minWidth: 900, backgroundImage: "radial-gradient(rgba(120,120,120,0.10) 1px, transparent 1px)", backgroundSize: "26px 26px" }}
+              >
                 {mesasSala.map((m, i) => MesaPlano(m, i))}
                 {mesasSala.length === 0 && (
                   <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>
@@ -570,6 +638,34 @@ export default function TPV() {
             )}
           </main>
         </div>
+
+        {/* Popover de reserva de mesa (pulsación larga sobre la mesa) */}
+        {reservaPop && (() => {
+          const m = reservaPop;
+          const r = reservaMesa[m.id];
+          return (
+            <div className="fixed inset-0 z-30 grid place-items-center bg-foreground/40 p-4" onClick={() => setReservaPop(null)}>
+              <div className="w-full max-w-xs rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
+                <h3 className="mb-3 font-semibold">{m.nombre} · {r ? "Reserva" : "Reservar mesa"}</h3>
+                {r && <p className="mb-3 text-sm">Reservada a las <b>{hhmm(r.fecha_hora)}</b> · {r.comensales} pax</p>}
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Hora</label>
+                <input
+                  type="time" value={horaResv} onChange={(e) => setHoraResv(e.target.value)}
+                  className="mb-4 w-full rounded-md border border-border bg-background px-3 py-2 outline-none focus:border-brand"
+                />
+                {r ? (
+                  <div className="flex gap-2">
+                    <button onClick={() => cambiarReserva(r)} disabled={!horaResv} className="btn-primary flex-1 disabled:opacity-50">Guardar hora</button>
+                    <button onClick={() => quitarReserva(r)} className="flex-1 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40">Quitar</button>
+                  </div>
+                ) : (
+                  <button onClick={() => crearReserva(m)} disabled={!horaResv} className="btn-primary w-full disabled:opacity-50">Reservar mesa</button>
+                )}
+                <button onClick={() => setReservaPop(null)} className="btn-ghost mt-2 w-full">Cancelar</button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
