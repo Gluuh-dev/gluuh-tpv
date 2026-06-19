@@ -25,6 +25,10 @@ const TERR: Record<string, string> = {
   CEUTA_MELILLA: "CEUTA_MELILLA", FORAL_PV: "PENINSULA_BALEARES", FORAL_NAVARRA: "PENINSULA_BALEARES",
 };
 
+// VERIFACTU DESACTIVADO: no se persiste ni encadena ninguna factura todavía.
+// Pagos en modo PRUEBA (ficticios). Poner a true AL FINAL para activar la fiscalidad real.
+const VERIFACTU_ACTIVO = false;
+
 /* ─── Modo de pago extra ─── */
 type ModoDescuento = { tipo: "PCT" | "EUR"; valor: number };
 
@@ -45,6 +49,7 @@ export default function TPV() {
   /* ── Datos ── */
   const [loading, setLoading]     = useState(true);
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [locInfo, setLocInfo] = useState<{ nombre: string; cif: string; direccion: string }>({ nombre: "", cif: "", direccion: "" });
   const [territorio, setTerritorio] = useState("PENINSULA_BALEARES");
   const [userId, setUserId]       = useState<string | null>(null);
   const [mesas, setMesas]         = useState<Mesa[]>([]);
@@ -100,10 +105,11 @@ export default function TPV() {
       try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
       const { data: ops } = await sb.rpc("listar_operarios");
       setOperarios((ops as { id: string; nombre: string; rol: string }[]) ?? []);
-      const { data: loc } = await sb.from("location").select("id,territorio_fiscal").limit(1).maybeSingle();
+      const { data: loc } = await sb.from("location").select("id,territorio_fiscal,nombre,razon_social,cif,direccion").limit(1).maybeSingle();
       const { data: u }   = await sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle();
       setLocationId(loc?.id ?? null);
       setTerritorio(loc?.territorio_fiscal ?? "PENINSULA_BALEARES");
+      setLocInfo({ nombre: loc?.razon_social ?? loc?.nombre ?? "", cif: loc?.cif ?? "", direccion: loc?.direccion ?? "" });
       setUserId(u?.id ?? null);
       const [{ data: f }, { data: c }, { data: p }] = await Promise.all([
         sb.from("family").select("id,nombre,color").order("orden"),
@@ -359,29 +365,30 @@ export default function TPV() {
       setOrdenAbiertaId(null);
       await recargarMesas();
 
-      // ── Persistencia VERIFACTU (best-effort: si falla, el ticket del flujo actual sigue) ──
-      try {
-        const tok = (await sb.auth.getSession()).data.session?.access_token;
-        const fr = await fetch("/api/factura", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
-          },
-          body: JSON.stringify({
-            orderId,
-            lineas: lineasComanda().map((l) => ({ precio: l.precio, tipo: l.tipo, cantidad: l.cantidad })),
-          }),
-        });
-        const fj = await fr.json();
-        if (fj?.ok) {
-          // Si la persistencia tiene éxito, enriquece el ticket con datos reales de la factura
-          t.numSerieFactura = fj.numSerieFactura ?? t.numSerieFactura;
-          if (fj.qrDataUrl) t.verifactu.qrDataUrl = fj.qrDataUrl;
-          if (fj.huella) t.verifactu.huella = fj.huella;
+      // ── Persistencia VERIFACTU: DESACTIVADA hasta el final (pagos en prueba) ──
+      if (VERIFACTU_ACTIVO) {
+        try {
+          const tok = (await sb.auth.getSession()).data.session?.access_token;
+          const fr = await fetch("/api/factura", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+            },
+            body: JSON.stringify({
+              orderId,
+              lineas: lineasComanda().map((l) => ({ precio: l.precio, tipo: l.tipo, cantidad: l.cantidad })),
+            }),
+          });
+          const fj = await fr.json();
+          if (fj?.ok) {
+            t.numSerieFactura = fj.numSerieFactura ?? t.numSerieFactura;
+            if (fj.qrDataUrl) t.verifactu.qrDataUrl = fj.qrDataUrl;
+            if (fj.huella) t.verifactu.huella = fj.huella;
+          }
+        } catch {
+          // best-effort: si /api/factura falla, el ticket sigue con /api/ticket
         }
-      } catch {
-        // best-effort: si /api/factura falla (p.ej. migración no aplicada), el ticket sigue con /api/ticket
       }
 
       setTicket(t);
@@ -924,7 +931,7 @@ export default function TPV() {
         </div>
       )}
 
-      {/* ── Modal ticket QR VERIFACTU ── */}
+      {/* ── Modal ticket (resumen en pantalla) ── */}
       {ticket && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-foreground/40 p-4" onClick={reset}>
           <div
@@ -941,10 +948,18 @@ export default function TPV() {
             <div className="my-1 flex justify-between border-t border-border pt-1 font-semibold tabular-nums">
               <span>TOTAL</span><span>{eur(ticket.impuestos.importeTotal)}</span>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={ticket.verifactu.qrDataUrl} alt="QR VERIFACTU" className="mx-auto my-2 h-32 w-32" />
-            <div className="font-semibold">{ticket.verifactu.leyenda}</div>
-            <div className="text-xs text-muted-foreground">{ticket.numSerieFactura}</div>
+            {VERIFACTU_ACTIVO ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={ticket.verifactu.qrDataUrl} alt="QR VERIFACTU" className="mx-auto my-2 h-32 w-32" />
+                <div className="font-semibold">{ticket.verifactu.leyenda}</div>
+                <div className="text-xs text-muted-foreground">{ticket.numSerieFactura}</div>
+              </>
+            ) : (
+              <div className="my-2 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                TICKET DE PRUEBA · sin validez fiscal
+              </div>
+            )}
             <div className="mt-3 flex gap-2">
               <button onClick={() => window.print()} className="btn-ghost flex-1">Imprimir</button>
               <button onClick={reset} className="btn-primary flex-1">Nueva venta</button>
@@ -952,6 +967,57 @@ export default function TPV() {
           </div>
         </div>
       )}
+
+      {/* ── Recibo 80mm para impresión (oculto en pantalla, visible al imprimir) ── */}
+      {ticket && (
+        <div id="recibo" className="pointer-events-none absolute -left-[9999px] top-0 w-[80mm] bg-white p-2 font-mono text-[11px] leading-tight text-black">
+          <div className="text-center">
+            <div className="text-sm font-bold">{locInfo.nombre || "Gluuh TPV"}</div>
+            {locInfo.cif && <div>CIF: {locInfo.cif}</div>}
+            {locInfo.direccion && <div>{locInfo.direccion}</div>}
+          </div>
+          <div className="my-1 border-t border-dashed border-black" />
+          <div>{new Date().toLocaleString("es-ES")}</div>
+          <div className="flex justify-between"><span>{mesa ? mesa.nombre : "Barra"}</span><span>Atiende: {operario?.nombre}</span></div>
+          {VERIFACTU_ACTIVO && <div>Factura: {ticket.numSerieFactura}</div>}
+          <div className="my-1 border-t border-dashed border-black" />
+          {lineasComanda().map((l) => (
+            <div key={l.id} className="flex justify-between gap-2">
+              <span>{l.cantidad}× {l.nombre}</span>
+              <span className="whitespace-nowrap tabular-nums">{eur(l.precio * l.cantidad)}</span>
+            </div>
+          ))}
+          <div className="my-1 border-t border-dashed border-black" />
+          {ticket.impuestos.desglose.map((d) => (
+            <div key={d.tipo} className="flex justify-between gap-2">
+              <span>{ticket.impuestos.impuesto} {d.tipo}% (base {eur(d.base)})</span>
+              <span className="whitespace-nowrap tabular-nums">{eur(d.cuota)}</span>
+            </div>
+          ))}
+          <div className="mt-1 flex justify-between text-sm font-bold"><span>TOTAL</span><span className="tabular-nums">{eur(ticket.impuestos.importeTotal)}</span></div>
+          <div className="my-1 border-t border-dashed border-black" />
+          {VERIFACTU_ACTIVO ? (
+            <div className="text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ticket.verifactu.qrDataUrl} alt="QR VERIFACTU" className="mx-auto h-28 w-28" />
+              <div className="font-semibold">{ticket.verifactu.leyenda}</div>
+              <div className="break-all text-[9px]">Huella: {ticket.verifactu.huella.slice(0, 32)}</div>
+            </div>
+          ) : (
+            <div className="text-center font-bold">TICKET DE PRUEBA · SIN VALIDEZ FISCAL</div>
+          )}
+          <div className="mt-2 text-center">¡Gracias por su visita!</div>
+        </div>
+      )}
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #recibo, #recibo * { visibility: visible !important; }
+          #recibo { position: fixed !important; left: 0 !important; top: 0 !important; width: 80mm !important; padding: 4mm !important; }
+          @page { size: 80mm auto; margin: 0; }
+        }
+      `}</style>
     </div>
   );
 }
