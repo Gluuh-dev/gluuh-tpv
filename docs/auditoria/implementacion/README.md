@@ -12,6 +12,7 @@
 | [`modelo-de-datos.md`](modelo-de-datos.md) | **Esquema completo unificado** (multi‑tenant RLS): todas las tablas de las fichas consolidadas y reconciliadas en un solo modelo coherente. |
 | [`arquitectura.md`](arquitectura.md) | Arquitectura técnica: superficies (web config / apps táctiles), offline‑first + sync, motor fiscal `@gluuh/core`, informes (RPC), agente de hardware, multi‑tenant. |
 | [`conexion-y-roles-dispositivo.md`](conexion-y-roles-dispositivo.md) | Cómo cada equipo se conecta y elige su rol (TPV/comandero/KDS…): modelo de Ágora (IP:puerto + Tipo) y nuestra propuesta de **emparejamiento por QR** sin IPs. |
+| [`suscripcion-planes-y-facturacion.md`](suscripcion-planes-y-facturacion.md) | Cómo cobramos a las empresas: suscripción (Stripe Billing), ciclo de vida/morosidad, planes y **feature gating** (qué desbloquea cada plan, forzado en backend/RLS). |
 
 ---
 

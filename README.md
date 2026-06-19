@@ -9,6 +9,50 @@ Monorepo de la plataforma TPV (Terminal Punto de Venta) para bares y restaurante
 
 ---
 
+## 🚀 Inicio rápido (arrancar y probar)
+
+Requisitos: **Node ≥ 20** y **pnpm 9** (`npm i -g pnpm`).
+
+```bash
+# 1) Instalar todo el monorepo (una vez)
+pnpm install
+
+# 2) Arrancar el backoffice + TPV (Next.js)
+pnpm --filter @gluuh/web dev
+#    → http://localhost:3100
+```
+
+> Necesitas **`apps/web/.env.local`** con las claves de Supabase (no se versiona — cópialo de
+> [`apps/web/.env.example`](apps/web/.env.example) y rellena los valores, o pídeselo a un compañero).
+
+### Acceso de prueba
+
+| | |
+|---|---|
+| **URL** | http://localhost:3100/login |
+| **Usuario** | `admin@gluuh.com` |
+| **Contraseña** | la que fijes tú (ver abajo) — **no se versiona** por seguridad |
+
+Para fijar una contraseña de prueba (necesita `SUPABASE_URL` y `SUPABASE_SECRET_KEY`, que están en `apps/api/.env`):
+
+```bash
+node scripts/reset-password.mjs admin@gluuh.com TuPassDePrueba123
+```
+
+### Datos de prueba (catálogo demo)
+
+```bash
+node scripts/seed-login-demo.mjs    # añade la categoría "Demo Gluuh" + productos al tenant del login (idempotente)
+```
+
+Luego, en **`/tpv`** → elige **Barra** o una **Mesa** → toca productos → **Cobrar Efectivo** (con cálculo de
+cambio) o **Pagos** (con propina). Las facturas con su **huella VERIFACTU** y el check de cadena se ven en
+**`/visor-de-verifactu`**.
+
+> Probar solo el **motor fiscal** sin arrancar nada: `pnpm core:test` (incluye el **vector oficial de la AEAT**).
+
+---
+
 ## Estructura del monorepo
 
 ```
