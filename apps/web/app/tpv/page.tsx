@@ -50,6 +50,13 @@ export default function TPV() {
   const [cats, setCats]           = useState<Cat[]>([]);
   const [prods, setProds]         = useState<Prod[]>([]);
 
+  /* ── Operario activo (quién opera; persiste hasta "Salir") ── */
+  const [operario, setOperario] = useState<{ id: string; nombre: string } | null>(null);
+  const [operarios, setOperarios] = useState<{ id: string; nombre: string; rol: string }[]>([]);
+  const [pinUser, setPinUser] = useState<{ id: string; nombre: string } | null>(null);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState("");
+
   /* ── Selección de contexto ── */
   const [mesa, setMesa]   = useState<Mesa | null>(null);
   const [barra, setBarra] = useState(false);
@@ -84,6 +91,10 @@ export default function TPV() {
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      // Operario activo desde localStorage (persiste hasta "Salir") + lista de operarios
+      try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
+      const { data: ops } = await sb.rpc("listar_operarios");
+      setOperarios((ops as { id: string; nombre: string; rol: string }[]) ?? []);
       const { data: loc } = await sb.from("location").select("id,territorio_fiscal").limit(1).maybeSingle();
       const { data: u }   = await sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle();
       setLocationId(loc?.id ?? null);
@@ -234,7 +245,7 @@ export default function TPV() {
       await sb.from("order_line").delete().eq("order_id", orderId);
     } else {
       const { data: order } = await sb.from("sales_order").insert({
-        location_id: locationId, table_id: mesa?.id ?? null, user_id: userId,
+        location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId,
         canal: "TPV", tipo_operacion: "VENTA", estado, estado_preparacion: estadoPrep,
         total: totalRedondeado, client_id: crypto.randomUUID(),
       }).select("id").single();
@@ -372,19 +383,91 @@ export default function TPV() {
     setOrdenAbiertaId(null);
   }
 
+  function salirOperario() {
+    try { localStorage.removeItem("gluuh_operario"); } catch { /* ignore */ }
+    setOperario(null); setPinUser(null); setPin(""); setPinError("");
+    reset();
+  }
+
+  async function validarPin() {
+    setPinError("");
+    const { data, error } = await sb.rpc("validar_pin", { p_pin: pin });
+    const u = (data as { id: string; nombre: string }[] | null)?.[0];
+    if (error || !u || (pinUser && u.id !== pinUser.id)) { setPinError("PIN incorrecto"); setPin(""); return; }
+    const op = { id: u.id, nombre: u.nombre };
+    try { localStorage.setItem("gluuh_operario", JSON.stringify(op)); } catch { /* ignore */ }
+    setOperario(op); setPinUser(null); setPin("");
+  }
+
   /* ─────────────────────────────── RENDERS ─────────────────────────────── */
 
   if (loading) return (
     <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>
   );
 
+  /* ── Gate: seleccionar operario (usuario + PIN) ── */
+  if (!operario) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
+        <div className="w-full max-w-md">
+          <h1 className="mb-6 text-center text-xl font-semibold">Selecciona usuario</h1>
+          {!pinUser ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {operarios.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => { setPinUser({ id: o.id, nombre: o.nombre }); setPin(""); setPinError(""); }}
+                  className="grid h-28 place-items-center rounded-lg border-2 border-border bg-card font-semibold hover:border-brand"
+                >
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-brand/15 text-lg text-brand">{o.nombre.charAt(0).toUpperCase()}</span>
+                  <span className="mt-1">{o.nombre}</span>
+                  <span className="text-xs font-normal text-muted-foreground">{o.rol}</span>
+                </button>
+              ))}
+              {operarios.length === 0 && (
+                <p className="col-span-full text-center text-muted-foreground">No hay usuarios con PIN. Créalos en <b>Empleados</b>.</p>
+              )}
+            </div>
+          ) : (
+            <div className="mx-auto w-full max-w-xs">
+              <p className="mb-2 text-center text-sm">PIN de <b>{pinUser.nombre}</b></p>
+              <div className="mb-3 h-10 rounded-md border border-border bg-muted text-center text-2xl leading-10 tracking-[0.4em]">
+                {pin.length ? "•".repeat(pin.length) : <span className="text-muted-foreground">····</span>}
+              </div>
+              {pinError && <p className="mb-2 text-center text-sm text-destructive">{pinError}</p>}
+              <div className="grid grid-cols-3 gap-2">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "←", "0", "OK"].map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      if (k === "←") return setPin((p) => p.slice(0, -1));
+                      if (k === "OK") return void validarPin();
+                      if (pin.length < 8) setPin((p) => p + k);
+                    }}
+                    className={`h-14 rounded-md border border-border text-lg font-medium ${k === "OK" ? "bg-brand text-brand-foreground" : "bg-card hover:bg-accent"}`}
+                  >
+                    {k}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => { setPinUser(null); setPin(""); setPinError(""); }} className="btn-ghost mt-3 w-full">← Cambiar usuario</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   /* ── Selección mesa/barra ── */
   if (!mesa && !barra) {
     return (
       <div className="min-h-screen bg-background">
         <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
-          <strong className="font-semibold">TPV</strong>
-          <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">← Panel</a>
+          <strong className="font-semibold">TPV · {operario.nombre}</strong>
+          <div className="flex items-center gap-4 text-sm">
+            <button onClick={salirOperario} className="text-muted-foreground hover:text-foreground">Salir</button>
+            <a href="/dashboard" className="text-muted-foreground hover:text-foreground">← Panel</a>
+          </div>
         </header>
         <div className="p-5">
           <button onClick={() => setBarra(true)} className="btn-primary mb-4">Barra / venta directa</button>
