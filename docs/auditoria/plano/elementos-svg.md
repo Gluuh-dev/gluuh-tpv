@@ -345,14 +345,22 @@ uniforme y plano, tipo croma, para poder recortar/extraer los elementos con faci
 sombras proyectadas sobre el fondo. Estilo ilustración PLANA y limpia, mismo grosor de
 línea y misma escala relativa en todo, sombras muy sutiles o ninguna.
 
-Coloca UN ÚNICO ejemplar de cada uno de estos objetos, separados entre sí y bien
-espaciados para que cada uno se distinga, en una cuadrícula imaginaria de huecos
-(mobiliario de interior y de exterior de un restaurante):
+Coloca los objetos separados entre sí y bien espaciados, en una cuadrícula imaginaria
+de huecos (mobiliario de interior y de exterior de un restaurante):
 
-mesa cuadrada con sus sillas, mesa rectangular con sus sillas, mesa redonda con sus
-sillas, silla suelta, taburete, mesa alta, tramo de barra, separador / biombo,
-jardinera, maceta con planta, palmera, sombrilla, banco, columna, puerta, futbolín,
-mesa de billar, estufa de terraza, poste con cordón, papelera.
+VARIAS opciones de BARRA: un tramo recto, una esquina en L, un tramo con una hilera de
+taburetes delante, y un extremo/remate de barra.
+
+VARIOS elementos de COCINA vistos desde arriba: una mesa de trabajo de acero, unos
+fogones de gas, una plancha/parrilla, una freidora, una campana extractora, una
+nevera/armario frigorífico, un fregadero de dos senos y un pase/estante caliente.
+
+VARIOS TABURETES distintos: redondo, cuadrado y alto de barra.
+
+Y UN ÚNICO ejemplar de cada uno del resto: mesa cuadrada con sus sillas, mesa
+rectangular con sus sillas, mesa redonda con sus sillas, silla suelta, mesa alta,
+separador / biombo, jardinera, maceta con planta, palmera, sombrilla, banco, columna,
+puerta, futbolín, mesa de billar, estufa de terraza, poste con cordón, papelera.
 
 Las mesas se ven COMPLETAMENTE LIMPIAS por su parte de arriba: NADA encima de ellas
 (sin platos, sin objetos, sin números, sin texto de ningún tipo). Maderas cálidas,
