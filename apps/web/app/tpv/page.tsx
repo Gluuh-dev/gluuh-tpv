@@ -6,7 +6,7 @@ import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Utensils } from "lucide-react";
 
 /* ─── Tipos ─── */
-interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null }
+interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
 interface Room   { id: string; nombre: string; orden: number }
 interface Reserva { id: string; fecha_hora: string; comensales: number; estado: string; notas: string | null }
 interface Family { id: string; nombre: string; color: string }
@@ -232,7 +232,7 @@ export default function TPV() {
   // Carga la lista de mesas + el importe de la cuenta abierta de cada una.
   async function recargarMesas() {
     const [{ data: m }, { data: ords }] = await Promise.all([
-      sb.from("restaurant_table").select("id,nombre,estado,room_id,pos_x,pos_y").order("nombre"),
+      sb.from("restaurant_table").select("id,nombre,estado,room_id,pos_x,pos_y,capacidad").order("nombre"),
       sb.from("sales_order").select("table_id,total,created_at")
         .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
         .not("table_id", "is", null),
@@ -477,89 +477,98 @@ export default function TPV() {
     );
   }
 
-  /* ── Selección mesa/barra ── */
-  if (!mesa && !barra) {
+  /* ── Dibuja una mesa en el plano con sillas según su capacidad ── */
+  function MesaPlano(m: Mesa, i: number) {
+    const cuenta = totalesMesa[m.id] ?? 0;
+    const ocupada = cuenta > 0 || m.estado !== "LIBRE";
+    const cap = m.capacidad || 2;
+    const perSide = Math.max(1, Math.ceil(cap / 2));
+    const bottom = Math.max(0, cap - perSide);
+    const bodyW = 64 + (perSide - 1) * 26;
+    const x = m.pos_x ?? (40 + (i % 4) * 210);
+    const y = m.pos_y ?? (40 + Math.floor(i / 4) * 200);
+    const chair = "h-2.5 w-5 rounded-sm bg-current opacity-40";
     return (
-      <div className="min-h-screen bg-background">
-        <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
+      <button
+        key={m.id}
+        onClick={() => abrirMesa(m)}
+        style={{ left: x, top: y }}
+        className={`absolute flex flex-col items-center transition-transform hover:scale-[1.04] ${ocupada ? "text-amber-700 dark:text-amber-400" : "text-foreground"}`}
+      >
+        <div className="flex gap-1">{Array.from({ length: perSide }).map((_, k) => <span key={k} className={chair} />)}</div>
+        <div
+          className={`my-1 grid place-items-center rounded-xl border-2 shadow-sm ${ocupada ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20" : "border-border bg-card"}`}
+          style={{ width: bodyW, height: 60 }}
+        >
+          <span className="text-sm font-bold leading-none">{m.nombre.replace("Mesa ", "M")}</span>
+          <span className="mt-0.5 text-[11px] font-medium leading-none">{ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}</span>
+        </div>
+        <div className="flex gap-1">{Array.from({ length: bottom }).map((_, k) => <span key={k} className={chair} />)}</div>
+      </button>
+    );
+  }
+
+  /* ── Selección mesa/barra: menú lateral de salas + plano a pantalla ── */
+  if (!mesa && !barra) {
+    const mesasSala = mesas.filter((m) => m.room_id === vistaSala);
+    return (
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <header className="flex flex-none items-center justify-between border-b border-border bg-card px-4 py-2.5">
           <strong className="font-semibold">TPV · {operario.nombre}</strong>
-          <div className="flex items-center gap-4 text-sm">
-            <button onClick={salirOperario} className="text-muted-foreground hover:text-foreground">Salir</button>
-            <a href="/dashboard" className="text-muted-foreground hover:text-foreground">← Panel</a>
-          </div>
+          <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">← Panel</a>
         </header>
-        <div className="p-4 sm:p-5">
-          {/* Pestañas de sala + Reservas + Barra */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex min-h-0 flex-1">
+          {/* Menú lateral de salas */}
+          <aside className="flex w-44 flex-none flex-col gap-1 border-r border-border bg-card p-2">
+            <p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Salas</p>
             {rooms.map((rm) => (
               <button
                 key={rm.id}
                 onClick={() => setVistaSala(rm.id)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  vistaSala === rm.id ? "bg-brand text-brand-foreground" : "border border-border bg-card hover:bg-accent"
-                }`}
+                className={`rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${vistaSala === rm.id ? "bg-brand text-brand-foreground" : "hover:bg-accent"}`}
               >
                 {rm.nombre}
               </button>
             ))}
             <button
               onClick={() => setVistaSala("RESERVAS")}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                vistaSala === "RESERVAS" ? "bg-brand text-brand-foreground" : "border border-border bg-card hover:bg-accent"
-              }`}
+              className={`rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${vistaSala === "RESERVAS" ? "bg-brand text-brand-foreground" : "hover:bg-accent"}`}
             >
               Reservas{reservas.length > 0 ? ` (${reservas.length})` : ""}
             </button>
-            <button onClick={() => setBarra(true)} className="btn-primary ml-auto">Barra / venta directa</button>
-          </div>
+            <div className="mt-auto space-y-1 border-t border-border pt-2">
+              <button onClick={() => setBarra(true)} className="w-full rounded-md bg-brand px-3 py-2 text-sm font-semibold text-brand-foreground">Barra / directa</button>
+              <button onClick={salirOperario} className="w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent">Salir</button>
+            </div>
+          </aside>
 
-          {vistaSala === "RESERVAS" ? (
-            <div className="mx-auto max-w-2xl space-y-2">
-              {reservas.length === 0 && <div className="card text-center text-muted-foreground">Sin reservas.</div>}
-              {reservas.map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="font-medium">
-                      {new Date(r.fecha_hora).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      <span className="ml-2 text-muted-foreground">· {r.comensales} pax</span>
+          {/* Plano / contenido */}
+          <main className="relative min-w-0 flex-1 overflow-auto bg-muted/20">
+            {vistaSala === "RESERVAS" ? (
+              <div className="mx-auto max-w-2xl space-y-2 p-4">
+                {reservas.length === 0 && <div className="card text-center text-muted-foreground">Sin reservas.</div>}
+                {reservas.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="font-medium">
+                        {new Date(r.fecha_hora).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        <span className="ml-2 text-muted-foreground">· {r.comensales} pax</span>
+                      </div>
+                      {r.notas && <div className="truncate text-xs text-muted-foreground">{r.notas}</div>}
                     </div>
-                    {r.notas && <div className="truncate text-xs text-muted-foreground">{r.notas}</div>}
+                    <span className="ml-3 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{r.estado}</span>
                   </div>
-                  <span className="ml-3 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{r.estado}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="relative mx-auto h-[560px] w-full max-w-[760px] overflow-auto rounded-xl border border-border bg-muted/30">
-              {mesas.filter((m) => m.room_id === vistaSala).map((m, i) => {
-                const cuenta = totalesMesa[m.id] ?? 0;
-                const ocupada = cuenta > 0 || m.estado !== "LIBRE";
-                // ponytail: sin posición → rejilla automática al fondo
-                const x = m.pos_x ?? (40 + (i % 4) * 180);
-                const y = m.pos_y ?? 460;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => abrirMesa(m)}
-                    style={{ left: x, top: y }}
-                    className={`absolute grid h-[78px] w-[100px] place-items-center rounded-xl border-2 font-semibold shadow-sm transition-transform hover:scale-105 ${
-                      ocupada
-                        ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
-                        : "border-border bg-card text-foreground"
-                    }`}
-                  >
-                    <span>{m.nombre}</span>
-                    <span className={`text-xs ${cuenta > 0 ? "font-semibold" : "font-normal text-muted-foreground"}`}>
-                      {ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}
-                    </span>
-                  </button>
-                );
-              })}
-              {mesas.filter((m) => m.room_id === vistaSala).length === 0 && (
-                <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="relative h-full min-h-[600px] w-full" style={{ minWidth: 900 }}>
+                {mesasSala.map((m, i) => MesaPlano(m, i))}
+                {mesasSala.length === 0 && (
+                  <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>
+                )}
+              </div>
+            )}
+          </main>
         </div>
       </div>
     );

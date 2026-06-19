@@ -25,21 +25,21 @@ try {
     console.log("✓ Sala 'Terraza' creada");
   }
 
-  // Layout: Salón (Mesa 1–5) y Terraza (Mesa 6–8), con posiciones en px
+  // Layout: Salón (Mesa 1–5) y Terraza (Mesa 6–8): [room, x, y, capacidad]
   const LAYOUT = {
-    "Mesa 1": [salon, 60, 60], "Mesa 2": [salon, 280, 60], "Mesa 3": [salon, 500, 60],
-    "Mesa 4": [salon, 60, 280], "Mesa 5": [salon, 280, 280],
-    "Mesa 6": [terraza, 60, 60], "Mesa 7": [terraza, 280, 60], "Mesa 8": [terraza, 500, 60],
+    "Mesa 1": [salon, 80, 90, 2], "Mesa 2": [salon, 320, 90, 4], "Mesa 3": [salon, 600, 90, 6],
+    "Mesa 4": [salon, 80, 320, 2], "Mesa 5": [salon, 360, 330, 4],
+    "Mesa 6": [terraza, 90, 100, 2], "Mesa 7": [terraza, 340, 100, 4], "Mesa 8": [terraza, 620, 110, 6],
   };
   let n = 0;
-  for (const [nombre, [room, x, y]] of Object.entries(LAYOUT)) {
+  for (const [nombre, [room, x, y, cap]] of Object.entries(LAYOUT)) {
     const r = await c.query(
-      `update restaurant_table set room_id=$2, pos_x=$3, pos_y=$4 where tenant_id=$1 and nombre=$5`,
-      [TENANT, room, x, y, nombre],
+      `update restaurant_table set room_id=$2, pos_x=$3, pos_y=$4, capacidad=$5 where tenant_id=$1 and nombre=$6`,
+      [TENANT, room, x, y, cap, nombre],
     );
     n += r.rowCount;
   }
-  console.log(`✓ ${n} mesas posicionadas (Salón 1–5, Terraza 6–8)`);
+  console.log(`✓ ${n} mesas posicionadas con capacidad (Salón 1–5, Terraza 6–8)`);
 
   // Reservas demo (best-effort: customer_id puede ser NOT NULL)
   try {
