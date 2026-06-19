@@ -6,7 +6,9 @@ import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { Utensils } from "lucide-react";
 
 /* ─── Tipos ─── */
-interface Mesa   { id: string; nombre: string; estado: string }
+interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null }
+interface Room   { id: string; nombre: string; orden: number }
+interface Reserva { id: string; fecha_hora: string; comensales: number; estado: string; notas: string | null }
 interface Family { id: string; nombre: string; color: string }
 interface Cat    { id: string; nombre: string; orden: number; family_id: string | null }
 interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null }
@@ -46,6 +48,9 @@ export default function TPV() {
   const [territorio, setTerritorio] = useState("PENINSULA_BALEARES");
   const [userId, setUserId]       = useState<string | null>(null);
   const [mesas, setMesas]         = useState<Mesa[]>([]);
+  const [rooms, setRooms]         = useState<Room[]>([]);
+  const [reservas, setReservas]   = useState<Reserva[]>([]);
+  const [vistaSala, setVistaSala] = useState<string>("");  // room id o "RESERVAS"
   const [families, setFamilies]   = useState<Family[]>([]);
   const [cats, setCats]           = useState<Cat[]>([]);
   const [prods, setProds]         = useState<Prod[]>([]);
@@ -110,6 +115,13 @@ export default function TPV() {
       setProds((p as Prod[]) ?? []);
       setCatSel((c as Cat[])?.[0]?.id ?? null);
       await recargarMesas();
+      const [{ data: rms }, { data: rsv }] = await Promise.all([
+        sb.from("room").select("id,nombre,orden").order("orden"),
+        sb.from("reservation").select("id,fecha_hora,comensales,estado,notas").order("fecha_hora"),
+      ]);
+      setRooms((rms as Room[]) ?? []);
+      setReservas((rsv as Reserva[]) ?? []);
+      setVistaSala((rms as Room[])?.[0]?.id ?? "");
       setLoading(false);
     })();
     /* eslint-disable-next-line */
@@ -214,7 +226,7 @@ export default function TPV() {
   // Carga la lista de mesas + el importe de la cuenta abierta de cada una.
   async function recargarMesas() {
     const [{ data: m }, { data: ords }] = await Promise.all([
-      sb.from("restaurant_table").select("id,nombre,estado").order("nombre"),
+      sb.from("restaurant_table").select("id,nombre,estado,room_id,pos_x,pos_y").order("nombre"),
       sb.from("sales_order").select("table_id,total,created_at")
         .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
         .not("table_id", "is", null),
@@ -469,33 +481,78 @@ export default function TPV() {
             <a href="/dashboard" className="text-muted-foreground hover:text-foreground">← Panel</a>
           </div>
         </header>
-        <div className="p-5">
-          <button onClick={() => setBarra(true)} className="btn-primary mb-4">Barra / venta directa</button>
-          {mesas.length === 0 && (
-            <div className="card text-muted-foreground">No hay mesas. Créalas en <b>Sala</b> o usa Barra.</div>
-          )}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {mesas.map((m) => {
-              const cuenta = totalesMesa[m.id] ?? 0;
-              const ocupada = cuenta > 0 || m.estado !== "LIBRE";
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => abrirMesa(m)}
-                  className={`grid h-24 place-items-center rounded-lg border-2 font-semibold ${
-                    ocupada
-                      ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
-                      : "border-border bg-card text-foreground"
-                  }`}
-                >
-                  {m.nombre}
-                  <span className={`text-xs font-${cuenta > 0 ? "semibold" : "normal"} ${cuenta > 0 ? "" : "text-muted-foreground"}`}>
-                    {ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}
-                  </span>
-                </button>
-              );
-            })}
+        <div className="p-4 sm:p-5">
+          {/* Pestañas de sala + Reservas + Barra */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {rooms.map((rm) => (
+              <button
+                key={rm.id}
+                onClick={() => setVistaSala(rm.id)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  vistaSala === rm.id ? "bg-brand text-brand-foreground" : "border border-border bg-card hover:bg-accent"
+                }`}
+              >
+                {rm.nombre}
+              </button>
+            ))}
+            <button
+              onClick={() => setVistaSala("RESERVAS")}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                vistaSala === "RESERVAS" ? "bg-brand text-brand-foreground" : "border border-border bg-card hover:bg-accent"
+              }`}
+            >
+              Reservas{reservas.length > 0 ? ` (${reservas.length})` : ""}
+            </button>
+            <button onClick={() => setBarra(true)} className="btn-primary ml-auto">Barra / venta directa</button>
           </div>
+
+          {vistaSala === "RESERVAS" ? (
+            <div className="mx-auto max-w-2xl space-y-2">
+              {reservas.length === 0 && <div className="card text-center text-muted-foreground">Sin reservas.</div>}
+              {reservas.map((r) => (
+                <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="font-medium">
+                      {new Date(r.fecha_hora).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      <span className="ml-2 text-muted-foreground">· {r.comensales} pax</span>
+                    </div>
+                    {r.notas && <div className="truncate text-xs text-muted-foreground">{r.notas}</div>}
+                  </div>
+                  <span className="ml-3 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{r.estado}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="relative mx-auto h-[560px] w-full max-w-[760px] overflow-auto rounded-xl border border-border bg-muted/30">
+              {mesas.filter((m) => m.room_id === vistaSala).map((m, i) => {
+                const cuenta = totalesMesa[m.id] ?? 0;
+                const ocupada = cuenta > 0 || m.estado !== "LIBRE";
+                // ponytail: sin posición → rejilla automática al fondo
+                const x = m.pos_x ?? (40 + (i % 4) * 180);
+                const y = m.pos_y ?? 460;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => abrirMesa(m)}
+                    style={{ left: x, top: y }}
+                    className={`absolute grid h-[78px] w-[100px] place-items-center rounded-xl border-2 font-semibold shadow-sm transition-transform hover:scale-105 ${
+                      ocupada
+                        ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                        : "border-border bg-card text-foreground"
+                    }`}
+                  >
+                    <span>{m.nombre}</span>
+                    <span className={`text-xs ${cuenta > 0 ? "font-semibold" : "font-normal text-muted-foreground"}`}>
+                      {ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}
+                    </span>
+                  </button>
+                );
+              })}
+              {mesas.filter((m) => m.room_id === vistaSala).length === 0 && (
+                <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
