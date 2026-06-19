@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { estacionDe } from "../lib/estaciones";
 
 interface Empleado { id: string; nombre: string; rol: string }
 interface Mesa { id: string; nombre: string; estado: string }
 interface Cat { id: string; nombre: string; orden: number }
-interface Prod { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; disponible: boolean }
+interface Prod { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; disponible: boolean; estacion: string | null }
 
 const eur = (n: number) => Number(n).toFixed(2) + " €";
 
@@ -28,6 +29,7 @@ export default function Comandera() {
   const [mesa, setMesa] = useState<Mesa | null>(null);
   const [catSel, setCatSel] = useState<string | null>(null);
   const [comanda, setComanda] = useState<Record<string, number>>({});
+  const [carrito, setCarrito] = useState(false);   // hoja inferior abierta
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
@@ -35,12 +37,11 @@ export default function Comandera() {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
       const { data: loc } = await sb.from("location").select("id").limit(1).maybeSingle();
-      const lid = loc?.id ?? null;
-      setLocationId(lid);
+      setLocationId(loc?.id ?? null);
       const [{ data: m }, { data: c }, { data: p }] = await Promise.all([
         sb.from("restaurant_table").select("id,nombre,estado").order("nombre"),
         sb.from("category").select("id,nombre,orden").order("orden"),
-        sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id,disponible").eq("disponible", true).order("nombre"),
+        sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id,disponible,estacion").eq("disponible", true).order("nombre"),
       ]);
       setMesas((m as Mesa[]) ?? []);
       setCats((c as Cat[]) ?? []);
@@ -81,43 +82,41 @@ export default function Comandera() {
       if (error || !order) { alert("Error: " + error?.message); return; }
       const lineas = Object.entries(comanda).map(([id, cantidad]) => {
         const p = prods.find((x) => x.id === id)!;
-        return { order_id: order.id, product_id: id, nombre: p.nombre, cantidad, precio_unitario: p.precio, tipo_impositivo: p.tipo_impositivo };
+        return { order_id: order.id, product_id: id, nombre: p.nombre, cantidad, precio_unitario: p.precio, tipo_impositivo: p.tipo_impositivo, estacion: estacionDe(p.estacion) };
       });
       await sb.from("order_line").insert(lineas);
       await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
-      setComanda({});
-      setMesa(null);
+      setComanda({}); setCarrito(false); setMesa(null);
     } finally {
       setEnviando(false);
     }
   }
 
   if (loading) return (
-    <div className="dark grid min-h-screen place-items-center bg-background text-muted-foreground">
-      Cargando…
-    </div>
+    <div className="dark grid min-h-[100dvh] place-items-center bg-background text-muted-foreground">Cargando…</div>
   );
 
-  /* ---- PIN ---- */
+  /* ───────── PIN ───────── */
   if (!empleado) {
     const teclas = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "OK"];
     return (
-      <div className="dark grid min-h-screen place-items-center bg-background p-6 text-foreground">
+      <div className="dark grid min-h-[100dvh] place-items-center bg-background p-6 text-foreground">
         <div className="w-full max-w-xs text-center">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-brand text-xl font-bold text-brand-foreground">G</div>
           <h1 className="text-xl font-semibold tracking-tight">Comandera</h1>
-          <p className="mb-4 text-sm text-muted-foreground">Introduce tu PIN</p>
-          <div className="mb-4 flex justify-center gap-2">
+          <p className="mb-5 text-sm text-muted-foreground">Introduce tu PIN</p>
+          <div className="mb-5 flex justify-center gap-2.5">
             {Array.from({ length: 4 }).map((_, i) => (
-              <span key={i} className={`h-4 w-4 rounded-full ${i < pin.length ? "bg-brand" : "bg-muted"}`} />
+              <span key={i} className={`h-3.5 w-3.5 rounded-full transition-colors ${i < pin.length ? "bg-brand" : "bg-muted"}`} />
             ))}
           </div>
-          {pinError && <p className="mb-2 text-sm text-destructive">{pinError}</p>}
+          {pinError && <p className="mb-3 text-sm text-destructive">{pinError}</p>}
           <div className="grid grid-cols-3 gap-3">
             {teclas.map((t) => (
               <button
                 key={t}
                 onClick={() => { if (t === "C") setPin(""); else if (t === "OK") comprobarPin(); else if (pin.length < 8) setPin(pin + t); }}
-                className={`h-16 rounded-md text-2xl font-semibold ${t === "OK" ? "bg-brand text-brand-foreground" : "bg-card text-foreground hover:bg-accent"}`}
+                className={`h-16 select-none rounded-2xl text-2xl font-semibold active:scale-95 ${t === "OK" ? "bg-brand text-brand-foreground" : "bg-card text-foreground hover:bg-accent"}`}
               >
                 {t}
               </button>
@@ -128,120 +127,127 @@ export default function Comandera() {
     );
   }
 
-  /* ---- MESAS ---- */
+  /* ───────── MESAS ───────── */
   if (!mesa) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
-        <header className="flex items-center justify-between border-b border-border bg-card px-5 py-3">
+      <div className="min-h-[100dvh] bg-background text-foreground">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <strong className="font-semibold">Mesas</strong>
-          <span className="text-sm text-muted-foreground">
-            {empleado.nombre} ·{" "}
-            <button className="underline" onClick={() => setEmpleado(null)}>cambiar</button>
-          </span>
+          <button className="rounded-full bg-muted px-3 py-1 text-sm" onClick={() => setEmpleado(null)}>{empleado.nombre} ·  salir</button>
         </header>
-        <div className="p-5">
+        <div className="p-4">
           {mesas.length === 0 && (
-            <div className="card text-muted-foreground">No hay mesas. Créalas en <b>Sala</b> (panel).</div>
+            <div className="rounded-lg border border-border bg-card p-4 text-muted-foreground">No hay mesas. Créalas en <b>Sala</b> (panel).</div>
           )}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-            {mesas.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMesa(m)}
-                className={`grid h-24 place-items-center rounded-lg border-2 text-center font-semibold ${
-                  m.estado === "LIBRE"
-                    ? "border-border bg-card text-foreground"
-                    : "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
-                }`}
-              >
-                {m.nombre}
-                <span className="text-xs font-normal text-muted-foreground">
-                  {m.estado === "LIBRE" ? "Libre" : "Ocupada"}
-                </span>
-              </button>
-            ))}
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {mesas.map((m) => {
+              const ocupada = m.estado !== "LIBRE";
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => { setMesa(m); setComanda({}); }}
+                  className={`grid aspect-square place-items-center rounded-2xl border-2 text-center font-semibold active:scale-95 ${
+                    ocupada ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" : "border-border bg-card text-foreground"
+                  }`}
+                >
+                  <span className="text-lg">{m.nombre.replace("Mesa ", "")}</span>
+                  <span className="text-[11px] font-normal opacity-70">{ocupada ? "Ocupada" : "Libre"}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
     );
   }
 
-  /* ---- COMANDA ---- */
+  /* ───────── COMANDA (mobile) ───────── */
   const productos = prods.filter((p) => p.category_id === catSel);
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="flex items-center justify-between border-b border-border bg-card px-5 py-3">
-        <button
-          onClick={() => { setMesa(null); setComanda({}); }}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Mesas
-        </button>
-        <strong>{mesa.nombre}</strong>
+    <div className="flex h-[100dvh] flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-2.5">
+        <button onClick={() => { setMesa(null); setComanda({}); }} className="rounded-full bg-muted px-3 py-1.5 text-sm">← Mesas</button>
+        <strong className="truncate">{mesa.nombre}</strong>
         <span className="text-sm text-muted-foreground">{empleado.nombre}</span>
       </header>
 
-      <div className="flex flex-1 flex-col md:flex-row">
-        {/* Carta */}
-        <div className="flex-1 p-4">
-          <div className="mb-3 flex flex-wrap gap-2">
-            {cats.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setCatSel(c.id)}
-                className={`rounded-md px-3 py-1.5 text-sm ${catSel === c.id ? "bg-brand text-brand-foreground" : "bg-muted text-foreground hover:bg-accent"}`}
-              >
-                {c.nombre}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {productos.map((p) => (
+      {/* Pills de categoría (scroll horizontal) */}
+      <nav className="sticky top-[49px] z-10 flex gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {cats.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setCatSel(c.id)}
+            className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium ${catSel === c.id ? "bg-brand text-brand-foreground" : "bg-muted text-foreground"}`}
+          >
+            {c.nombre}
+          </button>
+        ))}
+      </nav>
+
+      {/* Grid de productos */}
+      <main className="flex-1 overflow-y-auto p-3 pb-24">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {productos.map((p) => {
+            const q = comanda[p.id] ?? 0;
+            return (
               <button
                 key={p.id}
                 onClick={() => add(p.id)}
-                className="rounded-md border border-border bg-card p-3 text-left shadow-sm hover:bg-accent"
+                className="relative rounded-xl border border-border bg-card p-3 text-left shadow-sm active:scale-95"
               >
-                <div className="font-medium">{p.nombre}</div>
-                <div className="text-sm tabular-nums text-destructive">{eur(p.precio)}</div>
+                {q > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-brand text-xs font-bold text-brand-foreground">{q}</span>}
+                <div className="font-medium leading-tight">{p.nombre}</div>
+                <div className="mt-1 text-sm font-semibold tabular-nums text-destructive">{eur(p.precio)}</div>
               </button>
-            ))}
-            {productos.length === 0 && (
-              <p className="col-span-full text-muted-foreground">Sin productos en esta categoría.</p>
-            )}
+            );
+          })}
+          {productos.length === 0 && <p className="col-span-full text-muted-foreground">Sin productos en esta categoría.</p>}
+        </div>
+      </main>
+
+      {/* Carrito flotante */}
+      {unidades > 0 && !carrito && (
+        <button
+          onClick={() => setCarrito(true)}
+          className="absolute inset-x-3 bottom-3 z-20 flex items-center justify-between rounded-2xl bg-brand px-4 py-3.5 text-brand-foreground shadow-lg active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2 font-semibold"><span className="grid h-6 min-w-6 place-items-center rounded-full bg-brand-foreground/20 px-1 text-sm">{unidades}</span> Ver comanda</span>
+          <span className="font-bold tabular-nums">{eur(total)}</span>
+        </button>
+      )}
+
+      {/* Hoja inferior con la comanda */}
+      {carrito && (
+        <div className="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/40" onClick={() => setCarrito(false)}>
+          <div className="max-h-[80%] rounded-t-2xl border-t border-border bg-card p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-muted" />
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="font-semibold">Comanda · {mesa.nombre}</h2>
+              <button onClick={() => setCarrito(false)} className="text-sm text-muted-foreground">Cerrar</button>
+            </div>
+            <div className="max-h-[40vh] space-y-1 overflow-y-auto">
+              {Object.entries(comanda).map(([id, q]) => {
+                const p = prods.find((x) => x.id === id)!;
+                return (
+                  <div key={id} className="flex items-center gap-2 py-1 text-sm">
+                    <span className="flex-1 truncate">{p.nombre}</span>
+                    <button onClick={() => sub(id)} className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-lg leading-none">−</button>
+                    <span className="w-5 text-center tabular-nums">{q}</span>
+                    <button onClick={() => add(id)} className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-lg leading-none">+</button>
+                    <span className="w-16 text-right tabular-nums">{eur(p.precio * q)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold tabular-nums">
+              <span>Total</span><span>{eur(total)}</span>
+            </div>
+            <button onClick={enviar} disabled={!unidades || enviando} className="mt-3 w-full rounded-2xl bg-brand py-3.5 text-base font-semibold text-brand-foreground disabled:opacity-50 active:scale-[0.99]">
+              {enviando ? "Enviando…" : "Enviar a cocina"}
+            </button>
           </div>
         </div>
-
-        {/* Panel de comanda */}
-        <aside className="flex w-full flex-col border-t border-border bg-card p-4 md:w-80 md:border-l md:border-t-0">
-          <h2 className="mb-2 font-medium">Comanda</h2>
-          <div className="flex-1 space-y-1 overflow-y-auto">
-            {unidades === 0 && <p className="text-muted-foreground">Toca productos para añadir.</p>}
-            {Object.entries(comanda).map(([id, q]) => {
-              const p = prods.find((x) => x.id === id)!;
-              return (
-                <div key={id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="flex-1">{p.nombre}</span>
-                  <button onClick={() => sub(id)} className="h-7 w-7 rounded-md bg-muted text-foreground">−</button>
-                  <span className="w-5 text-center tabular-nums">{q}</span>
-                  <button onClick={() => add(id)} className="h-7 w-7 rounded-md bg-muted text-foreground">+</button>
-                  <span className="w-16 text-right tabular-nums">{eur(p.precio * q)}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-2 flex justify-between border-t border-border pt-2 font-semibold tabular-nums">
-            <span>Total</span><span>{eur(total)}</span>
-          </div>
-          <button
-            onClick={enviar}
-            disabled={!unidades || enviando}
-            className="btn-primary mt-3 w-full py-3 text-base disabled:opacity-50"
-          >
-            {enviando ? "Enviando…" : "Enviar a cocina"}
-          </button>
-        </aside>
-      </div>
+      )}
     </div>
   );
 }
