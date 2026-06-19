@@ -64,6 +64,15 @@
 | `billar` | `DECOR` | 2×4 | 0 0 80 160 | ocio |
 | `caja_tpv` | `DECOR` | 1×1 | 0 0 40 40 | punto de cobro |
 | `sombrilla` | `DECOR` | 2×2 | 0 0 80 80 | terraza |
+| `taburete` | `DECOR` | 1×1 | 0 0 40 40 | banqueta (barra/mesa alta) |
+| `mesa_alta` | mesa | 1×1 (sprite 2×2) | 0 0 80 80 | velador/mesa alta con taburetes |
+| `jardinera` | `PLANTA` | 1×3 (modular) | 0 0 40 120 | macetero alargado / verde separador |
+| `separador` | `PARED` | 1×3 (modular) | 0 0 40 120 | biombo/panel para dividir zonas |
+| `banco_corrido` | `DECOR` | N×1 (modular) | 0 0 40 40 | banqueta corrida (banquette) |
+| `columna` | `PARED` | 1×1 | 0 0 40 40 | pilar estructural |
+| `cordon_poste` | `DECOR` | 1×1 | 0 0 40 40 | poste con cordón (cola/acceso) |
+| `alfombra_zona` | `DECOR` | N×M | (variable) | mancha translúcida para delimitar un área |
+| `estufa_terraza` | `DECOR` | 1×1 | 0 0 40 40 | seta calefactora |
 
 > Las **mesas** son `restaurant_table` (su forma/sillas se derivan de `capacidad`); el resto son
 > `plano_elemento`. El **asset SVG** se referencia por `id` (p. ej. en `plano_elemento.icono`
@@ -206,6 +215,70 @@ SVG cenital flat de un punto de cobro/TPV, viewBox 0 0 40 40. Rectángulo redond
 con una pantalla pequeña marcada. currentColor. Sin texto.
 ```
 
+### Mobiliario extra y separadores de área
+
+**`taburete`** · 1×1 (viewBox `0 0 40 40`)
+```
+SVG cenital flat de taburete redondo, viewBox 0 0 40 40. Círculo radio 12 centrado, relleno
+#f5f1ea y borde 2px currentColor; pequeño aro interior sutil. Sin patas visibles (vista cenital).
+Sin texto.
+```
+
+**`mesa_alta`** · 1×1 + taburetes (sprite 2×2, viewBox `0 0 80 80`)
+```
+SVG cenital flat de mesa alta/velador con 2 taburetes, viewBox 0 0 80 80. Círculo central radio 18
+(#f5f1ea, borde 2px currentColor) y 2 taburetes (círculos radio 9, currentColor opacity 0.45) a los
+lados. Sin texto.
+```
+
+**`jardinera`** · 1×3 modular (viewBox `0 0 40 120`)
+```
+SVG cenital flat de JARDINERA rectangular alargada, viewBox 0 0 40 120. Caja 40x120 esquinas
+redondeadas 6px, borde madera #8a5a2b, relleno tierra #6b4a2b, y una hilera continua de hojas
+verdes #2f9e44/#2b8a3e por encima. Modular en vertical; sirve también de separador verde. Sin texto.
+```
+
+**`separador`** · 1×3 modular (viewBox `0 0 40 120`)
+```
+SVG cenital flat de SEPARADOR/biombo para dividir zonas, viewBox 0 0 40 120. Panel fino 14x120
+centrado, esquinas redondeadas 4px, relleno gris cálido #b9b2a7 con vetas sutiles; semiopaco.
+Modular (se repite/estira para formar la línea divisoria entre áreas). Sin texto.
+```
+
+**`banco_corrido`** · N×1 modular (viewBox `0 0 40 40`)
+```
+SVG cenital flat de BANCO CORRIDO (banquette) modular, viewBox 0 0 40 40. Cojín rectangular
+40x28 redondeado, relleno tapizado #d8cfbf con costura central; se repite en horizontal para
+hacer un banco largo pegado a la pared. Sin texto.
+```
+
+**`columna`** · 1×1 (viewBox `0 0 40 40`)
+```
+SVG cenital flat de COLUMNA/pilar, viewBox 0 0 40 40. Cuadrado 24x24 centrado con esquinas
+redondeadas, relleno gris #9aa0a6 y un cuadrado interior más oscuro. Estructural. Sin texto.
+```
+
+**`cordon_poste`** · 1×1 (viewBox `0 0 40 40`)
+```
+SVG cenital flat de POSTE con cordón (control de cola/acceso), viewBox 0 0 40 40. Círculo
+pequeño (base del poste) en gris metálico #8a8f96 y un arco de cordón saliendo hacia un lado
+(stroke 3px #9aa0a6). Sin texto.
+```
+
+**`alfombra_zona`** · N×M variable (viewBox `0 0 (an·40) (al·40)`)
+```
+SVG de ALFOMBRA/zona para delimitar un área, viewBox según footprint. Rectángulo redondeado que
+cubre el footprint, relleno currentColor opacity 0.08 con borde discontinuo currentColor opacity
+0.25. Va DETRÁS de las mesas y agrupa visualmente una zona (p. ej. "lounge"). Sin texto.
+```
+
+**`estufa_terraza`** · 1×1 (viewBox `0 0 40 40`)
+```
+SVG cenital flat de ESTUFA de terraza (seta calefactora), viewBox 0 0 40 40. Círculo radio 14
+(pantalla) gris #b0b6bd con anillos concéntricos y un punto central naranja #e8590c (calor).
+Sin texto.
+```
+
 ---
 
 ## 5. Ejemplos SVG de arranque (hechos a mano)
@@ -292,6 +365,11 @@ madera #8a5a2b; verdes #2f9e44/#2b8a3e). Todo ALINEADO a la rejilla (snapping a 
 - 1 PALMERA cenital (80x80 en x=600,y=380).
 - PARED gris #9aa0a6 formando el contorno del local (marco) por el borde del lienzo,
   con el hueco de la puerta.
+- 4 TABURETES (círculos radio 9, currentColor opacity 0.45) alineados frente a la BARRA.
+- 1 JARDINERA alargada (40x120) y un SEPARADOR/biombo (40x120) en línea, dividiendo la zona de
+  mesas de la zona de la barra.
+- 1 ALFOMBRA de zona (rectángulo translúcido currentColor opacity 0.08, borde discontinuo)
+  detrás de un grupo de mesas para marcar un área "lounge".
 
 Sin texto, sin números, sin sombras fuertes. Que se aprecie cómo cada elemento ocupa un número
 entero de celdas de la cuadrícula.
