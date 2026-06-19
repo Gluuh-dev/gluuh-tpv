@@ -53,6 +53,9 @@ export default function TPV() {
   /* ── Selección de contexto ── */
   const [mesa, setMesa]   = useState<Mesa | null>(null);
   const [barra, setBarra] = useState(false);
+  /* Cuenta abierta de la mesa (un pedido reutilizable por mesa) + importes por mesa */
+  const [ordenAbiertaId, setOrdenAbiertaId] = useState<string | null>(null);
+  const [totalesMesa, setTotalesMesa] = useState<Record<string, number>>({});
 
   /* ── Vista carta ── */
   const [catSel, setCatSel]   = useState<string | null>(null);
@@ -85,17 +88,16 @@ export default function TPV() {
       setLocationId(loc?.id ?? null);
       setTerritorio(loc?.territorio_fiscal ?? "PENINSULA_BALEARES");
       setUserId(u?.id ?? null);
-      const [{ data: m }, { data: f }, { data: c }, { data: p }] = await Promise.all([
-        sb.from("restaurant_table").select("id,nombre,estado").order("nombre"),
+      const [{ data: f }, { data: c }, { data: p }] = await Promise.all([
         sb.from("family").select("id,nombre,color").order("orden"),
         sb.from("category").select("id,nombre,orden,family_id").order("orden"),
         sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id").eq("disponible", true).order("nombre"),
       ]);
-      setMesas((m as Mesa[]) ?? []);
       setFamilies((f as Family[]) ?? []);
       setCats((c as Cat[]) ?? []);
       setProds((p as Prod[]) ?? []);
       setCatSel((c as Cat[])?.[0]?.id ?? null);
+      await recargarMesas();
       setLoading(false);
     })();
     /* eslint-disable-next-line */
@@ -196,18 +198,79 @@ export default function TPV() {
   }
 
   /* ── Backend ── */
+  // Carga la lista de mesas + el importe de la cuenta abierta de cada una.
+  async function recargarMesas() {
+    const [{ data: m }, { data: ords }] = await Promise.all([
+      sb.from("restaurant_table").select("id,nombre,estado").order("nombre"),
+      sb.from("sales_order").select("table_id,total,created_at")
+        .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
+        .not("table_id", "is", null),
+    ]);
+    setMesas((m as Mesa[]) ?? []);
+    const ultima: Record<string, { total: number; created_at: string }> = {};
+    for (const o of (ords ?? []) as { table_id: string; total: number; created_at: string }[]) {
+      const prev = ultima[o.table_id];
+      if (!prev || o.created_at > prev.created_at) ultima[o.table_id] = { total: Number(o.total), created_at: o.created_at };
+    }
+    const tot: Record<string, number> = {};
+    for (const k of Object.keys(ultima)) tot[k] = ultima[k]!.total;
+    setTotalesMesa(tot);
+  }
+
+  // Crea o REUTILIZA la cuenta abierta de la mesa (un único pedido por mesa).
   async function crearOrden(estado: string, estadoPrep: string) {
-    const { data: order } = await sb.from("sales_order").insert({
-      location_id: locationId, table_id: mesa?.id ?? null, user_id: userId,
-      canal: "TPV", tipo_operacion: "VENTA", estado, estado_preparacion: estadoPrep,
-      total: Math.round(total * 100) / 100, client_id: crypto.randomUUID(),
-    }).select("id").single();
-    if (!order) return null;
-    await sb.from("order_line").insert(lineasComanda().map((l) => ({
-      order_id: order.id, product_id: l.id, nombre: l.nombre,
+    const lineas = lineasComanda().map((l) => ({
+      product_id: l.id, nombre: l.nombre,
       cantidad: l.cantidad, precio_unitario: l.precio, tipo_impositivo: l.tipo,
-    })));
-    return order.id as string;
+    }));
+    const totalRedondeado = Math.round(total * 100) / 100;
+
+    let orderId = ordenAbiertaId;
+    if (orderId) {
+      await sb.from("sales_order").update({ estado, estado_preparacion: estadoPrep, total: totalRedondeado }).eq("id", orderId);
+      await sb.from("order_line").delete().eq("order_id", orderId);
+    } else {
+      const { data: order } = await sb.from("sales_order").insert({
+        location_id: locationId, table_id: mesa?.id ?? null, user_id: userId,
+        canal: "TPV", tipo_operacion: "VENTA", estado, estado_preparacion: estadoPrep,
+        total: totalRedondeado, client_id: crypto.randomUUID(),
+      }).select("id").single();
+      if (!order) return null;
+      orderId = (order as { id: string }).id;
+      setOrdenAbiertaId(orderId);
+    }
+    if (lineas.length) {
+      await sb.from("order_line").insert(lineas.map((l) => ({ order_id: orderId, ...l })));
+    }
+    return orderId;
+  }
+
+  // Abre una mesa y carga su cuenta (líneas) si la tiene.
+  async function abrirMesa(m: Mesa) {
+    setMesa(m); setBarra(false); setTicket(null);
+    setComanda({}); setDescuentos({}); setPreciosManuales({});
+    setBuffer(""); setLineaSel(null); setVistaProds(false);
+    setOrdenAbiertaId(null);
+
+    const { data: ord } = await sb.from("sales_order")
+      .select("id").eq("table_id", m.id)
+      .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!ord) return;
+    const oid = (ord as { id: string }).id;
+    setOrdenAbiertaId(oid);
+
+    const { data: lns } = await sb.from("order_line")
+      .select("product_id,cantidad,precio_unitario").eq("order_id", oid);
+    const comandaCargada: Record<string, number> = {};
+    const precios: Record<string, number> = {};
+    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number }[]) {
+      if (!l.product_id || !prods.some((p) => p.id === l.product_id)) continue;
+      comandaCargada[l.product_id] = (comandaCargada[l.product_id] ?? 0) + Number(l.cantidad);
+      precios[l.product_id] = Number(l.precio_unitario);
+    }
+    setComanda(comandaCargada);
+    setPreciosManuales(precios);
   }
 
   async function enviarCocina(estadoPrep: string) {
@@ -216,8 +279,22 @@ export default function TPV() {
     try {
       await crearOrden("ENVIADA_COCINA", estadoPrep);
       if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
+      await recargarMesas();
       reset();
     } finally { setBusy(false); }
+  }
+
+  // Guardar la cuenta de la mesa y volver a la lista (en barra solo limpia).
+  async function volver() {
+    if (mesa && unidades > 0) {
+      setBusy(true);
+      try {
+        await crearOrden("ABIERTA", "PENDIENTE");
+        await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
+        await recargarMesas();
+      } finally { setBusy(false); }
+    }
+    reset();
   }
 
   async function cobrar(metodo: string, propina = 0) {
@@ -249,6 +326,8 @@ export default function TPV() {
         if (payErr) console.error("No se registró el pago:", payErr.message);
       }
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
+      setOrdenAbiertaId(null);
+      await recargarMesas();
 
       // ── Persistencia VERIFACTU (best-effort: si falla, el ticket del flujo actual sigue) ──
       try {
@@ -283,6 +362,7 @@ export default function TPV() {
     setComanda({}); setDescuentos({}); setPreciosManuales({});
     setMesa(null); setBarra(false); setTicket(null);
     setBuffer(""); setLineaSel(null); setVistaProds(false);
+    setOrdenAbiertaId(null);
   }
 
   /* ─────────────────────────────── RENDERS ─────────────────────────────── */
@@ -305,22 +385,26 @@ export default function TPV() {
             <div className="card text-muted-foreground">No hay mesas. Créalas en <b>Sala</b> o usa Barra.</div>
           )}
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {mesas.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMesa(m)}
-                className={`grid h-24 place-items-center rounded-lg border-2 font-semibold ${
-                  m.estado === "LIBRE"
-                    ? "border-border bg-card text-foreground"
-                    : "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
-                }`}
-              >
-                {m.nombre}
-                <span className="text-xs font-normal text-muted-foreground">
-                  {m.estado === "LIBRE" ? "Libre" : "Ocupada"}
-                </span>
-              </button>
-            ))}
+            {mesas.map((m) => {
+              const cuenta = totalesMesa[m.id] ?? 0;
+              const ocupada = cuenta > 0 || m.estado !== "LIBRE";
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => abrirMesa(m)}
+                  className={`grid h-24 place-items-center rounded-lg border-2 font-semibold ${
+                    ocupada
+                      ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                      : "border-border bg-card text-foreground"
+                  }`}
+                >
+                  {m.nombre}
+                  <span className={`text-xs font-${cuenta > 0 ? "semibold" : "normal"} ${cuenta > 0 ? "" : "text-muted-foreground"}`}>
+                    {ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -550,8 +634,9 @@ export default function TPV() {
             Entregar Comanda
           </button>
           <button
-            onClick={reset}
-            className="ml-auto btn-ghost"
+            onClick={volver}
+            disabled={busy}
+            className="ml-auto btn-ghost disabled:opacity-50"
           >
             Volver
           </button>
