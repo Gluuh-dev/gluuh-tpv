@@ -8,7 +8,7 @@ import { Utensils } from "lucide-react";
 /* ─── Tipos ─── */
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
 interface Room   { id: string; nombre: string; orden: number }
-interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null }
+interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
 interface Family { id: string; nombre: string; color: string }
 interface Cat    { id: string; nombre: string; orden: number; family_id: string | null }
 interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null }
@@ -56,8 +56,8 @@ export default function TPV() {
   const [rooms, setRooms]         = useState<Room[]>([]);
   const [reservas, setReservas]   = useState<Reserva[]>([]);
   const [vistaSala, setVistaSala] = useState<string>("");  // room id o "RESERVAS"
-  const [reservaPop, setReservaPop] = useState<Mesa | null>(null);  // popover de reserva de mesa
-  const [horaResv, setHoraResv]   = useState("");
+  const [reservaPop, setReservaPop] = useState<Mesa | null>(null);  // popover de reservas de mesa
+  const [resForm, setResForm] = useState<{ id: string | null; nombre: string; personas: string; hora: string }>({ id: null, nombre: "", personas: "", hora: "" });
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
   const [families, setFamilies]   = useState<Family[]>([]);
@@ -127,7 +127,7 @@ export default function TPV() {
       await recargarMesas();
       const [{ data: rms }, { data: rsv }] = await Promise.all([
         sb.from("room").select("id,nombre,orden").order("orden"),
-        sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas").order("fecha_hora"),
+        sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora"),
       ]);
       setRooms((rms as Room[]) ?? []);
       setReservas((rsv as Reserva[]) ?? []);
@@ -165,13 +165,13 @@ export default function TPV() {
   const unidades = Object.values(comanda).reduce((s, q) => s + q, 0);
 
   /* ── Reserva próxima por mesa (para pintarla en el plano) ── */
-  const reservaMesa = useMemo(() => {
-    const out: Record<string, Reserva> = {};
+  const reservasPorMesa = useMemo(() => {
+    const out: Record<string, Reserva[]> = {};
     for (const r of reservas) {
       if (!r.table_id || r.estado === "CANCELADA") continue;
-      const prev = out[r.table_id];
-      if (!prev || r.fecha_hora < prev.fecha_hora) out[r.table_id] = r;
+      (out[r.table_id] ??= []).push(r);
     }
+    for (const k of Object.keys(out)) out[k]!.sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora));
     return out;
   }, [reservas]);
   const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -265,7 +265,7 @@ export default function TPV() {
   }
 
   async function recargarReservas() {
-    const { data } = await sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas").order("fecha_hora");
+    const { data } = await sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora");
     setReservas((data as Reserva[]) ?? []);
   }
 
@@ -274,7 +274,7 @@ export default function TPV() {
     longPressed.current = false;
     pressTimer.current = setTimeout(() => {
       longPressed.current = true;
-      setHoraResv(reservaMesa[m.id] ? hhmm(reservaMesa[m.id]!.fecha_hora) : "");
+      setResForm({ id: null, nombre: "", personas: String(m.capacidad || 2), hora: "" });
       setReservaPop(m);
     }, 450);
   }
@@ -288,19 +288,25 @@ export default function TPV() {
     const d = new Date(); d.setHours(h ?? 0, mi ?? 0, 0, 0);
     return d.toISOString();
   }
-  async function crearReserva(m: Mesa) {
-    if (!horaResv) return;
-    await sb.from("reservation").insert({ location_id: locationId, table_id: m.id, fecha_hora: fechaHoy(horaResv), comensales: m.capacidad || 2, estado: "CONFIRMADA" });
-    setReservaPop(null); await recargarReservas();
+  function editarReserva(r: Reserva) {
+    setResForm({ id: r.id, nombre: r.nombre ?? "", personas: String(r.comensales), hora: hhmm(r.fecha_hora) });
   }
-  async function cambiarReserva(r: Reserva) {
-    if (!horaResv) return;
-    await sb.from("reservation").update({ fecha_hora: fechaHoy(horaResv) }).eq("id", r.id);
-    setReservaPop(null); await recargarReservas();
+  async function guardarReserva(m: Mesa) {
+    if (!resForm.hora) return;
+    const datos = {
+      fecha_hora: fechaHoy(resForm.hora),
+      comensales: Number(resForm.personas) || (m.capacidad || 2),
+      nombre: resForm.nombre.trim() || null,
+    };
+    if (resForm.id) await sb.from("reservation").update(datos).eq("id", resForm.id);
+    else await sb.from("reservation").insert({ location_id: locationId, table_id: m.id, estado: "CONFIRMADA", ...datos });
+    setResForm({ id: null, nombre: "", personas: String(m.capacidad || 2), hora: "" });
+    await recargarReservas();
   }
   async function quitarReserva(r: Reserva) {
     await sb.from("reservation").delete().eq("id", r.id);
-    setReservaPop(null); await recargarReservas();
+    setResForm({ id: null, nombre: "", personas: "", hora: "" });
+    await recargarReservas();
   }
 
   // Crea o REUTILIZA la cuenta abierta de la mesa (un único pedido por mesa).
@@ -532,17 +538,25 @@ export default function TPV() {
     );
   }
 
-  /* ── Dibuja una mesa en el plano con sillas según su capacidad ── */
+  /* ── Dibuja una mesa en el plano: cuadrada (≤4) o rectangular (≥5),
+        con sillas en los 4 lados según capacidad ── */
   function MesaPlano(m: Mesa, i: number) {
     const cuenta = totalesMesa[m.id] ?? 0;
     const ocupada = cuenta > 0 || m.estado !== "LIBRE";
+    const resvs = reservasPorMesa[m.id] ?? [];
     const cap = m.capacidad || 2;
-    const perSide = Math.max(1, Math.ceil(cap / 2));
-    const bottom = Math.max(0, cap - perSide);
-    const bodyW = 64 + (perSide - 1) * 26;
-    const x = m.pos_x ?? (40 + (i % 4) * 210);
-    const y = m.pos_y ?? (40 + Math.floor(i / 4) * 200);
-    const chair = "h-2.5 w-5 rounded-sm bg-current opacity-40";
+    const isRect = cap >= 5;                 // doble: 80×160 vertical
+    const bodyW = 76, bodyH = isRect ? 152 : 76;
+    // Reparto de sillas por lado
+    let top = 1, bottom = 1, left = 0, right = 0;
+    if (isRect) { const rem = cap - 2; left = Math.ceil(rem / 2); right = rem - left; }
+    else if (cap <= 1) { bottom = 0; }
+    else if (cap === 3) { left = 1; }
+    else if (cap >= 4) { left = 1; right = 1; }
+    const x = m.pos_x ?? (40 + (i % 4) * 220);
+    const y = m.pos_y ?? (40 + Math.floor(i / 4) * 230);
+    const colorBody = ocupada ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20" : "border-border bg-card";
+    const chairCls = "rounded-sm bg-current opacity-40";
     return (
       <button
         key={m.id}
@@ -554,18 +568,22 @@ export default function TPV() {
         style={{ left: x, top: y }}
         className={`absolute flex select-none flex-col items-center transition-transform hover:scale-[1.04] ${ocupada ? "text-amber-700 dark:text-amber-400" : "text-foreground"}`}
       >
-        <div className="flex gap-1">{Array.from({ length: perSide }).map((_, k) => <span key={k} className={chair} />)}</div>
-        <div
-          className={`my-1 grid place-items-center rounded-xl border-2 shadow-sm ${ocupada ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20" : "border-border bg-card"}`}
-          style={{ width: bodyW, height: 60 }}
-        >
-          <span className="text-sm font-bold leading-none">{m.nombre.replace("Mesa ", "M")}</span>
-          <span className="mt-0.5 text-[11px] font-medium leading-none">{ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}</span>
+        <div className="relative" style={{ width: bodyW + 28, height: bodyH + 28 }}>
+          <div className="absolute left-1/2 top-0 flex -translate-x-1/2 gap-1.5">{Array.from({ length: top }).map((_, k) => <span key={k} className={chairCls} style={{ width: 22, height: 8 }} />)}</div>
+          <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-1.5">{Array.from({ length: bottom }).map((_, k) => <span key={k} className={chairCls} style={{ width: 22, height: 8 }} />)}</div>
+          <div className="absolute left-0 top-1/2 flex -translate-y-1/2 flex-col gap-1.5">{Array.from({ length: left }).map((_, k) => <span key={k} className={chairCls} style={{ width: 8, height: 22 }} />)}</div>
+          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 flex-col gap-1.5">{Array.from({ length: right }).map((_, k) => <span key={k} className={chairCls} style={{ width: 8, height: 22 }} />)}</div>
+          <div
+            className={`absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg border-2 shadow-sm ${colorBody}`}
+            style={{ width: bodyW, height: bodyH }}
+          >
+            <span className="text-base font-bold leading-none">{m.nombre.replace("Mesa ", "M")}</span>
+            <span className="mt-1 text-[11px] font-medium leading-none">{ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}</span>
+          </div>
         </div>
-        <div className="flex gap-1">{Array.from({ length: bottom }).map((_, k) => <span key={k} className={chair} />)}</div>
-        {reservaMesa[m.id] && (
-          <span className="mt-1 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-            🕑 {hhmm(reservaMesa[m.id]!.fecha_hora)}
+        {resvs.length > 0 && (
+          <span className="mt-0.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+            🕑 {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}
           </span>
         )}
       </button>
@@ -616,6 +634,7 @@ export default function TPV() {
                     <div className="min-w-0">
                       <div className="font-medium">
                         {new Date(r.fecha_hora).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        {r.nombre && <span className="ml-2">· {r.nombre}</span>}
                         <span className="ml-2 text-muted-foreground">· {r.comensales} pax</span>
                         {r.table_id && <span className="ml-2 text-muted-foreground">· {mesas.find((mm) => mm.id === r.table_id)?.nombre ?? "mesa"}</span>}
                       </div>
@@ -639,29 +658,42 @@ export default function TPV() {
           </main>
         </div>
 
-        {/* Popover de reserva de mesa (pulsación larga sobre la mesa) */}
+        {/* Popover de reservas de mesa (pulsación larga sobre la mesa) */}
         {reservaPop && (() => {
           const m = reservaPop;
-          const r = reservaMesa[m.id];
+          const list = reservasPorMesa[m.id] ?? [];
           return (
             <div className="fixed inset-0 z-30 grid place-items-center bg-foreground/40 p-4" onClick={() => setReservaPop(null)}>
-              <div className="w-full max-w-xs rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-                <h3 className="mb-3 font-semibold">{m.nombre} · {r ? "Reserva" : "Reservar mesa"}</h3>
-                {r && <p className="mb-3 text-sm">Reservada a las <b>{hhmm(r.fecha_hora)}</b> · {r.comensales} pax</p>}
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Hora</label>
-                <input
-                  type="time" value={horaResv} onChange={(e) => setHoraResv(e.target.value)}
-                  className="mb-4 w-full rounded-md border border-border bg-background px-3 py-2 outline-none focus:border-brand"
-                />
-                {r ? (
-                  <div className="flex gap-2">
-                    <button onClick={() => cambiarReserva(r)} disabled={!horaResv} className="btn-primary flex-1 disabled:opacity-50">Guardar hora</button>
-                    <button onClick={() => quitarReserva(r)} className="flex-1 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40">Quitar</button>
+              <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
+                <h3 className="mb-3 font-semibold">{m.nombre} · Reservas</h3>
+
+                {list.length > 0 && (
+                  <div className="mb-4 space-y-1">
+                    {list.map((r) => (
+                      <div key={r.id} className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${resForm.id === r.id ? "border-brand bg-brand/10" : "border-border"}`}>
+                        <button onClick={() => editarReserva(r)} className="min-w-0 flex-1 truncate text-left">
+                          <b className="tabular-nums">{hhmm(r.fecha_hora)}</b> · {r.nombre || "Sin nombre"} <span className="text-muted-foreground">· {r.comensales} pax</span>
+                        </button>
+                        <button onClick={() => quitarReserva(r)} className="ml-2 flex-none text-rose-600 hover:underline">Quitar</button>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <button onClick={() => crearReserva(m)} disabled={!horaResv} className="btn-primary w-full disabled:opacity-50">Reservar mesa</button>
                 )}
-                <button onClick={() => setReservaPop(null)} className="btn-ghost mt-2 w-full">Cancelar</button>
+
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{resForm.id ? "Editar reserva" : "Nueva reserva"}</div>
+                  <input value={resForm.nombre} onChange={(e) => setResForm((f) => ({ ...f, nombre: e.target.value }))} placeholder="Nombre de la reserva" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
+                  <div className="flex gap-2">
+                    <input type="time" value={resForm.hora} onChange={(e) => setResForm((f) => ({ ...f, hora: e.target.value }))} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
+                    <input type="number" min={1} value={resForm.personas} onChange={(e) => setResForm((f) => ({ ...f, personas: e.target.value }))} placeholder="pax" className="w-20 flex-none rounded-md border border-border bg-background px-3 py-2 text-right text-sm tabular-nums outline-none focus:border-brand" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => guardarReserva(m)} disabled={!resForm.hora} className="btn-primary flex-1 disabled:opacity-50">{resForm.id ? "Guardar" : "Añadir reserva"}</button>
+                    {resForm.id && <button onClick={() => setResForm({ id: null, nombre: "", personas: String(m.capacidad || 2), hora: "" })} className="btn-ghost">Nueva</button>}
+                  </div>
+                </div>
+
+                <button onClick={() => setReservaPop(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
               </div>
             </div>
           );
