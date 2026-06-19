@@ -9,6 +9,7 @@ import { Utensils } from "lucide-react";
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
 interface Room   { id: string; nombre: string; orden: number }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
+interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number }
 interface Family { id: string; nombre: string; color: string }
 interface Cat    { id: string; nombre: string; orden: number; family_id: string | null }
 interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null }
@@ -55,6 +56,7 @@ export default function TPV() {
   const [mesas, setMesas]         = useState<Mesa[]>([]);
   const [rooms, setRooms]         = useState<Room[]>([]);
   const [reservas, setReservas]   = useState<Reserva[]>([]);
+  const [elementos, setElementos] = useState<Elemento[]>([]);
   const [vistaSala, setVistaSala] = useState<string>("");  // room id o "RESERVAS"
   const [reservaPop, setReservaPop] = useState<Mesa | null>(null);  // popover de reservas de mesa
   const [resForm, setResForm] = useState<{ id: string | null; nombre: string; personas: string; hora: string }>({ id: null, nombre: "", personas: "", hora: "" });
@@ -125,12 +127,14 @@ export default function TPV() {
       setProds((p as Prod[]) ?? []);
       setCatSel((c as Cat[])?.[0]?.id ?? null);
       await recargarMesas();
-      const [{ data: rms }, { data: rsv }] = await Promise.all([
+      const [{ data: rms }, { data: rsv }, { data: els }] = await Promise.all([
         sb.from("room").select("id,nombre,orden").order("orden"),
         sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora"),
+        sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto"),
       ]);
       setRooms((rms as Room[]) ?? []);
       setReservas((rsv as Reserva[]) ?? []);
+      setElementos((els as Elemento[]) ?? []);
       setVistaSala((rms as Room[])?.[0]?.id ?? "");
       setLoading(false);
     })();
@@ -538,6 +542,24 @@ export default function TPV() {
     );
   }
 
+  /* ── Dibuja un elemento del plano (barra, pared, puerta, planta, decor) ── */
+  function ElementoPlano(e: Elemento) {
+    const st = { left: e.pos_x, top: e.pos_y, width: e.ancho, height: e.alto };
+    const base = "pointer-events-none absolute flex select-none items-center justify-center";
+    if (e.tipo === "BARRA")
+      return <div key={e.id} style={st} className={`${base} rounded-md bg-amber-800/85 text-xs font-semibold text-amber-50 shadow-sm`}>{e.etiqueta}</div>;
+    if (e.tipo === "PARED")
+      return <div key={e.id} style={st} className={`${base} rounded bg-foreground/25`} />;
+    if (e.tipo === "PUERTA")
+      return <div key={e.id} style={st} className={`${base} rounded border-2 border-dashed border-foreground/30 text-[10px] text-muted-foreground`}>{e.etiqueta}</div>;
+    // PLANTA / DECOR
+    return (
+      <div key={e.id} style={st} className={`${base} text-2xl`}>
+        {e.icono ?? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{e.etiqueta}</span>}
+      </div>
+    );
+  }
+
   /* ── Dibuja una mesa en el plano: cuadrada (≤4) o rectangular (≥5),
         con sillas en los 4 lados según capacidad ── */
   function MesaPlano(m: Mesa, i: number) {
@@ -646,9 +668,13 @@ export default function TPV() {
               </div>
             ) : (
               <div
-                className="relative h-full min-h-[600px] w-full"
+                className="relative h-full min-h-[640px] w-full"
                 style={{ minWidth: 900, backgroundImage: "radial-gradient(rgba(120,120,120,0.10) 1px, transparent 1px)", backgroundSize: "26px 26px" }}
               >
+                {/* Paredes (marco de la sala) */}
+                <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />
+                {/* Elementos (barra, plantas, puerta…) detrás de las mesas */}
+                {elementos.filter((e) => e.room_id === vistaSala).map((e) => ElementoPlano(e))}
                 {mesasSala.map((m, i) => MesaPlano(m, i))}
                 {mesasSala.length === 0 && (
                   <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>
