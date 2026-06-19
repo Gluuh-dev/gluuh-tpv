@@ -332,67 +332,28 @@ Sin texto.
 
 ---
 
-## 7. Prompt de lámina conjunta (varios elementos + cuadrícula detrás)
+## 7. Prompt de lámina de muestrario (un elemento de cada, fondo transparente)
 
-> Genera **una sola imagen** con varios elementos colocados sobre la rejilla **visible**.
-> Útil como muestrario / referencia de estilo y de footprints.
-
-**Lienzo:** 20×12 celdas → viewBox `0 0 800 480` (1 celda = 40 px).
+> Una sola imagen con **un único ejemplar de cada elemento**, para recortarlos como
+> assets. **Fondo transparente** (el suelo se pone después, debajo).
 
 ```
-Ilustración vectorial PLANA, vista CENITAL (planta de un restaurante), estilo flat limpio,
-en una sola imagen de 800x480 (viewBox 0 0 800 480).
+Una sola imagen, vista estrictamente CENITAL (desde arriba, 90°, proyección ortográfica,
+SIN perspectiva). Fondo TRANSPARENTE: sin cuadrícula, sin suelo, sin alfombras, sin
+ninguna superficie debajo. Estilo ilustración PLANA y limpia, mismo grosor de línea y
+misma escala relativa en todo, sombras muy sutiles o ninguna.
 
-FONDO — CUADRÍCULA visible:
-- Fondo blanco hueso (#fbfaf8).
-- Líneas finas cada 40px (1 celda) en gris claro #e3e1dc, grosor 1.
-- Líneas más marcadas cada 200px (módulo 5×5 celdas) en gris #c9c6bf, grosor 1.5.
-- La cuadrícula cubre todo el lienzo y queda DETRÁS de todos los elementos.
+Coloca UN ÚNICO ejemplar de cada uno de estos objetos, separados entre sí y bien
+espaciados para que cada uno se distinga, en una cuadrícula imaginaria de huecos
+(mobiliario de interior y de exterior de un restaurante):
 
-ELEMENTOS (vista cenital, flat, esquinas redondeadas 8px, trazo 2px; mesas con relleno
-#f5f1ea y borde gris #5b6066; sillas como rectángulos redondeados gris #5b6066 opacity 0.45;
-madera #8a5a2b; verdes #2f9e44/#2b8a3e). Todo ALINEADO a la rejilla (snapping a 40px):
+mesa cuadrada con sus sillas, mesa rectangular con sus sillas, mesa redonda con sus
+sillas, silla suelta, taburete, mesa alta, tramo de barra, separador / biombo,
+jardinera, maceta con planta, palmera, sombrilla, banco, columna, puerta, futbolín,
+mesa de billar, estufa de terraza, poste con cordón, papelera.
 
-- BARRA recta de madera ocupando 5×1 celdas en la fila superior izquierda (x=40,y=40, 200x40),
-  con franja clara #a9743a arriba.
-- MESA CUADRADA de 4 sillas (cuerpo 80x80 en x=40,y=160; una silla centrada en cada lado).
-- MESA CUADRADA de 4 sillas (cuerpo 80x80 en x=200,y=160).
-- MESA DOBLE rectangular vertical de 6 (cuerpo 80x160 en x=360,y=120; 1 silla en cada extremo
-  + 2 sillas por lado).
-- MESA REDONDA de 8 (círculo radio 52 centrado en x=600,y=200; 8 sillas cada 45°).
-- PUERTA con arco de apertura discontinuo (80x40 en x=40,y=400).
-- 2 MACETAS con planta (40x40) en esquinas (x=720,y=40 y x=720,y=400).
-- 1 PALMERA cenital (80x80 en x=600,y=380).
-- PARED gris #9aa0a6 formando el contorno del local (marco) por el borde del lienzo,
-  con el hueco de la puerta.
-- 4 TABURETES (círculos radio 9, currentColor opacity 0.45) alineados frente a la BARRA.
-- 1 JARDINERA alargada (40x120) y un SEPARADOR/biombo (40x120) en línea, dividiendo la zona de
-  mesas de la zona de la barra.
-- 1 ALFOMBRA de zona (rectángulo translúcido currentColor opacity 0.08, borde discontinuo)
-  detrás de un grupo de mesas para marcar un área "lounge".
-
-Sin texto, sin números, sin sombras fuertes. Que se aprecie cómo cada elemento ocupa un número
-entero de celdas de la cuadrícula.
-```
-
-**Variante "muestrario etiquetado":** igual que arriba pero añadiendo, debajo de cada elemento,
-una etiqueta pequeña con su nombre y footprint (p. ej. `mesa_doble_6 · 2×4`) para usarlo como
-catálogo visual. (Aquí sí se permite texto.)
-
-**Arranque del fondo (cuadrícula) en SVG:**
-```svg
-<svg viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg">
-  <rect width="800" height="480" fill="#fbfaf8"/>
-  <defs>
-    <pattern id="c1" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M40 0H0V40" fill="none" stroke="#e3e1dc" stroke-width="1"/>
-    </pattern>
-    <pattern id="c5" width="200" height="200" patternUnits="userSpaceOnUse">
-      <path d="M200 0H0V200" fill="none" stroke="#c9c6bf" stroke-width="1.5"/>
-    </pattern>
-  </defs>
-  <rect width="800" height="480" fill="url(#c1)"/>
-  <rect width="800" height="480" fill="url(#c5)"/>
-  <!-- … aquí van los elementos … -->
-</svg>
+Las mesas se ven COMPLETAMENTE LIMPIAS por su parte de arriba: NADA encima de ellas
+(sin platos, sin objetos, sin números, sin texto de ningún tipo). Maderas cálidas,
+verdes naturales en las plantas, grises neutros en lo estructural. Nada de etiquetas
+ni nombres.
 ```
