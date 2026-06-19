@@ -73,6 +73,7 @@ export default function TPV() {
   const [modalPagos, setModalPagos] = useState(false);
   const [modalEfectivo, setModalEfectivo] = useState(false);
   const [entregado, setEntregado] = useState("");
+  const [propina, setPropina] = useState("");
 
   /* ── Carga inicial ── */
   useEffect(() => {
@@ -219,7 +220,7 @@ export default function TPV() {
     } finally { setBusy(false); }
   }
 
-  async function cobrar(metodo: string) {
+  async function cobrar(metodo: string, propina = 0) {
     if (!unidades) return;
     setBusy(true);
     try {
@@ -242,6 +243,7 @@ export default function TPV() {
           order_id: orderId,
           metodo: metodoDb,
           importe: Math.round(total * 100) / 100,
+          propina: Math.round((propina || 0) * 100) / 100,
           client_id: crypto.randomUUID(),
         });
         if (payErr) console.error("No se registró el pago:", payErr.message);
@@ -514,7 +516,7 @@ export default function TPV() {
             Cobrar Efectivo
           </button>
           <button
-            onClick={() => setModalPagos(true)}
+            onClick={() => { setPropina(""); setModalPagos(true); }}
             disabled={!unidades || busy}
             className="btn-ghost disabled:opacity-50"
           >
@@ -563,10 +565,32 @@ export default function TPV() {
             className="w-full max-w-xs rounded-lg border border-border bg-card p-5 shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-4 font-semibold">Selecciona método de pago</h3>
+            <h3 className="mb-1 font-semibold">Selecciona método de pago</h3>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Total: <b className="text-foreground tabular-nums">{total.toFixed(2)} €</b>
+              {Number(propina) > 0 && (
+                <> · con propina: <b className="text-foreground tabular-nums">{(total + Number(propina)).toFixed(2)} €</b></>
+              )}
+            </p>
+
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Propina (opcional)</label>
+            <div className="mb-4 flex items-center gap-1.5">
+              <input
+                type="number" inputMode="decimal" min={0} step="0.10"
+                value={propina}
+                onChange={(e) => setPropina(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-right tabular-nums outline-none focus:border-brand"
+              />
+              {[1, 2].map((b) => (
+                <button key={b} onClick={() => setPropina(String(b))} className="btn-ghost text-xs">{b}€</button>
+              ))}
+              <button onClick={() => setPropina("")} className="btn-ghost text-xs">×</button>
+            </div>
+
             <div className="flex flex-col gap-2">
               {["Efectivo", "Tarjeta", "Bizum"].map((m) => (
-                <button key={m} onClick={() => cobrar(m)} disabled={busy} className="btn-primary disabled:opacity-50 w-full">
+                <button key={m} onClick={() => { setModalPagos(false); cobrar(m, Number(propina) || 0); }} disabled={busy} className="btn-primary disabled:opacity-50 w-full">
                   {m}
                 </button>
               ))}
