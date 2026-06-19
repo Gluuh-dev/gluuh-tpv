@@ -90,6 +90,46 @@ export function encadenarRegistros(
   return salida;
 }
 
+/** Resultado de verificar la integridad de una cadena de registros. */
+export interface ResultadoVerificacion {
+  /** true si TODA la cadena es íntegra. */
+  ok: boolean;
+  /** Validez por registro (para mostrar p. ej. "Cadena Correcta" por factura). */
+  registros: {
+    indice: number;
+    /** La huella almacenada coincide al recalcularla desde sus campos. */
+    huellaOk: boolean;
+    /** El enlace con el registro anterior (huellaRegistroAnterior) es correcto. */
+    enlaceOk: boolean;
+  }[];
+  /** Índice del primer registro con fallo, o -1 si todo correcto. */
+  primerFallo: number;
+}
+
+/**
+ * Verifica la integridad de una cadena de registros ya encadenados:
+ *  1. recalcula la huella de cada registro y la compara con la almacenada, y
+ *  2. comprueba que `huellaRegistroAnterior` enlaza con la huella del anterior.
+ * Es el inverso de `encadenarRegistros`: detecta manipulaciones o huecos.
+ * `huellaInicial` debe ser la última huella conocida antes de esta secuencia
+ * (o "" si arranca la cadena).
+ */
+export function verificarCadena(
+  registros: RegistroEncadenado[],
+  huellaInicial = "",
+): ResultadoVerificacion {
+  let anterior = huellaInicial;
+  let primerFallo = -1;
+  const detalle = registros.map((r, indice) => {
+    const enlaceOk = r.huellaRegistroAnterior === anterior;
+    const huellaOk = calcularHuella(r) === r.huella;
+    if ((!enlaceOk || !huellaOk) && primerFallo === -1) primerFallo = indice;
+    anterior = r.huella;
+    return { indice, huellaOk, enlaceOk };
+  });
+  return { ok: primerFallo === -1, registros: detalle, primerFallo };
+}
+
 export interface QRInput {
   nif: string;
   numSerieFactura: string;
