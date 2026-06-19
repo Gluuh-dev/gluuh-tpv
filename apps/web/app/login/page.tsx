@@ -27,7 +27,12 @@ export default function Login() {
     e.preventDefault();
     setCargando(true);
     setError("");
-    const { error } = await supabaseBrowser().auth.signInWithPassword({ email, password });
+    // Recortar espacios invisibles (autocompletar/pegar suelen añadir un espacio
+    // al final) que harían fallar el login con credenciales correctas.
+    const { error } = await supabaseBrowser().auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim(),
+    });
     setCargando(false);
     if (error) setError(traducirErrorAuth(error.message));
     else window.location.href = "/dashboard";
