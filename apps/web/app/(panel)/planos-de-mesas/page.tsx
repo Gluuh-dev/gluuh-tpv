@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 
 interface Room { id: string; nombre: string; orden: number; suelo: string | null }
-interface Mesa { id: string; nombre: string; room_id: string; pos_x: number | null; pos_y: number | null; capacidad: number }
+interface Mesa { id: string; nombre: string; room_id: string; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number }
 interface Elem { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
 type Sel = { kind: "mesa" | "elem"; id: string } | null;
 
@@ -39,6 +39,9 @@ export default function PlanosDeMesas() {
   const drag = useRef<{ kind: "mesa" | "elem"; id: string; offX: number; offY: number } | null>(null);
   const resize = useRef<{ id: string; sx: number; sy: number; sw: number; sh: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; kind: "mesa" | "elem"; id: string } | null>(null);
+  const [movil, setMovil] = useState(false);
+  const [movilPos, setMovilPos] = useState({ x: 60, y: 60 });
+  const movilDrag = useRef<{ ox: number; oy: number } | null>(null);
 
   async function cargar() {
     const { data: loc } = await sb.from("location").select("id").limit(1).maybeSingle();
@@ -47,7 +50,7 @@ export default function PlanosDeMesas() {
     if (!lid) return;
     const [{ data: r }, { data: m }, { data: e }] = await Promise.all([
       sb.from("room").select("id,nombre,orden,suelo").eq("location_id", lid).order("orden"),
-      sb.from("restaurant_table").select("id,nombre,room_id,pos_x,pos_y,capacidad"),
+      sb.from("restaurant_table").select("id,nombre,room_id,pos_x,pos_y,capacidad,rotacion"),
       sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto,rotacion"),
     ]);
     setRooms((r as Room[]) ?? []);
@@ -56,6 +59,12 @@ export default function PlanosDeMesas() {
     setMarca(await leerBranding(sb));
   }
   useEffect(() => { cargar(); /* eslint-disable-next-line */ }, []);
+  // Centrar el lienzo al abrir un plano
+  useEffect(() => {
+    if (!edit) return;
+    const el = canvasRef.current;
+    if (el) requestAnimationFrame(() => { el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2); });
+  }, [edit]);
 
   /* ── Planos (salas) ── */
   async function nuevoPlano(e: React.FormEvent) {
@@ -80,7 +89,7 @@ export default function PlanosDeMesas() {
   async function addElem(a: PlanoAsset) {
     if (!edit) return;
     const d = dim(a);
-    const tipo = a.tipo === "barra" ? "BARRA" : a.tipo === "separador" ? "PARED" : "PLANTA";
+    const tipo = a.tipo === "barra" ? "BARRA" : a.tipo === "separador" ? "PARED" : a.tipo === "abertura" ? "PUERTA" : "PLANTA";
     await sb.from("plano_elemento").insert({ room_id: edit, tipo, etiqueta: a.nombre, icono: a.id, pos_x: 80, pos_y: 80, ancho: d.w, alto: d.h });
     setDialogo(null); cargar();
   }
@@ -114,7 +123,18 @@ export default function PlanosDeMesas() {
     e.stopPropagation(); e.preventDefault();
     resize.current = { id: el.id, sx: e.clientX, sy: e.clientY, sw: el.ancho, sh: el.alto };
   }
+  function onMovilDown(e: React.PointerEvent) {
+    e.preventDefault();
+    const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return;
+    movilDrag.current = { ox: e.clientX - rect.left - movilPos.x, oy: e.clientY - rect.top - movilPos.y };
+  }
   function onMove(e: React.PointerEvent) {
+    const mv = movilDrag.current;
+    if (mv) {
+      const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return;
+      setMovilPos({ x: Math.max(0, e.clientX - rect.left - mv.ox), y: Math.max(0, e.clientY - rect.top - mv.oy) });
+      return;
+    }
     const r = resize.current;
     if (r) {
       const w = Math.max(20, r.sw + (e.clientX - r.sx));
@@ -130,6 +150,7 @@ export default function PlanosDeMesas() {
     else setElems((es) => es.map((el) => (el.id === d.id ? { ...el, pos_x: x, pos_y: y } : el)));
   }
   async function onUp() {
+    if (movilDrag.current) { movilDrag.current = null; return; }
     const r = resize.current;
     if (r) {
       resize.current = null;
@@ -164,19 +185,26 @@ export default function PlanosDeMesas() {
     if (!edit) return;
     if (kind === "mesa") {
       const m = mesas.find((z) => z.id === id); if (!m) return;
-      await sb.from("restaurant_table").insert({ room_id: edit, nombre: `${m.nombre} copia`, estado: "LIBRE", pos_x: (m.pos_x ?? 80) + 24, pos_y: (m.pos_y ?? 80) + 24, capacidad: m.capacidad });
+      await sb.from("restaurant_table").insert({ room_id: edit, nombre: `${m.nombre} copia`, estado: "LIBRE", pos_x: (m.pos_x ?? 80) + 24, pos_y: (m.pos_y ?? 80) + 24, capacidad: m.capacidad, rotacion: m.rotacion });
     } else {
       const el = elems.find((z) => z.id === id); if (!el) return;
       await sb.from("plano_elemento").insert({ room_id: edit, tipo: el.tipo, etiqueta: el.etiqueta, icono: el.icono, pos_x: el.pos_x + 24, pos_y: el.pos_y + 24, ancho: el.ancho, alto: el.alto, rotacion: el.rotacion });
     }
     cargar();
   }
-  async function rotar(id: string) {
+  async function rotar(kind: "mesa" | "elem", id: string) {
     setMenu(null);
-    const el = elems.find((z) => z.id === id); if (!el) return;
-    const rot = ((el.rotacion || 0) + 90) % 360;
-    setElems((es) => es.map((z) => (z.id === id ? { ...z, rotacion: rot } : z)));
-    await sb.from("plano_elemento").update({ rotacion: rot }).eq("id", id);
+    if (kind === "mesa") {
+      const m = mesas.find((z) => z.id === id); if (!m) return;
+      const rot = ((m.rotacion || 0) + 90) % 360;
+      setMesas((ms) => ms.map((z) => (z.id === id ? { ...z, rotacion: rot } : z)));
+      await sb.from("restaurant_table").update({ rotacion: rot }).eq("id", id);
+    } else {
+      const el = elems.find((z) => z.id === id); if (!el) return;
+      const rot = ((el.rotacion || 0) + 90) % 360;
+      setElems((es) => es.map((z) => (z.id === id ? { ...z, rotacion: rot } : z)));
+      await sb.from("plano_elemento").update({ rotacion: rot }).eq("id", id);
+    }
   }
 
   /* ───────── LISTADO ───────── */
@@ -227,7 +255,7 @@ export default function PlanosDeMesas() {
   const bg = room?.suelo
     ? { backgroundImage: `url(/plano/${room.suelo}.svg)`, backgroundRepeat: "repeat" as const }
     : { backgroundImage: "radial-gradient(rgba(120,120,120,0.12) 1px, transparent 1px)", backgroundSize: "40px 40px" };
-  const canvasStyle = { minWidth: 1000, ...bg, "--mesa-fill": marca.mesa_color, "--silla-fill": marca.silla_color } as unknown as React.CSSProperties;
+  const canvasStyle = { minWidth: 1800, minHeight: 1100, ...bg, "--mesa-fill": marca.mesa_color, "--silla-fill": marca.silla_color } as unknown as React.CSSProperties;
 
   return (
     <div className="space-y-3">
@@ -237,8 +265,9 @@ export default function PlanosDeMesas() {
         <Input value={room?.nombre ?? ""} onChange={(e) => edit && renombrar(edit, e.target.value)} className="w-52 font-medium" />
         <Button variant="outline" size="sm" onClick={() => setDialogo("fondo")}><Brush className="h-4 w-4" /> Fondo</Button>
         <Button size="sm" onClick={() => setDialogo("elemento")}><Plus className="h-4 w-4" /> Añadir</Button>
+        <Button variant={movil ? "default" : "outline"} size="sm" onClick={() => setMovil((v) => !v)}>📱 Móvil</Button>
         {sel && <Button variant="outline" size="sm" className="text-destructive" onClick={borrarSel}><Trash2 className="h-4 w-4" /> Eliminar</Button>}
-        <span className="ml-auto text-xs text-muted-foreground">Arrastra para colocar · se ajusta a la rejilla de 40px</span>
+        <span className="ml-auto text-xs text-muted-foreground">Clic derecho: clonar/rotar · arrastra el tirador para redimensionar</span>
       </div>
 
       {/* Propiedades del elemento seleccionado */}
@@ -269,7 +298,7 @@ export default function PlanosDeMesas() {
         onPointerUp={onUp}
         onPointerLeave={onUp}
         onPointerDown={(e) => { if (e.target === canvasRef.current) setSel(null); }}
-        className="relative h-[640px] w-full touch-none select-none overflow-auto rounded-xl border border-border bg-muted/20"
+        className="relative h-[calc(100vh-170px)] w-full touch-none select-none overflow-auto rounded-xl border border-border bg-muted/20"
         style={canvasStyle}
       >
         <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />
@@ -304,7 +333,7 @@ export default function PlanosDeMesas() {
           const x = m.pos_x ?? 80, y = m.pos_y ?? 80;
           return (
             <div key={m.id} style={{ left: x, top: y, width: d.w, height: d.h }} onPointerDown={(e) => onDown(e, "mesa", m.id, x, y)} onContextMenu={(e) => onCtx(e, "mesa", m.id)} className={`absolute cursor-move ${isSel ? "rounded-lg ring-2 ring-primary" : ""}`}>
-              <PlanoSvg file={a.file} className="pointer-events-none block h-full w-full" />
+              <PlanoSvg file={a.file} style={{ transform: m.rotacion ? `rotate(${m.rotacion}deg)` : undefined }} className="pointer-events-none block h-full w-full" />
               <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-background/85 px-1 text-[11px] font-bold text-foreground">{m.nombre.replace("Mesa ", "")}</span>
             </div>
           );
@@ -312,6 +341,13 @@ export default function PlanosDeMesas() {
 
         {mesasSala.length === 0 && elemsSala.length === 0 && (
           <p className="absolute inset-0 grid place-items-center text-muted-foreground">Pulsa «Añadir» para colocar mesas y elementos.</p>
+        )}
+
+        {/* Marco de vista móvil: lo que se ve en un teléfono (arrastra para situarlo) */}
+        {movil && (
+          <div style={{ left: movilPos.x, top: movilPos.y, width: 384, height: 760 }} className="pointer-events-none absolute z-20 rounded-[28px] border-[3px] border-dashed border-primary/80 bg-primary/5">
+            <div onPointerDown={onMovilDown} className="pointer-events-auto absolute -top-7 left-0 cursor-move rounded bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">📱 Vista móvil · arrastra</div>
+          </div>
         )}
       </div>
 
@@ -321,7 +357,7 @@ export default function PlanosDeMesas() {
           <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
           <div className="fixed z-50 min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm shadow-lg" style={{ left: menu.x, top: menu.y }}>
             <button onClick={() => clonar(menu.kind, menu.id)} className="block w-full px-3 py-1.5 text-left hover:bg-accent">Clonar</button>
-            {menu.kind === "elem" && <button onClick={() => rotar(menu.id)} className="block w-full px-3 py-1.5 text-left hover:bg-accent">Rotar 90°</button>}
+            <button onClick={() => rotar(menu.kind, menu.id)} className="block w-full px-3 py-1.5 text-left hover:bg-accent">Rotar 90°</button>
             <button onClick={() => { setMenu(null); borrarSel(); }} className="block w-full px-3 py-1.5 text-left text-destructive hover:bg-accent">Eliminar</button>
           </div>
         </>
@@ -363,7 +399,18 @@ export default function PlanosDeMesas() {
 
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mobiliario y plantas</p>
             <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {ASSETS.filter((a) => a.tipo !== "mesa").map((a) => (
+              {ASSETS.filter((a) => a.tipo === "barra" || a.tipo === "planta" || a.tipo === "separador").map((a) => (
+                <button key={a.id} onClick={() => addElem(a)} title={a.nombre} className="flex flex-col items-center gap-1 rounded-md border border-border p-2 hover:ring-2 hover:ring-primary">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/plano/${a.file}`} alt="" className="h-14 w-14 object-contain" />
+                  <span className="text-center text-[11px] leading-tight">{a.nombre}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Aberturas y marcas</p>
+            <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {ASSETS.filter((a) => a.tipo === "abertura").map((a) => (
                 <button key={a.id} onClick={() => addElem(a)} title={a.nombre} className="flex flex-col items-center gap-1 rounded-md border border-border p-2 hover:ring-2 hover:ring-primary">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={`/plano/${a.file}`} alt="" className="h-14 w-14 object-contain" />

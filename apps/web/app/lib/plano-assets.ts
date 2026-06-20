@@ -5,7 +5,7 @@ export interface PlanoAsset {
   id: string;
   file: string;
   nombre: string;
-  tipo: "mesa" | "barra" | "planta" | "separador";
+  tipo: "mesa" | "barra" | "planta" | "separador" | "abertura";
   w: number;   // ancho del viewBox
   h: number;   // alto del viewBox
   seats?: number;
@@ -21,7 +21,9 @@ export const ASSETS: PlanoAsset[] = [
   { id: "mesa-8-cuadrada", file: "mesa-8-cuadrada.svg", nombre: "Mesa cuadrada 8", tipo: "mesa", w: 772, h: 769.21, seats: 8 },
   { id: "mesa-6", file: "mesa-6.svg", nombre: "Mesa 6", tipo: "mesa", w: 784, h: 467.55, seats: 6 },
   { id: "mesa-8-larga", file: "mesa-8-larga.svg", nombre: "Mesa larga 8", tipo: "mesa", w: 1104.79, h: 464.78, seats: 8 },
-  { id: "taburete", file: "taburete.svg", nombre: "Taburete", tipo: "mesa", w: 100, h: 100, seats: 1 },
+  { id: "taburete", file: "taburete.svg", nombre: "Taburete", tipo: "mesa", w: 230, h: 230, seats: 1 },
+  { id: "puerta", file: "puerta.svg", nombre: "Puerta", tipo: "abertura", w: 240, h: 130 },
+  { id: "entrada", file: "entrada.svg", nombre: "Entrada", tipo: "abertura", w: 240, h: 160 },
   { id: "barra-recta", file: "barra-recta.svg", nombre: "Barra recta", tipo: "barra", w: 680.03, h: 212.83 },
   { id: "barra-esquina", file: "barra-esquina.svg", nombre: "Barra esquina", tipo: "barra", w: 676.41, h: 668.4 },
   { id: "planta-redonda", file: "planta-redonda.svg", nombre: "Planta / macetero", tipo: "planta", w: 165.38, h: 165.38 },

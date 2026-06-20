@@ -10,7 +10,7 @@ import { PlanoSvg } from "@/components/plano-svg";
 import { Utensils } from "lucide-react";
 
 /* ─── Tipos ─── */
-interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
+interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number }
 interface Room   { id: string; nombre: string; orden: number; suelo: string | null }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
 interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
@@ -264,7 +264,7 @@ export default function TPV() {
   // Carga la lista de mesas + el importe de la cuenta abierta de cada una.
   async function recargarMesas() {
     const [{ data: m }, { data: ords }] = await Promise.all([
-      sb.from("restaurant_table").select("id,nombre,estado,room_id,pos_x,pos_y,capacidad").order("nombre"),
+      sb.from("restaurant_table").select("id,nombre,estado,room_id,pos_x,pos_y,capacidad,rotacion").order("nombre"),
       sb.from("sales_order").select("table_id,total,created_at")
         .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
         .not("table_id", "is", null),
@@ -633,7 +633,7 @@ export default function TPV() {
         style={{ left: x, top: y, width: d.w, height: d.h }}
         className="absolute select-none transition-transform hover:scale-[1.04]"
       >
-        <PlanoSvg file={a.file} className="pointer-events-none block h-full w-full" />
+        <PlanoSvg file={a.file} style={{ transform: m.rotacion ? `rotate(${m.rotacion}deg)` : undefined }} className="pointer-events-none block h-full w-full" />
         {tint && <span className={`pointer-events-none absolute inset-0 rounded-xl ${tint} mix-blend-multiply`} />}
         <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5">
           <span className="rounded bg-background/85 px-1.5 text-xs font-bold leading-tight text-foreground">{m.nombre.replace("Mesa ", "M")}</span>
