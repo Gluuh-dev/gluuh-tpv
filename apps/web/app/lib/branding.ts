@@ -7,6 +7,8 @@ export interface Branding {
   color_secundario: string;
   kiosko_titulo: string | null;
   kiosko_subtitulo: string | null;
+  mesa_color: string;
+  silla_color: string;
 }
 
 export const BRANDING_DEFAULT: Branding = {
@@ -16,13 +18,15 @@ export const BRANDING_DEFAULT: Branding = {
   color_secundario: "#0f172a",
   kiosko_titulo: null,
   kiosko_subtitulo: null,
+  mesa_color: "#e8e4de",
+  silla_color: "#707378",
 };
 
 /** Lee la marca de la empresa de la sesión (RLS); cae a valores por defecto. */
 export async function leerBranding(sb: SupabaseClient): Promise<Branding> {
   const { data } = await sb
     .from("tenant_branding")
-    .select("nombre_comercial,logo_url,color_primario,color_secundario,kiosko_titulo,kiosko_subtitulo")
+    .select("nombre_comercial,logo_url,color_primario,color_secundario,kiosko_titulo,kiosko_subtitulo,mesa_color,silla_color")
     .limit(1)
     .maybeSingle();
   return { ...BRANDING_DEFAULT, ...(data ?? {}) };

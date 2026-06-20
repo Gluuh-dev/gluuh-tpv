@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { estacionDe } from "../lib/estaciones";
 import { assetPorId, mesaPorCapacidad, dim } from "../lib/plano-assets";
+import { leerBranding, BRANDING_DEFAULT, type Branding } from "../lib/branding";
+import { PlanoSvg } from "@/components/plano-svg";
 import { Utensils } from "lucide-react";
 
 /* ─── Tipos ─── */
@@ -53,6 +55,7 @@ export default function TPV() {
   const [loading, setLoading]     = useState(true);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [locInfo, setLocInfo] = useState<{ nombre: string; cif: string; direccion: string }>({ nombre: "", cif: "", direccion: "" });
+  const [marca, setMarca] = useState<Branding>(BRANDING_DEFAULT);
   const [territorio, setTerritorio] = useState("PENINSULA_BALEARES");
   const [userId, setUserId]       = useState<string | null>(null);
   const [mesas, setMesas]         = useState<Mesa[]>([]);
@@ -118,6 +121,7 @@ export default function TPV() {
       try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
       const { data: ops } = await sb.rpc("listar_operarios");
       setOperarios((ops as { id: string; nombre: string; rol: string }[]) ?? []);
+      setMarca(await leerBranding(sb));
       const { data: loc } = await sb.from("location").select("id,territorio_fiscal,nombre,razon_social,cif,direccion").limit(1).maybeSingle();
       const { data: u }   = await sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle();
       setLocationId(loc?.id ?? null);
@@ -603,15 +607,17 @@ export default function TPV() {
     return <div key={e.id} style={st} className={`${base} text-2xl`}>{e.icono ?? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{e.etiqueta}</span>}</div>;
   }
 
-  /* ── Dibuja una mesa con su SVG (según capacidad); estado y reservas encima ── */
+  /* ── Dibuja una mesa con su SVG; tinte de estado y etiquetas centradas encima ── */
   function MesaPlano(m: Mesa, i: number) {
     const cuenta = totalesMesa[m.id] ?? 0;
     const ocupada = cuenta > 0 || m.estado !== "LIBRE";
     const resvs = reservasPorMesa[m.id] ?? [];
+    const reservada = resvs.length > 0;
     const a = mesaPorCapacidad(m.capacidad || 4);
     const d = dim(a);
     const x = m.pos_x ?? (40 + (i % 4) * 220);
     const y = m.pos_y ?? (40 + Math.floor(i / 4) * 230);
+    const tint = ocupada ? "bg-amber-400/45" : reservada ? "bg-sky-400/50" : "";
     return (
       <button
         key={m.id}
@@ -620,21 +626,16 @@ export default function TPV() {
         onPointerUp={onPressEnd}
         onPointerLeave={onPressEnd}
         onContextMenu={(e) => e.preventDefault()}
-        style={{ left: x, top: y }}
-        className="absolute flex select-none flex-col items-center transition-transform hover:scale-[1.04]"
+        style={{ left: x, top: y, width: d.w, height: d.h }}
+        className="absolute select-none transition-transform hover:scale-[1.04]"
       >
-        <div className="relative" style={{ width: d.w, height: d.h }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/plano/${a.file}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
-          {ocupada && <span className="pointer-events-none absolute inset-[14%] rounded-lg ring-2 ring-amber-400/80" />}
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-background/80 px-1.5 text-xs font-bold text-foreground">{m.nombre.replace("Mesa ", "M")}</span>
-        </div>
-        {ocupada && cuenta > 0 && <span className="-mt-1 rounded bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{eur(cuenta)}</span>}
-        {resvs.length > 0 && (
-          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-            🕑 {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}
-          </span>
-        )}
+        <PlanoSvg file={a.file} className="pointer-events-none block h-full w-full" />
+        {tint && <span className={`pointer-events-none absolute inset-0 rounded-xl ${tint} mix-blend-multiply`} />}
+        <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5">
+          <span className="rounded bg-background/85 px-1.5 text-xs font-bold leading-tight text-foreground">{m.nombre.replace("Mesa ", "M")}</span>
+          {ocupada && cuenta > 0 && <span className="rounded bg-amber-500 px-1.5 text-[10px] font-semibold leading-tight text-white">{eur(cuenta)}</span>}
+          {!ocupada && reservada && <span className="rounded bg-sky-600 px-1.5 text-[10px] font-semibold leading-tight text-white">🕑 {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}</span>}
+        </span>
       </button>
     );
   }
@@ -646,6 +647,7 @@ export default function TPV() {
     const planoBg = roomActiva?.suelo
       ? { backgroundImage: `url(/plano/${roomActiva.suelo}.svg)`, backgroundRepeat: "repeat" as const }
       : { backgroundImage: "radial-gradient(rgba(120,120,120,0.10) 1px, transparent 1px)", backgroundSize: "26px 26px" };
+    const planoStyle = { minWidth: 900, ...planoBg, "--mesa-fill": marca.mesa_color, "--silla-fill": marca.silla_color } as unknown as React.CSSProperties;
     return (
       <div className="flex h-screen flex-col bg-background text-foreground">
         <header className="flex flex-none items-center justify-between border-b border-border bg-card px-4 py-2.5">
@@ -727,7 +729,7 @@ export default function TPV() {
             ) : (
               <div
                 className="relative h-full min-h-[640px] w-full"
-                style={{ minWidth: 900, ...planoBg }}
+                style={planoStyle}
               >
                 {/* Paredes (marco de la sala) */}
                 <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />

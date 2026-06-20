@@ -52,6 +52,8 @@ export default function Ajustes() {
       color_secundario: brand.color_secundario,
       kiosko_titulo: brand.kiosko_titulo || null,
       kiosko_subtitulo: brand.kiosko_subtitulo || null,
+      mesa_color: brand.mesa_color,
+      silla_color: brand.silla_color,
     }, { onConflict: "tenant_id" });
     setBrandSaving(false);
     setBrandMsg(error ? `Error: ${error.message}` : "Marca guardada ✓");
@@ -153,6 +155,22 @@ export default function Ajustes() {
               <div className="flex items-center gap-2">
                 <input type="color" value={brand.color_secundario} onChange={(e) => setBrand({ ...brand, color_secundario: e.target.value })} className="h-9 w-12 rounded border border-input" />
                 <Input value={brand.color_secundario} onChange={(e) => setBrand({ ...brand, color_secundario: e.target.value })} className="w-28" />
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Color de las mesas (plano)</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={brand.mesa_color} onChange={(e) => setBrand({ ...brand, mesa_color: e.target.value })} className="h-9 w-12 rounded border border-input" />
+                <Input value={brand.mesa_color} onChange={(e) => setBrand({ ...brand, mesa_color: e.target.value })} className="w-28" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Color de las sillas (plano)</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={brand.silla_color} onChange={(e) => setBrand({ ...brand, silla_color: e.target.value })} className="h-9 w-12 rounded border border-input" />
+                <Input value={brand.silla_color} onChange={(e) => setBrand({ ...brand, silla_color: e.target.value })} className="w-28" />
               </div>
             </div>
           </div>
