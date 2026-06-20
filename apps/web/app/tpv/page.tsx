@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { estacionDe } from "../lib/estaciones";
+import { assetPorId, mesaPorCapacidad, dim } from "../lib/plano-assets";
 import { Utensils } from "lucide-react";
 
 /* ─── Tipos ─── */
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
-interface Room   { id: string; nombre: string; orden: number }
+interface Room   { id: string; nombre: string; orden: number; suelo: string | null }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
 interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number }
 interface Family { id: string; nombre: string; color: string }
@@ -134,7 +135,7 @@ export default function TPV() {
       setCatSel((c as Cat[])?.[0]?.id ?? null);
       await recargarMesas();
       const [{ data: rms }, { data: rsv }, { data: els }] = await Promise.all([
-        sb.from("room").select("id,nombre,orden").order("orden"),
+        sb.from("room").select("id,nombre,orden,suelo").order("orden"),
         sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora"),
         sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto"),
       ]);
@@ -584,9 +585,14 @@ export default function TPV() {
     );
   }
 
-  /* ── Dibuja un elemento del plano (barra, pared, puerta, planta, decor) ── */
+  /* ── Dibuja un elemento del plano usando su SVG (fallback: caja) ── */
   function ElementoPlano(e: Elemento) {
     const st = { left: e.pos_x, top: e.pos_y, width: e.ancho, height: e.alto };
+    const a = assetPorId(e.icono);
+    if (a) {
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img key={e.id} src={`/plano/${a.file}`} alt="" draggable={false} style={st} className="pointer-events-none absolute select-none" />;
+    }
     const base = "pointer-events-none absolute flex select-none items-center justify-center";
     if (e.tipo === "BARRA")
       return <div key={e.id} style={st} className={`${base} rounded-md bg-amber-800/85 text-xs font-semibold text-amber-50 shadow-sm`}>{e.etiqueta}</div>;
@@ -594,33 +600,18 @@ export default function TPV() {
       return <div key={e.id} style={st} className={`${base} rounded bg-foreground/25`} />;
     if (e.tipo === "PUERTA")
       return <div key={e.id} style={st} className={`${base} rounded border-2 border-dashed border-foreground/30 text-[10px] text-muted-foreground`}>{e.etiqueta}</div>;
-    // PLANTA / DECOR
-    return (
-      <div key={e.id} style={st} className={`${base} text-2xl`}>
-        {e.icono ?? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{e.etiqueta}</span>}
-      </div>
-    );
+    return <div key={e.id} style={st} className={`${base} text-2xl`}>{e.icono ?? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{e.etiqueta}</span>}</div>;
   }
 
-  /* ── Dibuja una mesa en el plano: cuadrada (≤4) o rectangular (≥5),
-        con sillas en los 4 lados según capacidad ── */
+  /* ── Dibuja una mesa con su SVG (según capacidad); estado y reservas encima ── */
   function MesaPlano(m: Mesa, i: number) {
     const cuenta = totalesMesa[m.id] ?? 0;
     const ocupada = cuenta > 0 || m.estado !== "LIBRE";
     const resvs = reservasPorMesa[m.id] ?? [];
-    const cap = m.capacidad || 2;
-    const isRect = cap >= 5;                 // doble: 80×160 vertical
-    const bodyW = 76, bodyH = isRect ? 152 : 76;
-    // Reparto de sillas por lado
-    let top = 1, bottom = 1, left = 0, right = 0;
-    if (isRect) { const rem = cap - 2; left = Math.ceil(rem / 2); right = rem - left; }
-    else if (cap <= 1) { bottom = 0; }
-    else if (cap === 3) { left = 1; }
-    else if (cap >= 4) { left = 1; right = 1; }
+    const a = mesaPorCapacidad(m.capacidad || 4);
+    const d = dim(a);
     const x = m.pos_x ?? (40 + (i % 4) * 220);
     const y = m.pos_y ?? (40 + Math.floor(i / 4) * 230);
-    const colorBody = ocupada ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20" : "border-border bg-card";
-    const chairCls = "rounded-sm bg-current opacity-40";
     return (
       <button
         key={m.id}
@@ -630,23 +621,17 @@ export default function TPV() {
         onPointerLeave={onPressEnd}
         onContextMenu={(e) => e.preventDefault()}
         style={{ left: x, top: y }}
-        className={`absolute flex select-none flex-col items-center transition-transform hover:scale-[1.04] ${ocupada ? "text-amber-700 dark:text-amber-400" : "text-foreground"}`}
+        className="absolute flex select-none flex-col items-center transition-transform hover:scale-[1.04]"
       >
-        <div className="relative" style={{ width: bodyW + 28, height: bodyH + 28 }}>
-          <div className="absolute left-1/2 top-0 flex -translate-x-1/2 gap-1.5">{Array.from({ length: top }).map((_, k) => <span key={k} className={chairCls} style={{ width: 22, height: 8 }} />)}</div>
-          <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-1.5">{Array.from({ length: bottom }).map((_, k) => <span key={k} className={chairCls} style={{ width: 22, height: 8 }} />)}</div>
-          <div className="absolute left-0 top-1/2 flex -translate-y-1/2 flex-col gap-1.5">{Array.from({ length: left }).map((_, k) => <span key={k} className={chairCls} style={{ width: 8, height: 22 }} />)}</div>
-          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 flex-col gap-1.5">{Array.from({ length: right }).map((_, k) => <span key={k} className={chairCls} style={{ width: 8, height: 22 }} />)}</div>
-          <div
-            className={`absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg border-2 shadow-sm ${colorBody}`}
-            style={{ width: bodyW, height: bodyH }}
-          >
-            <span className="text-base font-bold leading-none">{m.nombre.replace("Mesa ", "M")}</span>
-            <span className="mt-1 text-[11px] font-medium leading-none">{ocupada ? (cuenta > 0 ? eur(cuenta) : "Ocupada") : "Libre"}</span>
-          </div>
+        <div className="relative" style={{ width: d.w, height: d.h }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/plano/${a.file}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
+          {ocupada && <span className="pointer-events-none absolute inset-[14%] rounded-lg ring-2 ring-amber-400/80" />}
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-background/80 px-1.5 text-xs font-bold text-foreground">{m.nombre.replace("Mesa ", "M")}</span>
         </div>
+        {ocupada && cuenta > 0 && <span className="-mt-1 rounded bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{eur(cuenta)}</span>}
         {resvs.length > 0 && (
-          <span className="mt-0.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
             🕑 {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}
           </span>
         )}
@@ -657,6 +642,10 @@ export default function TPV() {
   /* ── Selección mesa/barra: menú lateral de salas + plano a pantalla ── */
   if (!mesa && !barra && !llevar) {
     const mesasSala = mesas.filter((m) => m.room_id === vistaSala);
+    const roomActiva = rooms.find((r) => r.id === vistaSala);
+    const planoBg = roomActiva?.suelo
+      ? { backgroundImage: `url(/plano/${roomActiva.suelo}.svg)`, backgroundRepeat: "repeat" as const }
+      : { backgroundImage: "radial-gradient(rgba(120,120,120,0.10) 1px, transparent 1px)", backgroundSize: "26px 26px" };
     return (
       <div className="flex h-screen flex-col bg-background text-foreground">
         <header className="flex flex-none items-center justify-between border-b border-border bg-card px-4 py-2.5">
@@ -738,7 +727,7 @@ export default function TPV() {
             ) : (
               <div
                 className="relative h-full min-h-[640px] w-full"
-                style={{ minWidth: 900, backgroundImage: "radial-gradient(rgba(120,120,120,0.10) 1px, transparent 1px)", backgroundSize: "26px 26px" }}
+                style={{ minWidth: 900, ...planoBg }}
               >
                 {/* Paredes (marco de la sala) */}
                 <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />
