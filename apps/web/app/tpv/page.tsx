@@ -13,7 +13,7 @@ import { Utensils } from "lucide-react";
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number }
 interface Room   { id: string; nombre: string; orden: number; suelo: string | null }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
-interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number }
+interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
 interface Family { id: string; nombre: string; color: string }
 interface Cat    { id: string; nombre: string; orden: number; family_id: string | null }
 interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null }
@@ -141,7 +141,7 @@ export default function TPV() {
       const [{ data: rms }, { data: rsv }, { data: els }] = await Promise.all([
         sb.from("room").select("id,nombre,orden,suelo").order("orden"),
         sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora"),
-        sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto"),
+        sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto,rotacion"),
       ]);
       setRooms((rms as Room[]) ?? []);
       setReservas((rsv as Reserva[]) ?? []);
@@ -591,7 +591,7 @@ export default function TPV() {
 
   /* ── Dibuja un elemento del plano usando su SVG (fallback: caja) ── */
   function ElementoPlano(e: Elemento) {
-    const st = { left: e.pos_x, top: e.pos_y, width: e.ancho, height: e.alto };
+    const st = { left: e.pos_x, top: e.pos_y, width: e.ancho, height: e.alto, transform: e.rotacion ? `rotate(${e.rotacion}deg)` : undefined };
     if (e.icono?.startsWith("suelo:")) {
       const s = e.icono.slice(6);
       return <div key={e.id} style={{ ...st, backgroundImage: `url(/plano/${s}.svg)`, backgroundRepeat: "repeat" }} className="pointer-events-none absolute rounded-md border border-foreground/10" />;

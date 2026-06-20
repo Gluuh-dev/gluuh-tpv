@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 interface Room { id: string; nombre: string; orden: number; suelo: string | null }
 interface Mesa { id: string; nombre: string; room_id: string; pos_x: number | null; pos_y: number | null; capacidad: number }
-interface Elem { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number }
+interface Elem { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
 type Sel = { kind: "mesa" | "elem"; id: string } | null;
 
 const snap = (v: number) => Math.round(v / 40) * 40;
@@ -37,6 +37,8 @@ export default function PlanosDeMesas() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ kind: "mesa" | "elem"; id: string; offX: number; offY: number } | null>(null);
+  const resize = useRef<{ id: string; sx: number; sy: number; sw: number; sh: number } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; kind: "mesa" | "elem"; id: string } | null>(null);
 
   async function cargar() {
     const { data: loc } = await sb.from("location").select("id").limit(1).maybeSingle();
@@ -46,7 +48,7 @@ export default function PlanosDeMesas() {
     const [{ data: r }, { data: m }, { data: e }] = await Promise.all([
       sb.from("room").select("id,nombre,orden,suelo").eq("location_id", lid).order("orden"),
       sb.from("restaurant_table").select("id,nombre,room_id,pos_x,pos_y,capacidad"),
-      sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto"),
+      sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto,rotacion"),
     ]);
     setRooms((r as Room[]) ?? []);
     setMesas((m as Mesa[]) ?? []);
@@ -99,14 +101,27 @@ export default function PlanosDeMesas() {
     setSel(null); cargar();
   }
 
-  /* ── Drag ── */
+  /* ── Drag / resize ── */
   function onDown(e: React.PointerEvent, kind: "mesa" | "elem", id: string, x: number, y: number) {
+    if (e.button !== 0) return;                 // botón derecho → menú, no arrastrar
     e.preventDefault();
+    setMenu(null);
     const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return;
     drag.current = { kind, id, offX: e.clientX - rect.left - x, offY: e.clientY - rect.top - y };
     setSel({ kind, id });
   }
+  function onResizeDown(e: React.PointerEvent, el: Elem) {
+    e.stopPropagation(); e.preventDefault();
+    resize.current = { id: el.id, sx: e.clientX, sy: e.clientY, sw: el.ancho, sh: el.alto };
+  }
   function onMove(e: React.PointerEvent) {
+    const r = resize.current;
+    if (r) {
+      const w = Math.max(20, r.sw + (e.clientX - r.sx));
+      const h = Math.max(20, r.sh + (e.clientY - r.sy));
+      setElems((es) => es.map((z) => (z.id === r.id ? { ...z, ancho: w, alto: h } : z)));
+      return;
+    }
     const d = drag.current; if (!d) return;
     const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return;
     const x = Math.max(0, e.clientX - rect.left - d.offX);
@@ -115,6 +130,15 @@ export default function PlanosDeMesas() {
     else setElems((es) => es.map((el) => (el.id === d.id ? { ...el, pos_x: x, pos_y: y } : el)));
   }
   async function onUp() {
+    const r = resize.current;
+    if (r) {
+      resize.current = null;
+      const el = elems.find((z) => z.id === r.id); if (!el) return;
+      const w = snap(el.ancho), h = snap(el.alto);
+      setElems((es) => es.map((z) => (z.id === r.id ? { ...z, ancho: w, alto: h } : z)));
+      await sb.from("plano_elemento").update({ ancho: w, alto: h }).eq("id", r.id);
+      return;
+    }
     const d = drag.current; if (!d) return; drag.current = null;
     if (d.kind === "mesa") {
       const m = mesas.find((z) => z.id === d.id); if (!m) return;
@@ -127,6 +151,32 @@ export default function PlanosDeMesas() {
       setElems((es) => es.map((z) => (z.id === d.id ? { ...z, pos_x: x, pos_y: y } : z)));
       await sb.from("plano_elemento").update({ pos_x: x, pos_y: y }).eq("id", d.id);
     }
+  }
+
+  /* ── Menú contextual (botón derecho) ── */
+  function onCtx(e: React.MouseEvent, kind: "mesa" | "elem", id: string) {
+    e.preventDefault();
+    setSel({ kind, id });
+    setMenu({ x: e.clientX, y: e.clientY, kind, id });
+  }
+  async function clonar(kind: "mesa" | "elem", id: string) {
+    setMenu(null);
+    if (!edit) return;
+    if (kind === "mesa") {
+      const m = mesas.find((z) => z.id === id); if (!m) return;
+      await sb.from("restaurant_table").insert({ room_id: edit, nombre: `${m.nombre} copia`, estado: "LIBRE", pos_x: (m.pos_x ?? 80) + 24, pos_y: (m.pos_y ?? 80) + 24, capacidad: m.capacidad });
+    } else {
+      const el = elems.find((z) => z.id === id); if (!el) return;
+      await sb.from("plano_elemento").insert({ room_id: edit, tipo: el.tipo, etiqueta: el.etiqueta, icono: el.icono, pos_x: el.pos_x + 24, pos_y: el.pos_y + 24, ancho: el.ancho, alto: el.alto, rotacion: el.rotacion });
+    }
+    cargar();
+  }
+  async function rotar(id: string) {
+    setMenu(null);
+    const el = elems.find((z) => z.id === id); if (!el) return;
+    const rot = ((el.rotacion || 0) + 90) % 360;
+    setElems((es) => es.map((z) => (z.id === id ? { ...z, rotacion: rot } : z)));
+    await sb.from("plano_elemento").update({ rotacion: rot }).eq("id", id);
   }
 
   /* ───────── LISTADO ───────── */
@@ -230,12 +280,19 @@ export default function PlanosDeMesas() {
           const isSel = sel?.kind === "elem" && sel.id === el.id;
           const esSuelo = el.icono?.startsWith("suelo:");
           return (
-            <div key={el.id} style={{ left: el.pos_x, top: el.pos_y, width: el.ancho, height: el.alto }} onPointerDown={(e) => onDown(e, "elem", el.id, el.pos_x, el.pos_y)} className={`absolute cursor-move ${isSel ? "rounded ring-2 ring-primary" : ""}`}>
+            <div
+              key={el.id}
+              style={{ left: el.pos_x, top: el.pos_y, width: el.ancho, height: el.alto, transform: el.rotacion ? `rotate(${el.rotacion}deg)` : undefined }}
+              onPointerDown={(e) => onDown(e, "elem", el.id, el.pos_x, el.pos_y)}
+              onContextMenu={(e) => onCtx(e, "elem", el.id)}
+              className={`absolute cursor-move ${isSel ? "rounded ring-2 ring-primary" : ""}`}
+            >
               {esSuelo
                 ? <div className="h-full w-full rounded-md border border-foreground/10" style={{ backgroundImage: `url(/plano/${el.icono!.slice(6)}.svg)`, backgroundRepeat: "repeat" }} />
                 /* eslint-disable-next-line @next/next/no-img-element */
                 : a ? <img src={`/plano/${a.file}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
                 : <div className="grid h-full w-full place-items-center rounded bg-foreground/20 text-xs">{el.etiqueta}</div>}
+              {isSel && <span onPointerDown={(e) => onResizeDown(e, el)} className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-se-resize rounded-sm border border-primary bg-background" />}
             </div>
           );
         })}
@@ -246,7 +303,7 @@ export default function PlanosDeMesas() {
           const isSel = sel?.kind === "mesa" && sel.id === m.id;
           const x = m.pos_x ?? 80, y = m.pos_y ?? 80;
           return (
-            <div key={m.id} style={{ left: x, top: y, width: d.w, height: d.h }} onPointerDown={(e) => onDown(e, "mesa", m.id, x, y)} className={`absolute cursor-move ${isSel ? "rounded-lg ring-2 ring-primary" : ""}`}>
+            <div key={m.id} style={{ left: x, top: y, width: d.w, height: d.h }} onPointerDown={(e) => onDown(e, "mesa", m.id, x, y)} onContextMenu={(e) => onCtx(e, "mesa", m.id)} className={`absolute cursor-move ${isSel ? "rounded-lg ring-2 ring-primary" : ""}`}>
               <PlanoSvg file={a.file} className="pointer-events-none block h-full w-full" />
               <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-background/85 px-1 text-[11px] font-bold text-foreground">{m.nombre.replace("Mesa ", "")}</span>
             </div>
@@ -257,6 +314,18 @@ export default function PlanosDeMesas() {
           <p className="absolute inset-0 grid place-items-center text-muted-foreground">Pulsa «Añadir» para colocar mesas y elementos.</p>
         )}
       </div>
+
+      {/* ── Menú contextual (clonar/rotar/eliminar) ── */}
+      {menu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
+          <div className="fixed z-50 min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm shadow-lg" style={{ left: menu.x, top: menu.y }}>
+            <button onClick={() => clonar(menu.kind, menu.id)} className="block w-full px-3 py-1.5 text-left hover:bg-accent">Clonar</button>
+            {menu.kind === "elem" && <button onClick={() => rotar(menu.id)} className="block w-full px-3 py-1.5 text-left hover:bg-accent">Rotar 90°</button>}
+            <button onClick={() => { setMenu(null); borrarSel(); }} className="block w-full px-3 py-1.5 text-left text-destructive hover:bg-accent">Eliminar</button>
+          </div>
+        </>
+      )}
 
       {/* ── Diálogo: Seleccionar Suelo ── */}
       {dialogo === "fondo" && (
