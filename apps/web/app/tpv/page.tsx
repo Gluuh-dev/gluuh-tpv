@@ -592,6 +592,10 @@ export default function TPV() {
   /* ── Dibuja un elemento del plano usando su SVG (fallback: caja) ── */
   function ElementoPlano(e: Elemento) {
     const st = { left: e.pos_x, top: e.pos_y, width: e.ancho, height: e.alto };
+    if (e.icono?.startsWith("suelo:")) {
+      const s = e.icono.slice(6);
+      return <div key={e.id} style={{ ...st, backgroundImage: `url(/plano/${s}.svg)`, backgroundRepeat: "repeat" }} className="pointer-events-none absolute rounded-md border border-foreground/10" />;
+    }
     const a = assetPorId(e.icono);
     if (a) {
       // eslint-disable-next-line @next/next/no-img-element
@@ -634,8 +638,12 @@ export default function TPV() {
         <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5">
           <span className="rounded bg-background/85 px-1.5 text-xs font-bold leading-tight text-foreground">{m.nombre.replace("Mesa ", "M")}</span>
           {ocupada && cuenta > 0 && <span className="rounded bg-amber-500 px-1.5 text-[10px] font-semibold leading-tight text-white">{eur(cuenta)}</span>}
-          {!ocupada && reservada && <span className="rounded bg-sky-600 px-1.5 text-[10px] font-semibold leading-tight text-white">🕑 {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}</span>}
         </span>
+        {reservada && (
+          <span className="absolute left-1/2 top-full z-10 mt-0.5 -translate-x-1/2 whitespace-nowrap rounded bg-sky-600 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white shadow">
+            🕑 {resvs[0]!.nombre || "Reserva"} · {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}
+          </span>
+        )}
       </button>
     );
   }
@@ -733,8 +741,10 @@ export default function TPV() {
               >
                 {/* Paredes (marco de la sala) */}
                 <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />
-                {/* Elementos (barra, plantas, puerta…) detrás de las mesas */}
-                {elementos.filter((e) => e.room_id === vistaSala).map((e) => ElementoPlano(e))}
+                {/* Elementos detrás de las mesas; zonas de suelo primero (al fondo) */}
+                {elementos.filter((e) => e.room_id === vistaSala)
+                  .sort((a, b) => (b.icono?.startsWith("suelo:") ? 1 : 0) - (a.icono?.startsWith("suelo:") ? 1 : 0))
+                  .map((e) => ElementoPlano(e))}
                 {mesasSala.map((m, i) => MesaPlano(m, i))}
                 {mesasSala.length === 0 && (
                   <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>

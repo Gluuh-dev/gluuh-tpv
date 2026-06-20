@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><style>.tb{fill:var(--silla-fill,#cfd0cd);stroke:#2b2b2b;stroke-width:4;stroke-linejoin:round;stroke-miterlimit:10;}</style></defs>
+  <path class="tb" d="M28 26c0-12.2 9.8-22 22-22s22 9.8 22 22l-7.5 3.5c0-8-6.5-14.5-14.5-14.5s-14.5 6.5-14.5 14.5L28 26z"/>
+  <circle class="tb" cx="50" cy="58" r="38"/>
+</svg>

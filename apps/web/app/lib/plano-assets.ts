@@ -21,6 +21,7 @@ export const ASSETS: PlanoAsset[] = [
   { id: "mesa-8-cuadrada", file: "mesa-8-cuadrada.svg", nombre: "Mesa cuadrada 8", tipo: "mesa", w: 772, h: 769.21, seats: 8 },
   { id: "mesa-6", file: "mesa-6.svg", nombre: "Mesa 6", tipo: "mesa", w: 784, h: 467.55, seats: 6 },
   { id: "mesa-8-larga", file: "mesa-8-larga.svg", nombre: "Mesa larga 8", tipo: "mesa", w: 1104.79, h: 464.78, seats: 8 },
+  { id: "taburete", file: "taburete.svg", nombre: "Taburete", tipo: "mesa", w: 100, h: 100, seats: 1 },
   { id: "barra-recta", file: "barra-recta.svg", nombre: "Barra recta", tipo: "barra", w: 680.03, h: 212.83 },
   { id: "barra-esquina", file: "barra-esquina.svg", nombre: "Barra esquina", tipo: "barra", w: 676.41, h: 668.4 },
   { id: "planta-redonda", file: "planta-redonda.svg", nombre: "Planta / macetero", tipo: "planta", w: 165.38, h: 165.38 },
@@ -43,7 +44,7 @@ export const assetPorId = (id?: string | null): PlanoAsset | undefined => ASSETS
 
 // Mesa SVG según capacidad (cuando no se ha elegido sprite explícito).
 export function mesaPorCapacidad(cap: number): PlanoAsset {
-  const id = cap >= 8 ? "mesa-8-larga" : cap >= 5 ? "mesa-6" : cap <= 2 ? "mesa-2-vertical" : "mesa-4-cuadrada";
+  const id = cap <= 1 ? "taburete" : cap >= 8 ? "mesa-8-larga" : cap >= 5 ? "mesa-6" : cap <= 2 ? "mesa-2-vertical" : "mesa-4-cuadrada";
   return ASSETS.find((a) => a.id === id)!;
 }
 

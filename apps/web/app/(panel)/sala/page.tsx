@@ -91,6 +91,16 @@ export default function Sala() {
     cargar();
   }
   async function delElem(id: string) { await sb.from("plano_elemento").delete().eq("id", id); setSel(null); cargar(); }
+  async function addSueloZona(sueloId: string) {
+    if (!salaActiva || !sueloId) return;
+    await sb.from("plano_elemento").insert({ room_id: salaActiva, tipo: "DECOR", etiqueta: "Suelo", icono: `suelo:${sueloId}`, pos_x: 80, pos_y: 80, ancho: 240, alto: 200 });
+    cargar();
+  }
+  async function addTaburete() {
+    if (!salaActiva) return;
+    await sb.from("restaurant_table").insert({ room_id: salaActiva, nombre: `Taburete ${mesas.length + 1}`, estado: "LIBRE", pos_x: 80, pos_y: 80, capacidad: 1 });
+    cargar();
+  }
 
   /* ── Drag ── */
   function onDown(e: React.PointerEvent, kind: "mesa" | "elem", id: string, x: number, y: number) {
@@ -174,12 +184,19 @@ export default function Sala() {
           {/* Paleta: añadir mesa + elementos (SVG) */}
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={addMesa} disabled={!salaActiva}><Plus className="h-4 w-4" /> Mesa</Button>
+            <Button size="sm" variant="outline" onClick={addTaburete} disabled={!salaActiva}><Plus className="h-4 w-4" /> Taburete</Button>
             <span className="mx-1 text-muted-foreground">|</span>
             {ASSETS.filter((a) => a.tipo !== "mesa").map((a) => (
               <button key={a.id} onClick={() => addElem(a)} disabled={!salaActiva} title={a.nombre} className="flex h-12 w-14 items-center justify-center rounded-md border border-border bg-card p-1 hover:bg-accent disabled:opacity-50">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/plano/${a.file}`} alt={a.nombre} className="max-h-full max-w-full" />
               </button>
+            ))}
+            <span className="mx-1 text-muted-foreground">|</span>
+            {SUELOS.filter((s) => s.id).map((s) => (
+              <button key={s.id} onClick={() => addSueloZona(s.id)} disabled={!salaActiva} title={`Zona de suelo: ${s.nombre}`}
+                className="h-12 w-14 rounded-md border border-border hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundImage: `url(/plano/${s.id}.svg)`, backgroundRepeat: "repeat" }} />
             ))}
             {sel && (
               <Button size="sm" variant="outline" className="ml-auto text-destructive" onClick={() => (sel.kind === "mesa" ? delMesa(sel.id) : delElem(sel.id))}>
@@ -210,10 +227,11 @@ export default function Sala() {
           >
             <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />
 
-            {/* Elementos */}
-            {elemsSala.map((el) => {
+            {/* Elementos (zonas de suelo al fondo) */}
+            {elemsSala.slice().sort((a, b) => (b.icono?.startsWith("suelo:") ? 1 : 0) - (a.icono?.startsWith("suelo:") ? 1 : 0)).map((el) => {
               const a = assetPorId(el.icono);
               const isSel = sel?.kind === "elem" && sel.id === el.id;
+              const esSuelo = el.icono?.startsWith("suelo:");
               return (
                 <div
                   key={el.id}
@@ -221,9 +239,10 @@ export default function Sala() {
                   onPointerDown={(e) => onDown(e, "elem", el.id, el.pos_x, el.pos_y)}
                   className={`absolute cursor-move ${isSel ? "rounded ring-2 ring-primary" : ""}`}
                 >
-                  {a
+                  {esSuelo
+                    ? <div className="h-full w-full rounded-md border border-foreground/10" style={{ backgroundImage: `url(/plano/${el.icono!.slice(6)}.svg)`, backgroundRepeat: "repeat" }} />
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    ? <img src={`/plano/${a.file}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
+                    : a ? <img src={`/plano/${a.file}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
                     : <div className="grid h-full w-full place-items-center rounded bg-foreground/20 text-xs">{el.icono ?? el.etiqueta}</div>}
                 </div>
               );
