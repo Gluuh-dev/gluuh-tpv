@@ -16,7 +16,7 @@ interface Mesa { id: string; nombre: string; room_id: string; pos_x: number | nu
 interface Elem { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
 type Sel = { kind: "mesa" | "elem"; id: string } | null;
 
-const snap = (v: number) => Math.round(v / 40) * 40;
+const snap = (v: number) => Math.round(v / 20) * 20;   // rejilla fina (más cuadrados)
 const MESAS_CAT = [
   { label: "Taburete", cap: 1 }, { label: "Mesa 2", cap: 2 }, { label: "Mesa 4", cap: 4 },
   { label: "Mesa 6", cap: 6 }, { label: "Mesa 8", cap: 8 },
@@ -65,6 +65,21 @@ export default function PlanosDeMesas() {
     const el = canvasRef.current;
     if (el) requestAnimationFrame(() => { el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2); });
   }, [edit]);
+  // Atajos: Supr=eliminar · Ctrl/Cmd+D o C=clonar · R=rotar
+  useEffect(() => {
+    if (!edit) return;
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (!sel) return;
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); borrarSel(); }
+      else if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "c")) { e.preventDefault(); clonar(sel.kind, sel.id); }
+      else if (e.key === "r" || e.key === "R") { e.preventDefault(); rotar(sel.kind, sel.id); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [edit, sel]);
 
   /* ── Planos (salas) ── */
   async function nuevoPlano(e: React.FormEvent) {
@@ -254,7 +269,7 @@ export default function PlanosDeMesas() {
   const elemSel = sel?.kind === "elem" ? elems.find((e) => e.id === sel.id) : null;
   const bg = room?.suelo
     ? { backgroundImage: `url(/plano/${room.suelo}.svg)`, backgroundRepeat: "repeat" as const }
-    : { backgroundImage: "radial-gradient(rgba(120,120,120,0.12) 1px, transparent 1px)", backgroundSize: "40px 40px" };
+    : { backgroundImage: "radial-gradient(rgba(120,120,120,0.12) 1px, transparent 1px)", backgroundSize: "20px 20px" };
   const canvasStyle = { minWidth: 1800, minHeight: 1100, ...bg, "--mesa-fill": marca.mesa_color, "--silla-fill": marca.silla_color } as unknown as React.CSSProperties;
 
   return (
@@ -267,7 +282,7 @@ export default function PlanosDeMesas() {
         <Button size="sm" onClick={() => setDialogo("elemento")}><Plus className="h-4 w-4" /> Añadir</Button>
         <Button variant={movil ? "default" : "outline"} size="sm" onClick={() => setMovil((v) => !v)}>📱 Móvil</Button>
         {sel && <Button variant="outline" size="sm" className="text-destructive" onClick={borrarSel}><Trash2 className="h-4 w-4" /> Eliminar</Button>}
-        <span className="ml-auto text-xs text-muted-foreground">Clic derecho: clonar/rotar · arrastra el tirador para redimensionar</span>
+        <span className="ml-auto text-xs text-muted-foreground">Clic derecho o teclado: Supr=borrar · Ctrl+D=clonar · R=rotar · tirador=redimensionar</span>
       </div>
 
       {/* Propiedades del elemento seleccionado */}
