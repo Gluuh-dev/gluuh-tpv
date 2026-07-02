@@ -71,22 +71,29 @@ CREATE TABLE location (
 );
 CREATE INDEX idx_location_tenant ON location (tenant_id, id);
 
--- Dispositivo registrado (TPV, comandera, KDS). Clave para numeración offline.
+-- Dispositivo registrado (TPV, comandera, KDS, pantallas). Clave para numeración
+-- offline y para el emparejado por código (migración 0033).
 CREATE TABLE device (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
   location_id     uuid NOT NULL REFERENCES location(id) ON DELETE CASCADE,
-  tipo            text NOT NULL CHECK (tipo IN ('TPV','COMANDERA','KDS','WEB')),
+  tipo            text NOT NULL CHECK (tipo IN ('TPV','COMANDERA','KDS','WEB','PANTALLA','KIOSKO','CARTELERIA','VISOR')),
   nombre          text NOT NULL,
   -- Serie de facturación asignada a este dispositivo (numeración sin huecos offline)
   serie_dispositivo text,
   -- Última huella VERIFACTU emitida por el dispositivo (encadenamiento offline)
   ultima_huella   text,
   ultima_sync     timestamptz,
+  -- Emparejado por código de 6 dígitos (docs/implementacion/04)
+  modulo             text,
+  codigo_vinculacion text,
+  codigo_expira      timestamptz,
+  vinculado_at       timestamptz,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_device_tenant_location ON device (tenant_id, location_id);
+CREATE UNIQUE INDEX device_codigo_uq ON device (codigo_vinculacion) WHERE codigo_vinculacion IS NOT NULL;
 
 -- Usuarios (empleados). Login backoffice (email+pass) y TPV (PIN).
 CREATE TABLE app_user (

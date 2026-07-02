@@ -43,6 +43,22 @@ con foco en cumplimiento fiscal **VERIFACTU** e **IGIC** canario.
 - Idioma del proyecto: español (código, comentarios y docs).
 - **Secretos**: nunca en el repo. `.env`/`.env.local` están en `.gitignore`; solo se versiona `.env.example`.
 
+## Skills y guías de implementación
+
+- Plan vigente: `docs/auditoria_02_07_26/` (decisiones) + `docs/implementacion/`
+  (guías ejecutables con DDL, ficheros a tocar y criterios de aceptación).
+- Skills del proyecto en `.agents/skills/`: **gluuh-base-datos** (migraciones y
+  catálogo de cambios de esquema pendientes — leer antes de tocar `supabase/`),
+  **gluuh-tpv-glop** (pantalla de venta), **gluuh-ux-operativa** (diseño táctil
+  estilo Glop + checklist de auditoría UX), **gluuh-escritorio-hardware**
+  (Electron/impresión), **gluuh-modulos-dispositivos** (módulos y emparejado),
+  **ui-kit-shadcn** (estilo backoffice).
+- Dos niveles de interfaz: el **backoffice** (`app/(panel)`, estilo Supabase,
+  skill ui-kit-shadcn) y la **operativa** (`app/tpv` y pantallas, estilo Glop
+  colorido con marca del cliente, skill gluuh-ux-operativa). Son experiencias
+  distintas aunque compartan código y datos; la app de escritorio solo carga
+  la operativa (`/tpv`), nunca el panel.
+
 ## Fiscalidad (crítico)
 
 - Los precios de carta llevan impuesto INCLUIDO; `calcularImpuestosIncluidos` desglosa la

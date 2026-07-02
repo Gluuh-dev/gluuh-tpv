@@ -101,10 +101,17 @@
       "sourceType": "autoskills-registry",
       "computedHash": "3e8ca56eb3af0f18b9cca3ae002f2b52f5dd23bceb286dd7403e18ae2fb38d08"
     },
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "61638e85394d2e39d1109cbf607593afb9733e0de19cdf0b52ec9bc32d95ea74"
+    },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "4c09c107aa64d7722369c3856ba8743ea11e7450e4f1227cb72a0d375d1e4fd5"
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "3639bed1f40b3fbadae79fee631c42c89b2d1f5c30b05d5aa3cca06422a6bbbc"
     },
     "tailwind-css-patterns": {
       "source": "giuseppe-trisciuoglio/developer-kit",

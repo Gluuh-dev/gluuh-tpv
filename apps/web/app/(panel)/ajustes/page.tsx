@@ -146,7 +146,7 @@ export default function Ajustes() {
             <div className="space-y-1.5">
               <Label>Color principal</Label>
               <div className="flex items-center gap-2">
-                <input type="color" value={brand.color_primario} onChange={(e) => setBrand({ ...brand, color_primario: e.target.value })} className="h-9 w-12 rounded border border-input" />
+                <Input type="color" value={brand.color_primario} onChange={(e) => setBrand({ ...brand, color_primario: e.target.value })} className="h-9 w-12 rounded border border-input" />
                 <Input value={brand.color_primario} onChange={(e) => setBrand({ ...brand, color_primario: e.target.value })} className="w-28" />
               </div>
             </div>

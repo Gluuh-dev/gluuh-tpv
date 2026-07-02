@@ -1,0 +1,21 @@
+# Empaquetado Windows (NSIS) + auto-update. Guía: docs/implementacion/03 §pieza 4.
+appId: com.gluuh.tpv
+productName: Gluuh TPV
+directories:
+  output: dist-instalador
+files:
+  - dist/**
+  - package.json
+win:
+  target: nsis
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+# Auto-update vía GitHub Releases. Ajustar owner/repo al publicar la primera release.
+publish:
+  provider: github
+  owner: gluuh
+  repo: tpv-sofware
+# node-thermal-printer es JS puro: no hay nativos que recompilar.
+npmRebuild: false

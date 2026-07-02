@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 export interface CrudField { name: string; label: string; type?: "text" | "email" | "tel" | "textarea"; required?: boolean; placeholder?: string }
 export interface CrudConfig {
-  table: string; titulo: string; descripcion: string; singular: string;
+  table: string; titulo: string; descripcion: string; singular: string; nuevo?: string;
   fields: CrudField[]; columns: { name: string; label: string }[];
 }
 type Row = Record<string, unknown>;

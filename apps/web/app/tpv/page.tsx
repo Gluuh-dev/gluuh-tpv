@@ -6,6 +6,8 @@ import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { estacionDe } from "../lib/estaciones";
 import { assetPorId, mesaPorCapacidad, dim } from "../lib/plano-assets";
 import { leerBranding, BRANDING_DEFAULT, type Branding } from "../lib/branding";
+import { imprimirTicket } from "../lib/impresion";
+import { exportarBackupLocal } from "../lib/backup-local";
 import { PlanoSvg } from "@/components/plano-svg";
 import { Utensils } from "lucide-react";
 
@@ -19,7 +21,7 @@ interface Cat    { id: string; nombre: string; orden: number; family_id: string 
 interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null }
 interface Ticket {
   impuestos: { impuesto: string; desglose: { tipo: number; base: number; cuota: number }[]; importeTotal: number };
-  verifactu: { huella: string; qrDataUrl: string; leyenda: string };
+  verifactu: { huella: string; qrDataUrl: string; leyenda: string; qrUrl?: string };
   numSerieFactura: string;
 }
 
@@ -197,6 +199,43 @@ export default function TPV() {
     return Object.entries(comanda).map(([id, cantidad]) => {
       const p = prods.find((x) => x.id === id)!;
       return { id, nombre: p.nombre, cantidad, precio: precioEfectivo(id), tipo: p.tipo_impositivo, estacion: estacionDe(p.estacion) };
+    });
+  }
+
+  /* ── Integración con Gluuh Desktop (visor de cliente y backup nocturno) ── */
+  useEffect(() => {
+    window.gluuh?.publicarTicketVisor({
+      lineas: lineasComanda().map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, importe: l.precio * l.cantidad })),
+      total,
+      cobrado: !!ticket,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comanda, descuentos, preciosManuales, ticket, total]);
+
+  useEffect(() => {
+    return window.gluuh?.onEvento((e) => {
+      if (e.tipo === "backup") void exportarBackupLocal();
+    });
+  }, []);
+
+  /* ── Impresión del recibo: nativa (ESC/POS) en Gluuh Desktop, navegador si no ── */
+  function imprimirRecibo() {
+    if (!ticket) { window.print(); return; }
+    void imprimirTicket({
+      local: locInfo,
+      contexto: mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra",
+      operario: operario?.nombre,
+      numSerieFactura: VERIFACTU_ACTIVO ? ticket.numSerieFactura : undefined,
+      lineas: lineasComanda().map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, importe: l.precio * l.cantidad })),
+      desglose: ticket.impuestos.desglose.map((d) => ({
+        etiqueta: `${ticket.impuestos.impuesto} ${d.tipo}% (base ${eur(d.base)})`,
+        cuota: d.cuota,
+      })),
+      total: ticket.impuestos.importeTotal,
+      qrUrl: VERIFACTU_ACTIVO ? ticket.verifactu.qrUrl : undefined,
+      leyenda: VERIFACTU_ACTIVO ? ticket.verifactu.leyenda : undefined,
+      huella: VERIFACTU_ACTIVO ? ticket.verifactu.huella : undefined,
+      esPrueba: !VERIFACTU_ACTIVO,
     });
   }
 
@@ -471,6 +510,8 @@ export default function TPV() {
           pagos.map((p) => ({ order_id: orderId, ...p, client_id: crypto.randomUUID() })),
         );
         if (payErr) console.error("No se registró el pago:", payErr.message);
+        // En Gluuh Desktop, el cajón se abre al cobrar en efectivo.
+        if (pagos.some((p) => p.metodo === "EFECTIVO")) void window.gluuh?.abrirCajon();
       }
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
       setOrdenAbiertaId(null);
@@ -1037,7 +1078,7 @@ export default function TPV() {
             Pagos
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={imprimirRecibo}
             className="btn-ghost"
           >
             Imprimir
@@ -1235,7 +1276,7 @@ export default function TPV() {
               </div>
             )}
             <div className="mt-3 flex gap-2">
-              <button onClick={() => window.print()} className="btn-ghost flex-1">Imprimir</button>
+              <button onClick={imprimirRecibo} className="btn-ghost flex-1">Imprimir</button>
               <button onClick={reset} className="btn-primary flex-1">Nueva venta</button>
             </div>
           </div>

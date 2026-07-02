@@ -1,16 +1,25 @@
 {
   "name": "@gluuh/desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "TPV de barra (Windows) con Electron — carga la web y gestiona el hardware local (impresora ESC/POS, cajón, datáfono).",
-  "main": "electron/main.js",
+  "description": "TPV de barra (Windows) con Electron — carga la web operativa (/tpv) y gestiona el hardware local: impresora ESC/POS, cajón, visor de cliente y copia de seguridad a USB.",
+  "main": "dist/main.js",
   "scripts": {
-    "dev": "electron .",
-    "start": "electron .",
+    "build": "tsc",
+    "dev": "tsc && electron .",
+    "start": "tsc && electron .",
+    "dist": "tsc && electron-builder",
     "lint": "echo \"(lint pendiente)\"",
-    "typecheck": "echo \"(typecheck pendiente)\""
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gluuh/hardware": "workspace:*",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
-    "electron": "^42.4.0"
+    "@types/node": "^25.9.3",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^6.0.3"
   }
 }

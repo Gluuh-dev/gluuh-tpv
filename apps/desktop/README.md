@@ -1,37 +1,63 @@
 # @gluuh/desktop — TPV de barra (Electron)
 
-Aplicación de escritorio (Windows) del TPV principal. **Electron** carga la
-aplicación web (Next.js) y aporta lo que el navegador no puede: acceso al
-**hardware local** (impresora ESC/POS, cajón portamonedas, datáfono) y
-funcionamiento robusto en barra. Ver [docs/05](../../docs/05-stack-tecnologico.md) y [docs/10](../../docs/10-comanderas-kds-e-impresion.md).
+Aplicación de escritorio (Windows) del TPV. **Electron carga la web operativa
+(`/tpv`)** y aporta lo que el navegador no puede: impresión **ESC/POS** con cola
+local y reintentos, apertura de **cajón**, **visor de cliente** en el segundo
+monitor, **auto-update**, identidad de terminal y **copia de seguridad a USB**.
+Guía completa: [docs/implementacion/03](../../docs/implementacion/03-app-escritorio-electron.md).
 
 ## Ejecutar (desarrollo)
 
 ```bash
 # 1) Arranca la web (en otra terminal):
-pnpm --filter @gluuh/web dev          # http://localhost:3000
+pnpm --filter @gluuh/web dev          # http://localhost:3100
 
-# 2) Arranca el escritorio (carga la web):
+# 2) Arranca el escritorio (compila TS y carga la web):
 pnpm --filter @gluuh/desktop dev
 # o apuntando a otra URL:
-GLUUH_URL=http://localhost:3000/tpv pnpm --filter @gluuh/desktop dev
+GLUUH_URL=https://tpv.gluuh.app pnpm --filter @gluuh/desktop dev
 ```
 
-## Hardware
+En desarrollo abre ventana normal; empaquetada arranca a pantalla completa,
+con arranque junto a Windows y recarga automática si el renderer muere.
 
-El puente está en `electron/preload.js` (expone `window.gluuh`) y la lógica en
-`electron/main.js` (`ipcMain.handle("gluuh:imprimir-ticket", …)`).
+## Configuración del terminal
 
-Desde la web:
+Fichero `config.json` en la carpeta de datos de la app
+(`%APPDATA%/gluuh-desktop/` una vez empaquetada):
 
-```ts
-await window.gluuh.imprimirTicket(textoEscPos);
+```json
+{
+  "impresora": { "uri": "tcp://192.168.1.50:9100", "tipo": "EPSON", "ancho": 42 },
+  "backup": { "hora": "03:30", "destino": "E:\\backups-gluuh" }
+}
 ```
 
-> El handler de impresión es un **esqueleto** (registra y simula). La impresión
-> real ESC/POS se implementa con `node-thermal-printer`/`serialport` y la apertura
-> del cajón con `ESC p`. Ver [docs/10 §3](../../docs/10-comanderas-kds-e-impresion.md).
+- **impresora**: térmica ESC/POS por red (puerto 9100). Sin config, la web cae a
+  `window.print()`. USB: compartirla en Windows como impresora de red (driver
+  serie pendiente).
+- **backup**: volcado diario de CSVs del tenant a la carpeta/USB indicada
+  (retención: 30 copias). Sin `destino`, no hay backup automático.
 
-## Empaquetado
+## Puente `window.gluuh` (preload)
 
-Para generar el instalable de Windows se usará `electron-builder` (pendiente, ver roadmap).
+`imprimir(PrintJob)` · `abrirCajon()` · `guardarDispositivo(cred)` ·
+`publicarTicketVisor(datos)` · `guardarBackup(nombre, ficheros)` ·
+`onEvento(cb)` · `version` · `device`. El contrato `PrintJob` vive en
+`@gluuh/hardware`.
+
+## Identidad del dispositivo
+
+Se vincula desde `/conectar` con un código de 6 dígitos generado en el
+backoffice (Dispositivos). La credencial queda en `device.json` (userData).
+Sin vincular, la app funciona igualmente con el login web normal.
+
+## Empaquetado y auto-update
+
+```bash
+pnpm --filter @gluuh/desktop dist     # instalador NSIS en dist-instalador/
+```
+
+`electron-updater` comprueba GitHub Releases al arrancar y cada 6 h; instala al
+siguiente arranque (nunca en mitad del servicio). Pendiente: firma de código
+(SmartScreen avisará hasta entonces).

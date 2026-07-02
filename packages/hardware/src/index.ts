@@ -1,9 +1,9 @@
 /**
  * @gluuh/hardware — Abstracción de impresora / cajón / datáfono (ESC/POS).
  *
- * Placeholder del esqueleto. Define la interfaz común que implementan los
- * distintos backends de hardware (Rust en Tauri, SDK nativo en móvil, ePOS/
- * CloudPRNT en web). Ver docs/10-comanderas-kds-e-impresion.md.
+ * Define la interfaz común (`PrintJob`/`Printer`) y el primer backend real:
+ * `EscPosPrinter` (red tcp://, usado por la app de escritorio). Ver
+ * docs/implementacion/03-app-escritorio-electron.md.
  */
 
 /** Trabajo de impresión genérico (independiente del transporte físico). */
@@ -22,5 +22,7 @@ export interface PrintJob {
 export interface Printer {
   imprimir(job: PrintJob): Promise<void>;
 }
+
+export { EscPosPrinter, type ConfigImpresora } from "./escpos.js";
 
 export const HARDWARE_PACKAGE = "@gluuh/hardware";
