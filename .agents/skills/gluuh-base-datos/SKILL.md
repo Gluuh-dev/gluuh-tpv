@@ -16,8 +16,8 @@ description: >-
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
    numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0064`,
-   escrita y **PENDIENTE de aplicar** en Supabase). Nueva migración =
-   siguiente número libre + nombre descriptivo en snake_case.
+   aplicada). Nueva migración = siguiente número libre + nombre descriptivo
+   en snake_case.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
    delete cascade` + RLS** con `current_tenant_id()` (patrón de cualquier tabla
    de `0001_init.sql`). El trigger `set_tenant_id()` (`0004`) autorrellena el

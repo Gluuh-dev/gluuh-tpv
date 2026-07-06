@@ -1,7 +1,8 @@
 -- Semilla de la BIBLIOTECA de modificadores (Fase 2 Glop) para UN tenant.
 -- Crea los grupos base sin asignarlos: el cliente los asigna a sus familias.
 -- Requiere la migración 0064. Idempotente (no duplica por nombre).
--- Por defecto siembra el tenant "Bar Demo"; cambiar el WHERE para otro.
+-- Por defecto siembra el tenant "Bar Demo Gluuh" (sembrado el 06-07-2026);
+-- cambiar el WHERE para otro tenant.
 -- TODO: cablear esta semilla al alta de empresa (api/admin/crear-empresa).
 
 do $$
@@ -9,7 +10,7 @@ declare
   t uuid;
   g uuid;
 begin
-  select id into t from public.tenant where nombre ilike 'bar demo' limit 1;
+  select id into t from public.tenant where nombre ilike '%bar demo%' limit 1;
   if t is null then
     raise notice 'Tenant no encontrado: ajusta el WHERE de la semilla.';
     return;

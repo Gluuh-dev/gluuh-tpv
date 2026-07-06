@@ -3,8 +3,8 @@
 -- Hoy `modifier_group` cuelga de un producto; pasa a poder vivir en la biblioteca
 -- (`product_id` NULL). Los grupos por producto existentes siguen funcionando igual
 -- (el TPV los suma a los heredados): nada existente se rompe.
--- Aditiva e idempotente. PENDIENTE DE APLICAR en Supabase (MCP no disponible en
--- la sesión que la escribió); aplicar con apply_migration y quitar esta nota.
+-- Aditiva e idempotente. Aplicada y registrada en Supabase el 06-07-2026
+-- (apply_migration `biblioteca_modificadores`).
 
 -- ── El grupo puede ser de biblioteca (product_id opcional) y lleva tipo ──
 alter table public.modifier_group alter column product_id drop not null;
