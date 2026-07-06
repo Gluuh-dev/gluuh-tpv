@@ -68,6 +68,8 @@ export default function ConfiguracionImpresion() {
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Impresoras con el URI en modo "avanzado" (edición libre en vez de IP+puerto).
+  const [uriAvanzado, setUriAvanzado] = useState<Set<string>>(new Set());
   // Reparto por estación: nº de productos por estación + cuántos sin asignar.
   const [porEstacion, setPorEstacion] = useState<Record<Estacion, number> | null>(null);
   const [sinEstacion, setSinEstacion] = useState(0);
@@ -103,10 +105,32 @@ export default function ConfiguracionImpresion() {
     setCfg((c) => ({ ...c, ticket: { ...c.ticket, [k]: v } }));
   }
   function addImpresora() {
-    setCfg((c) => ({ ...c, impresoras: [...c.impresoras, { id: crypto.randomUUID(), nombre: "Impresora", uri: "tcp://192.168.1.50:9100", anchoMm: 80 }] }));
+    setCfg((c) => ({
+      ...c,
+      impresoras: [...c.impresoras, {
+        id: crypto.randomUUID(), nombre: "Impresora", uri: "tcp://192.168.1.50:9100",
+        anchoMm: 80, copias: 1, abreCajon: false, activa: true,
+      }],
+    }));
   }
   function delImpresora(id: string) {
     setCfg((c) => ({ ...c, impresoras: c.impresoras.filter((p) => p.id !== id), rutas: Object.fromEntries(Object.entries(c.rutas).filter(([, v]) => v !== id)) }));
+  }
+  /** Actualiza una impresora por id con un parche parcial. */
+  function setImp(id: string, patch: Partial<ImpresoraCfg>) {
+    setCfg((c) => ({ ...c, impresoras: c.impresoras.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  }
+  /** Si el URI es de red (tcp://IP:puerto) devuelve sus partes; si no, null. */
+  function parseRed(uri: string): { ip: string; puerto: string } | null {
+    const m = /^tcp:\/\/([^:/]+):(\d+)$/.exec(uri.trim());
+    return m ? { ip: m[1]!, puerto: m[2]! } : null;
+  }
+  async function abrirCajonAhora() {
+    const gluuh = window.gluuh;
+    if (!gluuh) return;
+    const r = await gluuh.abrirCajon();
+    if (r.ok) toast.success("Orden de apertura enviada al cajón.");
+    else toast.error("No se pudo abrir el cajón.");
   }
 
   async function guardar() {
@@ -216,9 +240,16 @@ export default function ConfiguracionImpresion() {
             <CardHeader className="flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">Impresoras</CardTitle>
-                <CardDescription>Las de red (tcp://IP:9100) las usa la app de escritorio para imprimir ESC/POS.</CardDescription>
+                <CardDescription>Red (IP:puerto, normalmente 9100) o URI avanzado. Copias, cajón y activa por impresora.</CardDescription>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addImpresora}><Plus className="h-4 w-4" /> Añadir</Button>
+              <div className="flex items-center gap-1.5">
+                {enDesktop && (
+                  <Button type="button" variant="outline" size="sm" onClick={abrirCajonAhora} title="Manda la orden de apertura por la impresora predeterminada del escritorio">
+                    Abrir cajón
+                  </Button>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={addImpresora}><Plus className="h-4 w-4" /> Añadir</Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               {cfg.impresoras.length === 0 && (
@@ -235,24 +266,70 @@ export default function ConfiguracionImpresion() {
                   </Button>
                 </div>
               )}
-              {cfg.impresoras.map((p) => (
-                <div key={p.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
-                  <Input className="w-40" value={p.nombre} onChange={(e) => setCfg((c) => ({ ...c, impresoras: c.impresoras.map((x) => x.id === p.id ? { ...x, nombre: e.target.value } : x) }))} placeholder="Barra" />
-                  <Input className="flex-1 min-w-48 font-mono text-xs" value={p.uri} onChange={(e) => setCfg((c) => ({ ...c, impresoras: c.impresoras.map((x) => x.id === p.id ? { ...x, uri: e.target.value } : x) }))} placeholder="tcp://192.168.1.50:9100" />
-                  <select value={p.anchoMm} onChange={(e) => setCfg((c) => ({ ...c, impresoras: c.impresoras.map((x) => x.id === p.id ? { ...x, anchoMm: Number(e.target.value) as Ancho } : x) }))} className="rounded-md border border-border bg-background px-2 py-2 text-sm">
-                    <option value={80}>80 mm</option><option value={58}>58 mm</option>
-                  </select>
-                  <Button
-                    type="button" variant="outline" size="sm"
-                    onClick={() => imprimirPrueba(p)}
-                    disabled={!enDesktop}
-                    title={enDesktop ? `Imprime un ticket de prueba en ${p.nombre}` : "Disponible en la app de escritorio"}
-                  >
-                    <Printer className="h-4 w-4" aria-hidden /> Imprimir prueba
-                  </Button>
-                  <button type="button" onClick={() => delImpresora(p.id)} aria-label="Quitar impresora" title="Quitar impresora" className="text-rose-500 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
-                </div>
-              ))}
+              {cfg.impresoras.map((p) => {
+                const red = uriAvanzado.has(p.id) ? null : parseRed(p.uri);
+                const inactiva = p.activa === false;
+                return (
+                  <div key={p.id} className={`space-y-2 rounded-md border p-2.5 ${inactiva ? "border-border opacity-60" : "border-border"}`}>
+                    {/* Fila 1: nombre · activa · eliminar */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input className="w-44 font-medium" value={p.nombre} onChange={(e) => setImp(p.id, { nombre: e.target.value })} placeholder="Barra, Cocina, Caja…" aria-label="Nombre de la impresora" />
+                      <Toggle label="Activa" on={!inactiva} onClick={() => setImp(p.id, { activa: inactiva })} />
+                      {inactiva && <span className="text-xs text-amber-600 dark:text-amber-500">Sus documentos no se imprimirán.</span>}
+                      <button type="button" onClick={() => delImpresora(p.id)} aria-label={`Quitar ${p.nombre}`} title="Quitar impresora" className="ml-auto text-rose-500 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                    {/* Fila 2: conexión · ancho · copias · cajón · prueba */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={red ? "RED" : "URI"}
+                        onChange={(e) => {
+                          setUriAvanzado((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.value === "URI") next.add(p.id);
+                            else next.delete(p.id);
+                            return next;
+                          });
+                          if (e.target.value === "RED" && !parseRed(p.uri)) setImp(p.id, { uri: "tcp://192.168.1.50:9100" });
+                        }}
+                        className="rounded-md border border-border bg-background px-2 py-2 text-sm"
+                        aria-label="Tipo de conexión"
+                      >
+                        <option value="RED">Red</option>
+                        <option value="URI">Avanzado</option>
+                      </select>
+                      {red ? (
+                        <>
+                          <Input className="w-36 font-mono text-xs" value={red.ip} onChange={(e) => setImp(p.id, { uri: `tcp://${e.target.value.trim()}:${red.puerto}` })} placeholder="192.168.1.50" aria-label="Dirección IP" />
+                          <Input className="w-20 font-mono text-xs" inputMode="numeric" value={red.puerto} onChange={(e) => setImp(p.id, { uri: `tcp://${red.ip}:${e.target.value.replace(/\D/g, "") || "9100"}` })} placeholder="9100" aria-label="Puerto" />
+                        </>
+                      ) : (
+                        <Input className="min-w-48 flex-1 font-mono text-xs" value={p.uri} onChange={(e) => setImp(p.id, { uri: e.target.value })} placeholder="tcp://192.168.1.50:9100" aria-label="URI de la impresora" />
+                      )}
+                      <select value={p.anchoMm} onChange={(e) => setImp(p.id, { anchoMm: Number(e.target.value) as Ancho })} className="rounded-md border border-border bg-background px-2 py-2 text-sm" aria-label="Ancho de papel">
+                        <option value={80}>80 mm</option><option value={58}>58 mm</option>
+                      </select>
+                      <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        Copias
+                        <Input className="w-14 text-center tabular-nums" inputMode="numeric" value={p.copias ?? 1}
+                          onChange={(e) => setImp(p.id, { copias: Math.max(1, Math.min(5, Number(e.target.value.replace(/\D/g, "")) || 1)) })}
+                          aria-label={`Copias de ${p.nombre}`} />
+                      </label>
+                      <Toggle label="Cajón" on={!!p.abreCajon} onClick={() => setImp(p.id, { abreCajon: !p.abreCajon })} />
+                      <Button
+                        type="button" variant="outline" size="sm"
+                        onClick={() => imprimirPrueba(p)}
+                        disabled={!enDesktop}
+                        title={enDesktop ? `Imprime un ticket de prueba en ${p.nombre}` : "Disponible en la app de escritorio"}
+                      >
+                        <Printer className="h-4 w-4" aria-hidden /> Prueba
+                      </Button>
+                    </div>
+                    {p.abreCajon && (
+                      <p className="text-[11px] text-muted-foreground">El cajón (RJ11) se abrirá por esta impresora al cobrar en efectivo.</p>
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
@@ -263,15 +340,30 @@ export default function ConfiguracionImpresion() {
               <CardDescription>A qué impresora va cada documento. La comanda de cocina/barra sale sin precios; el ticket y la factura, para el cliente.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {DOCS.map((d) => (
-                <div key={d.k} className="flex items-center justify-between gap-3 rounded-md border border-border p-2 text-sm">
-                  <span className="flex items-center gap-2"><Printer className="h-4 w-4 text-muted-foreground" /> {d.t}</span>
-                  <select value={cfg.rutas[d.k] ?? ""} onChange={(e) => setCfg((c) => ({ ...c, rutas: { ...c.rutas, [d.k]: e.target.value } }))} className="rounded-md border border-border bg-background px-2 py-1.5">
-                    <option value="">— Sin imprimir —</option>
-                    {cfg.impresoras.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
-                </div>
-              ))}
+              {DOCS.map((d) => {
+                const asignada = cfg.impresoras.find((p) => p.id === cfg.rutas[d.k]);
+                const inactiva = asignada?.activa === false;
+                return (
+                  <div key={d.k} className="flex items-center justify-between gap-3 rounded-md border border-border p-2 text-sm">
+                    <span className="flex items-center gap-2">
+                      <Printer className="h-4 w-4 text-muted-foreground" /> {d.t}
+                      {inactiva && (
+                        <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-500">
+                          impresora desactivada
+                        </span>
+                      )}
+                    </span>
+                    <select value={cfg.rutas[d.k] ?? ""} onChange={(e) => setCfg((c) => ({ ...c, rutas: { ...c.rutas, [d.k]: e.target.value } }))} className="rounded-md border border-border bg-background px-2 py-1.5">
+                      <option value="">— Sin imprimir —</option>
+                      {cfg.impresoras.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre}{(p.copias ?? 1) > 1 ? ` (x${p.copias})` : ""}{p.activa === false ? " — desactivada" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 

@@ -35,10 +35,18 @@ interface Dispositivo {
   vinculado_at: string | null;
   /** Grupo de puntos de venta (0067); null = sin grupo. */
   grupo_punto_venta_id: string | null;
+  /** Estación del monitor KDS (0068); null = la global del módulo Cocina. */
+  estacion: string | null;
 }
 
 interface GrupoPV { id: string; nombre: string }
 const SIN_GRUPO_PV = "__sin__"; // Radix Select no admite value=""
+const ESTACION_GLOBAL = "__global__";
+// Estaciones que puede fijar un monitor de cocina (mismas que la config global).
+const ESTACIONES_KDS = [
+  { v: "COCINA", t: "Cocina" }, { v: "BARRA", t: "Barra" },
+  { v: "CAMARERO", t: "Camarero" }, { v: "TODAS", t: "Todas" },
+];
 
 interface CodigoActivo {
   modulo: Modulo;
@@ -72,13 +80,15 @@ const DEFECTOS_CONFIG = {
 type ModuloConfigurable = keyof typeof DEFECTOS_CONFIG;
 const esConfigurable = (m: Modulo): m is ModuloConfigurable => m in DEFECTOS_CONFIG;
 
-function FilaDispositivo({ d, gruposPV, onGrupo, onDesvincular }: {
+function FilaDispositivo({ d, gruposPV, onGrupo, onEstacion, onDesvincular }: {
   d: Dispositivo;
   /** null = la 0067 no está aplicada (se oculta el selector). */
   gruposPV: GrupoPV[] | null;
   onGrupo(d: Dispositivo, grupoId: string | null): void;
+  onEstacion(d: Dispositivo, estacion: string | null): void;
   onDesvincular(d: Dispositivo): void;
 }) {
+  const esMonitor = moduloDe(d) === "COCINA";
   return (
     <li className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
       <div className="min-w-0">
@@ -92,6 +102,21 @@ function FilaDispositivo({ d, gruposPV, onGrupo, onDesvincular }: {
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {/* Estación del monitor (0068): qué partida muestra este KDS al arrancar. */}
+        {esMonitor && (
+          <Select
+            value={d.estacion ?? ESTACION_GLOBAL}
+            onValueChange={(v) => onEstacion(d, v === ESTACION_GLOBAL ? null : v)}
+          >
+            <SelectTrigger size="sm" className="h-7 w-28 text-[11px]" aria-label={`Estación de ${d.nombre}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ESTACION_GLOBAL}>Estación global</SelectItem>
+              {ESTACIONES_KDS.map((e) => <SelectItem key={e.v} value={e.v}>{e.t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         {/* Grupo de puntos de venta (0067): decide qué familias/categorías verá este terminal. */}
         {gruposPV && gruposPV.length > 0 && (
           <Select
@@ -362,27 +387,38 @@ export default function Modulos() {
 
   const cargarDispositivos = useCallback(async () => {
     const sb = supabaseBrowser();
-    // Con grupo de puntos de venta (0067); si la columna no existe, degrada.
-    const r = await sb.from("device")
-      .select("id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at, grupo_punto_venta_id")
-      .order("created_at", { ascending: false });
-    if (r.error) {
-      const { data } = await sb.from("device")
-        .select("id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at")
-        .order("created_at", { ascending: false });
-      setDispositivos((((data as Omit<Dispositivo, "grupo_punto_venta_id">[]) ?? [])).map((d) => ({ ...d, grupo_punto_venta_id: null })));
-      setGruposPV(null);
+    // Con grupo de puntos de venta (0067) y estación del monitor (0068);
+    // si faltan las columnas, degrada por tramos.
+    const BASE = "id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at";
+    const r0 = await sb.from("device").select(`${BASE}, grupo_punto_venta_id, estacion`).order("created_at", { ascending: false });
+    if (!r0.error) {
+      setDispositivos((r0.data as Dispositivo[]) ?? []);
+      const { data: g } = await sb.from("grupo_punto_venta").select("id,nombre").order("nombre");
+      setGruposPV((g as GrupoPV[] | null) ?? []);
       return;
     }
-    setDispositivos((r.data as Dispositivo[]) ?? []);
-    const { data: g } = await sb.from("grupo_punto_venta").select("id,nombre").order("nombre");
-    setGruposPV((g as GrupoPV[] | null) ?? []);
+    const r1 = await sb.from("device").select(`${BASE}, grupo_punto_venta_id`).order("created_at", { ascending: false });
+    if (!r1.error) {
+      setDispositivos((((r1.data as Omit<Dispositivo, "estacion">[]) ?? [])).map((d) => ({ ...d, estacion: null })));
+      const { data: g } = await sb.from("grupo_punto_venta").select("id,nombre").order("nombre");
+      setGruposPV((g as GrupoPV[] | null) ?? []);
+      return;
+    }
+    const { data } = await sb.from("device").select(BASE).order("created_at", { ascending: false });
+    setDispositivos((((data as Omit<Dispositivo, "grupo_punto_venta_id" | "estacion">[]) ?? [])).map((d) => ({ ...d, grupo_punto_venta_id: null, estacion: null })));
+    setGruposPV(null);
   }, []);
 
   async function cambiarGrupo(d: Dispositivo, grupoId: string | null) {
     const { error } = await supabaseBrowser().from("device").update({ grupo_punto_venta_id: grupoId }).eq("id", d.id);
     if (error) { toast.error(`No se pudo cambiar el grupo: ${error.message}`); return; }
     setDispositivos((prev) => prev.map((x) => (x.id === d.id ? { ...x, grupo_punto_venta_id: grupoId } : x)));
+  }
+
+  async function cambiarEstacion(d: Dispositivo, estacion: string | null) {
+    const { error } = await supabaseBrowser().from("device").update({ estacion }).eq("id", d.id);
+    if (error) { toast.error(`No se pudo cambiar la estación: ${error.message}`); return; }
+    setDispositivos((prev) => prev.map((x) => (x.id === d.id ? { ...x, estacion } : x)));
   }
 
   useEffect(() => {
@@ -593,7 +629,7 @@ export default function Modulos() {
                     {vinculados.length > 0 ? (
                       <ul className="space-y-1.5">
                         {vinculados.map((d) => (
-                          <FilaDispositivo key={d.id} d={d} gruposPV={gruposPV} onGrupo={cambiarGrupo} onDesvincular={desvincular} />
+                          <FilaDispositivo key={d.id} d={d} gruposPV={gruposPV} onGrupo={cambiarGrupo} onEstacion={cambiarEstacion} onDesvincular={desvincular} />
                         ))}
                       </ul>
                     ) : (
@@ -644,7 +680,7 @@ export default function Modulos() {
               <CardContent>
                 <ul className="space-y-1.5">
                   {sueltos.map((d) => (
-                    <FilaDispositivo key={d.id} d={d} gruposPV={gruposPV} onGrupo={cambiarGrupo} onDesvincular={desvincular} />
+                    <FilaDispositivo key={d.id} d={d} gruposPV={gruposPV} onGrupo={cambiarGrupo} onEstacion={cambiarEstacion} onDesvincular={desvincular} />
                   ))}
                 </ul>
               </CardContent>

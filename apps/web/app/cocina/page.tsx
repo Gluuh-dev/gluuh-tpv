@@ -89,6 +89,16 @@ export default function Cocina() {
       setCfg(c);
       sonidoRef.current = c.sonido;
       setFiltro(c.estacionDefecto);
+      // Estación PROPIA del monitor (device.estacion, 0068): si esta pantalla se
+      // emparejó (/conectar guarda gluuh_device), su estación manda sobre la global.
+      try {
+        const cred = JSON.parse(localStorage.getItem("gluuh_device") ?? "null") as { device_id?: string } | null;
+        if (cred?.device_id) {
+          const { data: dev } = await sb.from("device").select("estacion").eq("id", cred.device_id).maybeSingle();
+          const est = (dev as { estacion: string | null } | null)?.estacion;
+          if (est === "COCINA" || est === "BARRA" || est === "CAMARERO" || est === "TODAS") setFiltro(est);
+        }
+      } catch { /* sin identidad o sin la 0068: se queda la estación global */ }
       await cargar();
       setLoading(false);
       // Canal SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"`

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     .eq("codigo_vinculacion", String(codigo))
     .is("vinculado_at", null)
     .gt("codigo_expira", ahora)
-    .select("id, tenant_id, nombre, modulo");
+    .select("id, tenant_id, nombre, modulo, estacion");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const dev = filas?.[0];
   if (!dev) return NextResponse.json({ error: "Código no válido o caducado" }, { status: 404 });
@@ -59,5 +59,6 @@ export async function POST(req: Request) {
     .setExpirationTime("365d")
     .sign(new TextEncoder().encode(secreto));
 
-  return NextResponse.json({ ok: true, device_id: dev.id, nombre: dev.nombre, modulo, token });
+  // `estacion` (0068): la partida propia del monitor KDS; null = la global.
+  return NextResponse.json({ ok: true, device_id: dev.id, nombre: dev.nombre, modulo, estacion: dev.estacion ?? null, token });
 }

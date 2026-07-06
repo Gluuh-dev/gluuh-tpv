@@ -41,17 +41,34 @@ export interface DisenoTicket {
   pie?: string;
 }
 
-/** Una impresora de red del local. */
-export interface ImpresoraCfg { id: string; nombre: string; uri: string; anchoMm: 58 | 80 }
+/** Una impresora del local. */
+export interface ImpresoraCfg {
+  id: string;
+  nombre: string;
+  /** Destino: `tcp://IP:9100` (red) u otro URI que entienda el escritorio. */
+  uri: string;
+  anchoMm: 58 | 80;
+  /** Nº de copias por documento (1 por defecto, máx. 5). */
+  copias?: number;
+  /** El cajón portamonedas está conectado a esta impresora (kick RJ11). */
+  abreCajon?: boolean;
+  /** Desactivada = sus documentos no salen por ella (sin borrar la config). */
+  activa?: boolean;
+}
 /** Configuración de impresión guardada en `setting` (clave "impresion.config"). */
 export interface ConfigImpresion { ticket?: DisenoTicket; impresoras?: ImpresoraCfg[]; rutas?: Record<string, string> }
 
-/** Impresora a la que va un tipo de documento (TICKET_CLIENTE, COMANDA_COCINA…). */
+/** Impresora a la que va un tipo de documento (TICKET_CLIENTE, COMANDA_COCINA…).
+ *  Una impresora desactivada no resuelve (el documento cae al plan B: fichero/navegador). */
 export function resolverImpresora(cfg: ConfigImpresion | null, tipoDoc: string): ImpresoraCfg | null {
   const id = cfg?.rutas?.[tipoDoc];
   if (!id) return null;
-  return cfg?.impresoras?.find((p) => p.id === id) ?? null;
+  const p = cfg?.impresoras?.find((x) => x.id === id) ?? null;
+  return p && p.activa !== false ? p : null;
 }
+
+/** Copias saneadas de una impresora (1–5). */
+const copiasDe = (p?: ImpresoraCfg | null) => Math.max(1, Math.min(5, Math.round(p?.copias ?? 1)));
 
 const columnas = (mm?: number) => (mm === 58 ? 32 : 42);
 
@@ -227,15 +244,21 @@ export async function imprimirTicket(
     // packages/hardware (printImage) en una pasada del escritorio.
     // La cola local de Gluuh Desktop ya reintenta el envío ESC/POS; guardar el
     // documento como fichero es el cinturón extra para que nunca se pierda.
-    let r: { ok: boolean; pendientes?: number; error?: string };
+    // El cajón solo se abre si el TPV lo pide (cobro en efectivo) Y esta
+    // impresora lo tiene conectado; y solo en la primera copia.
+    const copias = copiasDe(dest);
+    let r: { ok: boolean; pendientes?: number; error?: string } = { ok: false };
     try {
-      r = await gluuh.imprimir({
-        lineas,
-        qr: t.qrUrl,
-        cortar: true,
-        abrirCajon: t.abrirCajon ?? false,
-        impresora: dest ? { uri: dest.uri, ancho: columnas(anchoMm) } : undefined,
-      });
+      for (let i = 0; i < copias; i++) {
+        r = await gluuh.imprimir({
+          lineas,
+          qr: t.qrUrl,
+          cortar: true,
+          abrirCajon: i === 0 && (t.abrirCajon ?? false) && (dest?.abreCajon ?? true),
+          impresora: dest ? { uri: dest.uri, ancho: columnas(anchoMm) } : undefined,
+        });
+        if (!r.ok) break;
+      }
     } catch (e) {
       guardarTicketComoFichero(lineas, `ticket-${fechaFichero()}.txt`);
       throw e;
@@ -279,9 +302,13 @@ export async function imprimirComanda(
   if (gluuh) {
     // Cinturón extra (la cola del escritorio ya reintenta): si falla, a fichero.
     const estacion = titulo.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "comanda";
-    let r: { ok: boolean; pendientes?: number; error?: string };
+    const copias = copiasDe(dest);
+    let r: { ok: boolean; pendientes?: number; error?: string } = { ok: false };
     try {
-      r = await gluuh.imprimir({ lineas, cortar: true, impresora: dest ? { uri: dest.uri, ancho: columnas(anchoMm) } : undefined });
+      for (let i = 0; i < copias; i++) {
+        r = await gluuh.imprimir({ lineas, cortar: true, impresora: dest ? { uri: dest.uri, ancho: columnas(anchoMm) } : undefined });
+        if (!r.ok) break;
+      }
     } catch (e) {
       guardarTicketComoFichero(lineas, `comanda-${estacion}-${fechaFichero()}.txt`);
       throw e;
