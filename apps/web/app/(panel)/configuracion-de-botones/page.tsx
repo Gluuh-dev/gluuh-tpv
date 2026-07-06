@@ -6,7 +6,7 @@
 // aquí solo se configura y previsualiza, no se cablea nada en la venta.
 import { useEffect, useState } from "react";
 import { LayoutGrid } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { getSetting, setSetting } from "../../lib/settings";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

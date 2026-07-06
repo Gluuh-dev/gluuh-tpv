@@ -4,7 +4,7 @@
 // disponibilidad con días de la semana. Sin franjas = siempre visible.
 // Nota: el TPV aún no filtra por horario (se cableará con el resto de filtros).
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Clock, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";

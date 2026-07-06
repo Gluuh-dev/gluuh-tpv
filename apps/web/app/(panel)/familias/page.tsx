@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Layers, Plus, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
 import { PageHeader } from "@/components/ui/page-header";

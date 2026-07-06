@@ -5,7 +5,7 @@
 // puede lanzar una copia manual si estamos dentro de Gluuh Desktop.
 import { useEffect, useState } from "react";
 import { Archive, Clock, HardDriveDownload } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { getSetting, setSetting } from "../../lib/settings";
 import { exportarBackupLocal } from "../../lib/backup-local";
 import { ZonaTecnica } from "@/components/zona-tecnica";

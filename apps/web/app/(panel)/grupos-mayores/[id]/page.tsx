@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "../../../lib/supabaseBrowser";
 import { BuscarAnadir } from "@/components/buscar-anadir";

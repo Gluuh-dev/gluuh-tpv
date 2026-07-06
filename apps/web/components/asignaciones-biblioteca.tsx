@@ -8,7 +8,7 @@
 // Los grupos PROPIOS del producto (modifier_group.product_id) no se tocan aquí:
 // se gestionan en su ficha. Degrada con aviso si la 0064 no está aplicada.
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { BookOpen, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";

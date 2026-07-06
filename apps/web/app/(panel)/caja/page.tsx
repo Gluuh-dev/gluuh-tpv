@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, Lock, AlertTriangle } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { getSetting } from "../../lib/settings";

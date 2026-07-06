@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Plus, Settings2, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import {
   CONFIG_CARTELERIA_DEF, CONFIG_COCINA_DEF, CONFIG_KIOSKO_DEF, CONFIG_PANTALLA_DEF,

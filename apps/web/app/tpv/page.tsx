@@ -8,7 +8,7 @@ import { ASSETS, ASSETS_LEGACY, FORMAS_MESA, assetPorId, mesaPorCapacidad, dim, 
 import { leerBranding, BRANDING_DEFAULT, subirMedia, type Branding } from "../lib/branding";
 import { imprimirTicket, imprimirComanda, resolverImpresora, formatearTicket, guardarTicketComoFichero, type TicketImpresion, type ConfigImpresion } from "../lib/impresion";
 import { claveBase, claveDeLinea, claveParaAnadir } from "./clave-linea";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { getSetting } from "../lib/settings";
 import { exportarBackupLocal } from "../lib/backup-local";
 import { BarraEstado } from "./components/BarraEstado";
@@ -59,7 +59,8 @@ const TERR: Record<string, string> = {
 };
 
 // VERIFACTU DESACTIVADO: no se persiste ni encadena ninguna factura todavía.
-// Pagos en modo PRUEBA (ficticios). Poner a true AL FINAL para activar la fiscalidad real.
+// Pagos en modo PRUEBA (ficticios). DECISIÓN (06-07-2026): se queda así durante
+// TODO el desarrollo; activar la fiscalidad real será lo ÚLTIMO antes de vender.
 const VERIFACTU_ACTIVO = false;
 
 /* ─── Formas de pago (cobro) ─── */

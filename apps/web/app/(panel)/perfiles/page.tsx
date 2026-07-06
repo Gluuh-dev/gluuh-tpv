@@ -7,7 +7,7 @@
 // Si la migración aún no está aplicada, el CRUD sigue funcionando y los
 // permisos quedan deshabilitados con aviso.
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { PageHeader } from "@/components/ui/page-header";

@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { KeyRound, Lock, LockOpen } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -7,7 +7,7 @@
 // ponytail: el TPV aún no aplica estas promociones al vender — aquí solo se configuran.
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";

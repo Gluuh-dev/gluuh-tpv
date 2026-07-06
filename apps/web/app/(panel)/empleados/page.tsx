@@ -10,7 +10,7 @@
 //   · cambiar PIN: RPC cambiar_pin(p_user_id,p_pin)  ← ver nota más abajo.
 import { useEffect, useState } from "react";
 import { Check, LockOpen, UserPlus, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

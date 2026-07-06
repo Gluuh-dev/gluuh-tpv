@@ -5,7 +5,7 @@
 // en esa tarifa (se cobra el base). Guarda al salir del campo.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Euro } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";

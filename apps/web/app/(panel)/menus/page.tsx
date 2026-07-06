@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Plus, Trash2, X } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";

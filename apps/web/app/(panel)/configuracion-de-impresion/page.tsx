@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Printer, Plus, Trash2, Download, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { getSetting, setSetting } from "../../lib/settings";
 import {
   formatearTicket, guardarTicketComoFichero,

@@ -5,7 +5,7 @@
 // se actualiza de forma optimista y recarga si falla el guardado.
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";

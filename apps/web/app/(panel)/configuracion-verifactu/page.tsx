@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileKey, Hash, ShieldAlert } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { getSetting, setSetting } from "../../lib/settings";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { ZonaTecnica } from "@/components/zona-tecnica";

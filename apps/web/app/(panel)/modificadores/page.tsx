@@ -6,7 +6,7 @@
 // gestionan los grupos y sus opciones. Los grupos PROPIOS de un producto
 // (modifier_group.product_id) se editan en la ficha del producto, no aquí.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { BookOpen, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";

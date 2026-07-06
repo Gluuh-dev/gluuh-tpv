@@ -6,7 +6,7 @@
 // (device.grupo_punto_venta_id); si no existe ninguno, permite crear el primero.
 // Nota: el TPV aún no filtra por grupo (llegará con la identidad de dispositivo).
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { MonitorSmartphone, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { BuscarAnadir } from "@/components/buscar-anadir";

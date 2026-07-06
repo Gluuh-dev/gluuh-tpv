@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";

@@ -8,7 +8,7 @@
 // ponytail: el TPV aún no aplica tarifas al vender; el primer consumidor será
 // Consumo propio (tarifa de empleado).
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { PageHeader } from "@/components/ui/page-header";

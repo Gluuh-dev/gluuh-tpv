@@ -5,7 +5,7 @@
 // product_etiqueta. Sirven para filtrar y para la carta digital.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { Tags, X } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { BuscarAnadir } from "@/components/buscar-anadir";

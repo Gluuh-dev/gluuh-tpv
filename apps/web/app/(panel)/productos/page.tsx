@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, Plus, Search } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
 import { Button } from "@/components/ui/button";
