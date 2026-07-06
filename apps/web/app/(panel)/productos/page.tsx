@@ -212,7 +212,7 @@ export default function ProductosLista() {
 
   const filtroCategoria = (
     <Select value={catFiltro} onValueChange={setCatFiltro}>
-      <SelectTrigger size="sm" className="h-8 w-48"><SelectValue /></SelectTrigger>
+      <SelectTrigger size="sm" className="h-8 w-48 border-border bg-background"><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value={TODAS}>Todas las categorías</SelectItem>
         {cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}

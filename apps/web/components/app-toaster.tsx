@@ -9,6 +9,5 @@ import "sileo/styles.css";
 
 export function AppToaster() {
   const { resolvedTheme } = useTheme();
-  // Arriba centrado, pero bajado ~56px para librar la barra superior (h-11 = 44px).
-  return <Toaster theme={(resolvedTheme as "light" | "dark") ?? "dark"} position="top-center" offset={{ top: 56 }} />;
+  return <Toaster theme={(resolvedTheme as "light" | "dark") ?? "dark"} position="bottom-center" />;
 }
