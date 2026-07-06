@@ -207,17 +207,17 @@ export function TablaDatos<T>({
               <Button size="sm" onClick={onNuevo}><Plus className="h-4 w-4" /> Nuevo</Button>
             )}
             {onCopiar && (
-              <Button size="sm" variant="outline" disabled={selCount === 0} onClick={duplicarSel} title="Duplica la(s) fila(s) seleccionada(s)">
+              <Button size="sm" variant="secondary" disabled={selCount === 0} onClick={duplicarSel} title="Duplica la(s) fila(s) seleccionada(s)">
                 <Copy className="h-4 w-4" /> Duplicar
               </Button>
             )}
             {onAbrir && (
-              <Button size="sm" variant="outline" disabled={selCount !== 1} onClick={editarSel} title="Edita la fila seleccionada">
+              <Button size="sm" variant="secondary" disabled={selCount !== 1} onClick={editarSel} title="Edita la fila seleccionada">
                 <Pencil className="h-4 w-4" /> Editar
               </Button>
             )}
             {onEliminar && (
-              <Button size="sm" variant="outline" disabled={selCount === 0} onClick={eliminarSel} className="text-destructive hover:text-destructive" title="Elimina la(s) fila(s) seleccionada(s)">
+              <Button size="sm" variant="destructive" disabled={selCount === 0} onClick={eliminarSel} title="Elimina la(s) fila(s) seleccionada(s)">
                 <Trash2 className="h-4 w-4" /> Eliminar
               </Button>
             )}
