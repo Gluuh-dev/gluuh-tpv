@@ -44,7 +44,8 @@ export default function Login() {
     try {
       const { error } = await entrarConPasskey(supabaseBrowser());
       if (error) setError(traducirErrorAuth(error.message));
-      else window.location.href = "/dashboard";
+      // En Gluuh Desktop, al lanzador (elegir TPV/Ajustes); en navegador, al panel.
+      else window.location.href = window.gluuh ? "/inicio" : "/dashboard";
     } catch (e) {
       setError("No se pudo usar la passkey en este dispositivo.");
     } finally {

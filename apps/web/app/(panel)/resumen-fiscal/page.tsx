@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Receipt, Calculator, Coins } from "lucide-react";
 
 interface RawLine {
@@ -44,18 +46,24 @@ function agruparPorTipo(lines: RawLine[]): FilaFiscal[] {
 export default function ResumenFiscalPage() {
   const [loading, setLoading] = useState(true);
   const [filas, setFilas] = useState<FilaFiscal[]>([]);
+  const [rango, setRango] = useState<Rango>(RANGO_DEFECTO);
+  const [truncado, setTruncado] = useState(false);
 
   useEffect(() => {
     const sb = supabaseBrowser();
+    setLoading(true);
     (async () => {
       const { data } = await sb
         .from("order_line")
-        .select("cantidad,precio_unitario,tipo_impositivo");
+        .select("cantidad,precio_unitario,tipo_impositivo")
+        .gte("created_at", fechaDesde(rango))
+        .limit(LIMITE_INFORME);
       const rows = (data as RawLine[] | null) ?? [];
+      setTruncado(rows.length === LIMITE_INFORME);
       setFilas(agruparPorTipo(rows));
       setLoading(false);
     })();
-  }, []);
+  }, [rango]);
 
   const baseTotal = filas.reduce((s, f) => s + f.base, 0);
   const cuotaTotal = filas.reduce((s, f) => s + f.cuota, 0);
@@ -67,6 +75,9 @@ export default function ResumenFiscalPage() {
         title="Resumen fiscal"
         description="Desglose de base imponible y cuota por tipo impositivo."
       />
+
+      <SelectorRango valor={rango} onCambio={setRango} />
+      <AvisoTruncado visible={truncado} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
@@ -107,8 +118,10 @@ export default function ResumenFiscalPage() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      Cargando…
+                    <TableCell colSpan={4} className="py-3">
+                      <div className="space-y-2.5">
+                        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-5 w-full" />)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}

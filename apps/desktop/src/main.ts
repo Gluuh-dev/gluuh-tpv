@@ -16,6 +16,14 @@ import { crearVisorSiHaySegundaPantalla, publicarEnVisor } from "./visor";
 const URL_BASE = (process.env.GLUUH_URL ?? "http://localhost:3100").replace(/\/tpv\/?$/, "");
 const ORIGEN = new URL(URL_BASE).origin;
 
+// Ruta inicial según el módulo con el que se vinculó el terminal. Duplica el
+// RUTA_MODULO de la web (apps/web/app/lib/modulos.ts) porque el proceso main no
+// puede importar código de Next; mantener en sincronía si se añaden módulos.
+const RUTA_MODULO: Record<string, string> = {
+  TPV: "/tpv", COMANDERA: "/comandera", COCINA: "/cocina", PANTALLA: "/pantalla",
+  KIOSKO: "/kiosko", CARTELERIA: "/ofertas", VISOR: "/visor",
+};
+
 let ventana: BrowserWindow | null = null;
 let identidad: Identidad | null = null;
 let cola: ColaImpresion;
@@ -43,7 +51,12 @@ function crearVentana(): void {
       nodeIntegration: false,
     },
   });
-  ventana.loadURL(`${URL_BASE}/tpv`);
+  // Una pantalla dedicada (cocina, kiosko, visor…) arranca en su ruta; un TPV o
+  // un equipo sin vincular abre el LANZADOR (/inicio) para elegir TPV o Ajustes.
+  const rutaInicial = identidad && identidad.modulo !== "TPV"
+    ? RUTA_MODULO[identidad.modulo] ?? "/inicio"
+    : "/inicio";
+  ventana.loadURL(`${URL_BASE}${rutaInicial}`);
 
   // Modo TPV: navegación solo dentro de nuestra web; lo externo, al navegador.
   ventana.webContents.on("will-navigate", (e, url) => {
@@ -89,9 +102,7 @@ app.whenReady().then(() => {
     };
   });
   ipcMain.handle("gluuh:imprimir", (_e, job: PrintJob) => cola.encolar(job));
-  ipcMain.handle("gluuh:abrir-cajon", () =>
-    cola.encolar({ lineas: [], cortar: false, abrirCajon: true }),
-  );
+  ipcMain.handle("gluuh:abrir-cajon", () => cola.abrirCajonInmediato());
   ipcMain.handle("gluuh:guardar-dispositivo", (_e, d: Identidad) => {
     guardarIdentidad(userData, d);
     identidad = d;
@@ -112,7 +123,7 @@ app.whenReady().then(() => {
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true });
   inicializarUpdater();
   crearPlanificadorDiario(
-    () => (leerConfig(userData).backup?.destino ? leerConfig(userData).backup?.hora ?? "03:30" : undefined),
+    () => { const b = leerConfig(userData).backup; return b?.destino ? b.hora ?? "03:30" : undefined; },
     () => notificarWeb({ tipo: "backup" }),
   );
 

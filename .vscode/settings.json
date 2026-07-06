@@ -11,5 +11,27 @@
         "statusBar.debuggingForeground": "#FDFBFD",
         "statusBar.noFolderBackground": "#411F4F",
         "statusBar.noFolderForeground": "#FDFBFD"
+    },
+
+    // Reglas de SonarLint apagadas: son sugerencias de estilo/opinión, no errores.
+    // (globalThis vs window, ternarios anidados, complejidad, a11y de POS táctil…)
+    "sonarlint.rules": {
+        "typescript:S7764": { "level": "off" },
+        "typescript:S3358": { "level": "off" },
+        "typescript:S3776": { "level": "off" },
+        "typescript:S4325": { "level": "off" },
+        "typescript:S6551": { "level": "off" },
+        "typescript:S2004": { "level": "off" },
+        "typescript:S6479": { "level": "off" },
+        "typescript:S2933": { "level": "off" },
+        "typescript:S7059": { "level": "off" },
+        "typescript:S2871": { "level": "off" },
+        "typescript:S2681": { "level": "off" },
+        "typescript:S7781": { "level": "off" },
+        "typescript:S6759": { "level": "off" },
+        "typescript:S1135": { "level": "off" },
+        "typescript:S1082": { "level": "off" },
+        "typescript:S6848": { "level": "off" },
+        "typescript:S6853": { "level": "off" }
     }
 }

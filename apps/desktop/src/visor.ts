@@ -4,6 +4,10 @@ import { BrowserWindow, screen } from "electron";
 import path from "node:path";
 
 let visor: BrowserWindow | null = null;
+// Último ticket publicado: se reenvía al crear el visor (2º monitor enchufado a
+// mitad de servicio) o cuando /visor termina de cargar tras el primer publicar,
+// para que el cliente no vea "Bienvenido" con una cuenta en curso.
+let ultimoTicket: unknown = null;
 
 export function crearVisorSiHaySegundaPantalla(urlBase: string): void {
   const pantallas = screen.getAllDisplays();
@@ -24,10 +28,14 @@ export function crearVisorSiHaySegundaPantalla(urlBase: string): void {
     },
   });
   visor.loadURL(`${urlBase}/visor`);
+  visor.webContents.on("did-finish-load", () => {
+    if (ultimoTicket !== null) visor?.webContents.send("gluuh:evento", { tipo: "visor", datos: ultimoTicket });
+  });
   visor.on("closed", () => { visor = null; });
 }
 
 export function publicarEnVisor(datos: unknown): void {
+  ultimoTicket = datos;
   if (visor && !visor.isDestroyed()) {
     visor.webContents.send("gluuh:evento", { tipo: "visor", datos });
   }

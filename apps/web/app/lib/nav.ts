@@ -1,9 +1,13 @@
 ﻿import {
   LayoutDashboard, BarChart3, ShoppingCart, Landmark, Package, Wrench, Info, type LucideIcon,
 } from "lucide-react";
+import type { Modulo } from "./modulos";
 
 export type Rol = "PROPIETARIO" | "ENCARGADO" | "CAMARERO" | "COCINA";
-export interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean; blank?: boolean }
+// `modulo`: la entrada se oculta si la empresa tiene ese módulo desactivado
+// (tabla tenant_module; catálogo en lib/modulos.ts). Tipado contra MODULOS para
+// que un typo (p. ej. "CARTELERÍA") no compile.
+export interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean; blank?: boolean; modulo?: Modulo }
 export interface NavSection { title?: string; items: NavLink[] }
 export interface NavEntry { id: string; title: string; icon: LucideIcon; sections: NavSection[]; direct?: boolean; index?: string }
 
@@ -21,29 +25,29 @@ export const NAV: NavEntry[] = [
   { id: "operativa", title: "Operativa", icon: ShoppingCart, index: "/operativa", sections: [
     { title: "Venta", items: [
       { href: "/tpv", label: "TPV", roles: VENTA, blank: true },
-      { href: "/comandera", label: "Comandera", roles: VENTA, blank: true },
+      { href: "/comandera", label: "Comandera", roles: VENTA, blank: true, modulo: "COMANDERA" },
     ] },
     { title: "Pantallas", items: [
-      { href: "/cocina", label: "Cocina (KDS)", roles: ["PROPIETARIO", "ENCARGADO", "COCINA"], blank: true },
-      { href: "/kiosko", label: "Kiosko", roles: GEST, blank: true },
-      { href: "/pantalla", label: "Display", roles: GEST, blank: true },
-      { href: "/ofertas", label: "Ofertas", roles: GEST, blank: true },
+      { href: "/cocina", label: "Cocina (KDS)", roles: ["PROPIETARIO", "ENCARGADO", "COCINA"], blank: true, modulo: "COCINA" },
+      { href: "/kiosko", label: "Kiosko", roles: GEST, blank: true, modulo: "KIOSKO" },
+      { href: "/pantalla", label: "Display", roles: GEST, blank: true, modulo: "PANTALLA" },
+      { href: "/ofertas", label: "Ofertas", roles: GEST, blank: true, modulo: "CARTELERIA" },
     ] },
     { title: "Caja", items: [{ href: "/caja", label: "Control de caja", roles: GEST }] },
   ] },
   { id: "admin", title: "Administracion", icon: Landmark, index: "/administracion", sections: [
     { title: "General", items: [
       { href: "/ajustes", label: "Empresa y local", roles: PROP },
-      { href: "/series", label: "Series", roles: PROP }, { href: "/configuracion-global", label: "Configuracion global", roles: PROP }, { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST },
+      { href: "/series", label: "Series", roles: PROP }, { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST },
       { href: "/plantillas-etiquetas", label: "Plantillas de etiquetas", roles: GEST }, { href: "/periodos-servicio", label: "Periodos de servicio", roles: GEST }, { href: "/tipos-cliente", label: "Tipos de clientes", roles: GEST },
-      { href: "/clientes", label: "Clientes", roles: GEST }, { href: "/puntos-venta", label: "Puntos de venta", roles: PROP },
+      { href: "/clientes", label: "Clientes", roles: GEST }, { href: "/reservas", label: "Reservas", roles: GEST, modulo: "RESERVAS" }, { href: "/puntos-venta", label: "Puntos de venta", roles: PROP },
     ] },
     { title: "Usuarios", items: [
       { href: "/perfiles", label: "Perfiles y permisos", roles: PROP }, { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
     ] },
     { title: "Catalogo", items: [
-      { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST }, { href: "/carta", label: "Familias", roles: GEST },
-      { href: "/carta", label: "Categorias", roles: GEST }, { href: "/carta", label: "Productos", roles: GEST },
+      { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST }, { href: "/familias", label: "Familias", roles: GEST },
+      { href: "/categorias", label: "Categorias", roles: GEST }, { href: "/productos", label: "Productos", roles: GEST },
       { href: "/menus", label: "Menus", roles: GEST }, { href: "/alergenos", label: "Alergenos", roles: GEST }, { href: "/etiquetas", label: "Etiquetas de productos", roles: GEST },
     ] },
     { title: "Tarifas y precios", items: [
@@ -77,13 +81,19 @@ export const NAV: NavEntry[] = [
       { href: "/ajustar-margenes", label: "Ajustar margenes", roles: GEST }, { href: "/programacion-de-tarifas", label: "Programacion de tarifas", roles: GEST },
     ] },
     { title: "VERI*FACTU", items: [{ href: "/visor-de-verifactu", label: "Visor de Verifactu", roles: PROP }, { href: "/configuracion-verifactu", label: "Configuracion Verifactu", roles: PROP }] },
+    // Zona tecnica: paginas que configura el instalador (candado con clave tecnica).
+    { title: "Zona tecnica", items: [
+      { href: "/configuracion-de-impresion", label: "Impresion", roles: GEST },
+      { href: "/modulos", label: "Modulos y pantallas", roles: PROP },
+      { href: "/copias-de-seguridad", label: "Copias de seguridad", roles: PROP },
+    ] },
     { title: "Control de efectivo", items: [{ href: "/caja", label: "Caja", roles: GEST }, { href: "/configuracion-de-caja", label: "Configuracion de caja", roles: PROP }] },
     { title: "Pasarela de pago", items: [{ href: "/configuracion-de-pago", label: "Configuracion de pago", roles: GEST }, { href: "/cobro-en-mesa", label: "Cobro en mesa", roles: GEST }] },
     { title: "Cartas digitales", items: [
       { href: "/personalizar", label: "Marca y carteleria", roles: PROP }, { href: "/traducciones", label: "Traducciones", roles: GEST },
       { href: "/pago-y-pedidos-qr", label: "Pago y pedidos QR", roles: GEST }, { href: "/generar-qrs", label: "Generar QRs", roles: GEST },
     ] },
-    { title: "Otros", items: [{ href: "/copias-de-seguridad", label: "Copias de seguridad", roles: PROP }, { href: "/auditoria", label: "Auditoria", roles: PROP }] },
+    { title: "Otros", items: [{ href: "/auditoria", label: "Auditoria", roles: PROP }] },
   ] },
   { id: "informes", title: "Informes", icon: BarChart3, index: "/informes", sections: [
     { title: "Resumen", items: [{ href: "/informes", label: "Panel de informes", roles: GEST }] },
@@ -101,7 +111,7 @@ export const NAV: NavEntry[] = [
       { href: "/cancelaciones-por-usuario", label: "Cancelaciones por usuario", roles: GEST }, { href: "/propinas-por-usuario", label: "Propinas por usuario", roles: GEST }, { href: "/asistencia", label: "Asistencia", roles: GEST },
     ] },
     { title: "Caja", items: [
-      { href: "/formas-de-pago", label: "Formas de pago", roles: GEST }, { href: "/movimientos-de-caja", label: "Movimientos de caja", roles: GEST }, { href: "/cobros-pendientes", label: "Cobros pendientes", roles: GEST },
+      { href: "/formas-de-pago", label: "Cobros por forma de pago", roles: GEST }, { href: "/movimientos-de-caja", label: "Movimientos de caja", roles: GEST }, { href: "/cobros-pendientes", label: "Cobros pendientes", roles: GEST },
       { href: "/propinas-por-forma-de-pago", label: "Propinas por forma de pago", roles: GEST }, { href: "/transacciones-con-tarjeta", label: "Transacciones con tarjeta", roles: GEST },
     ] },
     { title: "Clientes", items: [{ href: "/ventas-a-cliente", label: "Ventas a cliente", roles: GEST }, { href: "/facturas-por-cliente", label: "Facturas por cliente", roles: GEST }, { href: "/impuestos-por-cliente", label: "Impuestos por cliente", roles: GEST }] },

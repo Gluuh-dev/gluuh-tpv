@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 interface Desc { id: string; nombre: string; tipo: string; valor: number; activo: boolean }
 
@@ -38,7 +39,12 @@ export default function Descuentos() {
   async function del(id: string) { await sb.from("discount").delete().eq("id", id); cargar(); }
   const fmt = (d: Desc) => d.tipo === "PORCENTAJE" ? `${d.valor}%` : `${Number(d.valor).toFixed(2)} €`;
 
-  if (loading) return <div className="text-muted-foreground">Cargando…</div>;
+  if (loading) return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader title="Descuentos" description="Descuentos que el camarero podrá aplicar en el TPV (por % o por importe)." />
+      <TableSkeleton rows={5} />
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

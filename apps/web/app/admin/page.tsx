@@ -2,17 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, UserPlus, LogOut } from "lucide-react";
+import { Building2, UserPlus, LogOut, KeyRound } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { MODULOS, type DefModulo } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Empresa { id: string; nombre: string; plan: string; email_admin: string | null; created_at: string }
 interface Lead { id: string; nombre: string | null; email: string | null; telefono: string | null; mensaje: string | null; created_at: string }
+
+// Módulos premium que se venden por licencia (marcados en lib/modulos.ts).
+const MODULOS_PREMIUM = (Object.entries(MODULOS) as [string, DefModulo][])
+  .filter(([, d]) => d.requiereLicencia)
+  .map(([k, d]) => ({ k, nombre: d.nombre }));
 
 export default function Admin() {
   const sb = supabaseBrowser();
@@ -23,6 +30,10 @@ export default function Admin() {
   const [f, setF] = useState({ empresa: "", email: "", password: "" });
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lic, setLic] = useState<{ tenantId: string; meses: string; modulos: string[] }>({ tenantId: "", meses: "12", modulos: [] });
+  const [licBusy, setLicBusy] = useState(false);
+  const [licCodigo, setLicCodigo] = useState<string | null>(null);
+  const [licErr, setLicErr] = useState<string | null>(null);
 
   async function cargar() {
     const [{ data: e }, { data: l }] = await Promise.all([
@@ -57,9 +68,33 @@ export default function Admin() {
     const out = await res.json();
     setBusy(false);
     if (!res.ok) { setMsg({ t: "err", x: out.error ?? "Error" }); return; }
-    setMsg({ t: "ok", x: `Empresa "${f.empresa}" creada. Comparte el acceso: ${f.email}` });
+    setMsg({
+      t: "ok",
+      x: `Empresa "${f.empresa}" creada. Acceso: ${f.email}` +
+        (out.claveTecnica ? ` · Clave técnica: ${out.claveTecnica} (apúntala, no se vuelve a mostrar)` : ""),
+    });
     setF({ empresa: "", email: "", password: "" });
     cargar();
+  }
+
+  const toggleMod = (k: string) => setLic((s) => ({
+    ...s,
+    modulos: s.modulos.includes(k) ? s.modulos.filter((m) => m !== k) : [...s.modulos, k],
+  }));
+
+  async function generarLicencia() {
+    if (!lic.tenantId) { setLicErr("Elige una empresa."); return; }
+    setLicBusy(true); setLicErr(null); setLicCodigo(null);
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch("/api/admin/generar-licencia", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ tenantId: lic.tenantId, meses: Number(lic.meses), modulos: lic.modulos }),
+    });
+    const out = await res.json();
+    setLicBusy(false);
+    if (!res.ok) { setLicErr(out.error ?? "Error"); return; }
+    setLicCodigo(out.codigo);
   }
 
   if (estado === "cargando") return <div className="grid min-h-screen place-items-center text-muted-foreground">Cargando…</div>;
@@ -105,6 +140,55 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><KeyRound className="h-4 w-4" /> Generar licencia</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Empresa</Label>
+                <Select value={lic.tenantId} onValueChange={(v) => setLic({ ...lic, tenantId: v })}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Elige empresa…" /></SelectTrigger>
+                  <SelectContent>
+                    {empresas.map((e) => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Duración</Label>
+                <Select value={lic.meses} onValueChange={(v) => setLic({ ...lic, meses: v })}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="12">12 meses</SelectItem>
+                    <SelectItem value="24">24 meses</SelectItem>
+                    <SelectItem value="36">36 meses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Módulos incluidos</Label>
+              <div className="flex flex-wrap gap-2">
+                {MODULOS_PREMIUM.map(({ k, nombre }) => (
+                  <label key={k} className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
+                    <input type="checkbox" checked={lic.modulos.includes(k)} onChange={() => toggleMod(k)} className="accent-primary" />
+                    {nombre}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Button disabled={licBusy || !lic.tenantId} onClick={generarLicencia}>{licBusy ? "Generando…" : "Generar código"}</Button>
+            {licErr && <p className="text-sm text-destructive">{licErr}</p>}
+            {licCodigo && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-center">
+                <p className="font-mono text-2xl font-bold tracking-widest">{licCodigo}</p>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  Apúntalo y dáselo al cliente: lo activa en «Módulos». No se vuelve a mostrar.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader><CardTitle className="text-base">Solicitudes de acceso ({leads.length})</CardTitle></CardHeader>

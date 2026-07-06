@@ -41,7 +41,7 @@ export default function Comandera() {
       const [{ data: m }, { data: c }, { data: p }] = await Promise.all([
         sb.from("restaurant_table").select("id,nombre,estado").order("nombre"),
         sb.from("category").select("id,nombre,orden").order("orden"),
-        sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id,disponible,estacion").eq("disponible", true).order("nombre"),
+        sb.from("product").select("id,nombre,precio,tipo_impositivo,category_id,disponible,estacion").eq("disponible", true).or(`agotado_hasta.is.null,agotado_hasta.lt.${new Date().toISOString()}`).order("nombre"),
       ]);
       setMesas((m as Mesa[]) ?? []);
       setCats((c as Cat[]) ?? []);

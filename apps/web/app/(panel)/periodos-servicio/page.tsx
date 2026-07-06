@@ -9,6 +9,6 @@ export default function Page() {
       { name: "hora_inicio", label: "Hora inicio" },
       { name: "hora_fin", label: "Hora fin" },
     ],
-    columns: [{ name: "nombre", label: "Nombre" }, { name: "hora_inicio", label: "Hora inicio" }, { name: "hora_fin", label: "Hora fin" }],
+    columns: [{ name: "nombre", label: "Nombre" }, { name: "hora_inicio", label: "Hora inicio", badge: true }, { name: "hora_fin", label: "Hora fin", badge: true }],
   }} />;
 }

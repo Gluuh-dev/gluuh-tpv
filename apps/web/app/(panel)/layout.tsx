@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ExternalLink, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type Rol } from "../lib/nav";
+import { modulosInactivos } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AssistantPanel } from "@/components/assistant-panel";
@@ -19,7 +20,12 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const [info, setInfo] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [entrada, setEntrada] = useState("inicio");
+  const [modulosOff, setModulosOff] = useState<Set<string>>(new Set());
   const { railOpen, menuOpen, toggleRail, toggleMenu, setMenuOpen } = useUI();
+
+  useEffect(() => {
+    modulosInactivos().then(setModulosOff).catch(() => setModulosOff(new Set()));
+  }, []);
 
   useEffect(() => {
     const sb = supabaseBrowser();
@@ -42,9 +48,14 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     const rol = info?.rol ?? "PROPIETARIO";
     return NAV.map((e) => ({
       ...e,
-      sections: e.sections.map((sec) => ({ ...sec, items: sec.items.filter((i) => puede(rol, i.roles)) })).filter((sec) => sec.items.length > 0),
+      sections: e.sections
+        .map((sec) => ({
+          ...sec,
+          items: sec.items.filter((i) => puede(rol, i.roles) && !(i.modulo && modulosOff.has(i.modulo))),
+        }))
+        .filter((sec) => sec.items.length > 0),
     })).filter((e) => e.sections.length > 0);
-  }, [info?.rol]);
+  }, [info?.rol, modulosOff]);
 
   const activa = nav.find((e) => e.id === entrada) ?? nav[0];
 
@@ -124,6 +135,9 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             <span className="text-[14px] font-semibold">{activa?.title}</span>
           </div>
           <div className="flex items-center gap-1 text-[13px]">
+            <a href="/tpv" className="flex h-7 items-center gap-1.5 rounded-md bg-brand px-2.5 font-medium text-white transition-colors hover:bg-brand-hover" title="Abrir la pantalla de venta">
+              <Monitor className="h-4 w-4" /> <span className="hidden sm:inline">Ir al TPV</span>
+            </a>
             <span className="hidden text-(--text-muted) sm:inline">{info?.nombre || info?.email}</span>
             <ThemeToggle />
             <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-[13px]" onClick={salir}><LogOut className="h-4 w-4" /> Salir</Button>

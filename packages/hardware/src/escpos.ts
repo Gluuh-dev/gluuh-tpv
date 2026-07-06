@@ -31,9 +31,9 @@ export class EscPosPrinter implements Printer {
       options: { timeout: 5000 },
     });
 
-    const conectada = await impresora.isPrinterConnected();
-    if (!conectada) throw new Error(`Impresora no accesible en ${this.config.uri}`);
-
+    // Sin pre-check isPrinterConnected(): abría una conexión TCP extra por
+    // ticket; si la impresora no responde, execute() falla igual y el llamador
+    // (la cola) ya trata ese error.
     for (const linea of job.lineas) impresora.println(linea);
     if (job.qr) {
       impresora.alignCenter();

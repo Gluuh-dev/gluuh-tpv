@@ -3,6 +3,16 @@
 Transcripción de los menús reales de **Ágora 8.2.5** (capturas del cliente) y nuestro
 estado: ✅ hecho · 🟡 parcial · ❌ falta. Sirve de checklist para "estar completos".
 
+> **Actualización 04-07-2026**: gran tanda de configuración del backoffice completada
+> (migraciones 0045-0055, todas aplicadas). Ver `docs/implementacion/11-configuracion-backoffice.md`.
+> Cerrados desde este mapa: Productos (foto/alérgenos/formatos/modificadores/nombres de
+> impresión/estación), Alérgenos, Tarifas (precio real por tarifa), Promociones (reglas),
+> Descuentos, Perfiles con permisos, Config de Botones, Ordenar catálogo, VERIFACTU (UI),
+> Control de Efectivo (UI), Auditoría, Plantillas de Ticket (diseñador real), Formas de
+> Pago (tipo/cajón/arqueo), Series (multi-serie). Nuevo no-Ágora: **sistema de licencias
+> por código**, **zona técnica con clave**, **4 diseños de kiosko**, **pantallas
+> configurables** y **anti-fraude de precios server-side**.
+
 ## Administración
 
 ### General
@@ -91,8 +101,22 @@ asistencia), Caja (formas de pago, movimientos, cobros pendientes, propinas, tra
 Clientes, Almacén, Cocina (tiempos), Diarios (facturas, pedidos, cierres de caja). → ampliar por fases (media).
 
 ## Resumen: bloques que más nos acercan a Ágora (alta prioridad)
-1. **Catálogo completo**: producto (foto/alérgenos/desc/código), **Menús 1º/2º/postre**, **Descuentos**, **Formas de Pago**.
-2. **Cierre fiscal real**: persistir factura + `verifactu_record` (huella encadenada) + **Visor Verifactu**.
-3. **Caja**: apertura/arqueo/**cierre Z** + control de efectivo.
-4. **Permisos por perfil** (no solo UX, en RLS/RPC).
-5. **Compras/Stock + escandallos** (módulo entero) — fase posterior.
+1. ✅ **Catálogo completo**: producto (foto/alérgenos/desc/código/formatos/modificadores/
+   nombres de impresión), **Descuentos**, **Formas de Pago**. 🟡 Queda **Menús 1º/2º/postre**
+   (existe editor `/menus`, revisar cobertura).
+2. 🟡→**pendiente clave**: **Cierre fiscal real** — persistir factura + `verifactu_record`
+   (huella encadenada) + activar `VERIFACTU_ACTIVO`. UI de config y visor ✅; el motor
+   está en `@gluuh/core`. **Requiere certificado AEAT (tarea del instalador).**
+3. 🟡 **Caja**: UI de configuración ✅ (`/configuracion-de-caja`) y control de caja ✅;
+   falta que el TPV/arqueo **consuman** los flags (`caja.*`, `abre_cajon`, `cuenta_arqueo`).
+4. ✅ **Permisos por perfil** (UI + `perfil.permisos`, 0048). 🟡 Falta aplicarlos en
+   **RLS/RPC server-side** (hoy es gating de UI; ver auditoría de seguridad A1).
+5. ❌ **Compras/Stock + escandallos** (módulo entero) — fase posterior, sigue pendiente.
+
+### Pendientes que dependen del rediseño del TPV (en curso por el usuario) o del instalador
+- Cablear en el TPV: `tpv.botones`, `caja.*`, tarifas en Cons. propio, promociones al
+  vender, chips de anotaciones (`nota_preparacion`), `nombre_ticket`/`nombre_cocina` y
+  logo al imprimir, token en `/api/ticket`, y persistir descuento/`cancel_reason`.
+- Escritorio (`apps/desktop`): leer `backup.*`/`impresora.*` de `setting`; modo kiosko
+  que bloquee consola (seguridad C2); logo en ESC/POS (`packages/hardware`).
+- Activación real de VERIFACTU con certificado (guía `01-activar-verifactu.md`).

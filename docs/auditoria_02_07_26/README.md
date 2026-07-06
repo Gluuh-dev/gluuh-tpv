@@ -30,6 +30,8 @@
 | [04-tpv-estilo-glop.md](04-tpv-estilo-glop.md) | Análisis de Glop, mapeo función a función contra lo nuestro, y cómo superarlo |
 | [05-plan-de-accion.md](05-plan-de-accion.md) | Prioridades P0/P1/P2, quick wins y orden de ejecución recomendado |
 | [06-decision-local-vs-cloud.md](06-decision-local-vs-cloud.md) | Por qué nube + offline-first (y no PC-servidor ni modo dual); qué cobrar como extra mensual |
+| [07-catalogo-modulos-y-roadmap.md](07-catalogo-modulos-y-roadmap.md) | Módulos e integraciones de todo el mercado (ES + internacional) cruzados con Gluuh, y roadmap priorizado P0/P1/P2 |
+| [08-checklist-maestro-100.md](08-checklist-maestro-100.md) | ★ Lista maestra de TODO (módulos, funciones, mejoras) con estado ✅/🟡/❌ — la "definición de completo al 100%" |
 
 ## Documentos relacionados
 

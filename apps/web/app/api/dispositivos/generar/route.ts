@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { randomInt } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { excedeLimite, ipDe } from "../limite";
 
 // Genera un código de vinculación de 6 dígitos (caduca en 10 min, un solo uso).
 // Solo PROPIETARIO/ENCARGADO (el rol viaja en el JWT vía el auth hook).
@@ -16,6 +18,13 @@ function claim(token: string, nombre: string): string {
 }
 
 export async function POST(req: Request) {
+  if (excedeLimite(`generar:${ipDe(req)}`, 20)) {
+    return NextResponse.json(
+      { error: "Demasiadas peticiones. Espera un minuto e inténtalo de nuevo." },
+      { status: 429 },
+    );
+  }
+
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
@@ -41,7 +50,11 @@ export async function POST(req: Request) {
   if (!loc) return NextResponse.json({ error: "La empresa no tiene local" }, { status: 400 });
 
   const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
-  const codigo = String(Math.floor(100000 + Math.random() * 900000));
+  // Código aleatorio criptográfico (no Math.random, que es predecible).
+  // NOTA DE SEGURIDAD: 6 dígitos = 900k combinaciones. El canje es de un solo uso,
+  // caduca en 10 min y tanto este endpoint como el canje llevan rate-limit por IP
+  // en memoria (../limite.ts) como fricción anti fuerza bruta.
+  const codigo = String(randomInt(100000, 1000000));
   const expira = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   const { data: dev, error } = await admin
     .from("device")

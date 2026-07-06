@@ -46,6 +46,9 @@ CREATE TABLE tenant (
                   CHECK (plan IN ('FREE','PRO','AVANZADO','CADENA')),
   cif           text,
   email_admin   text,
+  clave_tecnica_hash text,         -- candado "Zona técnica" del backoffice, bcrypt (0045)
+  licencia_hasta   date,                          -- caducidad de la licencia; NULL = sin licencia (0052)
+  licencia_modulos text[] NOT NULL DEFAULT '{}',  -- módulos premium comprados (0052)
   activo        boolean NOT NULL DEFAULT true,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
@@ -95,6 +98,31 @@ CREATE TABLE device (
 CREATE INDEX idx_device_tenant_location ON device (tenant_id, location_id);
 CREATE UNIQUE INDEX device_codigo_uq ON device (codigo_vinculacion) WHERE codigo_vinculacion IS NOT NULL;
 
+-- Módulos activables por empresa (0035). Catálogo en apps/web/app/lib/modulos.ts;
+-- sin fila = valor por defecto del módulo (los básicos, activos).
+CREATE TABLE tenant_module (
+  tenant_id  uuid    NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  modulo     text    NOT NULL,
+  activo     boolean NOT NULL DEFAULT true,
+  config     jsonb   NOT NULL DEFAULT '{}',
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, modulo)
+);
+
+-- Códigos de licencia emitidos (0052). El estado efectivo vive en
+-- tenant.licencia_hasta/licencia_modulos; esta tabla es el histórico de códigos
+-- (uno por venta/renovación), que se canjean una sola vez vía activar_licencia().
+CREATE TABLE licencia (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  codigo      text NOT NULL UNIQUE,
+  meses       int  NOT NULL CHECK (meses > 0),
+  modulos     text[] NOT NULL DEFAULT '{}',
+  canjeado_at timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_licencia_tenant ON licencia (tenant_id);
+
 -- Usuarios (empleados). Login backoffice (email+pass) y TPV (PIN).
 CREATE TABLE app_user (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -103,6 +131,10 @@ CREATE TABLE app_user (
   email           text,
   password_hash   text,            -- Argon2/bcrypt (backoffice)
   pin_hash        text,            -- PIN del camarero en TPV/comandera
+  pulsera_hash    text,            -- código de pulsera RFID/NFC hasheado (0037)
+  permisos        jsonb NOT NULL DEFAULT '{}',  -- flags de permisos en el TPV (0041)
+  pin_intentos        int NOT NULL DEFAULT 0,   -- backoff login por PIN (0054)
+  pin_bloqueado_hasta timestamptz,              -- backoff login por PIN (0054)
   rol             text NOT NULL DEFAULT 'CAMARERO'
                     CHECK (rol IN ('ADMIN_PLATAFORMA','PROPIETARIO','ENCARGADO','CAMARERO','COCINA')),
   activo          boolean NOT NULL DEFAULT true,
@@ -123,15 +155,51 @@ CREATE TABLE shift (
 );
 CREATE INDEX idx_shift_tenant_user ON shift (tenant_id, user_id, entrada);
 
+-- Perfiles: plantillas de permisos para empleados (0020 + 0048).
+CREATE TABLE perfil (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre      text NOT NULL,
+  descripcion text,
+  permisos    jsonb NOT NULL DEFAULT '{}',  -- mismo formato que app_user.permisos; ausente = permitido (0048)
+  created_at  timestamptz DEFAULT now()
+);
+
 -- =============================================================================
 --  2. CATÁLOGO (carta, productos, inventario)
 -- =============================================================================
+
+-- Grupo mayor: división por encima de las familias (0020 + 0058).
+-- Jerarquía: grupo mayor → familia → categoría → producto.
+CREATE TABLE grupo_mayor (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre      text NOT NULL,
+  descripcion text,
+  created_at  timestamptz DEFAULT now()
+);
+
+-- Familias: agrupan categorías (0012); cuelgan opcionalmente de un grupo mayor (0058).
+CREATE TABLE family (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre         text NOT NULL,
+  orden          int  DEFAULT 0,
+  color          text DEFAULT '#64748b',
+  grupo_mayor_id uuid REFERENCES grupo_mayor(id) ON DELETE SET NULL,  -- null = sin grupo mayor (0058)
+  created_at     timestamptz DEFAULT now()
+);
+CREATE INDEX idx_family_grupo_mayor ON family (tenant_id, grupo_mayor_id);
 
 CREATE TABLE category (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
   nombre      text NOT NULL,
+  family_id   uuid REFERENCES family(id) ON DELETE SET NULL,  -- familia a la que pertenece (0012)
   orden       int NOT NULL DEFAULT 0,
+  foto_url    text,                       -- imagen para el botón del TPV (0044)
+  icono       text,                       -- nombre de icono lucide para el botón del TPV (0060)
+  estacion    text,                       -- estación por defecto de sus productos; null = sin definir (0050)
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -142,16 +210,53 @@ CREATE TABLE product (
   tenant_id       uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
   category_id     uuid REFERENCES category(id) ON DELETE SET NULL,
   nombre          text NOT NULL,
+  nombre_ticket   text,                       -- nombre en ticket/factura del cliente; null = nombre (0051)
+  nombre_cocina   text,                       -- nombre en comandas cocina/barra y ticket camarero; null = nombre (0051)
   precio          numeric(12,2) NOT NULL,     -- PVP, impuesto incluido
   tipo_impositivo numeric(5,2) NOT NULL DEFAULT 10,  -- % (10 IVA host., 7 IGIC...)
   es_alcohol      boolean NOT NULL DEFAULT false,
   estacion        text,                       -- enrutado a cocina/barra (docs/10)
   foto_url        text,
+  agotado_hasta   timestamptz,     -- "86": agotado hasta esta fecha (0038)
+  vendido_por_peso boolean NOT NULL DEFAULT false,  -- precio = €/kg (0040)
+  orden           int NOT NULL DEFAULT 0,     -- orden manual en la botonera (0046)
   disponible      boolean NOT NULL DEFAULT true,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_product_tenant_cat ON product (tenant_id, category_id);
+
+-- Formatos de venta por artículo (0039): caña/copa/botella, ración/media…
+CREATE TABLE product_format (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  product_id  uuid NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  nombre      text NOT NULL,
+  precio      numeric(12,2) NOT NULL,
+  orden       int NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_product_format ON product_format (tenant_id, product_id, orden);
+
+-- Tarifas de precios (0020) y precio de producto por tarifa (0047).
+-- Sin fila en product_price = el producto usa product.precio (impuesto incluido).
+CREATE TABLE tarifa (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre      text NOT NULL,
+  descripcion text,
+  created_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE product_price (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  product_id  uuid NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  tarifa_id   uuid NOT NULL REFERENCES tarifa(id) ON DELETE CASCADE,
+  precio      numeric(12,2) NOT NULL,       -- PVP, impuesto incluido
+  UNIQUE (tenant_id, product_id, tarifa_id)
+);
+CREATE INDEX idx_product_price_tarifa ON product_price (tenant_id, tarifa_id);
 
 CREATE TABLE modifier_group (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -221,6 +326,27 @@ CREATE TABLE stock_move (
 );
 CREATE INDEX idx_stockmove_tenant_ing ON stock_move (tenant_id, ingredient_id, created_at);
 
+-- Promociones (0020 + reglas de 0049). Ámbito: category_id/product_id, ambos
+-- NULL = toda la carta. El TPV aún no las aplica al vender; se configuran en
+-- el backoffice ((panel)/promociones).
+CREATE TABLE promocion (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id    uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre       text NOT NULL,
+  descripcion  text,
+  tipo         text NOT NULL DEFAULT 'PCT' CHECK (tipo IN ('PCT','EUR')),  -- % o € de descuento
+  valor        numeric(12,2) NOT NULL DEFAULT 0,
+  fecha_inicio date,
+  fecha_fin    date,
+  hora_inicio  time,
+  hora_fin     time,
+  dias_semana  int[],                      -- 1=lunes … 7=domingo; null = todos
+  category_id  uuid REFERENCES category(id) ON DELETE SET NULL,
+  product_id   uuid REFERENCES product(id) ON DELETE SET NULL,
+  activa       boolean NOT NULL DEFAULT true,
+  created_at   timestamptz DEFAULT now()
+);
+
 -- =============================================================================
 --  3. SALA Y VENTA
 -- =============================================================================
@@ -243,6 +369,9 @@ CREATE TABLE restaurant_table (
   pos_y       int,
   estado      text NOT NULL DEFAULT 'LIBRE'
                 CHECK (estado IN ('LIBRE','OCUPADA','PIDIENDO','SERVIDA','POR_COBRAR')),
+  capacidad   int NOT NULL DEFAULT 4,         -- comensales (define la forma por defecto)
+  rotacion    int NOT NULL DEFAULT 0,         -- giro en el plano (grados)
+  sprite      text,                           -- forma explícita (0042); NULL = por capacidad
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_table_tenant_room ON restaurant_table (tenant_id, room_id);
@@ -268,6 +397,12 @@ CREATE TABLE sales_order (
   canal         text NOT NULL DEFAULT 'TPV'
                   CHECK (canal IN ('TPV','COMANDERA','KIOSKO','ONLINE')),
   comensales    int,
+  cliente_nombre   text,     -- pedido para llevar (0029)
+  cliente_telefono text,     -- pedido para llevar (0029)
+  tipo_consumo     text,     -- (0006)
+  aparcado_como    text,     -- cuenta aparcada, etiqueta de recuperación (0036)
+  notas            text,      -- nota libre de la mesa/cuenta (0043)
+  customer_id   uuid REFERENCES customer(id) ON DELETE SET NULL,  -- cliente registrado (0036)
   total         numeric(12,2) NOT NULL DEFAULT 0,
   -- Sync / offline (docs/06 §4.5): UUID de cliente para idempotencia
   client_id     uuid NOT NULL,
@@ -291,9 +426,14 @@ CREATE TABLE order_line (
   notas         text,
   pase          int,                       -- curso/tiempo
   estacion      text,
+  user_id       uuid REFERENCES app_user(id) ON DELETE SET NULL,  -- camarero que la añadió (0059)
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_orderline_tenant_order ON order_line (tenant_id, order_id);
+-- NOTA (0053): las RPC crear_pedido / crear_pedido_srv (no reflejadas en este
+-- espejo, ver supabase/migrations/0053_precios_server_side.sql) valoran cada
+-- línea SIEMPRE con product.precio y product.tipo_impositivo del tenant;
+-- ignoran el precio/tipo que envíe el cliente (salvo precio variable NULL).
 
 -- Log de eventos inmutables de la comanda (event sourcing ligero, docs/06 §4.2)
 CREATE TABLE order_event (
@@ -325,11 +465,27 @@ CREATE TABLE payment (
 CREATE UNIQUE INDEX idx_payment_client ON payment (tenant_id, client_id);
 CREATE INDEX idx_payment_tenant_order ON payment (tenant_id, order_id);
 
+-- Formas de pago configurables (0014 + flags de 0055). El TPV (cobro) y el
+-- arqueo de caja consumen los flags abre_cajon / cuenta_arqueo.
+CREATE TABLE payment_method (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre        text NOT NULL,
+  tipo          text NOT NULL DEFAULT 'OTRO'
+                  CHECK (tipo IN ('EFECTIVO','TARJETA','BIZUM','VALE','OTRO')),
+  activo        boolean DEFAULT true,
+  abre_cajon    boolean NOT NULL DEFAULT false,   -- 0055
+  cuenta_arqueo boolean NOT NULL DEFAULT true,     -- 0055
+  orden         int DEFAULT 0,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
 -- Factura / ticket. Numeración correlativa por (location, serie).
+-- Forma consolidada tras 0034 (0001 + columnas VERIFACTU de 0022).
 CREATE TABLE invoice (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
-  location_id   uuid NOT NULL REFERENCES location(id) ON DELETE CASCADE,
+  location_id   uuid REFERENCES location(id) ON DELETE CASCADE,
   order_id      uuid REFERENCES sales_order(id) ON DELETE SET NULL,
   serie         text NOT NULL,
   numero        bigint NOT NULL,
@@ -342,11 +498,37 @@ CREATE TABLE invoice (
   base_total    numeric(12,2) NOT NULL,
   cuota_total   numeric(12,2) NOT NULL,
   importe_total numeric(12,2) NOT NULL,
-  fecha_expedicion date NOT NULL DEFAULT current_date,
+  fecha_expedicion text NOT NULL,           -- dd-mm-aaaa (formato AEAT, 0034)
+  -- VERIFACTU (0022/0034): lo que escribe /api/factura
+  num_serie_factura text,
+  nif_emisor        text,
+  nombre_emisor     text,
+  tipo_factura      text NOT NULL DEFAULT 'F2',
+  huella            text,
+  huella_anterior   text,
+  qr_url            text,
+  fecha_hora_huso   text,
+  estado_aeat       text NOT NULL DEFAULT 'NO_ENVIADA',
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX idx_invoice_serie_num ON invoice (tenant_id, location_id, serie, numero);
 CREATE INDEX idx_invoice_tenant_loc ON invoice (tenant_id, location_id, fecha_expedicion);
+ALTER TABLE invoice ADD CONSTRAINT invoice_tenant_serie_numero_key UNIQUE (tenant_id, serie, numero);
+
+-- Series de documento (stub 0019 + gestor multi-serie de 0055). prefijo=código
+-- de serie ("F","T"…), nombre=descripción. La facturación aún usa
+-- location.serie_factura; migrará a elegir de aquí por tipo.
+CREATE TABLE invoice_series (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre        text NOT NULL,                     -- descripción legible
+  prefijo       text,                              -- código de serie
+  tipo          text NOT NULL DEFAULT 'FACTURA'    -- 0055
+                  CHECK (tipo IN ('FACTURA','TICKET','ABONO','PRESUPUESTO')),
+  predeterminada boolean NOT NULL DEFAULT false,   -- 0055
+  activa         boolean NOT NULL DEFAULT true,    -- 0055
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
 
 -- Desglose de impuestos por tipo (un ticket puede tener varios: 7% y 15%)
 CREATE TABLE tax_line (
@@ -483,7 +665,8 @@ END$$;
 
 -- =============================================================================
 --  setting — configuración clave/valor por ámbito (GLOBAL/LOCAL/DEVICE).
---  Helpers setting_get()/setting_set() en supabase/migrations/0023_setting.sql.
+--  Helpers setting_get()/setting_set() en supabase/migrations/0023_setting.sql
+--  (setting_set valida pertenencia de location_id/device_id al tenant en 0054).
 -- =============================================================================
 CREATE TABLE setting (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -522,7 +705,9 @@ BEGIN
     'modifier','product_allergen','ingredient','recipe_item','stock_move','room',
     'restaurant_table','sales_order','order_line','order_event','payment','invoice',
     'tax_line','verifactu_record','ticketbai_record','cash_session','cash_move',
-    'customer','reservation','online_order','setting'
+    'customer','reservation','online_order','setting','tenant_module',
+    'perfil','tarifa','product_price','promocion','licencia',
+    'payment_method','invoice_series'
   ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

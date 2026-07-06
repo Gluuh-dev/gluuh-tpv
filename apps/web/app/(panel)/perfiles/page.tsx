@@ -1,13 +1,236 @@
-import { CrudPage } from "@/components/crud-page";
+"use client";
 
-export default function Page() {
-  return <CrudPage config={{
-    table: "perfil", titulo: "Perfiles y permisos", singular: "perfil",
-    descripcion: "Perfiles de usuario con sus niveles de acceso y permisos.",
-    fields: [
-      { name: "nombre", label: "Nombre", required: true },
-      { name: "descripcion", label: "Descripción", type: "textarea" },
-    ],
-    columns: [{ name: "nombre", label: "Nombre" }, { name: "descripcion", label: "Descripción" }],
-  }} />;
+// Perfiles de permisos: CRUD de perfiles (tabla perfil) + los mismos 5 flags
+// de permisos del TPV que app_user.permisos (ausente = permitido), guardados
+// en perfil.permisos (migración 0048). Desde Empleados se puede "aplicar
+// perfil" para copiar estos flags a un empleado.
+// Si la migración aún no está aplicada, el CRUD sigue funcionando y los
+// permisos quedan deshabilitados con aviso.
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+interface Permisos { modificar?: boolean; descuento?: boolean; borrar?: boolean; invitar?: boolean; cobrar?: boolean }
+interface Perfil { id: string; nombre: string; descripcion: string | null; permisos?: Permisos }
+
+// Misma lista y claves que (panel)/empleados/page.tsx y app/tpv (0041).
+const PERMISOS: [keyof Permisos, string][] = [
+  ["modificar", "Modificar la cuenta (cantidades, precio, notas)"],
+  ["descuento", "Aplicar descuentos"],
+  ["borrar", "Borrar / anular cuenta"],
+  ["invitar", "Invitaciones y consumo propio"],
+  ["cobrar", "Cobrar"],
+];
+
+export default function Perfiles() {
+  const sb = supabaseBrowser();
+  const [tenantId, setTenantId] = useState("");
+  const [perfiles, setPerfiles] = useState<Perfil[]>([]);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [sinMigracion, setSinMigracion] = useState(false);
+  const [form, setForm] = useState({ nombre: "", descripcion: "" });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [permForm, setPermForm] = useState<Permisos>({});
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const { data: t } = await sb.from("tenant").select("id").limit(1).maybeSingle();
+      setTenantId((t as { id: string } | null)?.id ?? "");
+      // Con permisos; si la columna no existe aún (0048 sin aplicar) → aviso.
+      const conPermisos = await sb.from("perfil").select("id,nombre,descripcion,permisos").order("nombre");
+      if (conPermisos.error) {
+        const { data } = await sb.from("perfil").select("id,nombre,descripcion").order("nombre");
+        setPerfiles((data as Perfil[]) ?? []);
+        setSinMigracion(true);
+      } else {
+        setPerfiles((conPermisos.data as Perfil[]) ?? []);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sel = perfiles.find((p) => p.id === selId) ?? null;
+
+  function seleccionar(p: Perfil) {
+    setSelId(p.id);
+    setPermForm({ ...(p.permisos ?? {}) });
+  }
+
+  function abrirEditar(p: Perfil) {
+    setEditId(p.id);
+    setForm({ nombre: p.nombre, descripcion: p.descripcion ?? "" });
+  }
+
+  async function guardarFicha(e: React.FormEvent) {
+    e.preventDefault();
+    const nombre = form.nombre.trim();
+    if (!nombre) return;
+    const payload = { nombre, descripcion: form.descripcion.trim() || null };
+    if (editId) {
+      const { error } = await sb.from("perfil").update(payload).eq("id", editId);
+      if (error) { toast.error(error.message); return; }
+      setPerfiles((prev) => prev.map((p) => (p.id === editId ? { ...p, ...payload } : p)).sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setEditId(null);
+    } else {
+      const { data, error } = await sb.from("perfil").insert({ tenant_id: tenantId, ...payload }).select("id,nombre,descripcion").single();
+      if (error) { toast.error(error.message); return; }
+      const nuevo = data as Perfil;
+      setPerfiles((prev) => [...prev, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      seleccionar(nuevo);
+    }
+    setForm({ nombre: "", descripcion: "" });
+  }
+
+  async function borrar(p: Perfil) {
+    if (!confirm(`¿Eliminar el perfil "${p.nombre}"?`)) return;
+    const { error } = await sb.from("perfil").delete().eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    setPerfiles((prev) => prev.filter((x) => x.id !== p.id));
+    if (selId === p.id) setSelId(null);
+    if (editId === p.id) { setEditId(null); setForm({ nombre: "", descripcion: "" }); }
+  }
+
+  async function guardarPermisos() {
+    if (!sel || sinMigracion) return;
+    setGuardando(true);
+    const { error } = await sb.from("perfil").update({ permisos: permForm }).eq("id", sel.id);
+    setGuardando(false);
+    if (error) { toast.error(error.message); return; }
+    setPerfiles((prev) => prev.map((p) => (p.id === sel.id ? { ...p, permisos: { ...permForm } } : p)));
+    toast.success(`Permisos del perfil "${sel.nombre}" guardados.`);
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader
+        title="Perfiles y permisos"
+        description="Plantillas de permisos del TPV. Desde Empleados puedes aplicar un perfil a cada empleado."
+      />
+
+      {sinMigracion && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-500/15 px-4 py-3 text-sm text-amber-600 dark:text-amber-500">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p>
+            Falta aplicar la migración <strong>0048</strong> (columna <code>perfil.permisos</code>) en la
+            base de datos. Puedes crear y editar perfiles, pero sus permisos no se pueden guardar todavía.
+          </p>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Lista + alta/edición */}
+        <Card className="self-start">
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              {perfiles.length === 0 && (
+                <p className="py-2 text-sm text-(--text-muted)">Aún no hay perfiles. Crea el primero abajo.</p>
+              )}
+              {perfiles.map((p) => (
+                <div
+                  key={p.id}
+                  className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm ${
+                    selId === p.id ? "bg-surface-muted font-medium" : "hover:bg-surface-overlay"
+                  }`}
+                >
+                  <button type="button" onClick={() => seleccionar(p)} className="flex-1 text-left">
+                    <span>{p.nombre}</span>
+                    {p.descripcion && <span className="block text-xs font-normal text-(--text-muted)">{p.descripcion}</span>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => abrirEditar(p)}
+                    aria-label={`Editar ${p.nombre}`}
+                    title="Editar"
+                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void borrar(p)}
+                    aria-label={`Eliminar ${p.nombre}`}
+                    title="Eliminar"
+                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-destructive group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={guardarFicha} className="space-y-2 border-t border-border pt-3">
+              <div className="space-y-1.5">
+                <Label>{editId ? "Editar perfil" : "Nuevo perfil"}</Label>
+                <Input
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  placeholder="Nombre (p. ej. Encargado)"
+                />
+              </div>
+              <Textarea
+                rows={2}
+                value={form.descripcion}
+                onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                placeholder="Descripción (opcional)"
+              />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" disabled={!form.nombre.trim()}>
+                  {editId ? "Guardar cambios" : <><Plus className="h-4 w-4" /> Crear perfil</>}
+                </Button>
+                {editId && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => { setEditId(null); setForm({ nombre: "", descripcion: "" }); }}>
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Permisos del perfil seleccionado */}
+        <Card className="self-start">
+          <CardContent>
+            {!sel ? (
+              <p className="py-6 text-center text-sm text-(--text-muted)">
+                Selecciona un perfil para editar sus permisos.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <h3 className="font-semibold">Permisos de {sel.nombre}</h3>
+                  <p className="text-sm text-(--text-muted)">
+                    Lo que puede hacer en el TPV quien tenga este perfil. Desmarca lo que quieras bloquear.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  {PERMISOS.map(([k, t]) => (
+                    <label key={k} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={permForm[k] !== false}
+                        disabled={sinMigracion}
+                        onChange={(e) => setPermForm((s) => ({ ...s, [k]: e.target.checked }))}
+                      />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+                <Button onClick={() => void guardarPermisos()} disabled={sinMigracion || guardando}>
+                  {guardando ? "Guardando…" : "Guardar permisos"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 }

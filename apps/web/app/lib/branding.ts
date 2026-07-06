@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface Branding {
   nombre_comercial: string | null;
   logo_url: string | null;
+  /** Logo para la cabecera del ticket térmico (b/n, simple). Cae a logo_url si falta. */
+  logo_ticket_url: string | null;
   color_primario: string;
   color_secundario: string;
   kiosko_titulo: string | null;
@@ -14,6 +16,7 @@ export interface Branding {
 export const BRANDING_DEFAULT: Branding = {
   nombre_comercial: null,
   logo_url: null,
+  logo_ticket_url: null,
   color_primario: "#e11d48",
   color_secundario: "#0f172a",
   kiosko_titulo: null,
@@ -26,7 +29,7 @@ export const BRANDING_DEFAULT: Branding = {
 export async function leerBranding(sb: SupabaseClient): Promise<Branding> {
   const { data } = await sb
     .from("tenant_branding")
-    .select("nombre_comercial,logo_url,color_primario,color_secundario,kiosko_titulo,kiosko_subtitulo,mesa_color,silla_color")
+    .select("nombre_comercial,logo_url,logo_ticket_url,color_primario,color_secundario,kiosko_titulo,kiosko_subtitulo,mesa_color,silla_color")
     .limit(1)
     .maybeSingle();
   return { ...BRANDING_DEFAULT, ...(data ?? {}) };

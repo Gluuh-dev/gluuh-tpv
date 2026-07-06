@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { BRANDING_DEFAULT, leerBranding, type Branding } from "../lib/branding";
 import type { EstadoPrep } from "../lib/estados";
 import { estacionDe } from "../lib/estaciones";
+import { CONFIG_PANTALLA_DEF, configCon, leerConfigModulo, type ConfigPantalla } from "../lib/modulos";
 
 interface Pedido { id: string; numero_pedido: number | null; estado_preparacion: EstadoPrep; order_line: { estacion: string | null }[] }
 
@@ -19,6 +20,7 @@ export default function PantallaCliente() {
   const [brand, setBrand] = useState<Branding>(BRANDING_DEFAULT);
   const [empresa, setEmpresa] = useState("");
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [cfg, setCfg] = useState<ConfigPantalla>(CONFIG_PANTALLA_DEF);
 
   const cargar = useCallback(async () => {
     const { data } = await sb
@@ -28,24 +30,42 @@ export default function PantallaCliente() {
       .neq("estado_preparacion", "ENTREGADO")
       .not("numero_pedido", "is", null)
       .order("numero_pedido", { ascending: true });
-    // La pantalla del cliente muestra SOLO comidas (pedidos con líneas de cocina).
-    const rows = (data as unknown as Pedido[]) ?? [];
-    setPedidos(rows.filter((p) => p.order_line?.some((l) => estacionDe(l.estacion) === "COCINA")));
+    // Se filtra por estación al renderizar (según config incluirBarra).
+    setPedidos((data as unknown as Pedido[]) ?? []);
   }, [sb]);
+
+  // Debounce (trailing, un solo timer) sobre `cargar`: una venta genera varios
+  // eventos realtime seguidos y sin esto se relanzaba la recarga por cada uno.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cargarDebounced = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void cargar(); }, 500);
+  }, [cargar]);
 
   useEffect(() => {
     let ch: ReturnType<typeof sb.channel> | undefined;
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { setEstado("sin-sesion"); return; }
-      const [{ data: t }, b] = await Promise.all([sb.from("tenant").select("nombre").limit(1).maybeSingle(), leerBranding(sb)]);
+      const [{ data: t }, b, rawCfg] = await Promise.all([
+        sb.from("tenant").select("nombre").limit(1).maybeSingle(),
+        leerBranding(sb),
+        leerConfigModulo(sb, "PANTALLA"),
+      ]);
       setBrand(b);
       setEmpresa(b.nombre_comercial || t?.nombre || "");
+      setCfg(configCon(CONFIG_PANTALLA_DEF, rawCfg));
       await cargar();
       setEstado("ok");
-      ch = sb.channel("pantalla").on("postgres_changes", { event: "*", schema: "public", table: "sales_order" }, () => cargar()).subscribe();
+      // Canal SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"`
+      // los UPDATE que sacan un pedido de ese estado (COBRADA/ANULADA) no llegarían
+      // y el número quedaría "zombi" en el display. El debounce colapsa la tormenta.
+      ch = sb.channel("pantalla").on("postgres_changes", { event: "*", schema: "public", table: "sales_order" }, cargarDebounced).subscribe();
     })();
-    return () => { if (ch) sb.removeChannel(ch); };
+    return () => {
+      if (ch) sb.removeChannel(ch);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
     /* eslint-disable-next-line */
   }, []);
 
@@ -66,8 +86,14 @@ export default function PantallaCliente() {
     </div>
   );
 
-  const preparando = pedidos.filter((p) => p.estado_preparacion === "PENDIENTE" || p.estado_preparacion === "EN_PREPARACION");
-  const listos = pedidos.filter((p) => p.estado_preparacion === "LISTO");
+  // La pantalla del cliente muestra las comidas (líneas de cocina); con
+  // incluirBarra también los pedidos cuyo único contenido es de barra.
+  const visibles = pedidos.filter((p) => p.order_line?.some((l) => {
+    const e = estacionDe(l.estacion);
+    return e === "COCINA" || (cfg.incluirBarra && e === "BARRA");
+  }));
+  const preparando = visibles.filter((p) => p.estado_preparacion === "PENDIENTE" || p.estado_preparacion === "EN_PREPARACION");
+  const listos = visibles.filter((p) => p.estado_preparacion === "LISTO");
 
   return (
     <div className="dark">
@@ -79,7 +105,7 @@ export default function PantallaCliente() {
         </header>
         <div className="grid flex-1 grid-cols-2">
           <section className="flex flex-col items-center p-8">
-            <h2 className="mb-6 text-3xl font-bold" style={{ color: "hsl(var(--chart-4))" }}>⏳ En preparación</h2>
+            <h2 className="mb-6 text-3xl font-bold" style={{ color: "hsl(var(--chart-4))" }}>⏳ {cfg.tituloPreparando}</h2>
             <div className="flex flex-wrap justify-center gap-5">
               {preparando.length === 0 && (
                 <span className="text-5xl text-muted-foreground">—</span>
@@ -96,7 +122,7 @@ export default function PantallaCliente() {
             </div>
           </section>
           <section className="flex flex-col items-center border-l border-border p-8">
-            <h2 className="mb-6 text-3xl font-bold" style={{ color: "hsl(var(--chart-2))" }}>✅ Listos para recoger</h2>
+            <h2 className="mb-6 text-3xl font-bold" style={{ color: "hsl(var(--chart-2))" }}>✅ {cfg.tituloListos}</h2>
             <div className="flex flex-wrap justify-center gap-5">
               {listos.length === 0 && (
                 <span className="text-5xl text-muted-foreground">—</span>

@@ -16,6 +16,11 @@ export interface PrintJob {
   abrirCajon?: boolean;
   /** Contenido para imprimir como QR (p. ej. URL de cotejo VERIFACTU). */
   qr?: string;
+  /**
+   * Impresora destino de ESTE trabajo (enrutado: barra, cocina, caja…).
+   * Si se omite, se usa la impresora por defecto del terminal.
+   */
+  impresora?: { uri: string; tipo?: "EPSON" | "STAR"; ancho?: number };
 }
 
 /** Contrato que implementa cada backend de impresión. */
@@ -24,5 +29,3 @@ export interface Printer {
 }
 
 export { EscPosPrinter, type ConfigImpresora } from "./escpos.js";
-
-export const HARDWARE_PACKAGE = "@gluuh/hardware";

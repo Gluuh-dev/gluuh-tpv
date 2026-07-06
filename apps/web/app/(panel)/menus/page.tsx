@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CLASES_FISCALES } from "@/lib/fiscal-clases";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 interface Menu { id: string; nombre: string; precio: number; clase_fiscal: string; activo: boolean }
 interface Grupo { id: string; menu_id: string; nombre: string; orden: number }
@@ -63,7 +64,12 @@ export default function Menus() {
     await sb.from("menu_choice").delete().eq("group_id", group_id).eq("product_id", product_id); cargar();
   }
 
-  if (loading) return <div className="text-muted-foreground">Cargando…</div>;
+  if (loading) return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader title="Menús" description="Menús del día y combos: crea grupos (Primero, Segundo, Postre) y elige qué productos ofrece cada uno." />
+      <TableSkeleton rows={5} />
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

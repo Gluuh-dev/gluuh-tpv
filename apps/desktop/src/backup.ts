@@ -8,7 +8,9 @@ const RETENCION = 30;
 
 export interface FicheroBackup {
   nombre: string;
+  /** Texto (CSV/JSON) o, si base64=true, contenido binario en base64 (imágenes). */
   contenido: string;
+  base64?: boolean;
 }
 
 export function guardarBackupEnDisco(
@@ -21,8 +23,13 @@ export function guardarBackupEnDisco(
     const carpeta = path.join(destino, nombreCarpeta.startsWith(PREFIJO) ? nombreCarpeta : PREFIJO + nombreCarpeta);
     mkdirSync(carpeta, { recursive: true });
     for (const f of ficheros) {
-      // Solo el nombre base: nada de rutas relativas que escapen de la carpeta.
-      writeFileSync(path.join(carpeta, path.basename(f.nombre)), f.contenido, "utf8");
+      // Se permite una subcarpeta (p. ej. "imagenes/x.jpg") pero cada segmento se
+      // sanea con basename() para que nada pueda escapar de la carpeta de backup.
+      const rel = f.nombre.split(/[\\/]/).map((s) => path.basename(s)).filter(Boolean).join(path.sep);
+      const destinoFichero = path.join(carpeta, rel);
+      mkdirSync(path.dirname(destinoFichero), { recursive: true });
+      if (f.base64) writeFileSync(destinoFichero, Buffer.from(f.contenido, "base64"));
+      else writeFileSync(destinoFichero, f.contenido, "utf8");
     }
     // Retención: borrar las copias más antiguas (orden lexicográfico = cronológico).
     const copias = readdirSync(destino).filter((d) => d.startsWith(PREFIJO)).sort();
@@ -38,12 +45,15 @@ export function guardarBackupEnDisco(
 /** Devuelve true una vez al día cuando el reloj pasa por la hora configurada. */
 export function crearPlanificadorDiario(obtenerHora: () => string | undefined, accion: () => void): NodeJS.Timeout {
   let ultimoDia = "";
+  const pad = (n: number) => String(n).padStart(2, "0");
   return setInterval(() => {
     const hora = obtenerHora();
     if (!hora) return;
     const ahora = new Date();
-    const hoy = ahora.toISOString().slice(0, 10);
-    const hhmm = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+    // Fecha y hora en horario LOCAL: mezclar día UTC con hora local disparaba el
+    // backup dos veces en las horas de madrugada (España es UTC+1/+2).
+    const hoy = `${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())}`;
+    const hhmm = `${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
     if (hhmm >= hora && ultimoDia !== hoy) {
       ultimoDia = hoy;
       accion();

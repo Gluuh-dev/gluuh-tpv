@@ -5,6 +5,7 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { nombreImpuesto } from "@/lib/fiscal-clases";
 
@@ -38,7 +39,7 @@ export default function Impuestos() {
           <Table>
             <TableHeader><TableRow><TableHead>Clase fiscal</TableHead><TableHead className="text-right">{nombreImpuesto(territorio)}</TableHead></TableRow></TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={2} className="py-6 text-center text-(--text-muted)">Cargando…</TableCell></TableRow>}
+              {loading && <TableRow><TableCell colSpan={2} className="py-3"><div className="space-y-2.5">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-5 w-full" />)}</div></TableCell></TableRow>}
               {rates.map((r) => (
                 <TableRow key={r.clase_fiscal}>
                   <TableCell className="font-medium">{CLASE_LABEL[r.clase_fiscal] ?? r.clase_fiscal}</TableCell>

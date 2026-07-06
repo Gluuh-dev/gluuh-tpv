@@ -8,6 +8,6 @@ export default function Page() {
       { name: "nombre", label: "Nombre", required: true, placeholder: "Kilogramo" },
       { name: "abreviatura", label: "Abreviatura", placeholder: "kg" },
     ],
-    columns: [{ name: "nombre", label: "Nombre" }, { name: "abreviatura", label: "Abreviatura" }],
+    columns: [{ name: "nombre", label: "Nombre" }, { name: "abreviatura", label: "Abreviatura", badge: true }],
   }} />;
 }

@@ -14,15 +14,17 @@ import {
 // El motor VERIFACTU usa node:crypto → este handler debe ejecutarse en Node.
 export const runtime = "nodejs";
 
-interface LineaDto {
-  precio: number;
-  tipo: number;
-  cantidad: number;
-}
-
+// Seguridad A2: las líneas fiscales NO se aceptan del cliente; se derivan del
+// pedido real (order_line) a partir del orderId. El body queda mínimo.
 interface FacturaDto {
   orderId?: string;
-  lineas: LineaDto[];
+}
+
+interface LineaBd {
+  precio_unitario: number | string;
+  cantidad: number | string;
+  tipo_impositivo: number | string;
+  product: { tipo_impositivo: number | string } | null;
 }
 
 // Mapeo de territorios forales al tipo de impuesto peninsular
@@ -56,16 +58,17 @@ export async function POST(req: Request) {
 
     // ── 2. Cuerpo de la petición ─────────────────────────────────────────────
     const body = (await req.json()) as FacturaDto;
-    if (!body.lineas?.length) {
-      return NextResponse.json({ ok: false, error: "Lineas vacías" }, { status: 400 });
+    if (!body.orderId) {
+      return NextResponse.json({ ok: false, error: "orderId requerido" }, { status: 400 });
     }
 
     // ── 3. Datos fiscales del local ──────────────────────────────────────────
     const { data: loc } = await supa
       .from("location")
-      .select("tenant_id,cif,razon_social,territorio_fiscal,serie_factura")
+      .select("id,tenant_id,cif,razon_social,territorio_fiscal,serie_factura")
       .limit(1)
       .maybeSingle();
+    const locationId = (loc as { id?: string } | null)?.id ?? null;
 
     const nif = loc?.cif && loc.cif !== "PENDIENTE" ? loc.cif : "B00000000";
     const nombre = (loc?.razon_social as string | null) ?? undefined;
@@ -93,10 +96,31 @@ export async function POST(req: Request) {
       };
     }
 
-    // ── 5. Cálculo fiscal ────────────────────────────────────────────────────
-    const lineasFiscales: LineaFiscal[] = body.lineas.map((l) => ({
-      importe: l.precio * l.cantidad,
-      tipo: l.tipo,
+    // ── 5. Cálculo fiscal desde el pedido REAL (nunca del body) ─────────────
+    // El cliente lleva el token del llamante: RLS acota order_line al tenant,
+    // así que un orderId ajeno devuelve 0 filas y se rechaza.
+    const { data: lineasBdRaw, error: lineasErr } = await supa
+      .from("order_line")
+      .select("precio_unitario,cantidad,tipo_impositivo,product:product_id(tipo_impositivo)")
+      .eq("order_id", body.orderId);
+    if (lineasErr) {
+      return NextResponse.json({ ok: false, error: lineasErr.message }, { status: 500 });
+    }
+    const lineasBd = (lineasBdRaw ?? []) as unknown as LineaBd[];
+    if (!lineasBd.length) {
+      return NextResponse.json(
+        { ok: false, error: "Pedido inexistente o sin líneas" },
+        { status: 404 },
+      );
+    }
+
+    // % vigente del producto como verdad; snapshot de order_line si el producto
+    // ya no existe. ponytail: el precio_unitario escrito por el TPV autenticado
+    // sigue viniendo del navegador del personal (inserta order_line directo);
+    // techo conocido — se cierra cuando el TPV pase por una RPC como el kiosko.
+    const lineasFiscales: LineaFiscal[] = lineasBd.map((l) => ({
+      importe: Number(l.precio_unitario) * Number(l.cantidad),
+      tipo: Number(l.product?.tipo_impositivo ?? l.tipo_impositivo),
     }));
     const impuestos = calcularImpuestosIncluidos(lineasFiscales, territorio);
 
@@ -142,7 +166,8 @@ export async function POST(req: Request) {
         .from("invoice")
         .insert({
           tenant_id: tenantId,
-          order_id: body.orderId ?? null,
+          location_id: locationId,
+          order_id: body.orderId,
           serie,
           numero,
           num_serie_factura: numSerieFactura,

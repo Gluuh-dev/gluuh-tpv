@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Offer {
   id: string; titulo: string; descripcion: string | null; precio: string | null;
@@ -27,6 +28,7 @@ export default function Personalizar() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string>("");
   const logoInput = useRef<HTMLInputElement>(null);
+  const logoTicketInput = useRef<HTMLInputElement>(null);
 
   async function cargar() {
     const { data: t } = await sb.from("tenant").select("id").limit(1).maybeSingle();
@@ -52,6 +54,12 @@ export default function Personalizar() {
   async function onLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f || !tenantId) return;
     try { const url = await subirMedia(sb, tenantId, f, "marca"); setMarca((m) => ({ ...m, logo_url: url })); aviso("Logo subido (recuerda Guardar)"); }
+    catch (err) { aviso("Error subiendo logo"); console.error(err); }
+  }
+
+  async function onLogoTicket(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f || !tenantId) return;
+    try { const url = await subirMedia(sb, tenantId, f, "marca"); setMarca((m) => ({ ...m, logo_ticket_url: url })); aviso("Logo de tickets subido (recuerda Guardar)"); }
     catch (err) { aviso("Error subiendo logo"); console.error(err); }
   }
 
@@ -85,7 +93,18 @@ export default function Personalizar() {
     } catch (err) { aviso("Error subiendo archivo"); console.error(err); }
   }
 
-  if (loading) return <div className="text-muted-foreground">Cargando…</div>;
+  if (loading) return (
+    <div className="mx-auto max-w-5xl space-y-8">
+      <PageHeader title="Personalización" description="Tu marca y tus ofertas, tal y como las verán tus clientes en kiosko, display y cartelería." />
+      <div className="space-y-4 rounded-lg border border-border bg-surface p-6">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-9 w-full max-w-md" />
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-9 w-full max-w-md" />
+        <Skeleton className="h-9 w-40" />
+      </div>
+    </div>
+  );
   const fg = textoSobre(marca.color_primario);
 
   return (
@@ -104,16 +123,29 @@ export default function Personalizar() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Label>Nombre comercial</Label><Input value={marca.nombre_comercial ?? ""} onChange={(e) => setMarca({ ...marca, nombre_comercial: e.target.value })} placeholder="Mi Restaurante" /></div>
               <div className="space-y-1.5">
-                <Label>Logo</Label>
+                <Label>Logo original (color)</Label>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => logoInput.current?.click()}><Upload className="h-4 w-4" /> Subir</Button>
                   {marca.logo_url && <img src={marca.logo_url} alt="" className="h-9 w-9 rounded object-contain" />}
                   {marca.logo_url && <button type="button" onClick={() => setMarca({ ...marca, logo_url: null })} className="text-xs text-destructive">Quitar</button>}
                   <input ref={logoInput} type="file" accept="image/*" className="hidden" onChange={onLogo} />
                 </div>
+                <p className="text-xs text-muted-foreground">A color, para kiosko, display y cartelería.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Logo para tickets (blanco y negro)</Label>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => logoTicketInput.current?.click()}><Upload className="h-4 w-4" /> Subir</Button>
+                  {marca.logo_ticket_url && <img src={marca.logo_ticket_url} alt="" className="h-9 w-9 rounded border border-border bg-white object-contain p-0.5" />}
+                  {marca.logo_ticket_url && <button type="button" onClick={() => setMarca({ ...marca, logo_ticket_url: null })} className="text-xs text-destructive">Quitar</button>}
+                  <input ref={logoTicketInput} type="file" accept="image/*" className="hidden" onChange={onLogoTicket} />
+                </div>
+                <p className="text-xs text-muted-foreground">Se imprime en la cabecera del ticket; usa una versión simple, alto contraste.</p>
               </div>
               <div className="space-y-1.5"><Label>Color principal</Label><div className="flex items-center gap-2"><input type="color" value={marca.color_primario} onChange={(e) => setMarca({ ...marca, color_primario: e.target.value })} className="h-10 w-12 rounded border border-input" /><Input value={marca.color_primario} onChange={(e) => setMarca({ ...marca, color_primario: e.target.value })} /></div></div>
               <div className="space-y-1.5"><Label>Color secundario</Label><div className="flex items-center gap-2"><input type="color" value={marca.color_secundario} onChange={(e) => setMarca({ ...marca, color_secundario: e.target.value })} className="h-10 w-12 rounded border border-input" /><Input value={marca.color_secundario} onChange={(e) => setMarca({ ...marca, color_secundario: e.target.value })} /></div></div>
+              <div className="space-y-1.5"><Label>Color de las mesas (plano)</Label><div className="flex items-center gap-2"><input type="color" value={marca.mesa_color} onChange={(e) => setMarca({ ...marca, mesa_color: e.target.value })} className="h-10 w-12 rounded border border-input" /><Input value={marca.mesa_color} onChange={(e) => setMarca({ ...marca, mesa_color: e.target.value })} /></div></div>
+              <div className="space-y-1.5"><Label>Color de las sillas (plano)</Label><div className="flex items-center gap-2"><input type="color" value={marca.silla_color} onChange={(e) => setMarca({ ...marca, silla_color: e.target.value })} className="h-10 w-12 rounded border border-input" /><Input value={marca.silla_color} onChange={(e) => setMarca({ ...marca, silla_color: e.target.value })} /></div></div>
               <div className="space-y-1.5"><Label>Título del kiosko</Label><Input value={marca.kiosko_titulo ?? ""} onChange={(e) => setMarca({ ...marca, kiosko_titulo: e.target.value })} placeholder="¡Bienvenido!" /></div>
               <div className="space-y-1.5"><Label>Subtítulo del kiosko</Label><Input value={marca.kiosko_subtitulo ?? ""} onChange={(e) => setMarca({ ...marca, kiosko_subtitulo: e.target.value })} placeholder="Haz tu pedido aquí" /></div>
             </div>

@@ -7,6 +7,7 @@ interface GluuhPrintJob {
   cortar?: boolean;
   abrirCajon?: boolean;
   qr?: string;
+  impresora?: { uri: string; tipo?: "EPSON" | "STAR"; ancho?: number };
 }
 
 interface GluuhEvento {
@@ -23,7 +24,7 @@ interface GluuhDesktop {
   publicarTicketVisor(datos: unknown): void;
   guardarBackup(
     nombreCarpeta: string,
-    ficheros: { nombre: string; contenido: string }[],
+    ficheros: { nombre: string; contenido: string; base64?: boolean }[],
   ): Promise<{ ok: boolean; ruta?: string; error?: string }>;
   onEvento(cb: (evento: GluuhEvento) => void): () => void;
 }

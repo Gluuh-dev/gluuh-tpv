@@ -3,8 +3,7 @@
 // reintenta cada 15 s y se notifica a la web (toast).
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { EscPosPrinter, type PrintJob } from "@gluuh/hardware";
-import type { ConfigImpresora } from "@gluuh/hardware";
+import { EscPosPrinter, type ConfigImpresora, type PrintJob } from "@gluuh/hardware";
 
 const REINTENTO_MS = 15_000;
 
@@ -47,20 +46,36 @@ export class ColaImpresion {
     return { ok: true, pendientes: this.cola.length };
   }
 
+  // Apertura de cajón INMEDIATA (best-effort, sin cola ni reintento): abrir el
+  // cajón horas después —cuando reviva la cola— con la caja desatendida es peor
+  // que no abrirlo. Si la impresora está apagada, simplemente no se abre ahora.
+  async abrirCajonInmediato(): Promise<{ ok: boolean; error?: string }> {
+    const config = this.obtenerConfig();
+    if (!config?.uri) return { ok: false, error: "Impresora sin configurar" };
+    try {
+      await new EscPosPrinter(config).imprimir({ lineas: [], cortar: false, abrirCajon: true });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
   private async procesar(): Promise<void> {
     if (this.procesando) return;
     this.procesando = true;
     try {
       while (this.cola.length) {
-        const config = this.obtenerConfig();
+        const job = this.cola[0]!;
+        // Cada trabajo va a SU impresora (barra, cocina…) por IP; si no trae
+        // una, a la impresora por defecto del terminal.
+        const config = job.impresora ?? this.obtenerConfig();
         if (!config?.uri) {
           this.notificar({
             tipo: "impresion",
-            datos: { estado: "ERROR", pendientes: this.cola.length, error: "Impresora sin configurar (config.json → impresora.uri)" },
+            datos: { estado: "ERROR", pendientes: this.cola.length, error: "Impresora sin configurar" },
           });
           return; // el timer reintentará cuando haya config
         }
-        const job = this.cola[0]!;
         try {
           await new EscPosPrinter(config).imprimir(job);
           this.cola.shift();

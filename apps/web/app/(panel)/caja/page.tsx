@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Wallet, ArrowDownToLine, ArrowUpFromLine, Lock } from "lucide-react";
+import { Wallet, ArrowDownToLine, ArrowUpFromLine, Lock, AlertTriangle } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { getSetting } from "../../lib/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
+import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 
 interface Sesion { id: string; fondo_inicial: number; abierta_en: string; cerrada_en: string | null; total_efectivo: number | null; descuadre: number | null }
 interface Mov { id: string; tipo: "ENTRADA" | "SALIDA"; importe: number; motivo: string | null; created_at: string }
@@ -25,6 +28,11 @@ export default function Caja() {
   const [fondo, setFondo] = useState("");
   const [mov, setMov] = useState({ tipo: "SALIDA" as "ENTRADA" | "SALIDA", importe: "", motivo: "" });
   const [loading, setLoading] = useState(true);
+  // Ajustes de "Configuración de caja" (setting GLOBAL) que guían el cierre.
+  const [arqueoCiego, setArqueoCiego] = useState(false);
+  const [umbral, setUmbral] = useState<number | null>(null); // null = sin umbral
+  const [cerrarOpen, setCerrarOpen] = useState(false);
+  const [contado, setContado] = useState("");
 
   async function cargar() {
     const { data: { session } } = await sb.auth.getSession();
@@ -43,7 +51,19 @@ export default function Caja() {
       setMovs((m as Mov[]) ?? []);
     } else setMovs([]);
   }
-  useEffect(() => { (async () => { await cargar(); setLoading(false); })(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { (async () => {
+    await cargar();
+    // Ajustes de "Configuración de caja": fondo por defecto, arqueo ciego y umbral.
+    const [f, ciego, u] = await Promise.all([
+      getSetting<number>("caja.fondo_inicial").catch(() => null),
+      getSetting<boolean>("caja.arqueo_ciego").catch(() => null),
+      getSetting<number>("caja.umbral_descuadre").catch(() => null),
+    ]);
+    if (f !== null) setFondo(String(f)); // precarga editable de la apertura
+    setArqueoCiego(ciego ?? false);
+    setUmbral(u);
+    setLoading(false);
+  })(); /* eslint-disable-next-line */ }, []);
 
   async function abrir(e: React.FormEvent) {
     e.preventDefault();
@@ -59,20 +79,35 @@ export default function Caja() {
 
   const entradas = movs.filter((m) => m.tipo === "ENTRADA").reduce((s, m) => s + Number(m.importe), 0);
   const salidas = movs.filter((m) => m.tipo === "SALIDA").reduce((s, m) => s + Number(m.importe), 0);
-  const teorico = (sesion?.fondo_inicial ?? 0) + entradas - salidas; // ponytail: solo efectivo; ventas por forma de pago al integrar cobro
+  // ponytail: el efectivo esperado del arqueo solo cuenta fondo + cash_move (efectivo).
+  // Cuando el cobro registre el método por pago, sumar aquí solo los pagos cuya
+  // payment_method.cuenta_arqueo = true; los métodos con cuenta_arqueo = false no arquean.
+  const teorico = (sesion?.fondo_inicial ?? 0) + entradas - salidas;
 
-  async function cerrar() {
-    if (!sesion) return;
-    const txt = prompt(`Efectivo contado en caja (teórico: ${eur(teorico)})`, teorico.toFixed(2));
-    if (txt === null) return;
-    const contado = Number(txt.replace(",", ".")) || 0;
-    await sb.from("cash_session").update({ cerrada_en: new Date().toISOString(), total_efectivo: contado, descuadre: contado - teorico }).eq("id", sesion.id);
+  // Cierre Z guiado por ajustes: arqueo ciego (oculta esperado hasta contar) y umbral de descuadre.
+  const contadoNum = Number(contado.replace(",", ".")) || 0;
+  const contadoIntroducido = contado.trim() !== "";
+  const descuadre = contadoNum - teorico;
+  const mostrarEsperado = !arqueoCiego || contadoIntroducido;
+  const superaUmbral = contadoIntroducido && umbral !== null && Math.abs(descuadre) > umbral;
+
+  async function confirmarCierre() {
+    if (!sesion || !contadoIntroducido) return;
+    await sb.from("cash_session").update({ cerrada_en: new Date().toISOString(), total_efectivo: contadoNum, descuadre }).eq("id", sesion.id);
+    setCerrarOpen(false); setContado("");
     cargar();
-    const d = contado - teorico;
-    toast.success(`Cierre Z guardado · descuadre ${eur(d)}`);
+    toast.success(`Cierre Z guardado · descuadre ${eur(descuadre)}`);
   }
 
-  if (loading) return <div className="text-muted-foreground">Cargando…</div>;
+  if (loading) return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader title="Caja" description="Control de caja y arqueo del turno." />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[76px] w-full" />)}
+      </div>
+      <TableSkeleton rows={4} />
+    </div>
+  );
 
   if (!sesion) return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -89,13 +124,14 @@ export default function Caja() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title="Caja abierta" description={`Desde ${new Date(sesion.abierta_en).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`}
-        actions={<Button variant="destructive" onClick={cerrar}><Lock className="h-4 w-4" /> Cerrar caja (Z)</Button>} />
+        actions={<Button variant="destructive" onClick={() => { setContado(""); setCerrarOpen(true); }}><Lock className="h-4 w-4" /> Cerrar caja (Z)</Button>} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Fondo inicial" value={eur(sesion.fondo_inicial)} />
         <StatCard icon={<ArrowDownToLine className="h-4 w-4" />} label="Entradas" value={eur(entradas)} />
         <StatCard icon={<ArrowUpFromLine className="h-4 w-4" />} label="Salidas" value={eur(salidas)} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Efectivo teórico" value={eur(teorico)} />
+        {/* Con arqueo ciego el esperado no se muestra hasta contar en el cierre. */}
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Efectivo teórico" value={arqueoCiego ? "—" : eur(teorico)} hint={arqueoCiego ? "Oculto por arqueo ciego" : undefined} />
       </div>
 
       <Card>
@@ -132,6 +168,52 @@ export default function Caja() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={cerrarOpen} onOpenChange={setCerrarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cierre de caja (Z)</DialogTitle>
+            <DialogDescription>
+              {arqueoCiego
+                ? "Arqueo ciego: cuenta el efectivo y anótalo. No verás el total esperado hasta introducirlo."
+                : "Introduce el efectivo contado para calcular el descuadre."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="cierre-contado" className="text-sm font-medium">Efectivo contado (€)</label>
+              <Input id="cierre-contado" autoFocus inputMode="decimal" placeholder="0,00 €" value={contado} onChange={(e) => setContado(e.target.value)} />
+            </div>
+
+            {mostrarEsperado && (
+              <div className="space-y-1 rounded-md border border-border bg-surface-muted px-3 py-2 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Efectivo teórico</span><span className="tabular-nums">{eur(teorico)}</span></div>
+                {contadoIntroducido && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Descuadre</span>
+                    <span className={`font-medium tabular-nums ${descuadre === 0 ? "" : descuadre > 0 ? "text-emerald-600" : "text-destructive"}`}>{descuadre > 0 ? "+" : ""}{eur(descuadre)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {superaUmbral && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-sm text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Descuadre de {eur(Math.abs(descuadre))} supera el límite ({eur(umbral ?? 0)}). Revisa el efectivo antes de confirmar el cierre.</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCerrarOpen(false)}>Cancelar</Button>
+            <Button variant={superaUmbral ? "destructive" : undefined} disabled={!contadoIntroducido} onClick={confirmarCierre}>
+              <Lock className="h-4 w-4" /> {superaUmbral ? "Confirmar cierre con descuadre" : "Cerrar caja (Z)"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

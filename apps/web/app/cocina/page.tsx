@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { COLOR, LABEL, SIGUIENTE, type EstadoPrep } from "../lib/estados";
 import { estacionDe } from "../lib/estaciones";
+import { CONFIG_COCINA_DEF, configCon, leerConfigModulo, type ConfigCocina } from "../lib/modulos";
 
 interface Linea { nombre: string; cantidad: number; estacion: string | null; notas: string | null }
 type Filtro = "COCINA" | "BARRA" | "CAMARERO" | "TODAS";
@@ -24,12 +25,37 @@ interface Pedido {
 
 const minutos = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
 
+// Beep corto (WebAudio, sin ficheros) al entrar una comanda nueva.
+function beep() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+    osc.onended = () => { void ctx.close(); };
+  } catch {
+    // Sin interacción previa el navegador puede bloquear el audio: silencio.
+  }
+}
+
 export default function Cocina() {
   const sb = supabaseBrowser();
   const router = useRouter();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<Filtro>("COCINA");
+  const [cfg, setCfg] = useState<ConfigCocina>(CONFIG_COCINA_DEF);
+  // Refs para que `cargar` (capturada por el canal realtime) no quede obsoleta.
+  const sonidoRef = useRef(CONFIG_COCINA_DEF.sonido);
+  const idsRef = useRef<Set<string> | null>(null);
+  // Re-render periódico para que los minutos y sus umbrales avancen solos.
+  const [, setTick] = useState(0);
 
   const cargar = useCallback(async () => {
     const { data } = await sb
@@ -38,23 +64,51 @@ export default function Cocina() {
       .eq("estado", "ENVIADA_COCINA")
       .neq("estado_preparacion", "ENTREGADO")
       .order("created_at", { ascending: true });
-    setPedidos((data as unknown as Pedido[]) ?? []);
+    const rows = (data as unknown as Pedido[]) ?? [];
+    setPedidos(rows);
+    const previos = idsRef.current;
+    if (previos && sonidoRef.current && rows.some((r) => !previos.has(r.id))) beep();
+    idsRef.current = new Set(rows.map((r) => r.id));
   }, [sb]);
+
+  // Debounce (trailing, un solo timer) sobre `cargar`: una venta genera varios
+  // eventos realtime seguidos (pedido + líneas + pago) y sin esto se relanzaba
+  // la recarga completa por cada uno.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cargarDebounced = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void cargar(); }, 500);
+  }, [cargar]);
 
   useEffect(() => {
     let ch: ReturnType<typeof sb.channel> | undefined;
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      const c = configCon(CONFIG_COCINA_DEF, await leerConfigModulo(sb, "COCINA"));
+      setCfg(c);
+      sonidoRef.current = c.sonido;
+      setFiltro(c.estacionDefecto);
       await cargar();
       setLoading(false);
+      // Canal SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"`
+      // los UPDATE que sacan un pedido de ese estado (COBRADA/ANULADA) no llegarían
+      // y la comanda quedaría "zombi" en pantalla. El debounce ya colapsa la tormenta.
       ch = sb
         .channel("cocina")
-        .on("postgres_changes", { event: "*", schema: "public", table: "sales_order" }, () => cargar())
+        .on("postgres_changes", { event: "*", schema: "public", table: "sales_order" }, cargarDebounced)
         .subscribe();
     })();
-    return () => { if (ch) sb.removeChannel(ch); };
+    return () => {
+      if (ch) sb.removeChannel(ch);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
     /* eslint-disable-next-line */
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setTick((v) => v + 1), 30_000);
+    return () => clearInterval(t);
   }, []);
 
   async function avanzar(p: Pedido) {
@@ -73,7 +127,7 @@ export default function Cocina() {
   const visibles = pedidos.filter((p) => filtro === "TODAS" || p.order_line.some((l) => estacionDe(l.estacion) === filtro));
 
   return (
-    <div className="dark">
+    <div className={cfg.tema === "claro" ? "" : "dark"}>
       <main className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border bg-card px-6 py-3">
           <div className="flex items-center justify-between">
@@ -100,11 +154,19 @@ export default function Cocina() {
             const titulo = p.restaurant_table?.nombre ?? (p.numero_pedido ? `A-${p.numero_pedido}` : "Pedido");
             const sig = SIGUIENTE[p.estado_preparacion];
             const lineas = filtro === "TODAS" ? p.order_line : p.order_line.filter((l) => estacionDe(l.estacion) === filtro);
+            // Umbrales de espera (config): ámbar al avisar, rojo en crítico —
+            // el borde entero cambia para leerse a 2 metros.
+            const min = minutos(p.created_at);
+            const nivel = min >= cfg.criticoMin ? "critico" : min >= cfg.avisoMin ? "aviso" : null;
             return (
               <div
                 key={p.id}
-                className="rounded-lg border border-border bg-card p-4 shadow-sm"
-                style={{ borderTopColor: COLOR[p.estado_preparacion], borderTopWidth: 4 }}
+                className={`rounded-lg border bg-card p-4 shadow-sm ${
+                  nivel === "critico" ? "border-2 border-red-500"
+                    : nivel === "aviso" ? "border-2 border-amber-500"
+                    : "border-border"
+                }`}
+                style={nivel ? undefined : { borderTopColor: COLOR[p.estado_preparacion], borderTopWidth: 4 }}
               >
                 <div className="mb-1 flex items-center justify-between">
                   <strong className="text-lg font-semibold">{titulo}</strong>
@@ -116,7 +178,16 @@ export default function Cocina() {
                   </span>
                 </div>
                 <div className="mb-2 text-xs text-muted-foreground tabular-nums">
-                  {p.canal} · hace {minutos(p.created_at)} min
+                  {p.canal} ·{" "}
+                  <span
+                    className={
+                      nivel === "critico" ? "text-sm font-bold text-red-500"
+                        : nivel === "aviso" ? "text-sm font-bold text-amber-500"
+                        : undefined
+                    }
+                  >
+                    hace {min} min
+                  </span>
                 </div>
                 <ul className="mb-3 space-y-0.5 text-sm">
                   {lineas.map((l, i) => (

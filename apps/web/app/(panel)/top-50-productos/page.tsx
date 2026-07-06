@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Package, ShoppingCart } from "lucide-react";
 
 interface RawLine {
@@ -40,18 +42,24 @@ function agruparPorProducto(lines: RawLine[]): ProductoTop[] {
 export default function Top50ProductosPage() {
   const [loading, setLoading] = useState(true);
   const [filas, setFilas] = useState<ProductoTop[]>([]);
+  const [rango, setRango] = useState<Rango>(RANGO_DEFECTO);
+  const [truncado, setTruncado] = useState(false);
 
   useEffect(() => {
     const sb = supabaseBrowser();
+    setLoading(true);
     (async () => {
       const { data } = await sb
         .from("order_line")
-        .select("nombre,cantidad,precio_unitario");
+        .select("nombre,cantidad,precio_unitario")
+        .gte("created_at", fechaDesde(rango))
+        .limit(LIMITE_INFORME);
       const rows = (data as RawLine[] | null) ?? [];
+      setTruncado(rows.length === LIMITE_INFORME);
       setFilas(agruparPorProducto(rows));
       setLoading(false);
     })();
-  }, []);
+  }, [rango]);
 
   const productosDistintos = filas.length;
   const udsTotales = filas.reduce((s, f) => s + f.uds, 0);
@@ -62,6 +70,9 @@ export default function Top50ProductosPage() {
         title="Top 50 productos"
         description="Productos más vendidos por unidades."
       />
+
+      <SelectorRango valor={rango} onCambio={setRango} />
+      <AvisoTruncado visible={truncado} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
@@ -97,8 +108,10 @@ export default function Top50ProductosPage() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      Cargando…
+                    <TableCell colSpan={4} className="py-3">
+                      <div className="space-y-2.5">
+                        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-5 w-full" />)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}

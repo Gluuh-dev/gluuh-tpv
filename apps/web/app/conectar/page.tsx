@@ -6,17 +6,7 @@
 // localStorage. Diseño: docs/implementacion/04-modulos-y-emparejado.md.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-const RUTA_MODULO: Record<string, string> = {
-  TPV: "/tpv",
-  COMANDERA: "/comandera",
-  COCINA: "/cocina",
-  KDS: "/cocina",
-  PANTALLA: "/pantalla",
-  KIOSKO: "/kiosko",
-  CARTELERIA: "/ofertas",
-  VISOR: "/visor",
-};
+import { RUTA_MODULO } from "../lib/modulos";
 
 export default function Conectar() {
   const router = useRouter();
@@ -47,9 +37,16 @@ export default function Conectar() {
         return;
       }
       const cred = { device_id: j.device_id, nombre: j.nombre, modulo: j.modulo, token: j.token };
-      if (window.gluuh) await window.gluuh.guardarDispositivo(cred);
-      else localStorage.setItem("gluuh_device", JSON.stringify(cred));
-      router.replace(RUTA_MODULO[j.modulo] ?? "/tpv");
+      const destino = RUTA_MODULO[j.modulo] ?? "/tpv";
+      if (window.gluuh) {
+        await window.gluuh.guardarDispositivo(cred);
+        // Recarga COMPLETA (no SPA): el preload de Electron vuelve a ejecutarse y
+        // window.gluuh.device pasa a reflejar el terminal recién vinculado.
+        window.location.assign(destino);
+      } else {
+        localStorage.setItem("gluuh_device", JSON.stringify(cred));
+        router.replace(destino);
+      }
     } finally {
       setBusy(false);
     }
@@ -79,6 +76,7 @@ export default function Conectar() {
           {["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "<"].map((d) => (
             <button
               key={d}
+              type="button"
               onClick={() => tecla(d)}
               className="h-14 rounded-md border border-border bg-card text-xl font-semibold hover:bg-accent"
             >
@@ -88,6 +86,7 @@ export default function Conectar() {
         </div>
 
         <button
+          type="button"
           onClick={canjear}
           disabled={codigo.length !== 6 || busy}
           className="btn-primary mt-6 w-full py-3 text-base disabled:opacity-50"

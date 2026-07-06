@@ -10,6 +10,15 @@ const TABLAS = [
   "invoice", "cash_session", "cash_move", "customer", "reservation",
 ] as const;
 
+function blobABase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onloadend = () => resolve(String(r.result).split(",")[1] ?? "");
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
 function aCsv(filas: Record<string, unknown>[]): string {
   if (!filas.length) return "";
   const cols = Object.keys(filas[0]!);
@@ -26,23 +35,45 @@ export async function exportarBackupLocal(): Promise<{ ok: boolean; ruta?: strin
   if (!gluuh) return { ok: false, error: "Solo disponible en Gluuh Desktop" };
 
   const sb = supabaseBrowser();
-  const ficheros: { nombre: string; contenido: string }[] = [];
+  const ficheros: { nombre: string; contenido: string; base64?: boolean }[] = [];
+  const incompletas: string[] = [];
   for (const tabla of TABLAS) {
     // Paginar en bloques de 1000 (límite por defecto de PostgREST).
     const filas: Record<string, unknown>[] = [];
+    let completa = true;
     for (let desde = 0; ; desde += 1000) {
       const { data, error } = await sb.from(tabla).select("*").range(desde, desde + 999);
-      if (error) break; // tabla inaccesible: se omite, el backup sigue
+      if (error) { completa = false; break; } // fallo a mitad: CSV parcial, no fiable
       filas.push(...(data ?? []));
       if (!data || data.length < 1000) break;
     }
+    if (!completa) incompletas.push(tabla);
     ficheros.push({ nombre: `${tabla}.csv`, contenido: aCsv(filas) });
   }
+  // Imágenes de producto a la subcarpeta "imagenes/". Si una no se puede
+  // descargar (URL caída), se omite sin abortar el resto del backup.
+  const { data: conFoto } = await sb.from("product").select("id,foto_url").not("foto_url", "is", null);
+  for (const p of (conFoto ?? []) as { id: string; foto_url: string }[]) {
+    try {
+      const resp = await fetch(p.foto_url);
+      if (!resp.ok) continue;
+      const b64 = await blobABase64(await resp.blob());
+      const ext = (p.foto_url.split("?")[0]!.split(".").pop() || "jpg").slice(0, 4);
+      ficheros.push({ nombre: `imagenes/${p.id}.${ext}`, contenido: b64, base64: true });
+    } catch { /* imagen no accesible: se omite */ }
+  }
+
+  // El manifest registra qué tablas quedaron incompletas: una copia con omisiones
+  // silenciosas es peor que ninguna (al restaurar faltarían datos sin avisar).
   ficheros.push({
     nombre: "manifest.json",
-    contenido: JSON.stringify({ fecha: new Date().toISOString(), tablas: TABLAS, formato: "csv;" }, null, 2),
+    contenido: JSON.stringify({ fecha: new Date().toISOString(), tablas: TABLAS, incompletas, formato: "csv;" }, null, 2),
   });
 
   const hoy = new Date().toISOString().slice(0, 10);
-  return gluuh.guardarBackup(`gluuh-backup-${hoy}`, ficheros);
+  const res = await gluuh.guardarBackup(`gluuh-backup-${hoy}`, ficheros);
+  if (res.ok && incompletas.length) {
+    return { ok: false, ruta: res.ruta, error: `Copia incompleta: ${incompletas.join(", ")}` };
+  }
+  return res;
 }

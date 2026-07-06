@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Landmark, CreditCard } from "lucide-react";
 
 interface RawPayment {
@@ -38,18 +40,24 @@ function agruparPorMetodo(payments: RawPayment[]): MetodoPago[] {
 export default function FormasDePagoPage() {
   const [loading, setLoading] = useState(true);
   const [filas, setFilas] = useState<MetodoPago[]>([]);
+  const [rango, setRango] = useState<Rango>(RANGO_DEFECTO);
+  const [truncado, setTruncado] = useState(false);
 
   useEffect(() => {
     const sb = supabaseBrowser();
+    setLoading(true);
     (async () => {
       const { data } = await sb
         .from("payment")
-        .select("metodo,importe");
+        .select("metodo,importe")
+        .gte("created_at", fechaDesde(rango))
+        .limit(LIMITE_INFORME);
       const rows = (data as RawPayment[] | null) ?? [];
+      setTruncado(rows.length === LIMITE_INFORME);
       setFilas(agruparPorMetodo(rows));
       setLoading(false);
     })();
-  }, []);
+  }, [rango]);
 
   const totalCobrado = filas.reduce((s, f) => s + f.total, 0);
   const nPagos = filas.reduce((s, f) => s + f.nPagos, 0);
@@ -60,6 +68,9 @@ export default function FormasDePagoPage() {
         title="Formas de pago"
         description="Cobros agrupados por método de pago."
       />
+
+      <SelectorRango valor={rango} onCambio={setRango} />
+      <AvisoTruncado visible={truncado} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
@@ -94,8 +105,10 @@ export default function FormasDePagoPage() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                      Cargando…
+                    <TableCell colSpan={3} className="py-3">
+                      <div className="space-y-2.5">
+                        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-5 w-full" />)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}

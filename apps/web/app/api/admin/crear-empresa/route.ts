@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { randomInt } from "node:crypto";
 
 // Crea una cuenta de empresa. SOLO el administrador de plataforma (Gluuh).
 // Verifica al llamante con su token (es_admin_plataforma) y luego usa la clave
 // secreta para crear el usuario; el trigger provisiona tenant + propietario.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Clave técnica legible para el instalador: 8 caracteres sin ambiguos (0/O, 1/l/I).
+const ALFABETO_CLAVE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function generarClaveTecnica(): string {
+  return Array.from({ length: 8 }, () => ALFABETO_CLAVE[randomInt(ALFABETO_CLAVE.length)]).join("");
+}
 
 export async function POST(req: Request) {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -28,5 +35,25 @@ export async function POST(req: Request) {
     email, password, email_confirm: true, user_metadata: { empresa_nombre: empresa },
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true, userId: data.user?.id });
+
+  // Clave técnica de la "Zona técnica" (Impresión, Dispositivos, Copias). Se
+  // guarda hasheada (RPC 0045, solo service_role) y se devuelve UNA VEZ en la
+  // respuesta para que el instalador la apunte.
+  let claveTecnica: string | null = generarClaveTecnica();
+  const { data: au } = await admin
+    .from("app_user")
+    .select("tenant_id")
+    .eq("auth_user_id", data.user?.id ?? "")
+    .maybeSingle();
+  if (au?.tenant_id) {
+    const { error: eClave } = await admin.rpc("admin_establecer_clave_tecnica", {
+      p_tenant: au.tenant_id,
+      p_clave: claveTecnica,
+    });
+    if (eClave) claveTecnica = null; // la empresa queda creada; la clave se podrá fijar después
+  } else {
+    claveTecnica = null;
+  }
+
+  return NextResponse.json({ ok: true, userId: data.user?.id, claveTecnica });
 }

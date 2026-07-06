@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { textoSobre } from "../lib/branding";
+import { CONFIG_CARTELERIA_DEF, configCon, leerConfigModulo } from "../lib/modulos";
 
 interface Offer {
   id: string; titulo: string; descripcion: string | null; precio: string | null;
@@ -18,12 +19,18 @@ export default function Ofertas() {
   const [estado, setEstado] = useState<"cargando" | "sin-sesion" | "vacio" | "ok">("cargando");
   const [ofertas, setOfertas] = useState<Offer[]>([]);
   const [i, setI] = useState(0);
+  const [segundos, setSegundos] = useState(CONFIG_CARTELERIA_DEF.segundosPorOferta);
 
   useEffect(() => {
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { setEstado("sin-sesion"); return; }
-      const { data } = await sb.from("offer").select("id,titulo,descripcion,precio,media_tipo,media_url,emoji,color").eq("activa", true).order("orden");
+      const [{ data }, rawCfg] = await Promise.all([
+        sb.from("offer").select("id,titulo,descripcion,precio,media_tipo,media_url,emoji,color").eq("activa", true).order("orden"),
+        leerConfigModulo(sb, "CARTELERIA"),
+      ]);
+      // Mínimo 2 s: por debajo la rotación es ilegible.
+      setSegundos(Math.max(2, configCon(CONFIG_CARTELERIA_DEF, rawCfg).segundosPorOferta));
       const list = (data as Offer[]) ?? [];
       setOfertas(list);
       setEstado(list.length ? "ok" : "vacio");
@@ -33,9 +40,9 @@ export default function Ofertas() {
 
   useEffect(() => {
     if (ofertas.length < 2) return;
-    const t = setInterval(() => setI((v) => (v + 1) % ofertas.length), 6000);
+    const t = setInterval(() => setI((v) => (v + 1) % ofertas.length), segundos * 1000);
     return () => clearInterval(t);
-  }, [ofertas.length]);
+  }, [ofertas.length, segundos]);
 
   if (estado === "cargando") return (
     <div className="dark grid min-h-screen place-items-center bg-background text-muted-foreground">
