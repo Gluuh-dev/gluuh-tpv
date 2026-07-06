@@ -42,8 +42,28 @@ componentes compartidos en `apps/web/components/`.
 - **Aceptación:** `Ctrl/⌘+K` abre el modal desde cualquier página; teclear
   «product…» lista páginas y productos; Enter navega; Esc cierra.
 
-> Nota: hoy las notificaciones ya son **Sileo** (`app/lib/toast.ts`), el tema es
-> claro/oscuro por `next-themes`. El buscador y el footer deben respetar ambos.
+> Nota: hoy las notificaciones ya son **Sileo** (`app/lib/toast.ts`, título corto
+> + detalle en el contenido, arriba a la derecha), el tema es claro/oscuro por
+> `next-themes`. El buscador y el footer deben respetar ambos.
+
+### E3 · Caché de datos con TanStack Query (React Query)
+**Observado por el cliente (06-07-2026):** «los datos siempre los pide» — cada
+navegación entre páginas del panel **re-fetchea** el mismo catálogo (familias,
+categorías, productos…) porque cada página carga en su `useEffect`. Propuesta:
+introducir **@tanstack/react-query** para **cachear** por clave y compartir datos
+entre páginas, con `staleTime` e invalidación al crear/editar/eliminar.
+
+- **Qué:** `QueryClientProvider` en el layout del panel; hooks `useQuery` por
+  recurso (p. ej. `useCatalogo`, `useProductos`) que sustituyen los `useEffect +
+  useState + cargar()` de cada página; `invalidateQueries` tras las mutaciones
+  (duplicar/eliminar) en vez del `cargar()` manual.
+- **Por qué:** menos llamadas a Supabase, navegación instantánea (datos en caché),
+  y un único sitio para el estado de carga/error. El store `useCatalogo`
+  (Zustand, para el TPV) puede convivir o migrarse.
+- **Alcance:** transversal; hacerlo por recurso, empezando por el catálogo del
+  panel (familias/categorías/productos/series). No bloquea las sesiones S1–S6.
+- **Aceptación:** volver a una página ya visitada no dispara un nuevo fetch
+  (salvo `staleTime` vencido); al duplicar/eliminar, la lista se refresca sola.
 
 ---
 
@@ -105,6 +125,29 @@ que **absorbe** lo que hoy está disperso en `/ajustes`:
   propia página con drag-and-drop (hoy son flechas ↑↓) y previsualización.
 - **Aceptación:** reordenar y guardar cambia el orden real en `app/tpv`; footer E1.
 
+### S6 · Plantillas de ticket con imagen (foto/logo) — falta en la config global
+**Observado por el cliente (06-07-2026, capturas de Ágora):** al pulsar «Nuevo»
+en *Plantillas de Ticket*, Ágora deja elegir el **tipo de impresora** (Térmica/
+Matricial vs Inyección/Láser) y el editor permite **añadir Imagen** (además de
+Texto) en la **cabecera** y el **pie** del ticket. **Nuestra config global**
+(`/configuracion-de-impresion`) tiene el diseño del ticket pero **le falta la
+imagen/logo bien resuelta**: hoy solo hay un toggle «Logo de tickets» y el logo
+en ESC/POS está pendiente (`app/lib/impresion.ts`, ponytail: «logo en ESC/POS
+pendiente — PrintJob no soporta imagen»).
+
+- **Qué construir:** en la config de impresión, poder subir/colocar **imagen en
+  cabecera y en pie** (no solo el logo superior), con vista previa; a futuro,
+  soporte de **plantillas** por tipo de impresora (térmica vs A4/láser) como
+  Ágora, si se decide ir a un editor de plantillas completo.
+- **Depende de:** `packages/hardware` debe aprender a imprimir imagen ESC/POS
+  (`printImage`) — es la pieza que hoy bloquea el logo real en térmica; la app de
+  escritorio (guía 03) es donde se prueba de verdad.
+- Referencia visual: el editor «Editar Plantilla de Ticket» de Ágora (cabecera/
+  pie con Texto+Imagen + catálogo de «Parámetros de impresión» en checkboxes —
+  muchos ya los tenemos como toggles del diseño del ticket).
+- **Aceptación:** se puede poner una imagen en cabecera y pie del ticket y se ve
+  en la vista previa; en escritorio, sale impresa en la térmica.
+
 ### S5 · Arreglar la navegación (no redirigir)
 - **Problema:** varias entradas del menú **redirigen** a otra página, lo que
   desorienta. Hoy: `/carta → /productos`, `/dispositivos → /modulos`,
@@ -125,7 +168,9 @@ que **absorbe** lo que hoy está disperso en `/ajustes`:
   en `setting` (GLOBAL/LOCAL/DEVICE), no en columnas nuevas (regla del repo).
   Datos de empresa/local → columnas de `location` (S1).
 - **BD por MCP** (token personal ya configurado); espejo en `apps/api/db/schema.sql`.
-- Orden sugerido: **E1 → E2 → S1 → S5 → S2 → S3 → S4** (los estilos primero para
-  no rehacer footers; S5 es barato y quita la confusión del menú cuanto antes).
+- Orden sugerido: **E1 → E2 → S1 → S5 → S2 → S3 → S4 → S6** (los estilos primero
+  para no rehacer footers; S5 es barato y quita la confusión del menú cuanto
+  antes; S6 —imagen en ticket— depende de imprimir imagen ESC/POS y encaja mejor
+  con la app de escritorio, guía 03).
 - Cada sesión, al cerrarla: entrada en `docs/sesiones/` + este documento marca la
   sesión como hecha.

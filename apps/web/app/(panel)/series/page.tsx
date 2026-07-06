@@ -8,6 +8,7 @@
 // serie de esta tabla por tipo más adelante.
 import { useEffect, useState } from "react";
 import { Plus, Star, TriangleAlert } from "lucide-react";
+import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { TablaDatos, type ColumnaDatos } from "@/components/tabla-datos";
 import { Button } from "@/components/ui/button";
@@ -74,8 +75,17 @@ export default function Series() {
   }
   async function toggleActiva(s: Serie) { await sb.from("invoice_series").update({ activa: !s.activa }).eq("id", s.id); await cargar(); }
   async function del(s: Serie) {
-    if (!window.confirm(`¿Eliminar la serie «${s.prefijo || s.nombre}»?`)) return;
-    await sb.from("invoice_series").delete().eq("id", s.id); await cargar();
+    const { error } = await sb.from("invoice_series").delete().eq("id", s.id);
+    if (error) { toast.error("No se pudo eliminar."); return; }
+    await cargar();
+  }
+  async function duplicar(s: Serie) {
+    const { error } = await sb.from("invoice_series").insert({
+      tenant_id: tenantId, prefijo: s.prefijo ? `${s.prefijo}C` : null,
+      nombre: `${s.nombre} - copia`, tipo: s.tipo,
+    });
+    if (error) { toast.error(`No se pudo duplicar: ${error.message}`); return; }
+    await cargar();
   }
 
   async function guardarSerieFactura() {
@@ -153,24 +163,22 @@ export default function Series() {
     <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader title="Series de documento" description="Series para numerar facturas, tickets, abonos y presupuestos. Marca una predeterminada por tipo." />
 
-      <Card>
-        <CardContent className="pt-6">
-          <form onSubmit={add} className="flex flex-wrap items-center gap-2">
-            <Input className="w-28" placeholder="Código (F)" value={f.codigo} onChange={(e) => setF({ ...f, codigo: e.target.value })} />
-            <Input className="w-56" placeholder="Descripción (Facturas)" value={f.descripcion} onChange={(e) => setF({ ...f, descripcion: e.target.value })} />
-            <Select value={f.tipo} onValueChange={(v) => setF({ ...f, tipo: v })}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>{TIPOS.map((t) => <SelectItem key={t.v} value={t.v}>{t.t}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button><Plus className="h-4 w-4" /> Añadir</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {/* Alta de serie: fila alineada con la tabla (sin tarjeta aparte). */}
+      <form onSubmit={add} className="flex flex-wrap items-center gap-2">
+        <Input className="w-28" placeholder="Código (F)" value={f.codigo} onChange={(e) => setF({ ...f, codigo: e.target.value })} />
+        <Input className="w-56" placeholder="Descripción (Facturas)" value={f.descripcion} onChange={(e) => setF({ ...f, descripcion: e.target.value })} />
+        <Select value={f.tipo} onValueChange={(v) => setF({ ...f, tipo: v })}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>{TIPOS.map((t) => <SelectItem key={t.v} value={t.v}>{t.t}</SelectItem>)}</SelectContent>
+        </Select>
+        <Button><Plus className="h-4 w-4" /> Añadir</Button>
+      </form>
 
       <TablaDatos
         columnas={columnas}
         filas={list}
         idDe={(s) => s.id}
+        onCopiar={duplicar}
         onEliminar={del}
         exportarNombre="series"
         vacio="Sin series. Añade tu primera (por ejemplo código «F» de tipo Factura)."

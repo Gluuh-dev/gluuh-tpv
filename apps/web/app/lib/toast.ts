@@ -6,10 +6,21 @@ import { sileo, type SileoOptions } from "sileo";
 
 type Extra = Pick<SileoOptions, "description" | "duration" | "button">;
 
+// Notificación con TÍTULO corto y DETALLE en el contenido: si el mensaje trae un
+// «Cabecera: detalle…», la cabecera va de título y el resto de descripción; si no,
+// el mensaje entero es el título. `extra.description` siempre tiene prioridad.
 const lanzar =
   (fn: (o: SileoOptions) => string) =>
-  (mensaje: string, extra?: Extra) =>
-    fn({ title: mensaje, ...extra });
+  (mensaje: string, extra?: Extra) => {
+    const i = mensaje.indexOf(": ");
+    const parte = i > 0 && i <= 48;
+    return fn({
+      title: parte ? mensaje.slice(0, i) : mensaje,
+      description: extra?.description ?? (parte ? mensaje.slice(i + 2) : undefined),
+      duration: extra?.duration,
+      button: extra?.button,
+    });
+  };
 
 // Invocable a pelo (toast("mensaje")) como sonner, con los métodos colgados.
 export const toast = Object.assign(lanzar(sileo.show), {

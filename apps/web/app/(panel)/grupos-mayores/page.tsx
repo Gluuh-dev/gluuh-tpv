@@ -2,7 +2,7 @@
 
 // Listado de GRUPOS MAYORES sobre TablaDatos (ordenación, selección + exportar,
 // acciones junto al nombre). Jerarquía: grupo mayor → familia → categoría → producto.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Layers, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "@/app/lib/toast";
@@ -10,7 +10,6 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { TablaDatos, type ColumnaDatos } from "@/components/tabla-datos";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SearchInput } from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
 
 interface Fila { id: string; nombre: string; descripcion: string | null; familias: number }
@@ -20,43 +19,42 @@ export default function GruposMayoresPage() {
   const [loading, setLoading] = useState(true);
   const [filas, setFilas] = useState<Fila[]>([]);
   const [sinColumna, setSinColumna] = useState(false);
-  const [q, setQ] = useState("");
 
-  useEffect(() => {
+  const cargar = useCallback(async () => {
     const sb = supabaseBrowser();
-    (async () => {
-      const [{ data: gData }, famRes] = await Promise.all([
-        sb.from("grupo_mayor").select("id,nombre,descripcion").order("nombre"),
-        sb.from("family").select("id,grupo_mayor_id"),
-      ]);
-      const nFams = new Map<string, number>();
-      if (famRes.error) setSinColumna(true);
-      else {
-        for (const f of (famRes.data as { grupo_mayor_id: string | null }[] | null) ?? []) {
-          if (f.grupo_mayor_id) nFams.set(f.grupo_mayor_id, (nFams.get(f.grupo_mayor_id) ?? 0) + 1);
-        }
+    const [{ data: gData }, famRes] = await Promise.all([
+      sb.from("grupo_mayor").select("id,nombre,descripcion").order("nombre"),
+      sb.from("family").select("id,grupo_mayor_id"),
+    ]);
+    const nFams = new Map<string, number>();
+    if (famRes.error) setSinColumna(true);
+    else {
+      for (const f of (famRes.data as { grupo_mayor_id: string | null }[] | null) ?? []) {
+        if (f.grupo_mayor_id) nFams.set(f.grupo_mayor_id, (nFams.get(f.grupo_mayor_id) ?? 0) + 1);
       }
-      setFilas(((gData as { id: string; nombre: string; descripcion: string | null }[] | null) ?? []).map((g) => ({
-        ...g, familias: nFams.get(g.id) ?? 0,
-      })));
-      setLoading(false);
-    })();
+    }
+    setFilas(((gData as { id: string; nombre: string; descripcion: string | null }[] | null) ?? []).map((g) => ({
+      ...g, familias: nFams.get(g.id) ?? 0,
+    })));
+    setLoading(false);
   }, []);
 
-  const filtradas = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return term ? filas.filter((f) => f.nombre.toLowerCase().includes(term)) : filas;
-  }, [filas, q]);
+  useEffect(() => { void cargar(); }, [cargar]);
 
   async function eliminar(g: Fila) {
-    const aviso = g.familias > 0
-      ? `«${g.nombre}» contiene ${g.familias} familia(s). Quedarán sin grupo mayor. ¿Eliminar?`
-      : `¿Eliminar «${g.nombre}»?`;
-    if (!window.confirm(aviso)) return;
     const { error } = await supabaseBrowser().from("grupo_mayor").delete().eq("id", g.id);
     if (error) { toast.error("No se pudo eliminar."); return; }
-    toast.success("Grupo mayor eliminado.");
     setFilas((prev) => prev.filter((x) => x.id !== g.id));
+  }
+  async function duplicar(g: Fila) {
+    const sb = supabaseBrowser();
+    const { data: t } = await sb.from("tenant").select("id").limit(1).maybeSingle();
+    const { error } = await sb.from("grupo_mayor").insert({
+      tenant_id: (t as { id: string } | null)?.id, nombre: `${g.nombre} - copia`, descripcion: g.descripcion,
+    });
+    if (error) { toast.error(`No se pudo duplicar: ${error.message}`); return; }
+    toast.success("Grupo mayor duplicado.");
+    await cargar();
   }
 
   const columnas: ColumnaDatos<Fila>[] = [
@@ -70,7 +68,6 @@ export default function GruposMayoresPage() {
       <PageHeader
         title="Grupos mayores"
         description="La división por encima de las familias: grupo mayor → familia → categoría → producto."
-        actions={<Button onClick={() => router.push("/grupos-mayores/nuevo")}><Plus className="h-4 w-4" /> Nuevo</Button>}
       />
 
       {sinColumna && (
@@ -79,10 +76,6 @@ export default function GruposMayoresPage() {
           <p>Falta la migración <strong>0058</strong> (<code>family.grupo_mayor_id</code>): no se pueden asignar familias.</p>
         </div>
       )}
-
-      <div className="flex justify-end">
-        <SearchInput value={q} onChange={setQ} placeholder="Buscar…" className="w-72" />
-      </div>
 
       {!loading && filas.length === 0 ? (
         <EmptyState
@@ -94,13 +87,14 @@ export default function GruposMayoresPage() {
       ) : (
         <TablaDatos
           columnas={columnas}
-          filas={filtradas}
+          filas={filas}
           idDe={(f) => f.id}
+          onNuevo={() => router.push("/grupos-mayores/nuevo")}
           onAbrir={(f) => router.push(`/grupos-mayores/${f.id}`)}
+          onCopiar={duplicar}
           onEliminar={eliminar}
           exportarNombre="grupos-mayores"
           cargando={loading}
-          vacio={`Sin resultados para «${q}».`}
         />
       )}
     </div>
