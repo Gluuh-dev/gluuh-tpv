@@ -15,7 +15,7 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0065`,
+   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0067`,
    aplicada). Nueva migración = siguiente número libre + nombre descriptivo
    en snake_case.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
