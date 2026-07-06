@@ -33,7 +33,12 @@ interface Dispositivo {
   codigo_vinculacion: string | null;
   codigo_expira: string | null;
   vinculado_at: string | null;
+  /** Grupo de puntos de venta (0067); null = sin grupo. */
+  grupo_punto_venta_id: string | null;
 }
+
+interface GrupoPV { id: string; nombre: string }
+const SIN_GRUPO_PV = "__sin__"; // Radix Select no admite value=""
 
 interface CodigoActivo {
   modulo: Modulo;
@@ -67,7 +72,13 @@ const DEFECTOS_CONFIG = {
 type ModuloConfigurable = keyof typeof DEFECTOS_CONFIG;
 const esConfigurable = (m: Modulo): m is ModuloConfigurable => m in DEFECTOS_CONFIG;
 
-function FilaDispositivo({ d, onDesvincular }: { d: Dispositivo; onDesvincular(d: Dispositivo): void }) {
+function FilaDispositivo({ d, gruposPV, onGrupo, onDesvincular }: {
+  d: Dispositivo;
+  /** null = la 0067 no está aplicada (se oculta el selector). */
+  gruposPV: GrupoPV[] | null;
+  onGrupo(d: Dispositivo, grupoId: string | null): void;
+  onDesvincular(d: Dispositivo): void;
+}) {
   return (
     <li className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
       <div className="min-w-0">
@@ -80,9 +91,26 @@ function FilaDispositivo({ d, onDesvincular }: { d: Dispositivo; onDesvincular(d
               : <span className="text-muted-foreground">Sin vincular</span>}
         </p>
       </div>
-      <Button variant="ghost" size="xs" className="text-destructive shrink-0" onClick={() => onDesvincular(d)}>
-        <Trash2 aria-hidden /> {d.vinculado_at ? "Desvincular" : "Eliminar"}
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        {/* Grupo de puntos de venta (0067): decide qué familias/categorías verá este terminal. */}
+        {gruposPV && gruposPV.length > 0 && (
+          <Select
+            value={d.grupo_punto_venta_id ?? SIN_GRUPO_PV}
+            onValueChange={(v) => onGrupo(d, v === SIN_GRUPO_PV ? null : v)}
+          >
+            <SelectTrigger size="sm" className="h-7 w-28 text-[11px]" aria-label={`Grupo de ${d.nombre}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SIN_GRUPO_PV}>Sin grupo</SelectItem>
+              {gruposPV.map((g) => <SelectItem key={g.id} value={g.id}>{g.nombre}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        <Button variant="ghost" size="xs" className="text-destructive shrink-0" onClick={() => onDesvincular(d)}>
+          <Trash2 aria-hidden /> {d.vinculado_at ? "Desvincular" : "Eliminar"}
+        </Button>
+      </div>
     </li>
   );
 }
@@ -330,13 +358,32 @@ export default function Modulos() {
   const [codigoLic, setCodigoLic] = useState("");
   const [activando, setActivando] = useState(false);
 
+  const [gruposPV, setGruposPV] = useState<GrupoPV[] | null>(null); // null = 0067 sin aplicar
+
   const cargarDispositivos = useCallback(async () => {
-    const { data } = await supabaseBrowser()
-      .from("device")
-      .select("id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at")
+    const sb = supabaseBrowser();
+    // Con grupo de puntos de venta (0067); si la columna no existe, degrada.
+    const r = await sb.from("device")
+      .select("id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at, grupo_punto_venta_id")
       .order("created_at", { ascending: false });
-    setDispositivos((data as Dispositivo[]) ?? []);
+    if (r.error) {
+      const { data } = await sb.from("device")
+        .select("id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at")
+        .order("created_at", { ascending: false });
+      setDispositivos((((data as Omit<Dispositivo, "grupo_punto_venta_id">[]) ?? [])).map((d) => ({ ...d, grupo_punto_venta_id: null })));
+      setGruposPV(null);
+      return;
+    }
+    setDispositivos((r.data as Dispositivo[]) ?? []);
+    const { data: g } = await sb.from("grupo_punto_venta").select("id,nombre").order("nombre");
+    setGruposPV((g as GrupoPV[] | null) ?? []);
   }, []);
+
+  async function cambiarGrupo(d: Dispositivo, grupoId: string | null) {
+    const { error } = await supabaseBrowser().from("device").update({ grupo_punto_venta_id: grupoId }).eq("id", d.id);
+    if (error) { toast.error(`No se pudo cambiar el grupo: ${error.message}`); return; }
+    setDispositivos((prev) => prev.map((x) => (x.id === d.id ? { ...x, grupo_punto_venta_id: grupoId } : x)));
+  }
 
   useEffect(() => {
     (async () => {
@@ -545,7 +592,9 @@ export default function Modulos() {
                   <CardContent className="space-y-2">
                     {vinculados.length > 0 ? (
                       <ul className="space-y-1.5">
-                        {vinculados.map((d) => <FilaDispositivo key={d.id} d={d} onDesvincular={desvincular} />)}
+                        {vinculados.map((d) => (
+                          <FilaDispositivo key={d.id} d={d} gruposPV={gruposPV} onGrupo={cambiarGrupo} onDesvincular={desvincular} />
+                        ))}
                       </ul>
                     ) : (
                       <p className="text-[12.5px] text-muted-foreground">Ninguna pantalla vinculada.</p>
@@ -594,7 +643,9 @@ export default function Modulos() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-1.5">
-                  {sueltos.map((d) => <FilaDispositivo key={d.id} d={d} onDesvincular={desvincular} />)}
+                  {sueltos.map((d) => (
+                    <FilaDispositivo key={d.id} d={d} gruposPV={gruposPV} onGrupo={cambiarGrupo} onDesvincular={desvincular} />
+                  ))}
                 </ul>
               </CardContent>
             </Card>

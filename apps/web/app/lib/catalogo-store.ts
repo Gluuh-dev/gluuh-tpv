@@ -11,6 +11,8 @@ export interface ModOpcion { id: string; nombre: string; precio_extra: number }
 export interface ModGrupo  { id: string; product_id: string | null; nombre: string; min_sel: number; max_sel: number; tipo?: "EXTRA" | "COMENTARIO"; opciones: ModOpcion[] }
 /** Asignación de un grupo de biblioteca a familia/categoría/producto (0064, Fase 2 Glop). */
 export interface ModAsignacion { modifier_group_id: string; family_id: string | null; category_id: string | null; product_id: string | null; modo: "INCLUIR" | "EXCLUIR" }
+/** Franja horaria de una categoría (0067): sin franjas = siempre disponible. */
+export interface FranjaHorario { category_id: string; hora_inicio: string; hora_fin: string; dias: number[] }
 
 interface CatalogoState {
   cargado: boolean;
@@ -26,6 +28,8 @@ interface CatalogoState {
   biblioteca: ModGrupo[];
   /** Asignaciones de biblioteca por nivel (0064). Vacío si la migración no existe. */
   asignaciones: ModAsignacion[];
+  /** Franjas de disponibilidad por categoría (0067). Vacío si no aplicada. */
+  horariosCat: Record<string, FranjaHorario[]>;
   modById: Record<string, ModOpcion>;
   /** Carga el catálogo. Cache en memoria + localStorage; solo fetchea la 1ª vez (o con force). */
   cargar: (sb: SupabaseClient, opts?: { force?: boolean }) => Promise<void>;
@@ -42,7 +46,7 @@ let revalidadoSesion = false;
 export const useCatalogo = create<CatalogoState>()(
   persist(
     (set, get) => ({
-      cargado: false, families: [], cats: [], prods: [], prodCats: {}, formatos: {}, gruposMod: {}, biblioteca: [], asignaciones: [], modById: {},
+      cargado: false, families: [], cats: [], prods: [], prodCats: {}, formatos: {}, gruposMod: {}, biblioteca: [], asignaciones: [], horariosCat: {}, modById: {},
 
       setProds: (p) => set({ prods: p }),
       setCats: (updater) => set((s) => ({ cats: updater(s.cats) })),
@@ -78,7 +82,7 @@ export const useCatalogo = create<CatalogoState>()(
           const r = await sb.from("modifier_group").select(`${MG_COLS},tipo`);
           return r.error ? sb.from("modifier_group").select(MG_COLS) : r;
         };
-        const [{ data: f }, { data: c }, { data: p }, { data: fmts }, { data: mgs }, { data: mods }, { data: pcs }, { data: asg }] = await Promise.all([
+        const [{ data: f }, { data: c }, { data: p }, { data: fmts }, { data: mgs }, { data: mods }, { data: pcs }, { data: asg }, { data: hor }] = await Promise.all([
           sb.from("family").select("id,nombre,color").order("orden"),
           cargarCats(),
           cargarProds(),
@@ -87,6 +91,7 @@ export const useCatalogo = create<CatalogoState>()(
           sb.from("modifier").select("id,modifier_group_id,nombre,precio_extra"),
           sb.from("product_category").select("product_id,category_id"),   // m2m (0061); vacío si no aplicada
           sb.from("modifier_group_asignacion").select("modifier_group_id,family_id,category_id,product_id,modo"), // 0064; vacío si no aplicada
+          sb.from("category_horario").select("category_id,hora_inicio,hora_fin,dias"), // 0067; vacío si no aplicada
         ]);
         // Formatos por producto
         const formatos: Record<string, Formato[]> = {};
@@ -113,10 +118,14 @@ export const useCatalogo = create<CatalogoState>()(
         const prodCats: Record<string, string[]> = {};
         for (const pc of (pcs as { product_id: string; category_id: string }[]) ?? []) (prodCats[pc.product_id] ??= []).push(pc.category_id);
 
+        // Horarios por categoría (0067)
+        const horariosCat: Record<string, FranjaHorario[]> = {};
+        for (const h of (hor as FranjaHorario[]) ?? []) (horariosCat[h.category_id] ??= []).push(h);
+
         set({
           cargado: true,
           families: (f as Family[]) ?? [], cats: (c as Cat[]) ?? [], prods: (p as Prod[]) ?? [],
-          prodCats, formatos, gruposMod, biblioteca, asignaciones: (asg as ModAsignacion[]) ?? [], modById,
+          prodCats, formatos, gruposMod, biblioteca, asignaciones: (asg as ModAsignacion[]) ?? [], horariosCat, modById,
         });
 
         // Imágenes de categoría (best-effort; la columna foto_url puede no existir aún, 0044).
@@ -133,7 +142,8 @@ export const useCatalogo = create<CatalogoState>()(
       // Solo datos (las acciones no se serializan).
       partialize: (s) => ({
         cargado: s.cargado, families: s.families, cats: s.cats, prods: s.prods, prodCats: s.prodCats,
-        formatos: s.formatos, gruposMod: s.gruposMod, biblioteca: s.biblioteca, asignaciones: s.asignaciones, modById: s.modById,
+        formatos: s.formatos, gruposMod: s.gruposMod, biblioteca: s.biblioteca, asignaciones: s.asignaciones,
+        horariosCat: s.horariosCat, modById: s.modById,
       }),
     }
   )
@@ -174,4 +184,19 @@ export function gruposDeProducto(
   const porId = new Map(s.biblioteca.map((g) => [g.id, g]));
   const heredados = [...efectivos].map((id) => porId.get(id)).filter((g): g is ModGrupo => !!g);
   return [...propios, ...heredados];
+}
+
+// ── Horario por categoría (0067) ────────────────────────────────────────────
+// ¿Está la categoría disponible AHORA? Sin franjas = siempre. Los días van
+// 1=lunes … 7=domingo; una franja con fin < inicio cruza la medianoche.
+export function categoriaDisponible(franjas: FranjaHorario[] | undefined, ahora: Date): boolean {
+  if (!franjas || franjas.length === 0) return true;
+  const dia = ahora.getDay() === 0 ? 7 : ahora.getDay();
+  const hm = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+  return franjas.some((F) => {
+    if (!F.dias.includes(dia)) return false;
+    const ini = F.hora_inicio.slice(0, 5);
+    const fin = F.hora_fin.slice(0, 5);
+    return ini <= fin ? hm >= ini && hm < fin : hm >= ini || hm < fin;
+  });
 }

@@ -24,7 +24,7 @@ import { TileProducto } from "./components/TileProducto";
 import { TileCategoria } from "./components/TileCategoria";
 import { TecladoTPV } from "./components/TecladoTPV";
 import { RailSalas, type RailTab } from "./components/RailSalas";
-import { useCatalogo, gruposDeProducto, type Family, type Cat, type Prod, type Formato, type ModGrupo, type ModOpcion } from "../lib/catalogo-store";
+import { useCatalogo, gruposDeProducto, categoriaDisponible, type Family, type Cat, type Prod, type Formato, type ModGrupo, type ModOpcion } from "../lib/catalogo-store";
 import { CLASES_FISCALES, ivaAuto } from "@/lib/fiscal-clases";
 import { PlanoSvg } from "@/components/plano-svg";
 import { Plus, Trash2, ChevronUp, ChevronDown, Search,
@@ -219,6 +219,13 @@ export default function TPV() {
   const modById   = useCatalogo((s) => s.modById);
   const biblioteca   = useCatalogo((s) => s.biblioteca);     // grupos de biblioteca (0064, Fase 2)
   const asignaciones = useCatalogo((s) => s.asignaciones);   // herencia familia→categoría→producto
+  const horariosCat  = useCatalogo((s) => s.horariosCat);    // franjas por categoría (0067)
+  // Re-evalúa la disponibilidad por horario cada minuto (sin refetch).
+  const [tickHorario, setTickHorario] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTickHorario((x) => x + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
   // Grupos EFECTIVOS de un producto: los suyos + los heredados de la biblioteca.
   const gruposDe = (pid: string) =>
     gruposDeProducto({ gruposMod, biblioteca, asignaciones, prods, cats, prodCats }, pid);
@@ -1641,9 +1648,14 @@ export default function TPV() {
   const buscando = busqProd.trim().length > 0;
   const catActual    = cats.find((c) => c.id === catSelEf);
   const colorActual  = catActual ? (colorCat[catActual.id] ?? "") : "";
-  // Solo categorías marcadas "mostrar en venta" (Fase 1 Glop). Antes de la migración,
-  // mostrar_venta es undefined → se muestran todas.
-  const catsVisibles = useMemo(() => cats.filter((c) => c.mostrar_venta !== false), [cats]);
+  // Solo categorías marcadas "mostrar en venta" (Fase 1 Glop) y disponibles a
+  // esta hora según su horario (0067; sin franjas = siempre). tickHorario fuerza
+  // la re-evaluación cada minuto.
+  const catsVisibles = useMemo(
+    () => cats.filter((c) => c.mostrar_venta !== false && categoriaDisponible(horariosCat[c.id], new Date())),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cats, horariosCat, tickHorario],
+  );
   // Gr. Cocina = partida a la que va el pedido, según la estación de sus productos:
   // solo bebidas → "Barra", con comida → "Cocina", mezclado → "Cocina y Barra".
   const grCocina = useMemo(() => {
