@@ -171,6 +171,7 @@ export default function TPV() {
   const families = useCatalogo((s) => s.families);
   const cats     = useCatalogo((s) => s.cats);
   const prods    = useCatalogo((s) => s.prods);
+  const prodCats = useCatalogo((s) => s.prodCats);   // categorías por producto (m2m Fase 1)
   const setProds = useCatalogo((s) => s.setProds);
   const [menus, setMenus] = useState<MenuTPV[]>([]);   // menús/combos del tenant (Carta → Menús); [] si no hay o falla la carga
 
@@ -1614,7 +1615,16 @@ export default function TPV() {
   const scrollBox = (ref: React.RefObject<HTMLDivElement | null>, dir: -1 | 1) => {
     const el = ref.current; if (el) el.scrollBy({ top: dir * el.clientHeight * 0.8, behavior: "smooth" });
   };
-  const productosCat = useMemo(() => prods.filter((p) => p.category_id === catSelEf), [prods, catSelEf]);
+  // Productos de la categoría activa por la m2m (product_category); si un producto aún
+  // no tiene filas m2m, cae a su category_id (categoría principal). Degrada sin la tabla.
+  const productosCat = useMemo(
+    () => prods.filter((p) => {
+      if (!catSelEf) return false;
+      const cs = prodCats[p.id];
+      return cs && cs.length ? cs.includes(catSelEf) : p.category_id === catSelEf;
+    }),
+    [prods, catSelEf, prodCats],
+  );
   // Vista del grid: con búsqueda activa filtra TODOS los productos por nombre
   // (sin acentos), ignorando la categoría; sin búsqueda, los de la categoría.
   const productosVista = useMemo(() => {
@@ -1626,6 +1636,9 @@ export default function TPV() {
   const buscando = busqProd.trim().length > 0;
   const catActual    = cats.find((c) => c.id === catSelEf);
   const colorActual  = catActual ? (colorCat[catActual.id] ?? "") : "";
+  // Solo categorías marcadas "mostrar en venta" (Fase 1 Glop). Antes de la migración,
+  // mostrar_venta es undefined → se muestran todas.
+  const catsVisibles = useMemo(() => cats.filter((c) => c.mostrar_venta !== false), [cats]);
   // Gr. Cocina = partida a la que va el pedido, según la estación de sus productos:
   // solo bebidas → "Barra", con comida → "Cocina", mezclado → "Cocina y Barra".
   const grCocina = useMemo(() => {
@@ -1691,10 +1704,10 @@ export default function TPV() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productosVista, buscando, busqProd, colorCat, colorActual, catSelEf, botonesCfg]);
 
-  // Grid de categorías memoizado: todas las categorías (sin nivel de familia en el TPV).
+  // Grid de categorías memoizado: solo las visibles (mostrar_venta), sin nivel de familia.
   const gridCategorias = useMemo(() => (
     <div ref={catScrollRef} className="grid flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(104px,1fr))] content-start gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {cats.map((c, i) => {
+      {catsVisibles.map((c, i) => {
         const color = colorCat[c.id] || "#64748b";
         const sel = catSelEf === c.id;
         // Icono lucide por nombre (category.icono). Si no hay o no está en el mapa, cae a foto/texto.
@@ -1713,12 +1726,12 @@ export default function TPV() {
           />
         );
       })}
-      {cats.length === 0 && (
+      {catsVisibles.length === 0 && (
         <p className="col-span-full text-muted-foreground text-sm">Sin categorías. Añade carta en el panel.</p>
       )}
     </div>
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [cats, catSelEf, colorCat, iconosCat]);
+  ), [catsVisibles, catSelEf, colorCat, iconosCat]);
 
   if (loading) return (
     <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>
