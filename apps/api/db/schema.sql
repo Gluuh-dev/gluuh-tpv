@@ -92,6 +92,8 @@ CREATE TABLE device (
   codigo_vinculacion text,
   codigo_expira      timestamptz,
   vinculado_at       timestamptz,
+  -- Grupo de puntos de venta al que pertenece (0067); null = sin grupo
+  grupo_punto_venta_id uuid REFERENCES grupo_punto_venta(id) ON DELETE SET NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -258,6 +260,51 @@ CREATE TABLE category_sales_center (
   PRIMARY KEY (category_id, sales_center_id)
 );
 CREATE INDEX idx_csc_tenant ON category_sales_center (tenant_id, sales_center_id);
+
+-- Horario de disponibilidad por categoría (0067): sin filas = siempre visible.
+CREATE TABLE category_horario (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  category_id uuid NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+  hora_inicio time NOT NULL,
+  hora_fin    time NOT NULL,
+  dias        int[] NOT NULL DEFAULT '{1,2,3,4,5,6,7}',  -- 1=lunes … 7=domingo
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_cathorario_tenant ON category_horario (tenant_id, category_id);
+
+-- Grupos de puntos de venta (0067): agrupan dispositivos TPV. La visibilidad
+-- por grupo va en family_grupo_pv / category_grupo_pv (sin filas = en todos).
+CREATE TABLE grupo_punto_venta (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  nombre      text NOT NULL,
+  descripcion text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE family_grupo_pv (
+  family_id uuid NOT NULL REFERENCES family(id) ON DELETE CASCADE,
+  grupo_id  uuid NOT NULL REFERENCES grupo_punto_venta(id) ON DELETE CASCADE,
+  tenant_id uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  PRIMARY KEY (family_id, grupo_id)
+);
+CREATE INDEX idx_fgpv_tenant ON family_grupo_pv (tenant_id, grupo_id);
+CREATE TABLE category_grupo_pv (
+  category_id uuid NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+  grupo_id    uuid NOT NULL REFERENCES grupo_punto_venta(id) ON DELETE CASCADE,
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  PRIMARY KEY (category_id, grupo_id)
+);
+CREATE INDEX idx_cgpv_tenant ON category_grupo_pv (tenant_id, grupo_id);
+
+-- Etiquetas de producto (0067): m2m sobre el catálogo etiqueta_producto.
+CREATE TABLE product_etiqueta (
+  product_id  uuid NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  etiqueta_id uuid NOT NULL REFERENCES etiqueta_producto(id) ON DELETE CASCADE,
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  PRIMARY KEY (product_id, etiqueta_id)
+);
+CREATE INDEX idx_petiq_tenant ON product_etiqueta (tenant_id, etiqueta_id);
 
 -- Producto ↔ categoría muchos-a-muchos (0061): un producto puede estar en N
 -- categorías del TPV; product.category_id queda como "categoría principal".
