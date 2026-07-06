@@ -210,6 +210,7 @@ CREATE TABLE category (
   mostrar_venta boolean NOT NULL DEFAULT true,  -- sale en la pantalla de venta (0061)
   mostrar_menus boolean NOT NULL DEFAULT true,  -- elegible dentro de menús (0061)
   categoria_padre_id uuid REFERENCES category(id) ON DELETE SET NULL,  -- jerarquía (0065)
+  color       text,                       -- color propio; null = hereda el de la familia (0066)
   texto_boton text,                       -- texto del botón; null = nombre (0065)
   carta_nombre text,                      -- carta digital: null = nombre (0065)
   carta_descripcion text,                 -- carta digital: null = nombres de productos (0065)
