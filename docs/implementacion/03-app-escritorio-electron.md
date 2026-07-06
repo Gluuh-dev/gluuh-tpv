@@ -3,7 +3,7 @@
 **Objetivo:** convertir el esqueleto `apps/desktop` en el instalador Windows que un
 bar usa a diario: TPV a pantalla completa, impresión ESC/POS con cajón, visor en
 segunda pantalla, auto-update, identidad de terminal y copia de seguridad a USB.
-Arquitectura y justificación en `docs/auditoria_02_07_26/02-app-escritorio-windows.md`.
+Arquitectura y justificación en `docs/plan/02-app-escritorio-windows.md`.
 
 ## Estructura destino
 

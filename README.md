@@ -73,7 +73,7 @@ gluuh-tpv/
 └── pnpm-workspace.yaml
 ```
 
-El paquete **[`packages/core`](packages/core)** es el "cerebro" compartido por las 4 plataformas: tipos de dominio, cálculo de impuestos (IVA peninsular e **IGIC canario**) y el **motor VERIFACTU** (hash encadenado SHA‑256 + QR de cotejo AEAT). Ver [docs/05](docs/05-stack-tecnologico.md) y [docs/07](docs/07-facturacion-y-cumplimiento-legal.md).
+El paquete **[`packages/core`](packages/core)** es el "cerebro" compartido por las 4 plataformas: tipos de dominio, cálculo de impuestos (IVA peninsular e **IGIC canario**) y el **motor VERIFACTU** (hash encadenado SHA‑256 + QR de cotejo AEAT). Ver [docs/05](docs/dossier/05-stack-tecnologico.md) y [docs/07](docs/dossier/07-facturacion-y-cumplimiento-legal.md).
 
 ---
 
@@ -99,7 +99,7 @@ pnpm --filter @gluuh/mobile start
 pnpm --filter @gluuh/desktop dev
 ```
 
-> Las apps (`web`, `mobile`, `desktop`) son **esqueletos mínimos** listos para construir encima. El núcleo de valor implementado hoy es **`packages/core`** (fiscalidad + dominio) y el **esquema de base de datos** (`apps/api/db/schema.sql`). Ver el [roadmap](docs/13-roadmap-mvp-y-equipo.md).
+> Las apps (`web`, `mobile`, `desktop`) son **esqueletos mínimos** listos para construir encima. El núcleo de valor implementado hoy es **`packages/core`** (fiscalidad + dominio) y el **esquema de base de datos** (`apps/api/db/schema.sql`). Ver el [roadmap](docs/dossier/13-roadmap-mvp-y-equipo.md).
 
 ## Estado
 

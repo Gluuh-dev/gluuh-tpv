@@ -1,6 +1,6 @@
 # Supabase — base de datos de Gluuh
 
-**Sí: toda la base de datos puede ser Supabase.** Supabase es **PostgreSQL gestionado** + **Auth** + **Realtime** + **Storage** + **Edge Functions**. El esquema de Gluuh (multi‑tenant con RLS) corre tal cual. Ver [docs/05 §7](../docs/05-stack-tecnologico.md) y [docs/06](../docs/06-base-de-datos-y-sincronizacion.md).
+**Sí: toda la base de datos puede ser Supabase.** Supabase es **PostgreSQL gestionado** + **Auth** + **Realtime** + **Storage** + **Edge Functions**. El esquema de Gluuh (multi‑tenant con RLS) corre tal cual. Ver [docs/05 §7](../docs/dossier/05-stack-tecnologico.md) y [docs/06](../docs/dossier/06-base-de-datos-y-sincronizacion.md).
 
 ## Qué cubre Supabase y qué no
 
@@ -35,7 +35,7 @@ El esquema usa `current_setting('app.tenant_id')` para el aislamiento. Con Supab
 USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid)
 ```
 
-Añade `tenant_id` (y `role`) como **custom claims** del JWT (vía Auth Hook / función) y las políticas filtran solas. El mismo claim alimenta los **buckets de PowerSync**. Ver [docs/12](../docs/12-seguridad-y-rgpd.md).
+Añade `tenant_id` (y `role`) como **custom claims** del JWT (vía Auth Hook / función) y las políticas filtran solas. El mismo claim alimenta los **buckets de PowerSync**. Ver [docs/12](../docs/dossier/12-seguridad-y-rgpd.md).
 
 ## Variables de entorno
 

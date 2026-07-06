@@ -1,6 +1,6 @@
 # 05 — Paridad Glop en la pantalla de venta
 
-**Objetivo:** cerrar la tabla 4.2 de `docs/auditoria_02_07_26/04-tpv-estilo-glop.md`.
+**Objetivo:** cerrar la tabla 4.2 de `docs/plan/04-tpv-estilo-glop.md`.
 Requiere la guía 02 (refactor) hecha: todo lo de aquí son componentes nuevos o campos
 en `useComanda`, no líneas extra en un monolito. Orden sugerido = orden del documento
 (de más barato y visible a más caro).

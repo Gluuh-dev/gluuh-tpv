@@ -4,7 +4,7 @@
 > **Alcance:** Web (backoffice + TPV en navegador) · App de escritorio Windows (TPV de barra) · App Android e iOS (comanderas) · Backend SaaS multi‑tenant en la nube.
 > **Mercado objetivo:** España (con especial atención a Canarias / IGIC, dado el origen del proyecto en La Palma) y, en una segunda fase, resto de la UE.
 > **Marca:** **Gluuh** (marca paraguas, ya registrada). **Este producto: Gluuh TPV.** Familia con **Gluuh Campo** (análisis de facturas del campo).
-> **Fecha de la documentación:** junio de 2026.
+> **Fecha de la documentación:** junio de 2026 (índice actualizado el 06-07-2026).
 
 ---
 
@@ -17,21 +17,43 @@ Orden de lectura recomendado:
 | # | Documento | Para quién | Qué responde |
 |---|-----------|-----------|--------------|
 | — | **[README.md](README.md)** (este) | Todos | Resumen ejecutivo, decisiones clave, índice |
-| 01 | [Investigación de mercado](01-investigacion-mercado.md) | Negocio / Producto | ¿Quién compite, a qué precio y qué falla? |
-| 02 | [Visión y posicionamiento](02-vision-y-posicionamiento.md) | Negocio / Producto | ¿Por qué vamos a ganar? Propuesta de valor |
-| 03 | [Requisitos funcionales](03-requisitos-funcionales.md) | Producto / Desarrollo | ¿Qué hace exactamente el sistema? Módulos |
-| 04 | [Arquitectura técnica](04-arquitectura-tecnica.md) | Desarrollo | ¿Cómo encaja todo? Diagramas, offline‑first |
-| 05 | [Stack tecnológico](05-stack-tecnologico.md) | Desarrollo | ¿Con qué lo construimos y por qué? |
-| 06 | [Base de datos y sincronización](06-base-de-datos-y-sincronizacion.md) | Desarrollo | Modelo de datos, multi‑tenant, sync offline |
-| 07 | [Facturación y cumplimiento legal](07-facturacion-y-cumplimiento-legal.md) | Desarrollo / Legal | Verifactu, TicketBAI, IVA/IGIC, tickets |
-| 08 | [Pasarelas de pago](08-pasarelas-de-pago.md) | Desarrollo / Negocio | Redsys, Stripe, Bizum, modelo plataforma |
-| 09 | [Hardware](09-hardware.md) | Operaciones / Ventas | Terminales, impresoras, kits y precios |
-| 10 | [Comanderas, KDS e impresión](10-comanderas-kds-e-impresion.md) | Desarrollo | App de camarero, pantallas de cocina, ESC/POS |
-| 11 | [Modelo de negocio y precios](11-modelo-de-negocio-y-precios.md) | Negocio | Planes, tarifas, go‑to‑market, unit economics |
-| 12 | [Seguridad y RGPD](12-seguridad-y-rgpd.md) | Desarrollo / Legal | Protección de datos, PCI, hardening |
-| 13 | [Roadmap, MVP y equipo](13-roadmap-mvp-y-equipo.md) | Dirección | Fases, plazos, equipo y presupuesto |
-| 14 | [Pantallas: kiosko, KDS, display, ofertas](14-pantallas-cliente-kiosko-y-kds.md) | Producto / Desarrollo | Autopedido estilo fast-food, cocina, estado del pedido, cartelería |
-| 15 | [Cuentas y servicios](15-cuentas-y-servicios.md) | Dirección / Operaciones | Altas necesarias (dominio, GitHub, Supabase, Stripe, AEAT, stores…) |
+| 01 | [Investigación de mercado](dossier/01-investigacion-mercado.md) | Negocio / Producto | ¿Quién compite, a qué precio y qué falla? |
+| 02 | [Visión y posicionamiento](dossier/02-vision-y-posicionamiento.md) | Negocio / Producto | ¿Por qué vamos a ganar? Propuesta de valor |
+| 03 | [Requisitos funcionales](dossier/03-requisitos-funcionales.md) | Producto / Desarrollo | ¿Qué hace exactamente el sistema? Módulos |
+| 04 | [Arquitectura técnica](dossier/04-arquitectura-tecnica.md) | Desarrollo | ¿Cómo encaja todo? Diagramas, offline‑first |
+| 05 | [Stack tecnológico](dossier/05-stack-tecnologico.md) | Desarrollo | ¿Con qué lo construimos y por qué? |
+| 06 | [Base de datos y sincronización](dossier/06-base-de-datos-y-sincronizacion.md) | Desarrollo | Modelo de datos, multi‑tenant, sync offline |
+| 07 | [Facturación y cumplimiento legal](dossier/07-facturacion-y-cumplimiento-legal.md) | Desarrollo / Legal | Verifactu, TicketBAI, IVA/IGIC, tickets |
+| 08 | [Pasarelas de pago](dossier/08-pasarelas-de-pago.md) | Desarrollo / Negocio | Redsys, Stripe, Bizum, modelo plataforma |
+| 09 | [Hardware](dossier/09-hardware.md) | Operaciones / Ventas | Terminales, impresoras, kits y precios |
+| 10 | [Comanderas, KDS e impresión](dossier/10-comanderas-kds-e-impresion.md) | Desarrollo | App de camarero, pantallas de cocina, ESC/POS |
+| 11 | [Modelo de negocio y precios](dossier/11-modelo-de-negocio-y-precios.md) | Negocio | Planes, tarifas, go‑to‑market, unit economics |
+| 12 | [Seguridad y RGPD](dossier/12-seguridad-y-rgpd.md) | Desarrollo / Legal | Protección de datos, PCI, hardening |
+| 13 | [Roadmap, MVP y equipo](dossier/13-roadmap-mvp-y-equipo.md) | Dirección | Fases, plazos, equipo y presupuesto |
+| 14 | [Pantallas: kiosko, KDS, display, ofertas](dossier/14-pantallas-cliente-kiosko-y-kds.md) | Producto / Desarrollo | Autopedido estilo fast-food, cocina, estado del pedido, cartelería |
+| 15 | [Cuentas y servicios](dossier/15-cuentas-y-servicios.md) | Dirección / Operaciones | Altas necesarias (dominio, GitHub, Supabase, Stripe, AEAT, stores…) |
+
+### Especificaciones de construcción — [`especificaciones/`](especificaciones/)
+
+| Documento | Qué contiene |
+|-----------|--------------|
+| [Páginas de creación y configuración](especificaciones/paginas-creacion-configuracion.md) | Especificación maestra del backoffice: páginas, formularios y campos con nombre real de columna (absorbió al antiguo doc 16) |
+| [Mapa Ágora completo](especificaciones/mapa-agora-completo.md) | Checklist funcional contra Ágora |
+| [Guía de diseño](especificaciones/guia-de-diseno.md) | Sistema de diseño del backoffice (estilo Supabase) + patrón estándar de página de gestión |
+| [Elementos del plano (SVG)](especificaciones/plano-elementos-svg.md) | Catálogo de elementos del plano de sala: rejilla, viewBox y prompts SVG |
+
+### Carpetas de trabajo
+
+Todo vive en carpetas; en la raíz solo queda este índice.
+
+| Carpeta | Rol | Estado |
+|---------|-----|--------|
+| [`plan/`](plan/) | Decisiones del 02-07-2026: estado real del código, app de escritorio, módulos, TPV estilo Glop y **checklist maestro** | ★ **Plan vigente** |
+| [`implementacion/`](implementacion/) | Guías ejecutables (el *cómo*): DDL, ficheros a tocar y criterios de aceptación, una por frente | ★ **Plan vigente** |
+| [`dossier/`](dossier/) | Los 15 documentos de producto de junio (tabla de arriba): mercado, decisiones, arquitectura, fiscal, negocio | Referencia estable |
+| [`especificaciones/`](especificaciones/) | Especificaciones de construcción: páginas y campos, mapa Ágora, guía de diseño, elementos del plano | Referencia estable |
+| [`referencia/`](referencia/) | Guía de construcción de junio: áreas 01–08, **configurador de Ágora campo a campo** (`09-referencia-configurador-agora/`), modelo de datos objetivo (`diseno/`), infraestructura y mejoras | Referencia estable |
+| [`sesiones/`](sesiones/) | Registro cronológico de cambios, implementaciones y mejoras por sesión de trabajo (traspasos) | Vivo — ver skill `gluuh-registro` |
 
 ---
 
@@ -76,7 +98,7 @@ Modelo **transparente, sin permanencia y sin alta** (lo contrario al mercado), c
 | **Avanzado** | ~79–99 €/mes por local | Restaurante grande, multi‑zona, delivery |
 | **Cadena** | a medida | Grupos y multi‑local |
 
-Detalle completo y *unit economics* en **[11 — Modelo de negocio y precios](11-modelo-de-negocio-y-precios.md)**.
+Detalle completo y *unit economics* en **[11 — Modelo de negocio y precios](dossier/11-modelo-de-negocio-y-precios.md)**.
 
 ### 1.5 Plan de ejecución (resumen)
 
@@ -84,7 +106,7 @@ Detalle completo y *unit economics* en **[11 — Modelo de negocio y precios](11
 - **v1 comercial (+3–5 meses):** KDS, informes, gestión completa de carta/turnos, **TicketBAI**, datáfono real, pulido offline, app comandera iOS/Android pulida.
 - **Escala:** multi‑local avanzado, analítica/IA, integraciones (delivery vía Deliverect, reservas), migración a infraestructura AWS.
 
-Detalle, plazos y presupuesto en **[13 — Roadmap, MVP y equipo](13-roadmap-mvp-y-equipo.md)**.
+Detalle, plazos y presupuesto en **[13 — Roadmap, MVP y equipo](dossier/13-roadmap-mvp-y-equipo.md)**.
 
 ---
 
@@ -143,7 +165,7 @@ flowchart TB
 | **Gluuh Campo** | Análisis de facturas del campo | Existente |
 | **Gluuh TPV** | Este proyecto: TPV de hostelería | En desarrollo |
 
-En el código, el scope de paquetes es **`@gluuh/*`** y los identificadores **`com.gluuh.tpv`** / **`com.gluuh.comandera`**. Dominio sugerido para el TPV: **`tpv.gluuh.com`** (subdominio del dominio que ya tienes — sin coste de dominio nuevo). Cuentas a crear/reutilizar en **[15 — Cuentas y servicios](15-cuentas-y-servicios.md)**.
+En el código, el scope de paquetes es **`@gluuh/*`** y los identificadores **`com.gluuh.tpv`** / **`com.gluuh.comandera`**. Dominio sugerido para el TPV: **`tpv.gluuh.com`** (subdominio del dominio que ya tienes — sin coste de dominio nuevo). Cuentas a crear/reutilizar en **[15 — Cuentas y servicios](dossier/15-cuentas-y-servicios.md)**.
 
 ---
 
@@ -169,9 +191,11 @@ En el código, el scope de paquetes es **`@gluuh/*`** y los identificadores **`c
 
 | Documento | Estado |
 |-----------|--------|
-| 01 – 13 | ✅ Redactados (investigación de mercado + decisiones técnicas y de negocio) |
-| Diseño UI/UX (wireframes) | ⏳ Pendiente (fase de diseño, ver roadmap) |
-| Esquema SQL detallado / OpenAPI | ⏳ Pendiente (fase de arranque técnico) |
+| 01 – 15 (`dossier/`) | ✅ Redactados (investigación de mercado + decisiones técnicas y de negocio, junio 2026) |
+| `especificaciones/` | ✅ Redactados (06-07-2026: el antiguo 16 se fusionó en páginas-creación y el 19 en la guía de diseño) |
+| `referencia/` (junio) | ✅ Referencia estable (Ágora, modelo de datos objetivo, plan F0–F8) |
+| `plan/` + `implementacion/` | ★ Plan vigente — se actualiza al implementar |
+| `sesiones/` | Vivo — una entrada por sesión de trabajo |
 | Especificación XSD Verifactu final | ⚠️ Reconfirmar contra el portal AEAT antes de cerrar desarrollo |
 
 > Toda la investigación está fechada en **junio de 2026** con fuentes citadas en cada documento. Las cifras de precios de competidores y comisiones son orientativas y deben reconfirmarse antes de cualquier decisión contractual.

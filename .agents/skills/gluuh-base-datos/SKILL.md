@@ -15,7 +15,7 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 02-07-2026 la última es `0032`). Nueva
+   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0063`). Nueva
    migración = siguiente número libre + nombre descriptivo en snake_case.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
    delete cascade` + RLS** con `current_tenant_id()` (patrón de cualquier tabla
@@ -46,7 +46,7 @@ description: >-
 - **Stubs en español** (0018-0021: `tarifa`, `promocion`, `perfil`,
   `grupo_mayor`, `alergeno`, `etiqueta_producto`, `warehouse`, `sales_center`…):
   son cáscaras del CRUD genérico. El esquema objetivo que los reconcilia está en
-  `docs/auditoria/implementacion/modelo-de-datos.md` — consultarlo antes de
+  `docs/referencia/diseno/modelo-de-datos.md` — consultarlo antes de
   ampliar cualquiera de ellos.
 - El mecanismo **`setting`** (0023) con precedencia DEVICE > LOCAL > GLOBAL y
   RPCs `setting_get`/`setting_set` ya existe: usar eso para configuración,

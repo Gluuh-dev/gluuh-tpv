@@ -1,7 +1,7 @@
 -- =============================================================================
 --  Gluuh TPV — Esquema de base de datos (PostgreSQL)
 --  Multi-tenant: shared schema + tenant_id + Row-Level Security (RLS)
---  Ver docs/06-base-de-datos-y-sincronizacion.md y docs/07 (fiscalidad)
+--  Ver docs/dossier/06-base-de-datos-y-sincronizacion.md y docs/dossier/07 (fiscalidad)
 --
 --  Convenciones:
 --   - PK uuid (gen_random_uuid).

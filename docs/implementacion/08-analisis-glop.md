@@ -4,7 +4,7 @@
 analiza sus tres pantallas clave (capturas aportadas el 02-07-2026: pantalla de
 venta, diálogo de cobro y editor de salón) botón a botón, más lo aprendido de sus
 manuales y ayuda online, y termina en decisiones concretas para Gluuh. Complementa
-la tabla función-a-función de `docs/auditoria_02_07_26/04-tpv-estilo-glop.md`.
+la tabla función-a-función de `docs/plan/04-tpv-estilo-glop.md`.
 
 ## 8.1 Pantalla de venta — anatomía completa (captura 1)
 
@@ -207,4 +207,4 @@ venta+cobro, traspaso de mesas, dividir cuenta y editor de salones en
 | "A devolver" gigante legible a un metro | Adoptar | guía 05 §5.8 |
 | Modo Und./Precio en el teclado | Ya lo tenemos | — |
 | Editor de salón | No copiar (el nuestro es superior); valorar lista de plantillas lateral | backlog UI |
-| Estética verde-flúo 2010, densidad caótica | **No copiar**: misma disposición, nuestra piel (marca del cliente + `GUIA_DISENO_COMPLETA.md`) | — |
+| Estética verde-flúo 2010, densidad caótica | **No copiar**: misma disposición, nuestra piel (marca del cliente + `docs/especificaciones/guia-de-diseno.md`) | — |

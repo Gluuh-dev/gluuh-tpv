@@ -13,7 +13,7 @@ description: >-
 # Módulos y dispositivos — guía de trabajo
 
 Documento madre: `docs/implementacion/04-modulos-y-emparejado.md` (pasos, DDL,
-criterios). Diseño: `docs/auditoria_02_07_26/03-sistema-de-modulos.md`.
+criterios). Diseño: `docs/plan/03-sistema-de-modulos.md`.
 
 ## Arquitectura (decidida — no rediseñar)
 

@@ -7,7 +7,7 @@
  *  - Motor VERIFACTU (hash encadenado SHA-256 + QR de cotejo AEAT).
  *  - Máquina de estados de la comanda.
  *
- * Ver docs/05-stack-tecnologico.md y docs/07-facturacion-y-cumplimiento-legal.md
+ * Ver docs/dossier/05-stack-tecnologico.md y docs/dossier/07-facturacion-y-cumplimiento-legal.md
  */
 
 export * from "./domain/types.js";

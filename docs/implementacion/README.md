@@ -1,11 +1,11 @@
 # Implementación — guías ejecutables
 
-**Fecha:** 02-07-2026. Carpeta hermana de `docs/auditoria_02_07_26/` (el *qué* y el
+**Fecha:** 02-07-2026. Carpeta hermana de `docs/plan/` (el *qué* y el
 *porqué*): aquí está el **cómo** — cada documento es una guía de implementación con
 ficheros a tocar, migraciones SQL, contratos de código y criterios de aceptación,
 pensada para ejecutarla tal cual (por una persona o por un agente).
 
-> Existe también `docs/auditoria/implementacion/` (junio), con el modelo de datos
+> Existe también `docs/referencia/diseno/` (junio), con el modelo de datos
 > objetivo y el plan F0–F8 generales. Estas guías son más concretas y mandan cuando
 > haya conflicto: reflejan las decisiones de julio (Electron, módulos, offline-first).
 
@@ -33,7 +33,7 @@ para no seguir engordando `tpv/page.tsx`.
 ## Convenciones de estas guías
 
 - Rutas relativas a la raíz del repo. Migraciones nuevas: siguiente número libre en
-  `supabase/migrations/` (a 02-07-2026 el último es `0032`; los ejemplos usan `00xx`).
+  `supabase/migrations/` (a 06-07-2026 la última es `0063`; los ejemplos usan `00xx`).
 - Todo cambio de esquema se refleja también en `apps/api/db/schema.sql` (espejo, ver
   `supabase/README.md`).
 - Código y UI en español, TypeScript estricto, tests Vitest junto al fichero.

@@ -1,6 +1,6 @@
 # 06 — Offline con PowerSync
 
-**Objetivo:** el modelo confirmado en `docs/auditoria_02_07_26/06-decision-local-vs-cloud.md`:
+**Objetivo:** el modelo confirmado en `docs/plan/06-decision-local-vs-cloud.md`:
 sin internet el TPV sigue vendiendo con su copia local; al volver la red, todo se
 vuelca a la nube; los cambios hechos online (backoffice desde casa) bajan solos al
 TPV. "Online" es el canal de sincronización, no un requisito.
@@ -50,7 +50,7 @@ de la auditoría: desktop online-only con cola de impresión local).
 ## Fase 3 — Numeración fiscal offline (3-4 d)
 
 El único conflicto real de un TPV offline es el número de factura (diseño en
-`docs/06-base-de-datos-y-sincronizacion.md`):
+`docs/dossier/06-base-de-datos-y-sincronizacion.md`):
 
 1. Tabla `number_range`: `tenant_id, device_id, serie, desde, hasta, siguiente`.
    Al conectar, cada dispositivo reserva un rango (RPC `reservar_rango(serie, n)`);

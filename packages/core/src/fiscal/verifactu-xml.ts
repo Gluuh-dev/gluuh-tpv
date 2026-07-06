@@ -7,7 +7,7 @@
  * abajo son APROXIMADOS y DEBEN reconfirmarse contra los XSD oficiales vigentes
  * del portal de desarrolladores de la AEAT antes de enviar nada real.
  * La ESTRUCTURA de etiquetas (IDFactura, Desglose, Encadenamiento, Huella…) sí
- * sigue la documentación. Ver docs/07-facturacion-y-cumplimiento-legal.md §3.
+ * sigue la documentación. Ver docs/dossier/07-facturacion-y-cumplimiento-legal.md §3.
  */
 
 import type { Impuesto, ResultadoImpuestos } from "./tax.js";

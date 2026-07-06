@@ -3,7 +3,7 @@
 **Objetivo:** interruptores de módulos por empresa (kiosko, KDS, pantalla, cartelería,
 comandera…) gestionados desde el backoffice y desde el TPV, y vinculación de cualquier
 pantalla/dispositivo con un código de 6 dígitos — sin email/contraseña en la tele de
-la cocina. Diseño completo en `docs/auditoria_02_07_26/03-sistema-de-modulos.md`.
+la cocina. Diseño completo en `docs/plan/03-sistema-de-modulos.md`.
 
 ## Paso 1 — Registro de módulos y activación
 

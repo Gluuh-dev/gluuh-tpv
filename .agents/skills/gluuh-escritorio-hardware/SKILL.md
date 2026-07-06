@@ -14,7 +14,7 @@ description: >-
 
 Documento madre: `docs/implementacion/03-app-escritorio-electron.md` (piezas,
 DDL de `print_job`, criterios de aceptación). Decisiones de arquitectura:
-`docs/auditoria_02_07_26/02-app-escritorio-windows.md`.
+`docs/plan/02-app-escritorio-windows.md`.
 
 ## Principios
 

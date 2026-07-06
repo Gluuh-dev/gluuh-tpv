@@ -6,7 +6,7 @@
  * `id` (texto/UUID) a cada tabla. La fuente de verdad canónica es PostgreSQL
  * (apps/api/db/schema.sql); aquí se replica lo necesario por dispositivo.
  *
- * Ver docs/06-base-de-datos-y-sincronizacion.md §4.
+ * Ver docs/dossier/06-base-de-datos-y-sincronizacion.md §4.
  */
 
 import { column, Schema, Table } from "@powersync/common";

@@ -14,7 +14,7 @@ description: >-
 
 # UX operativa — el estilo Glop hecho bien
 
-**Dos niveles de interfaz** (decisión de proyecto, `docs/17` §1): el
+**Dos niveles de interfaz** (decisión de proyecto, `docs/especificaciones/paginas-creacion-configuracion.md` §1): el
 **backoffice** es estilo Supabase/Notion (skill `ui-kit-shadcn`); la
 **operativa** — todo lo que toca un camarero, un cocinero o un cliente — es
 esta skill: colorida, táctil, con la marca del bar (`tenant_branding`), densa

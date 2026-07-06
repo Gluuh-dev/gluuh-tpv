@@ -1,6 +1,6 @@
 # @gluuh/sync — Sincronización offline-first (PowerSync)
 
-Esquema y conector compartidos para el modo **offline-first** del TPV. Ver el diseño completo en [docs/06](../../docs/06-base-de-datos-y-sincronizacion.md).
+Esquema y conector compartidos para el modo **offline-first** del TPV. Ver el diseño completo en [docs/06](../../docs/dossier/06-base-de-datos-y-sincronizacion.md).
 
 ## Qué hay aquí
 
@@ -34,6 +34,6 @@ import { PowerSyncDatabase } from "@powersync/react-native";
 1. **Servicio PowerSync** conectado a la base PostgreSQL (`apps/api/db/schema.sql`).
 2. **Sync rules** que definan los *buckets por `tenant_id`** (cada dispositivo solo descarga los datos de su restaurante).
 3. **Write-path** en el backend: endpoint `POST /sync/upload` (ya esbozado en `apps/api/src/sync/`) que valida y persiste.
-4. **JWT** con `tenant_id` + rol para credenciales y RLS (ver [docs/05 §11](../../docs/05-stack-tecnologico.md) y [docs/12](../../docs/12-seguridad-y-rgpd.md)).
+4. **JWT** con `tenant_id` + rol para credenciales y RLS (ver [docs/05 §11](../../docs/dossier/05-stack-tecnologico.md) y [docs/12](../../docs/dossier/12-seguridad-y-rgpd.md)).
 
 > Esta pieza no se puede ejecutar de extremo a extremo sin la infraestructura anterior; el esquema y el conector sí están listos y tipados.

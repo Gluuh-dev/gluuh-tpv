@@ -6,7 +6,7 @@
  * exige la especificación. Salidas: SVG (ideal para imprimir en el ticket) y
  * data-URL PNG (ideal para mostrar en web/pantalla).
  *
- * Ver docs/07-facturacion-y-cumplimiento-legal.md §3.4.
+ * Ver docs/dossier/07-facturacion-y-cumplimiento-legal.md §3.4.
  */
 
 import QRCode from "qrcode";

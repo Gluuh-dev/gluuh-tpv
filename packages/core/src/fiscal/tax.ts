@@ -5,7 +5,7 @@
  * que aquí se calcula la base y la cuota "desglosando hacia atrás" desde el PVP.
  *
  * Tipos vigentes a junio de 2026 — verificar cambios normativos (la UE presiona
- * para subir el IVA de hostelería al 21 %). Ver docs/07-facturacion-y-cumplimiento-legal.md §7.
+ * para subir el IVA de hostelería al 21 %). Ver docs/dossier/07-facturacion-y-cumplimiento-legal.md §7.
  */
 
 import type { Territorio, LineaImpuesto } from "../domain/types.js";

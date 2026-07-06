@@ -9,7 +9,7 @@
  *  - QR = URL HTTPS al servicio "ValidarQR" con nif, numserie, fecha, importe.
  *
  * ⚠️ Antes de producción, reconfirmar los XSD y el formato vigentes en el portal
- * de desarrolladores de la AEAT. Ver docs/07-facturacion-y-cumplimiento-legal.md §3.
+ * de desarrolladores de la AEAT. Ver docs/dossier/07-facturacion-y-cumplimiento-legal.md §3.
  */
 
 import { createHash } from "node:crypto";

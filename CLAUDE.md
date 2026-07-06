@@ -24,7 +24,11 @@ con foco en cumplimiento fiscal **VERIFACTU** e **IGIC** canario.
   TPV en `app/tpv`, pantallas fast-food (`app/kiosko|kds|pantalla|cocina|ofertas`).
 - `apps/desktop` (Electron) y `apps/mobile` (Expo) — esqueletos.
 - `packages/{ui,api-client,hardware,sync,supabase}` — compartidos; varios son esqueletos.
-- `docs/` — 16 documentos de producto/arquitectura/fiscalidad/roadmap.
+- `docs/` — todo en carpetas: `dossier/` (producto 01–15), `especificaciones/`
+  (páginas/campos, mapa Ágora, guía de diseño, plano SVG), `referencia/` (junio:
+  áreas 01–08, configurador Ágora, modelo de datos objetivo en `diseno/`),
+  `plan/` (decisiones vigentes + checklist maestro), `implementacion/` (guías
+  ejecutables) y `sesiones/` (registro por sesión). Índice: `docs/README.md`.
 
 ## Base de datos
 
@@ -45,14 +49,15 @@ con foco en cumplimiento fiscal **VERIFACTU** e **IGIC** canario.
 
 ## Skills y guías de implementación
 
-- Plan vigente: `docs/auditoria_02_07_26/` (decisiones) + `docs/implementacion/`
+- Plan vigente: `docs/plan/` (decisiones) + `docs/implementacion/`
   (guías ejecutables con DDL, ficheros a tocar y criterios de aceptación).
 - Skills del proyecto en `.agents/skills/`: **gluuh-base-datos** (migraciones y
   catálogo de cambios de esquema pendientes — leer antes de tocar `supabase/`),
   **gluuh-tpv-glop** (pantalla de venta), **gluuh-ux-operativa** (diseño táctil
   estilo Glop + checklist de auditoría UX), **gluuh-escritorio-hardware**
   (Electron/impresión), **gluuh-modulos-dispositivos** (módulos y emparejado),
-  **ui-kit-shadcn** (estilo backoffice).
+  **ui-kit-shadcn** (estilo backoffice), **gluuh-registro** (documentar cambios
+  y traspasos de sesión en `docs/sesiones/`).
 - Dos niveles de interfaz: el **backoffice** (`app/(panel)`, estilo Supabase,
   skill ui-kit-shadcn) y la **operativa** (`app/tpv` y pantallas, estilo Glop
   colorido con marca del cliente, skill gluuh-ux-operativa). Son experiencias
