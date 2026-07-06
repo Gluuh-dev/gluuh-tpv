@@ -6,6 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Loader2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../../lib/supabaseBrowser";
+import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -283,6 +284,10 @@ export default function FamiliaEditarPage() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Modificadores heredables: lo que se incluye aquí llega a todos los
+              productos de la familia (Fase 2 Glop, 0064). */}
+          {!esNueva && <AsignacionesBiblioteca nivel="familia" refId={id} />}
 
           {!esNueva && (
             <Card>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
+import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
 import { subirMedia } from "@/app/lib/branding";
 import { ESTACIONES, ESTACION_LABEL, estacionDe } from "@/app/lib/estaciones";
 import { ALERGENOS } from "@/lib/alergenos";
@@ -576,6 +577,10 @@ export default function ProductoEditar() {
           </>
         )}
       </Card>
+
+      {/* ── Biblioteca (Fase 2 Glop, 0064): grupos heredados de la familia y las
+          categorías, con ajuste fino aquí (Incluir/Quitar mandan sobre lo heredado). ── */}
+      {!esNuevo && <AsignacionesBiblioteca nivel="producto" refId={id} />}
 
       {/* ── Acciones ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-end gap-2">

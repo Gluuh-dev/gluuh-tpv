@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
+import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
 import { ESTACIONES, ESTACION_LABEL } from "@/app/lib/estaciones";
 import { subirMedia } from "@/app/lib/branding";
 import { Button } from "@/components/ui/button";
@@ -241,6 +242,10 @@ export default function CategoriaEditar() {
           <Button variant="destructive" onClick={eliminar}><Trash2 className="h-4 w-4" /> Eliminar</Button>
         )}
       </div>
+
+      {/* Modificadores de biblioteca: Incluir los suma a los productos de esta
+          categoría; Quitar anula lo heredado de la familia (Fase 2 Glop, 0064). */}
+      {!esNuevo && <AsignacionesBiblioteca nivel="categoria" refId={id} />}
 
       {!esNuevo && (
         <div className="space-y-2">

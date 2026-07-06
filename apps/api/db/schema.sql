@@ -187,6 +187,8 @@ CREATE TABLE family (
   orden          int  DEFAULT 0,
   color          text DEFAULT '#64748b',
   grupo_mayor_id uuid REFERENCES grupo_mayor(id) ON DELETE SET NULL,  -- null = sin grupo mayor (0058)
+  mostrar_venta  boolean NOT NULL DEFAULT true,   -- sale en la pantalla de venta (0061)
+  mostrar_menus  boolean NOT NULL DEFAULT true,   -- elegible dentro de menús (0061)
   created_at     timestamptz DEFAULT now()
 );
 CREATE INDEX idx_family_grupo_mayor ON family (tenant_id, grupo_mayor_id);
@@ -200,6 +202,8 @@ CREATE TABLE category (
   foto_url    text,                       -- imagen para el botón del TPV (0044)
   icono       text,                       -- nombre de icono lucide para el botón del TPV (0060)
   estacion    text,                       -- estación por defecto de sus productos; null = sin definir (0050)
+  mostrar_venta boolean NOT NULL DEFAULT true,  -- sale en la pantalla de venta (0061)
+  mostrar_menus boolean NOT NULL DEFAULT true,  -- elegible dentro de menús (0061)
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -225,6 +229,17 @@ CREATE TABLE product (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_product_tenant_cat ON product (tenant_id, category_id);
+
+-- Producto ↔ categoría muchos-a-muchos (0061): un producto puede estar en N
+-- categorías del TPV; product.category_id queda como "categoría principal".
+CREATE TABLE product_category (
+  product_id  uuid NOT NULL REFERENCES product(id)  ON DELETE CASCADE,
+  category_id uuid NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+  tenant_id   uuid NOT NULL REFERENCES tenant(id)   ON DELETE CASCADE,
+  orden       int  DEFAULT 0,
+  PRIMARY KEY (product_id, category_id)
+);
+CREATE INDEX idx_product_category_cat ON product_category (tenant_id, category_id);
 
 -- Formatos de venta por artículo (0039): caña/copa/botella, ración/media…
 CREATE TABLE product_format (
@@ -258,11 +273,14 @@ CREATE TABLE product_price (
 );
 CREATE INDEX idx_product_price_tarifa ON product_price (tenant_id, tarifa_id);
 
+-- Grupos de modificadores: de un producto (product_id) o de la BIBLIOTECA del
+-- tenant (product_id NULL, 0064) — reutilizables vía modifier_group_asignacion.
 CREATE TABLE modifier_group (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
-  product_id  uuid NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  product_id  uuid REFERENCES product(id) ON DELETE CASCADE,  -- NULL = biblioteca (0064)
   nombre      text NOT NULL,               -- "Punto de la carne", "Extras"
+  tipo        text NOT NULL DEFAULT 'EXTRA' CHECK (tipo IN ('EXTRA','COMENTARIO')),  -- 0064
   min_sel     int NOT NULL DEFAULT 0,
   max_sel     int NOT NULL DEFAULT 1
 );
@@ -276,6 +294,29 @@ CREATE TABLE modifier (
   precio_extra      numeric(12,2) NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_modifier_tenant_group ON modifier (tenant_id, modifier_group_id);
+
+-- Asignación de grupos de biblioteca con herencia (0064): destino = exactamente
+-- UNO de familia/categoría/producto. INCLUIR suma; EXCLUIR quita lo heredado de
+-- niveles superiores (familia < categoría < producto; en el nivel, INCLUIR gana).
+CREATE TABLE modifier_group_asignacion (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  modifier_group_id uuid NOT NULL REFERENCES modifier_group(id) ON DELETE CASCADE,
+  family_id         uuid REFERENCES family(id)   ON DELETE CASCADE,
+  category_id       uuid REFERENCES category(id) ON DELETE CASCADE,
+  product_id        uuid REFERENCES product(id)  ON DELETE CASCADE,
+  modo              text NOT NULL DEFAULT 'INCLUIR' CHECK (modo IN ('INCLUIR','EXCLUIR')),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  CHECK (num_nonnulls(family_id, category_id, product_id) = 1)
+);
+CREATE UNIQUE INDEX uq_mga_familia   ON modifier_group_asignacion (modifier_group_id, family_id)   WHERE family_id   IS NOT NULL;
+CREATE UNIQUE INDEX uq_mga_categoria ON modifier_group_asignacion (modifier_group_id, category_id) WHERE category_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_mga_producto  ON modifier_group_asignacion (modifier_group_id, product_id)  WHERE product_id  IS NOT NULL;
+CREATE INDEX idx_mga_tenant    ON modifier_group_asignacion (tenant_id);
+CREATE INDEX idx_mga_grupo     ON modifier_group_asignacion (modifier_group_id);
+CREATE INDEX idx_mga_familia   ON modifier_group_asignacion (family_id);
+CREATE INDEX idx_mga_categoria ON modifier_group_asignacion (category_id);
+CREATE INDEX idx_mga_producto  ON modifier_group_asignacion (product_id);
 
 -- Catálogo de los 14 alérgenos (global) y relación con productos
 CREATE TABLE allergen (
@@ -701,8 +742,9 @@ DO $$
 DECLARE t text;
 BEGIN
   FOR t IN SELECT unnest(ARRAY[
-    'location','device','app_user','shift','category','product','modifier_group',
-    'modifier','product_allergen','ingredient','recipe_item','stock_move','room',
+    'location','device','app_user','shift','category','product','product_category',
+    'modifier_group','modifier','modifier_group_asignacion',
+    'product_allergen','ingredient','recipe_item','stock_move','room',
     'restaurant_table','sales_order','order_line','order_event','payment','invoice',
     'tax_line','verifactu_record','ticketbai_record','cash_session','cash_move',
     'customer','reservation','online_order','setting','tenant_module',

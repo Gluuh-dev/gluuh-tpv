@@ -48,6 +48,7 @@ export const NAV: NavEntry[] = [
     { title: "Catalogo", items: [
       { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST }, { href: "/familias", label: "Familias", roles: GEST },
       { href: "/categorias", label: "Categorias", roles: GEST }, { href: "/productos", label: "Productos", roles: GEST },
+      { href: "/modificadores", label: "Modificadores", roles: GEST },
       { href: "/menus", label: "Menus", roles: GEST }, { href: "/alergenos", label: "Alergenos", roles: GEST }, { href: "/etiquetas", label: "Etiquetas de productos", roles: GEST },
     ] },
     { title: "Tarifas y precios", items: [

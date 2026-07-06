@@ -24,7 +24,7 @@ import { TileProducto } from "./components/TileProducto";
 import { TileCategoria } from "./components/TileCategoria";
 import { TecladoTPV } from "./components/TecladoTPV";
 import { RailSalas, type RailTab } from "./components/RailSalas";
-import { useCatalogo, type Family, type Cat, type Prod, type Formato, type ModGrupo, type ModOpcion } from "../lib/catalogo-store";
+import { useCatalogo, gruposDeProducto, type Family, type Cat, type Prod, type Formato, type ModGrupo, type ModOpcion } from "../lib/catalogo-store";
 import { CLASES_FISCALES, ivaAuto } from "@/lib/fiscal-clases";
 import { PlanoSvg } from "@/components/plano-svg";
 import { Plus, Trash2, ChevronUp, ChevronDown, Search,
@@ -217,6 +217,11 @@ export default function TPV() {
   const [formatoPop, setFormatoPop] = useState<Prod | null>(null);
   const gruposMod = useCatalogo((s) => s.gruposMod);
   const modById   = useCatalogo((s) => s.modById);
+  const biblioteca   = useCatalogo((s) => s.biblioteca);     // grupos de biblioteca (0064, Fase 2)
+  const asignaciones = useCatalogo((s) => s.asignaciones);   // herencia familia→categoría→producto
+  // Grupos EFECTIVOS de un producto: los suyos + los heredados de la biblioteca.
+  const gruposDe = (pid: string) =>
+    gruposDeProducto({ gruposMod, biblioteca, asignaciones, prods, cats, prodCats }, pid);
   // reemplazar = clave de la línea que se está re-editando ("Com. y extra"); si va,
   // guardarModificadores re-clava esa línea en vez de añadir una nueva.
   const [modProd, setModProd] = useState<{ p: Prod; fid?: string; reemplazar?: string } | null>(null);
@@ -1474,7 +1479,7 @@ export default function TPV() {
   // comentario manual van a las notas de la línea (se imprimen en cocina).
   function guardarModificadores(sel: SeleccionModificadores) {
     if (!modProd) return;
-    const grupos = gruposMod[modProd.p.id] ?? [];
+    const grupos = gruposDe(modProd.p.id);
     // Backstop de obligatoriedad (min_sel): comentarios por id elegido, extras por
     // unidades > 0. El aviso ya lo da el modal (deshabilita Guardar en grupos de
     // comentario); esto cubre además grupos de extras obligatorios. Si falta, no guarda.
@@ -2940,12 +2945,13 @@ export default function TPV() {
 
       {/* ── Modificadores (ModificadoresModal): comentarios + extras + nota ── */}
       {modProd && (() => {
-        const grupos = gruposMod[modProd.p.id] ?? [];
+        const grupos = gruposDe(modProd.p.id);
         const fmt = modProd.fid ? (formatos[modProd.p.id] ?? []).find((f) => f.id === modProd.fid) : undefined;
         const precioBase = fmt ? fmt.precio : modProd.p.precio;
-        // Grupos "comentario" = todas sus opciones sin precio (punto de la carne…).
+        // Grupos "comentario": por tipo (0064) o, si aún no hay tipo, todas sus
+        // opciones sin precio (punto de la carne…).
         const gruposComentario = grupos
-          .filter((g) => g.opciones.length > 0 && g.opciones.every((o) => o.precio_extra === 0))
+          .filter((g) => g.opciones.length > 0 && (g.tipo ? g.tipo === "COMENTARIO" : g.opciones.every((o) => o.precio_extra === 0)))
           // unica: los grupos obligatorios de una opción (min_sel≥1, p. ej. "Punto de la carne")
           // salen como selección única (radio) en el modal.
           .map((g) => ({ nombre: g.nombre, min: g.min_sel, unica: g.min_sel >= 1, opciones: g.opciones.map((o) => ({ id: o.id, nombre: o.nombre })) }));

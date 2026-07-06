@@ -8,7 +8,9 @@ export interface Cat    { id: string; nombre: string; orden: number; family_id: 
 export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null }
 export interface Formato { id: string; product_id: string; nombre: string; precio: number }
 export interface ModOpcion { id: string; nombre: string; precio_extra: number }
-export interface ModGrupo  { id: string; product_id: string; nombre: string; min_sel: number; max_sel: number; opciones: ModOpcion[] }
+export interface ModGrupo  { id: string; product_id: string | null; nombre: string; min_sel: number; max_sel: number; tipo?: "EXTRA" | "COMENTARIO"; opciones: ModOpcion[] }
+/** Asignación de un grupo de biblioteca a familia/categoría/producto (0064, Fase 2 Glop). */
+export interface ModAsignacion { modifier_group_id: string; family_id: string | null; category_id: string | null; product_id: string | null; modo: "INCLUIR" | "EXCLUIR" }
 
 interface CatalogoState {
   cargado: boolean;
@@ -18,7 +20,12 @@ interface CatalogoState {
   /** Categorías de cada producto (m2m `product_category`, Fase 1 Glop). Vacío si aún no aplicada. */
   prodCats: Record<string, string[]>;
   formatos: Record<string, Formato[]>;
+  /** Grupos PROPIOS de cada producto (modifier_group con product_id). */
   gruposMod: Record<string, ModGrupo[]>;
+  /** Biblioteca del tenant (modifier_group con product_id NULL, 0064). */
+  biblioteca: ModGrupo[];
+  /** Asignaciones de biblioteca por nivel (0064). Vacío si la migración no existe. */
+  asignaciones: ModAsignacion[];
   modById: Record<string, ModOpcion>;
   /** Carga el catálogo. Cache en memoria + localStorage; solo fetchea la 1ª vez (o con force). */
   cargar: (sb: SupabaseClient, opts?: { force?: boolean }) => Promise<void>;
@@ -35,7 +42,7 @@ let revalidadoSesion = false;
 export const useCatalogo = create<CatalogoState>()(
   persist(
     (set, get) => ({
-      cargado: false, families: [], cats: [], prods: [], prodCats: {}, formatos: {}, gruposMod: {}, modById: {},
+      cargado: false, families: [], cats: [], prods: [], prodCats: {}, formatos: {}, gruposMod: {}, biblioteca: [], asignaciones: [], modById: {},
 
       setProds: (p) => set({ prods: p }),
       setCats: (updater) => set((s) => ({ cats: updater(s.cats) })),
@@ -59,14 +66,21 @@ export const useCatalogo = create<CatalogoState>()(
           const r = await sb.from("category").select(`${CAT_COLS},mostrar_venta`).order("orden");
           return r.error ? sb.from("category").select(CAT_COLS).order("orden") : r;
         };
-        const [{ data: f }, { data: c }, { data: p }, { data: fmts }, { data: mgs }, { data: mods }, { data: pcs }] = await Promise.all([
+        // modifier_group.tipo (0064) puede no existir aún: reintenta sin la columna.
+        const MG_COLS = "id,product_id,nombre,min_sel,max_sel";
+        const cargarGrupos = async () => {
+          const r = await sb.from("modifier_group").select(`${MG_COLS},tipo`);
+          return r.error ? sb.from("modifier_group").select(MG_COLS) : r;
+        };
+        const [{ data: f }, { data: c }, { data: p }, { data: fmts }, { data: mgs }, { data: mods }, { data: pcs }, { data: asg }] = await Promise.all([
           sb.from("family").select("id,nombre,color").order("orden"),
           cargarCats(),
           cargarProds(),
           sb.from("product_format").select("id,product_id,nombre,precio").order("orden"),
-          sb.from("modifier_group").select("id,product_id,nombre,min_sel,max_sel"),
+          cargarGrupos(),
           sb.from("modifier").select("id,modifier_group_id,nombre,precio_extra"),
           sb.from("product_category").select("product_id,category_id"),   // m2m (0061); vacío si no aplicada
+          sb.from("modifier_group_asignacion").select("modifier_group_id,family_id,category_id,product_id,modo"), // 0064; vacío si no aplicada
         ]);
         // Formatos por producto
         const formatos: Record<string, Formato[]> = {};
@@ -79,8 +93,15 @@ export const useCatalogo = create<CatalogoState>()(
           (opcionesPorGrupo[m.modifier_group_id] ??= []).push(op);
           modById[m.id] = op;
         }
+        // Grupos: los de producto van a gruposMod[product_id]; los de biblioteca
+        // (product_id NULL, 0064) a la biblioteca — el resolver los reparte por herencia.
         const gruposMod: Record<string, ModGrupo[]> = {};
-        for (const g of (mgs as ModGrupo[]) ?? []) (gruposMod[g.product_id] ??= []).push({ ...g, opciones: opcionesPorGrupo[g.id] ?? [] });
+        const biblioteca: ModGrupo[] = [];
+        for (const g of (mgs as ModGrupo[]) ?? []) {
+          const grupo = { ...g, opciones: opcionesPorGrupo[g.id] ?? [] };
+          if (g.product_id) (gruposMod[g.product_id] ??= []).push(grupo);
+          else biblioteca.push(grupo);
+        }
         // Categorías por producto (m2m). Si `product_category` no existe aún, queda vacío
         // y el TPV cae a `product.category_id` (categoría principal).
         const prodCats: Record<string, string[]> = {};
@@ -89,7 +110,7 @@ export const useCatalogo = create<CatalogoState>()(
         set({
           cargado: true,
           families: (f as Family[]) ?? [], cats: (c as Cat[]) ?? [], prods: (p as Prod[]) ?? [],
-          prodCats, formatos, gruposMod, modById,
+          prodCats, formatos, gruposMod, biblioteca, asignaciones: (asg as ModAsignacion[]) ?? [], modById,
         });
 
         // Imágenes de categoría (best-effort; la columna foto_url puede no existir aún, 0044).
@@ -106,8 +127,44 @@ export const useCatalogo = create<CatalogoState>()(
       // Solo datos (las acciones no se serializan).
       partialize: (s) => ({
         cargado: s.cargado, families: s.families, cats: s.cats, prods: s.prods, prodCats: s.prodCats,
-        formatos: s.formatos, gruposMod: s.gruposMod, modById: s.modById,
+        formatos: s.formatos, gruposMod: s.gruposMod, biblioteca: s.biblioteca, asignaciones: s.asignaciones, modById: s.modById,
       }),
     }
   )
 );
+
+// ── Herencia de la biblioteca (Fase 2 Glop) ─────────────────────────────────
+// Grupos EFECTIVOS de un producto = sus grupos propios + los de biblioteca que
+// le llegan por asignación, resuelta por niveles: familia (de su categoría
+// principal) → categorías (todas las suyas, m2m) → producto. En cada nivel se
+// aplican primero los EXCLUIR y luego los INCLUIR (dentro del nivel, INCLUIR
+// gana); un nivel inferior puede quitar lo heredado o volver a añadirlo.
+// Función pura: la usan el TPV (store) y el panel (con datos propios).
+export function gruposDeProducto(
+  s: Pick<CatalogoState, "gruposMod" | "biblioteca" | "asignaciones" | "prods" | "cats" | "prodCats">,
+  productId: string,
+): ModGrupo[] {
+  const propios = s.gruposMod[productId] ?? [];
+  if (s.asignaciones.length === 0 || s.biblioteca.length === 0) return propios;
+
+  const prod = s.prods.find((p) => p.id === productId);
+  if (!prod) return propios;
+  const m2m = s.prodCats[productId];
+  let catIds: string[] = [];
+  if (m2m?.length) catIds = m2m;
+  else if (prod.category_id) catIds = [prod.category_id];
+  const famId = s.cats.find((c) => c.id === prod.category_id)?.family_id ?? null;
+
+  const efectivos = new Set<string>();
+  const aplicarNivel = (as: ModAsignacion[]) => {
+    for (const a of as) if (a.modo === "EXCLUIR") efectivos.delete(a.modifier_group_id);
+    for (const a of as) if (a.modo === "INCLUIR") efectivos.add(a.modifier_group_id);
+  };
+  aplicarNivel(s.asignaciones.filter((a) => a.family_id !== null && a.family_id === famId));
+  aplicarNivel(s.asignaciones.filter((a) => a.category_id !== null && catIds.includes(a.category_id)));
+  aplicarNivel(s.asignaciones.filter((a) => a.product_id === productId));
+
+  const porId = new Map(s.biblioteca.map((g) => [g.id, g]));
+  const heredados = [...efectivos].map((id) => porId.get(id)).filter((g): g is ModGrupo => !!g);
+  return [...propios, ...heredados];
+}
