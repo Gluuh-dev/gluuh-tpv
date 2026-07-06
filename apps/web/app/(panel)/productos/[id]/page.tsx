@@ -12,6 +12,8 @@ import { ArrowLeft, Star, Trash2, TriangleAlert, Upload, X } from "lucide-react"
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
 import { BuscarAnadir } from "@/components/buscar-anadir";
+import { EtiquetasProducto } from "@/components/etiquetas-producto";
+import { PreciosTarifa } from "@/components/precios-tarifa";
 import { subirMedia } from "@/app/lib/branding";
 import { ESTACIONES, ESTACION_LABEL, estacionDe } from "@/app/lib/estaciones";
 import { ALERGENOS } from "@/lib/alergenos";
@@ -703,6 +705,12 @@ export default function ProductoEditar() {
           </>
         )}
       </Card>
+
+      {/* ── Precios de venta por tarifa (0047) ── */}
+      {!esNuevo && <PreciosTarifa refId={id} precioBase={precio} />}
+
+      {/* ── Etiquetas (0067) ── */}
+      {!esNuevo && <EtiquetasProducto refId={id} />}
 
       {/* ── Ficha ── */}
       <Card className="p-4">

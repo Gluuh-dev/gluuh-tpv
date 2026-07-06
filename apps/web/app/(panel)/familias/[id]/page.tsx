@@ -13,6 +13,7 @@ import { supabaseBrowser } from "../../../lib/supabaseBrowser";
 import { subirMedia } from "@/app/lib/branding";
 import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
 import { BuscarAnadir } from "@/components/buscar-anadir";
+import { GruposPuntoVenta } from "@/components/grupos-punto-venta";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -345,6 +346,9 @@ export default function FamiliaEditarPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Grupos de puntos de venta (0067) ── */}
+      {!esNueva && <GruposPuntoVenta nivel="familia" refId={id} />}
 
       {/* ── Modificadores heredables (biblioteca, Fase 2) ── */}
       {!esNueva && <AsignacionesBiblioteca nivel="familia" refId={id} />}

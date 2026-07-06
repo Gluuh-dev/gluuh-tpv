@@ -14,6 +14,8 @@ import { subirMedia } from "@/app/lib/branding";
 import { ESTACIONES, ESTACION_LABEL } from "@/app/lib/estaciones";
 import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
 import { BuscarAnadir } from "@/components/buscar-anadir";
+import { GruposPuntoVenta } from "@/components/grupos-punto-venta";
+import { HorarioCategoria } from "@/components/horario-categoria";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -480,6 +482,12 @@ export default function CategoriaEditarPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Grupos de puntos de venta (0067) ── */}
+      {!esNueva && <GruposPuntoVenta nivel="categoria" refId={id} />}
+
+      {/* ── Horario de disponibilidad (0067) ── */}
+      {!esNueva && <HorarioCategoria refId={id} />}
 
       {/* ── Carta digital ── */}
       {!sin0065 && (

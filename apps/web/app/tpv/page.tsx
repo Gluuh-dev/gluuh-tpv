@@ -1676,7 +1676,7 @@ export default function TPV() {
         return (
           <TileProducto
             key={p.id}
-            nombre={p.nombre}
+            nombre={p.texto_boton || p.nombre}
             precio={p.precio}
             agotado={agotado}
             foto={foto ?? undefined}
@@ -1722,7 +1722,7 @@ export default function TPV() {
         return (
           <TileCategoria
             key={c.id}
-            nombre={c.nombre}
+            nombre={c.texto_boton || c.nombre}
             color={color}
             seleccionada={sel}
             Icono={IconoCat}
