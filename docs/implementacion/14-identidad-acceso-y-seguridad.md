@@ -57,6 +57,34 @@ Casi todo está; el trabajo es **recomponer**, no construir de cero.
   desbloqueada**.
 - **Autoría**: cada cambio queda ligado al operario que lo hizo (→ audit_log).
 
+### Usuarios por defecto (se crean SIEMPRE al instalar)
+- Al instalar se crean **siempre** dos operarios:
+  - **técnico** — clave **1212**. Lo ve **todo** + zona técnica desbloqueada.
+  - **admin** — clave **1111**. Propietario/administrador.
+- Son claves **por defecto, cambiables una vez dentro** de la app (y el asistente
+  fuerza a cambiar la de admin en el primer arranque, ver abajo).
+
+---
+
+## Instalación y primer arranque (asistente de escritorio)
+Al instalar la app (Electron, guía 03), antes de poder usarla:
+1. **Aceptar** (condiciones / continuar) — obligatorio.
+2. **Directorio de copia de seguridad** — dónde guarda los backups locales (el
+   backup local ya existe: `exportarBackupLocal` / `gluuh.guardarBackup`).
+3. **Código tenant** (código de licencia, Capa 1) — **obligatorio: sin meterlo
+   NO se puede continuar**. Liga la instalación al tenant + módulos + tiempo activo.
+4. Resumen de **qué se va a instalar**.
+5. Paso final: **crear el primer usuario** o **cambiar la clave de admin**
+   (no dejar 1111 por defecto).
+
+El código tenant se puede **actualizar una vez dentro** (renovación/cambio de
+licencia). Hasta aceptar y meter el código tenant, el asistente no avanza.
+
+> Depende de la app Electron (guía 03) para el asistente real. En navegador, el
+> equivalente es el flujo de alta + `activar_licencia`. La siembra de los
+> operarios por defecto (técnico/admin) va en el alta de empresa
+> (`api/admin/crear-empresa`) o en el primer arranque.
+
 ---
 
 ## Superficies “por puerta” (a qué entra cada uno)
