@@ -2,6 +2,7 @@
   "name": "@gluuh/desktop",
   "version": "0.1.0",
   "private": true,
+  "author": "Gluuh",
   "description": "TPV de barra (Windows) con Electron — carga la web operativa (/tpv) y gestiona el hardware local: impresora ESC/POS, cajón, visor de cliente y copia de seguridad a USB.",
   "main": "dist/main.js",
   "scripts": {
