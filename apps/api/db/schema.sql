@@ -189,9 +189,14 @@ CREATE TABLE family (
   grupo_mayor_id uuid REFERENCES grupo_mayor(id) ON DELETE SET NULL,  -- null = sin grupo mayor (0058)
   mostrar_venta  boolean NOT NULL DEFAULT true,   -- sale en la pantalla de venta (0061)
   mostrar_menus  boolean NOT NULL DEFAULT true,   -- elegible dentro de menús (0061)
+  familia_padre_id uuid REFERENCES family(id) ON DELETE SET NULL,  -- jerarquía (0065)
+  orden_impresion int NOT NULL DEFAULT 0,          -- orden en factura/ticket (0065)
+  texto_boton    text,                             -- texto del botón; null = nombre (0065)
+  foto_url       text,                             -- imagen del botón (0065)
   created_at     timestamptz DEFAULT now()
 );
 CREATE INDEX idx_family_grupo_mayor ON family (tenant_id, grupo_mayor_id);
+CREATE INDEX idx_family_padre ON family (familia_padre_id);
 
 CREATE TABLE category (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -204,10 +209,15 @@ CREATE TABLE category (
   estacion    text,                       -- estación por defecto de sus productos; null = sin definir (0050)
   mostrar_venta boolean NOT NULL DEFAULT true,  -- sale en la pantalla de venta (0061)
   mostrar_menus boolean NOT NULL DEFAULT true,  -- elegible dentro de menús (0061)
+  categoria_padre_id uuid REFERENCES category(id) ON DELETE SET NULL,  -- jerarquía (0065)
+  texto_boton text,                       -- texto del botón; null = nombre (0065)
+  carta_nombre text,                      -- carta digital: null = nombre (0065)
+  carta_descripcion text,                 -- carta digital: null = nombres de productos (0065)
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_category_tenant ON category (tenant_id, orden);
+CREATE INDEX idx_category_padre ON category (categoria_padre_id);
 
 CREATE TABLE product (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -225,10 +235,28 @@ CREATE TABLE product (
   vendido_por_peso boolean NOT NULL DEFAULT false,  -- precio = €/kg (0040)
   orden           int NOT NULL DEFAULT 0,     -- orden manual en la botonera (0046)
   disponible      boolean NOT NULL DEFAULT true,
+  family_id       uuid REFERENCES family(id) ON DELETE SET NULL,  -- familia DIRECTA, modelo Glop (0065)
+  plu             text,                       -- código PLU (0065); único por tenant
+  es_principal    boolean NOT NULL DEFAULT true,   -- venta como producto principal (0065)
+  es_anadido      boolean NOT NULL DEFAULT false,  -- venta como añadido de otro (0065)
+  tiempo_preparacion_min int,                 -- (0065)
+  texto_boton     text,                       -- texto del botón; null = nombre (0065)
+  carta_nombre    text,                       -- carta digital: null = nombre (0065)
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_product_tenant_cat ON product (tenant_id, category_id);
+CREATE INDEX idx_product_family ON product (family_id);
+CREATE UNIQUE INDEX uq_product_plu ON product (tenant_id, plu) WHERE plu IS NOT NULL;
+
+-- Centros de venta por categoría (0065): sin filas = asociar a todos.
+CREATE TABLE category_sales_center (
+  category_id     uuid NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+  sales_center_id uuid NOT NULL REFERENCES sales_center(id) ON DELETE CASCADE,
+  tenant_id       uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  PRIMARY KEY (category_id, sales_center_id)
+);
+CREATE INDEX idx_csc_tenant ON category_sales_center (tenant_id, sales_center_id);
 
 -- Producto ↔ categoría muchos-a-muchos (0061): un producto puede estar en N
 -- categorías del TPV; product.category_id queda como "categoría principal".
