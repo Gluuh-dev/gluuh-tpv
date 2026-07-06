@@ -15,7 +15,7 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0064`,
+   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0065`,
    aplicada). Nueva migración = siguiente número libre + nombre descriptivo
    en snake_case.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
@@ -72,6 +72,12 @@ description: >-
 | Permisos finos (P2) | `role`/`permission`/`role_permission` — diseño en `modelo-de-datos.md` | plan |
 
 Notas de diseño ya decididas:
+- **Ficha Glop/Ágora (0065, Fase 3a)**: `product.family_id` = familia DIRECTA
+  del producto (modelo Glop; el resolver de herencia la prefiere sobre la
+  derivada de la categoría principal). `familia_padre_id`/`categoria_padre_id`
+  (jerarquía), `plu` (único por tenant), `es_principal`/`es_anadido`,
+  `texto_boton` y `carta_nombre`/`carta_descripcion` (carta digital).
+  `category_sales_center`: SIN filas = la categoría sale en todos los centros.
 - **Biblioteca de modificadores (0064, Fase 2 Glop)**: `modifier_group.product_id`
   NULL = grupo de biblioteca del tenant, con `tipo` EXTRA/COMENTARIO; la asignación
   vive en `modifier_group_asignacion` (destino XOR familia/categoría/producto,
