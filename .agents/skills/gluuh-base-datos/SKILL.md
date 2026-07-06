@@ -15,8 +15,9 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0063`). Nueva
-   migración = siguiente número libre + nombre descriptivo en snake_case.
+   numeradas secuencialmente (`0001`…; a 06-07-2026 la última es `0064`,
+   escrita y **PENDIENTE de aplicar** en Supabase). Nueva migración =
+   siguiente número libre + nombre descriptivo en snake_case.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
    delete cascade` + RLS** con `current_tenant_id()` (patrón de cualquier tabla
    de `0001_init.sql`). El trigger `set_tenant_id()` (`0004`) autorrellena el
@@ -71,6 +72,13 @@ description: >-
 | Permisos finos (P2) | `role`/`permission`/`role_permission` — diseño en `modelo-de-datos.md` | plan |
 
 Notas de diseño ya decididas:
+- **Biblioteca de modificadores (0064, Fase 2 Glop)**: `modifier_group.product_id`
+  NULL = grupo de biblioteca del tenant, con `tipo` EXTRA/COMENTARIO; la asignación
+  vive en `modifier_group_asignacion` (destino XOR familia/categoría/producto,
+  `modo` INCLUIR/EXCLUIR). La herencia NO se resuelve en SQL: función pura
+  `gruposDeProducto()` en `apps/web/app/lib/catalogo-store.ts` (familia → categorías
+  m2m → producto; en cada nivel EXCLUIR primero, INCLUIR gana). Semilla base en
+  `supabase/seed-biblioteca-modificadores.sql` (TODO: cablearla al alta de empresa).
 - El 4º estado de mesa ("cuenta solicitada", estilo Glop) **no necesita columna**:
   se deriva de `sales_order.estado = 'POR_COBRAR'` en el plano.
 - Las pantallas vinculadas (KDS, pantalla, cartelería) no usan sesión Supabase:

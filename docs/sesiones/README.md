@@ -10,4 +10,4 @@ El estado global del producto (✅/🟡/❌) vive en el
 
 | Fecha | Frente trabajado |
 |-------|------------------|
-| [06-07-2026](2026-07-06-traspaso.md) | Catálogo modelo Glop (m2m producto–categoría, `mostrar_venta`), endurecimiento BD (migraciones 0061–0063), TPV adaptado · Sesión 2: reorganización completa de `docs/`, skill `gluuh-registro` y commits `de37ebc`/`19e092a`/`c4401e2` |
+| [06-07-2026](2026-07-06-traspaso.md) | Catálogo modelo Glop (m2m producto–categoría, `mostrar_venta`), endurecimiento BD (0061–0063), TPV adaptado · Sesión 2: reorganización completa de `docs/` y skill `gluuh-registro` · Sesión 3: **Fase 2 — biblioteca de modificadores con herencia** (0064 escrita sin aplicar, store+TPV+panel) |
