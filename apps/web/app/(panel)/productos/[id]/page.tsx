@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// Ficha de PRODUCTO estilo Ágora: panel Producto (impuesto, prep., familia
+// directa, PLU, tiempos, principal/añadido) + Estilo + estilo de impresión +
+// categorías (m2m) + añadidos propios y de biblioteca + formatos + ficha +
+// carta digital. Degrada con aviso si falta la 0065.
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Star, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { AsignacionesBiblioteca } from "@/components/asignaciones-biblioteca";
+import { BuscarAnadir } from "@/components/buscar-anadir";
 import { subirMedia } from "@/app/lib/branding";
 import { ESTACIONES, ESTACION_LABEL, estacionDe } from "@/app/lib/estaciones";
 import { ALERGENOS } from "@/lib/alergenos";
@@ -14,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
@@ -22,8 +28,9 @@ interface Categoria { id: string; nombre: string; estacion: string | null }
 type Grupo = { id: string; nombre: string; min_sel: number; max_sel: number; opciones: { id: string; nombre: string; precio_extra: number }[] };
 
 const SIN_CAT = "__sincat__";
+const NINGUNO = "__ninguno__";
 
-// Plantillas rápidas de formatos habituales (mismas que producto-dialog): crean a precio 0.
+// Plantillas rápidas de formatos habituales: crean a precio 0.
 const PLANTILLAS_FORMATO: { t: string; nombres: string[] }[] = [
   { t: "Caña/Tubo/Tercio", nombres: ["Caña", "Tubo", "Tercio"] },
   { t: "Copa/Botella", nombres: ["Copa", "Botella"] },
@@ -44,10 +51,14 @@ export default function ProductoEditar() {
   const [tenantId, setTenantId] = useState("");
   const [territorio, setTerritorio] = useState("PENINSULA_BALEARES");
   const [cats, setCats] = useState<Categoria[]>([]);
+  const [familias, setFamilias] = useState<{ id: string; nombre: string }[]>([]);
+  const [sin0065, setSin0065] = useState(false);
 
-  // Básico
+  // Panel Producto
   const [nombre, setNombre] = useState("");
-  const [categoryId, setCategoryId] = useState<string>(SIN_CAT);
+  const [categoryId, setCategoryId] = useState<string>(SIN_CAT); // categoría PRINCIPAL
+  const [catsM2m, setCatsM2m] = useState<string[]>([]);          // todas (product_category)
+  const [familyId, setFamilyId] = useState<string>(NINGUNO);
   const [precio, setPrecio] = useState("");
   const [clase, setClase] = useState("REDUCIDO");
   const [alcohol, setAlcohol] = useState(false);
@@ -55,12 +66,18 @@ export default function ProductoEditar() {
   const [estacionHeredada, setEstacionHeredada] = useState(false);
   const [disponible, setDisponible] = useState(true);
   const [vendidoPorPeso, setVendidoPorPeso] = useState(false);
+  const [plu, setPlu] = useState("");
+  const [esPrincipal, setEsPrincipal] = useState(true);
+  const [esAnadido, setEsAnadido] = useState(false);
+  const [tiempoPrep, setTiempoPrep] = useState("");
 
-  // Ficha
+  // Estilo / ficha / carta
+  const [textoBoton, setTextoBoton] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [codigoBarras, setCodigoBarras] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
   const [alergenos, setAlergenos] = useState<string[]>([]);
+  const [cartaNombre, setCartaNombre] = useState("");
 
   // Nombres de impresión (0051). null = migración sin aplicar → sección oculta.
   const [nombres, setNombres] = useState<{ ticket: string; cocina: string } | null>(null);
@@ -87,17 +104,23 @@ export default function ProductoEditar() {
     }));
     setGrupos(conOpc);
   }
+  const cargarCatsM2m = useCallback(async () => {
+    const { data } = await sb.from("product_category").select("category_id").eq("product_id", id);
+    setCatsM2m(((data as { category_id: string }[] | null) ?? []).map((r) => r.category_id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     (async () => {
-      const [{ data: loc }, catsRes, { data: t }] = await Promise.all([
+      const [{ data: loc }, catsRes, { data: t }, { data: fams }] = await Promise.all([
         sb.from("location").select("territorio_fiscal").limit(1).maybeSingle(),
         sb.from("category").select("id,nombre,estacion").order("orden"),
         sb.from("tenant").select("id").limit(1).maybeSingle(),
+        sb.from("family").select("id,nombre").order("nombre"),
       ]);
       if (loc?.territorio_fiscal) setTerritorio(loc.territorio_fiscal);
       setTenantId((t as { id: string } | null)?.id ?? "");
-      // Degradación 0050: si category.estacion no existe, recarga sin ella.
+      setFamilias((fams as { id: string; nombre: string }[] | null) ?? []);
       if (catsRes.error) {
         const { data: c } = await sb.from("category").select("id,nombre").order("orden");
         setCats(((c as Omit<Categoria, "estacion">[]) ?? []).map((x) => ({ ...x, estacion: null })));
@@ -106,18 +129,20 @@ export default function ProductoEditar() {
       }
 
       if (esNuevo) {
-        // Probe 0051: ¿existe la columna de nombres de impresión?
         const { error } = await sb.from("product").select("nombre_ticket").limit(1);
         setNombres(error ? null : { ticket: "", cocina: "" });
+        const probe65 = await sb.from("product").select("plu").limit(1);
+        setSin0065(!!probe65.error);
         setCargando(false);
         return;
       }
 
-      const [pr, nr] = await Promise.all([
+      const [pr, nr, p65] = await Promise.all([
         sb.from("product")
           .select("nombre,precio,clase_fiscal,category_id,es_alcohol,estacion,disponible,vendido_por_peso,descripcion,codigo_barras,foto_url,alergenos")
           .eq("id", id).maybeSingle(),
         sb.from("product").select("nombre_ticket,nombre_cocina").eq("id", id).maybeSingle(),
+        sb.from("product").select("family_id,plu,es_principal,es_anadido,tiempo_preparacion_min,texto_boton,carta_nombre").eq("id", id).maybeSingle(),
       ]);
       const p = pr.data as {
         nombre: string; precio: number; clase_fiscal: string | null; category_id: string | null;
@@ -138,7 +163,19 @@ export default function ProductoEditar() {
       setFotoUrl(p.foto_url ?? "");
       setAlergenos(p.alergenos ?? []);
 
-      // Estación: si el producto no tiene, hereda la de su categoría.
+      if (p65.error) setSin0065(true);
+      else {
+        const x = p65.data as { family_id: string | null; plu: string | null; es_principal: boolean; es_anadido: boolean; tiempo_preparacion_min: number | null; texto_boton: string | null; carta_nombre: string | null } | null;
+        setFamilyId(x?.family_id ?? NINGUNO);
+        setPlu(x?.plu ?? "");
+        setEsPrincipal(x?.es_principal ?? true);
+        setEsAnadido(x?.es_anadido ?? false);
+        setTiempoPrep(x?.tiempo_preparacion_min != null ? String(x.tiempo_preparacion_min) : "");
+        setTextoBoton(x?.texto_boton ?? "");
+        setCartaNombre(x?.carta_nombre ?? "");
+      }
+
+      // Estación: si el producto no tiene, hereda la de su categoría principal.
       let est = p.estacion ?? null;
       let heredada = false;
       if (!est && p.category_id) {
@@ -154,19 +191,12 @@ export default function ProductoEditar() {
         setNombres({ ticket: n?.nombre_ticket ?? "", cocina: n?.nombre_cocina ?? "" });
       }
 
-      await cargarFormatos();
-      await cargarModificadores();
+      await Promise.all([cargarFormatos(), cargarModificadores(), cargarCatsM2m()]);
       setCargando(false);
     })();
     /* eslint-disable-next-line */
   }, [id]);
 
-  // Al elegir categoría, aplica su estación por defecto (si la tiene).
-  function cambiarCategoria(v: string) {
-    setCategoryId(v);
-    const est = cats.find((c) => c.id === v)?.estacion;
-    if (est && (ESTACIONES as readonly string[]).includes(est)) { setEstacion(est); setEstacionHeredada(false); }
-  }
   // Alcohol → clase General + estación Barra (bebida), como en la carta.
   function setAlcoholOn(on: boolean) {
     setAlcohol(on);
@@ -179,6 +209,35 @@ export default function ProductoEditar() {
     const file = e.target.files?.[0]; if (!file || !tenantId) return;
     try { setFotoUrl(""); setFotoUrl(await subirMedia(sb, tenantId, file, "productos")); }
     catch (err) { toast.error(`No se pudo subir la foto: ${err instanceof Error ? err.message : err}`); }
+  }
+
+  // ── Categorías (m2m product_category; category_id = principal) ────────
+  async function anadirCategoria(catId: string) {
+    const { error } = await sb.from("product_category").insert({ tenant_id: tenantId, product_id: id, category_id: catId });
+    if (error) { toast.error("No se pudo añadir la categoría."); return; }
+    if (categoryId === SIN_CAT) {
+      await sb.from("product").update({ category_id: catId }).eq("id", id);
+      setCategoryId(catId);
+      const est = cats.find((c) => c.id === catId)?.estacion;
+      if (est && (ESTACIONES as readonly string[]).includes(est)) { setEstacion(est); setEstacionHeredada(false); }
+    }
+    await cargarCatsM2m();
+  }
+  async function quitarCategoria(catId: string) {
+    const { error } = await sb.from("product_category").delete().eq("product_id", id).eq("category_id", catId);
+    if (error) { toast.error("No se pudo quitar la categoría."); return; }
+    if (categoryId === catId) {
+      const resto = catsM2m.filter((c) => c !== catId);
+      const nueva = resto[0] ?? null;
+      await sb.from("product").update({ category_id: nueva }).eq("id", id);
+      setCategoryId(nueva ?? SIN_CAT);
+    }
+    await cargarCatsM2m();
+  }
+  async function hacerPrincipal(catId: string) {
+    const { error } = await sb.from("product").update({ category_id: catId }).eq("id", id);
+    if (error) { toast.error("No se pudo cambiar la principal."); return; }
+    setCategoryId(catId);
   }
 
   // ── Formatos ──────────────────────────────────────────────────────────
@@ -194,7 +253,7 @@ export default function ProductoEditar() {
     const existentes = new Set(formatos.map((ft) => ft.nombre.toLowerCase()));
     const nuevos = nombresFmt.filter((n) => !existentes.has(n.toLowerCase()));
     if (!nuevos.length) return;
-    await sb.from("product_format").insert(nuevos.map((nombre, i) => ({ tenant_id: tenantId, product_id: id, nombre, precio: 0, orden: formatos.length + i })));
+    await sb.from("product_format").insert(nuevos.map((nombreFt, i) => ({ tenant_id: tenantId, product_id: id, nombre: nombreFt, precio: 0, orden: formatos.length + i })));
     await cargarFormatos();
     toast.success("Formatos creados: pon los precios en la lista");
   }
@@ -205,7 +264,7 @@ export default function ProductoEditar() {
     await cargarFormatos();
   }
 
-  // ── Añadidos (grupos + opciones) ──────────────────────────────────────
+  // ── Añadidos propios (grupos + opciones) ──────────────────────────────
   async function addGrupo() {
     if (!nuevoGrupo.nombre.trim() || !tenantId) return;
     await sb.from("modifier_group").insert({ tenant_id: tenantId, product_id: id, nombre: nuevoGrupo.nombre.trim(), min_sel: Number(nuevoGrupo.min) || 0, max_sel: Number(nuevoGrupo.max) || 1 });
@@ -222,9 +281,6 @@ export default function ProductoEditar() {
   async function delOpcion(oid: string) { await sb.from("modifier").delete().eq("id", oid); await cargarModificadores(); }
 
   // ── Copiar de otro producto (formatos / añadidos) ─────────────────────
-  // Misma lógica de clonado que components/producto-dialog.tsx, adaptada a esta
-  // página: usa `id` como producto destino y añade tenant_id explícito también
-  // en product_format (aquí lo exige la RLS). No borra lo existente: añade encima.
   const [copiarAbierto, setCopiarAbierto] = useState(false);
   const [candidatos, setCandidatos] = useState<{ id: string; nombre: string }[]>([]);
   const [copia, setCopia] = useState({ origen: "", fmts: true, mods: true, busy: false });
@@ -235,8 +291,8 @@ export default function ProductoEditar() {
       sb.from("product_format").select("product_id"),
       sb.from("modifier_group").select("product_id"),
     ]);
-    const conAlgo = [...((pf as { product_id: string }[]) ?? []), ...((mg as { product_id: string }[]) ?? [])];
-    const ids = [...new Set(conAlgo.map((r) => r.product_id))].filter((pid) => pid !== id);
+    const conAlgo = [...((pf as { product_id: string }[]) ?? []), ...((mg as { product_id: string | null }[]) ?? [])];
+    const ids = [...new Set(conAlgo.map((r) => r.product_id).filter((x): x is string => !!x))].filter((pid) => pid !== id);
     if (!ids.length) { setCandidatos([]); return; }
     const { data: ps } = await sb.from("product").select("id,nombre").in("id", ids).order("nombre");
     setCandidatos((ps as { id: string; nombre: string }[]) ?? []);
@@ -300,6 +356,15 @@ export default function ProductoEditar() {
       base.nombre_ticket = nombres.ticket.trim() || null;
       base.nombre_cocina = nombres.cocina.trim() || null;
     }
+    if (!sin0065) {
+      base.family_id = familyId === NINGUNO ? null : familyId;
+      base.plu = plu.trim() || null;
+      base.es_principal = esPrincipal;
+      base.es_anadido = esAnadido;
+      base.tiempo_preparacion_min = tiempoPrep.trim() ? Number(tiempoPrep) || null : null;
+      base.texto_boton = textoBoton.trim() || null;
+      base.carta_nombre = cartaNombre.trim() || null;
+    }
     try {
       if (esNuevo) {
         const { error } = await sb.from("product").insert(tenantId ? { ...base, tenant_id: tenantId } : base);
@@ -323,169 +388,258 @@ export default function ProductoEditar() {
     router.push("/productos");
   }
 
-  if (cargando) return <div className="mx-auto max-w-3xl"><p className="text-sm text-muted-foreground">Cargando…</p></div>;
+  if (cargando) return <div className="w-full"><p className="text-sm text-muted-foreground">Cargando…</p></div>;
   if (noExiste) return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="w-full space-y-4">
       <button onClick={() => router.push("/productos")} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Productos</button>
       <p className="text-sm">Este producto no existe o no tienes acceso.</p>
     </div>
   );
 
+  const catsAsignadas = catsM2m.length ? catsM2m : (categoryId !== SIN_CAT ? [categoryId] : []);
+  const candidatosCat = cats.filter((c) => !catsAsignadas.includes(c.id)).map((c) => ({ id: c.id, etiqueta: c.nombre }));
+
   return (
-    <div className="mx-auto max-w-3xl space-y-5 pb-16">
+    <div className="w-full space-y-4 pb-16">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button onClick={() => router.push("/productos")} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Productos
-        </button>
+        <div>
+          <Link href="/productos" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> Productos
+          </Link>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo producto" : nombre || "Producto"}</h1>
+        </div>
         {!esNuevo && (
           <Button variant="destructive" size="sm" onClick={eliminar}><Trash2 className="h-4 w-4" /> Eliminar</Button>
         )}
       </div>
 
-      <h1 className="text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo producto" : nombre || "Producto"}</h1>
+      {sin0065 && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-500/15 px-4 py-3 text-sm text-amber-600 dark:text-amber-500">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p>Falta aplicar la migración <strong>0065</strong>: familia directa, PLU, principal/añadido y carta digital no están disponibles.</p>
+        </div>
+      )}
 
-      {/* ── Básico ───────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Básico</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Nombre</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Categoría</Label>
-            <Select value={categoryId} onValueChange={cambiarCategoria}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Categoría" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SIN_CAT}>Sin categoría</SelectItem>
-                {cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Precio (impuesto incluido)</Label>
-            <Input inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="0,00" />
-            {vendidoPorPeso && <p className="text-xs text-muted-foreground">Es el precio por kilo (€/kg).</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label>Clase fiscal</Label>
-            <Select value={clase} onValueChange={(v) => setClase(v)}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{CLASES_FISCALES.map((c) => <SelectItem key={c.v} value={c.v}>{c.t}</SelectItem>)}</SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">{nombreImpuesto(territorio)} automático: <b>{ivaPrev}%</b></p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Estación de preparación</Label>
-            <Select value={estacion} onValueChange={(v) => { setEstacion(v); setEstacionHeredada(false); }}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{ESTACIONES.map((s) => <SelectItem key={s} value={s}>{ESTACION_LABEL[s]}</SelectItem>)}</SelectContent>
-            </Select>
-            {estacionHeredada && <p className="text-xs text-muted-foreground">Heredada de la categoría (se fijará al guardar).</p>}
-          </div>
-          <div className="flex flex-col justify-end gap-3 sm:col-span-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Switch id="p-alcohol" checked={alcohol} onCheckedChange={setAlcoholOn} aria-label="Alcohol" />
-              <label htmlFor="p-alcohol">Alcohol (fuerza clase General y estación Barra)</label>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Switch id="p-disponible" checked={disponible} onCheckedChange={setDisponible} aria-label="Disponible" />
-              <label htmlFor="p-disponible">Disponible (visible y a la venta)</label>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Switch id="p-peso" checked={vendidoPorPeso} onCheckedChange={setVendidoPorPeso} aria-label="Vendido por peso" />
-              <label htmlFor="p-peso">Vendido por peso (el precio es €/kg; al vender se teclea el peso)</label>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* ── Ficha ────────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Ficha</h2>
-        <div className="space-y-1.5">
-          <Label>Descripción</Label>
-          <Textarea rows={2} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Para carta y kiosko" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Código de barras</Label>
-            <Input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Foto</Label>
-            <div className="flex items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
-                <Upload className="h-4 w-4" /> Subir<input type="file" accept="image/*" className="hidden" onChange={onFoto} />
-              </label>
-              {fotoUrl && <img src={fotoUrl} alt="" className="h-9 w-9 rounded object-cover" />}
-            </div>
-          </div>
-        </div>
-        <div>
-          <Label className="mb-1.5 block">Alérgenos</Label>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {ALERGENOS.map((a) => (
-              <label key={a.v} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={alergenos.includes(a.v)} onChange={() => toggleAlergeno(a.v)} /> {a.t}
-              </label>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* ── Nombres de impresión (0051) ──────────────────────────── */}
-      {nombres && (
+      {/* ── Dos paneles: Producto + Estilo (disposición Ágora) ── */}
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card className="p-4">
-          <div>
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Nombres de impresión</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Cómo sale este artículo impreso. Vacío = igual que el nombre.</p>
-          </div>
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Producto</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">En ticket y factura</Label>
-              <Input value={nombres.ticket} onChange={(e) => setNombres({ ...nombres, ticket: e.target.value })} placeholder={nombre || "Nombre del producto"} />
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Nombre</Label>
+              <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">En cocina y comandas</Label>
-              <Input value={nombres.cocina} onChange={(e) => setNombres({ ...nombres, cocina: e.target.value })} placeholder={nombre || "Nombre del producto"} />
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Copiar de otro producto (solo edición) ───────────────── */}
-      {!esNuevo && (
-        <Card className="p-4">
-          <div>
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Copiar de otro producto</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Clona formatos y/o añadidos de otro artículo. Se añaden a los que ya tiene este producto (no reemplaza nada).</p>
-          </div>
-          {!copiarAbierto ? (
-            <Button type="button" variant="outline" size="sm" onClick={abrirCopiar}>Copiar de otro producto…</Button>
-          ) : (
-            <div className="space-y-3">
-              <Select value={copia.origen} onValueChange={(v) => setCopia((s) => ({ ...s, origen: v }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Elige el producto de origen" /></SelectTrigger>
-                <SelectContent>
-                  {candidatos.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
-                </SelectContent>
+              <Label>Imp. venta</Label>
+              <Select value={clase} onValueChange={(v) => setClase(v)}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>{CLASES_FISCALES.map((c) => <SelectItem key={c.v} value={c.v}>{c.t}</SelectItem>)}</SelectContent>
               </Select>
-              {candidatos.length === 0 && <p className="text-xs text-muted-foreground">Ningún otro producto tiene formatos o añadidos que copiar.</p>}
-              <div className="flex items-center gap-4 text-sm">
-                <label className="flex items-center gap-1.5"><input type="checkbox" checked={copia.fmts} onChange={(e) => setCopia((s) => ({ ...s, fmts: e.target.checked }))} /> Formatos</label>
-                <label className="flex items-center gap-1.5"><input type="checkbox" checked={copia.mods} onChange={(e) => setCopia((s) => ({ ...s, mods: e.target.checked }))} /> Añadidos</label>
+              <p className="text-xs text-muted-foreground">{nombreImpuesto(territorio)} automático: <b>{ivaPrev}%</b></p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo de preparación</Label>
+              <Select value={estacion} onValueChange={(v) => { setEstacion(v); setEstacionHeredada(false); }}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>{ESTACIONES.map((s) => <SelectItem key={s} value={s}>{ESTACION_LABEL[s]}</SelectItem>)}</SelectContent>
+              </Select>
+              {estacionHeredada && <p className="text-xs text-muted-foreground">Heredada de la categoría (se fijará al guardar).</p>}
+            </div>
+            {!sin0065 && (
+              <div className="space-y-1.5">
+                <Label>Familia</Label>
+                <Select value={familyId} onValueChange={setFamilyId}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NINGUNO}>&lt;Ninguna&gt;</SelectItem>
+                    {familias.map((f) => <SelectItem key={f.id} value={f.id}>{f.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">De la familia hereda modificadores y estilo.</p>
               </div>
-              <div className="flex gap-2">
-                <Button type="button" size="sm" onClick={copiarDesde} disabled={copia.busy || !copia.origen || (!copia.fmts && !copia.mods)}>{copia.busy ? "Copiando…" : "Copiar"}</Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setCopiarAbierto(false)}>Cancelar</Button>
+            )}
+            <div className="space-y-1.5">
+              <Label>Precio (impuesto incluido)</Label>
+              <Input inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="0,00" />
+              {vendidoPorPeso && <p className="text-xs text-muted-foreground">Es el precio por kilo (€/kg).</p>}
+            </div>
+            {!sin0065 && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Código PLU</Label>
+                  <Input value={plu} onChange={(e) => setPlu(e.target.value)} placeholder="Ej.: 101" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tiempo de preparación (min)</Label>
+                  <Input inputMode="numeric" value={tiempoPrep} onChange={(e) => setTiempoPrep(e.target.value)} placeholder="—" />
+                </div>
+              </>
+            )}
+            <div className="flex flex-col justify-end gap-3 sm:col-span-2">
+              {!sin0065 && (
+                <>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Switch id="p-principal" checked={esPrincipal} onCheckedChange={setEsPrincipal} aria-label="Venta como producto principal" />
+                    <label htmlFor="p-principal">Permitir venta como producto principal</label>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Switch id="p-anadido" checked={esAnadido} onCheckedChange={setEsAnadido} aria-label="Venta como añadido" />
+                    <label htmlFor="p-anadido">Permitir venta como añadido de otro producto</label>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-2 text-sm">
+                <Switch id="p-alcohol" checked={alcohol} onCheckedChange={setAlcoholOn} aria-label="Alcohol" />
+                <label htmlFor="p-alcohol">Alcohol (fuerza clase General y estación Barra)</label>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Switch id="p-disponible" checked={disponible} onCheckedChange={setDisponible} aria-label="Disponible" />
+                <label htmlFor="p-disponible">Disponible (visible y a la venta)</label>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Switch id="p-peso" checked={vendidoPorPeso} onCheckedChange={setVendidoPorPeso} aria-label="Vendido por peso" />
+                <label htmlFor="p-peso">Vendido por peso (el precio es €/kg; al vender se teclea el peso)</label>
               </div>
             </div>
-          )}
+          </div>
         </Card>
-      )}
 
-      {/* ── Formatos (solo edición: necesitan product_id) ────────── */}
+        <div className="space-y-4">
+          <Card className="p-4">
+            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Estilo</h2>
+            {!sin0065 && (
+              <div className="space-y-1.5">
+                <Label>Texto</Label>
+                <Input value={textoBoton} onChange={(e) => setTextoBoton(e.target.value)} placeholder={nombre || "Texto del botón en el TPV"} />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Imagen</Label>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+                  <Upload className="h-4 w-4" /> Subir<input type="file" accept="image/*" className="hidden" onChange={onFoto} />
+                </label>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {fotoUrl && <img src={fotoUrl} alt="" className="h-12 w-12 rounded object-cover" />}
+                {fotoUrl && (
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setFotoUrl("")}>
+                    <X className="h-4 w-4" /> Quitar
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {nombres && (
+            <Card className="p-4">
+              <div>
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Estilo de impresión</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Cómo sale este artículo impreso. Vacío = igual que el nombre.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Texto para documento (ticket/factura)</Label>
+                  <Input value={nombres.ticket} onChange={(e) => setNombres({ ...nombres, ticket: e.target.value })} placeholder={nombre || "Nombre del producto"} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Texto para comanda (cocina/barra)</Label>
+                  <Input value={nombres.cocina} onChange={(e) => setNombres({ ...nombres, cocina: e.target.value })} placeholder={nombre || "Nombre del producto"} />
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* ── Categorías (m2m): un producto puede estar en varias ── */}
+      <Card className="p-4">
+        <div>
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Categorías</h2>
+          <p className="mt-1 text-xs text-muted-foreground">El producto sale en todas sus categorías; la marcada con ★ es la principal (define color y estación heredadas).</p>
+        </div>
+        {esNuevo ? (
+          <p className="text-sm text-muted-foreground">Guarda el producto para poder asignarle categorías.</p>
+        ) : (
+          <>
+            <BuscarAnadir opciones={candidatosCat} onAnadir={anadirCategoria} placeholder="Buscar y añadir categoría…" />
+            {catsAsignadas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin categorías: el producto no aparece en la pantalla de venta.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {catsAsignadas.map((cid) => {
+                  const cat = cats.find((c) => c.id === cid);
+                  const principal = cid === categoryId;
+                  return (
+                    <span key={cid} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm ${principal ? "border-brand bg-brand/10" : "border-border bg-surface"}`}>
+                      {principal && <Star className="h-3.5 w-3.5 fill-current text-brand" aria-label="Categoría principal" />}
+                      {cat?.nombre ?? "?"}
+                      {!principal && (
+                        <button type="button" onClick={() => hacerPrincipal(cid)}
+                          className="text-xs text-muted-foreground underline-offset-2 hover:underline" title="Hacer principal">
+                          principal
+                        </button>
+                      )}
+                      <button type="button" onClick={() => quitarCategoria(cid)}
+                        className="text-muted-foreground transition-colors hover:text-destructive" aria-label={`Quitar de ${cat?.nombre}`}>
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* ── Añadidos del producto (propios) ── */}
+      <Card className="p-4">
+        <div>
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Añadidos del producto</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Grupos SOLO de este producto. Para grupos compartidos usa la biblioteca (abajo) o asígnalos a su familia.</p>
+        </div>
+        {esNuevo ? (
+          <p className="text-sm text-muted-foreground">Guarda el producto para poder añadir grupos de opciones.</p>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {grupos.map((g) => (
+                <div key={g.id} className="rounded-md border border-input p-2">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-sm font-medium">{g.nombre} <span className="text-xs text-muted-foreground">({g.min_sel}–{g.max_sel})</span></span>
+                    <button type="button" onClick={() => delGrupo(g.id)} className="text-xs text-destructive hover:underline">Quitar grupo</button>
+                  </div>
+                  <div className="space-y-1">
+                    {g.opciones.map((op) => (
+                      <div key={op.id} className="flex items-center gap-2 text-sm">
+                        <span className="flex-1">{op.nombre}</span>
+                        <span className="tabular-nums text-muted-foreground">{op.precio_extra > 0 ? `+${Number(op.precio_extra).toFixed(2)} €` : "—"}</span>
+                        <button type="button" onClick={() => delOpcion(op.id)} className="text-xs text-destructive hover:underline">×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1.5 flex gap-2">
+                    <Input className="h-8" value={nuevaOpcion[g.id]?.nombre ?? ""} onChange={(e) => setNuevaOpcion((s) => ({ ...s, [g.id]: { nombre: e.target.value, precio: s[g.id]?.precio ?? "" } }))} placeholder="Opción (Bacon…)" />
+                    <Input className="h-8 w-20" inputMode="decimal" value={nuevaOpcion[g.id]?.precio ?? ""} onChange={(e) => setNuevaOpcion((s) => ({ ...s, [g.id]: { nombre: s[g.id]?.nombre ?? "", precio: e.target.value } }))} placeholder="+€" />
+                    <Button type="button" size="sm" variant="outline" onClick={() => addOpcion(g.id)}>+</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Input value={nuevoGrupo.nombre} onChange={(e) => setNuevoGrupo((s) => ({ ...s, nombre: e.target.value }))} placeholder="Nuevo grupo (Extras…)" />
+              <Input className="w-16" inputMode="numeric" value={nuevoGrupo.min} onChange={(e) => setNuevoGrupo((s) => ({ ...s, min: e.target.value }))} placeholder="mín" title="Mínimo a elegir" />
+              <Input className="w-16" inputMode="numeric" value={nuevoGrupo.max} onChange={(e) => setNuevoGrupo((s) => ({ ...s, max: e.target.value }))} placeholder="máx" title="Máximo a elegir" />
+              <Button type="button" variant="outline" onClick={addGrupo} disabled={!nuevoGrupo.nombre.trim()}>Añadir grupo</Button>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* ── Biblioteca (Fase 2): heredados de familia/categorías + ajuste fino ── */}
+      {!esNuevo && <AsignacionesBiblioteca nivel="producto" refId={id} />}
+
+      {/* ── Formatos de venta ── */}
       <Card className="p-4">
         <div>
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Formatos de venta</h2>
@@ -534,58 +688,83 @@ export default function ProductoEditar() {
         )}
       </Card>
 
-      {/* ── Añadidos (solo edición) ──────────────────────────────── */}
+      {/* ── Ficha ── */}
       <Card className="p-4">
-        <div>
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Añadidos</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Grupos de opciones (punto de la carne, extras…). En el TPV se eligen al vender; los extras suman al precio.</p>
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Ficha</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Código de barras</Label>
+            <Input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Descripción</Label>
+            <Textarea rows={2} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Para carta digital y kiosko" />
+          </div>
         </div>
-        {esNuevo ? (
-          <p className="text-sm text-muted-foreground">Guarda el producto para poder añadir grupos de opciones.</p>
-        ) : (
-          <>
-            <div className="space-y-3">
-              {grupos.map((g) => (
-                <div key={g.id} className="rounded-md border border-input p-2">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-sm font-medium">{g.nombre} <span className="text-xs text-muted-foreground">({g.min_sel}–{g.max_sel})</span></span>
-                    <button type="button" onClick={() => delGrupo(g.id)} className="text-xs text-destructive hover:underline">Quitar grupo</button>
-                  </div>
-                  <div className="space-y-1">
-                    {g.opciones.map((op) => (
-                      <div key={op.id} className="flex items-center gap-2 text-sm">
-                        <span className="flex-1">{op.nombre}</span>
-                        <span className="tabular-nums text-muted-foreground">{op.precio_extra > 0 ? `+${Number(op.precio_extra).toFixed(2)} €` : "—"}</span>
-                        <button type="button" onClick={() => delOpcion(op.id)} className="text-xs text-destructive hover:underline">×</button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-1.5 flex gap-2">
-                    <Input className="h-8" value={nuevaOpcion[g.id]?.nombre ?? ""} onChange={(e) => setNuevaOpcion((s) => ({ ...s, [g.id]: { nombre: e.target.value, precio: s[g.id]?.precio ?? "" } }))} placeholder="Opción (Bacon…)" />
-                    <Input className="h-8 w-20" inputMode="decimal" value={nuevaOpcion[g.id]?.precio ?? ""} onChange={(e) => setNuevaOpcion((s) => ({ ...s, [g.id]: { nombre: s[g.id]?.nombre ?? "", precio: e.target.value } }))} placeholder="+€" />
-                    <Button type="button" size="sm" variant="outline" onClick={() => addOpcion(g.id)}>+</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Input value={nuevoGrupo.nombre} onChange={(e) => setNuevoGrupo((s) => ({ ...s, nombre: e.target.value }))} placeholder="Nuevo grupo (Extras…)" />
-              <Input className="w-16" inputMode="numeric" value={nuevoGrupo.min} onChange={(e) => setNuevoGrupo((s) => ({ ...s, min: e.target.value }))} placeholder="mín" title="Mínimo a elegir" />
-              <Input className="w-16" inputMode="numeric" value={nuevoGrupo.max} onChange={(e) => setNuevoGrupo((s) => ({ ...s, max: e.target.value }))} placeholder="máx" title="Máximo a elegir" />
-              <Button type="button" variant="outline" onClick={addGrupo} disabled={!nuevoGrupo.nombre.trim()}>Añadir grupo</Button>
-            </div>
-          </>
-        )}
+        <div>
+          <Label className="mb-1.5 block">Alérgenos</Label>
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {ALERGENOS.map((a) => (
+              <label key={a.v} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={alergenos.includes(a.v)} onChange={() => toggleAlergeno(a.v)} /> {a.t}
+              </label>
+            ))}
+          </div>
+        </div>
       </Card>
 
-      {/* ── Biblioteca (Fase 2 Glop, 0064): grupos heredados de la familia y las
-          categorías, con ajuste fino aquí (Incluir/Quitar mandan sobre lo heredado). ── */}
-      {!esNuevo && <AsignacionesBiblioteca nivel="producto" refId={id} />}
+      {/* ── Carta digital ── */}
+      {!sin0065 && (
+        <Card className="p-4">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Carta digital</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Nombre</Label>
+              <Input value={cartaNombre} onChange={(e) => setCartaNombre(e.target.value)} placeholder="Utilizar el nombre del producto" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Texto</Label>
+              <Input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Utilizar la descripción de la ficha" />
+            </div>
+          </div>
+        </Card>
+      )}
 
-      {/* ── Acciones ─────────────────────────────────────────────── */}
+      {/* ── Copiar de otro producto (solo edición) ── */}
+      {!esNuevo && (
+        <Card className="p-4">
+          <div>
+            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Copiar de otro producto</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Clona formatos y/o añadidos de otro artículo. Se añaden a los que ya tiene este producto (no reemplaza nada).</p>
+          </div>
+          {!copiarAbierto ? (
+            <Button type="button" variant="outline" size="sm" onClick={abrirCopiar}>Copiar de otro producto…</Button>
+          ) : (
+            <div className="space-y-3">
+              <Select value={copia.origen} onValueChange={(v) => setCopia((s) => ({ ...s, origen: v }))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Elige el producto de origen" /></SelectTrigger>
+                <SelectContent>
+                  {candidatos.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {candidatos.length === 0 && <p className="text-xs text-muted-foreground">Ningún otro producto tiene formatos o añadidos que copiar.</p>}
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-1.5"><input type="checkbox" checked={copia.fmts} onChange={(e) => setCopia((s) => ({ ...s, fmts: e.target.checked }))} /> Formatos</label>
+                <label className="flex items-center gap-1.5"><input type="checkbox" checked={copia.mods} onChange={(e) => setCopia((s) => ({ ...s, mods: e.target.checked }))} /> Añadidos</label>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={copiarDesde} disabled={copia.busy || !copia.origen || (!copia.fmts && !copia.mods)}>{copia.busy ? "Copiando…" : "Copiar"}</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setCopiarAbierto(false)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── Acciones ── */}
       <div className="flex items-center justify-end gap-2">
         <Button variant="outline" onClick={() => router.push("/productos")}>Cancelar</Button>
-        <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : "Guardar"}</Button>
+        <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : "Aceptar"}</Button>
       </div>
     </div>
   );

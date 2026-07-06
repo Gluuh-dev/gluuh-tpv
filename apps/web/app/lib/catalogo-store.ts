@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Tipos del catálogo (compartidos por TPV, kiosko, KDS…).
 export interface Family { id: string; nombre: string; color: string }
 export interface Cat    { id: string; nombre: string; orden: number; family_id: string | null; foto_url?: string | null; mostrar_venta?: boolean }
-export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null }
+export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null; family_id?: string | null }
 export interface Formato { id: string; product_id: string; nombre: string; precio: number }
 export interface ModOpcion { id: string; nombre: string; precio_extra: number }
 export interface ModGrupo  { id: string; product_id: string | null; nombre: string; min_sel: number; max_sel: number; tipo?: "EXTRA" | "COMENTARIO"; opciones: ModOpcion[] }
@@ -57,8 +57,11 @@ export const useCatalogo = create<CatalogoState>()(
         // si el select con esas columnas falla, reintenta sin ellas (no rompe la carta).
         const PROD_COLS = "id,nombre,precio,tipo_impositivo,category_id,estacion,foto_url,agotado_hasta,vendido_por_peso";
         const cargarProds = async () => {
-          const r = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina`).eq("disponible", true).order("nombre");
-          return r.error ? sb.from("product").select(PROD_COLS).eq("disponible", true).order("nombre") : r;
+          // family_id (0065) y nombre_ticket/nombre_cocina (0051) pueden no existir aún.
+          const r0 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id`).eq("disponible", true).order("nombre");
+          if (!r0.error) return r0;
+          const r1 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina`).eq("disponible", true).order("nombre");
+          return r1.error ? sb.from("product").select(PROD_COLS).eq("disponible", true).order("nombre") : r1;
         };
         // category.mostrar_venta (0061) puede no existir aún: si falla, reintenta sin ella.
         const CAT_COLS = "id,nombre,orden,family_id";
@@ -153,7 +156,8 @@ export function gruposDeProducto(
   let catIds: string[] = [];
   if (m2m?.length) catIds = m2m;
   else if (prod.category_id) catIds = [prod.category_id];
-  const famId = s.cats.find((c) => c.id === prod.category_id)?.family_id ?? null;
+  // Familia: la DIRECTA del producto (0065, modelo Glop); si no, la de su categoría principal.
+  const famId = prod.family_id ?? s.cats.find((c) => c.id === prod.category_id)?.family_id ?? null;
 
   const efectivos = new Set<string>();
   const aplicarNivel = (as: ModAsignacion[]) => {
