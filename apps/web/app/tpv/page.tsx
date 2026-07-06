@@ -362,12 +362,12 @@ export default function TPV() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Mapa color por categoría (vía family) ── */
+  /* ── Mapa color por categoría: color propio (0066) o el de su familia ── */
   const colorCat = useMemo(() => {
     const famMap: Record<string, string> = {};
     for (const f of families) famMap[f.id] = f.color;
     const out: Record<string, string> = {};
-    for (const c of cats) out[c.id] = c.family_id ? (famMap[c.family_id] ?? "") : "";
+    for (const c of cats) out[c.id] = c.color || (c.family_id ? (famMap[c.family_id] ?? "") : "");
     return out;
   }, [families, cats]);
 

@@ -1,17 +1,16 @@
 "use client";
 
-// Listado de PRODUCTOS estilo Ágora: tabla densa a ancho completo con familia,
-// categorías (m2m), PLU, impuesto, estación, principal/añadido y precio.
-// Scroll horizontal si no cabe. Clic en la fila = editar.
+// Listado de PRODUCTOS estilo Ágora sobre TablaDatos: scroll con cabecera fija,
+// ordenación por columna, selección + exportar, acciones junto al nombre y
+// botón «ir a» hacia familia y categoría principal.
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Package, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Package, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
+import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,9 +27,9 @@ interface Prod {
 const eur = (n: number) => Number(n).toFixed(2).replace(".", ",") + " €";
 const TODAS = "__todas__";
 const SIN_CAT = "__sincat__";
-
+const siNo = (v: boolean) => (v ? "Sí" : "No");
 const SiNo = ({ v }: Readonly<{ v: boolean }>) => (
-  <span className={v ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground"}>{v ? "Sí" : "No"}</span>
+  <span className={v ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground"}>{siNo(v)}</span>
 );
 
 export default function ProductosLista() {
@@ -47,7 +46,6 @@ export default function ProductosLista() {
     const sb = supabaseBrowser();
     (async () => {
       const COLS = "id,nombre,precio,tipo_impositivo,clase_fiscal,category_id,estacion,disponible,agotado_hasta";
-      // Con columnas 0065; si no existen aún, degrada a las básicas.
       const full = await sb.from("product").select(`${COLS},family_id,plu,es_principal,es_anadido`).order("nombre");
       let lista: Prod[];
       if (full.error) {
@@ -80,11 +78,17 @@ export default function ProductosLista() {
   const colorFam = useMemo(() => new Map(familias.map((f) => [f.id, f.color ?? "#cbd5e1"])), [familias]);
   const nombreCat = useMemo(() => new Map(cats.map((c) => [c.id, c.nombre])), [cats]);
   const claseLabel = useMemo(() => new Map<string, string>(CLASES_FISCALES.map((c) => [c.v, c.t])), []);
+  const ahora = Date.now();
 
   const catsDe = (p: Prod): string[] => {
     const m2m = prodCats.get(p.id);
     if (m2m?.length) return m2m;
     return p.category_id ? [p.category_id] : [];
+  };
+  const estadoDe = (p: Prod): string => {
+    if (!p.disponible) return "Agotado";
+    if (p.agotado_hasta && new Date(p.agotado_hasta).getTime() > ahora) return "86";
+    return "Disponible";
   };
 
   const filtrados = useMemo(() => {
@@ -97,8 +101,7 @@ export default function ProductosLista() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prods, catFiltro, busca, prodCats]);
 
-  async function eliminar(p: Prod, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function eliminar(p: Prod) {
     if (!window.confirm(`¿Eliminar «${p.nombre}»? No se puede deshacer.`)) return;
     const { error } = await supabaseBrowser().from("product").delete().eq("id", p.id);
     if (error) { toast.error("No se pudo eliminar."); return; }
@@ -106,7 +109,66 @@ export default function ProductosLista() {
     setProds((prev) => prev.filter((x) => x.id !== p.id));
   }
 
-  const ahora = Date.now();
+  const columnas: ColumnaDatos<Prod>[] = [
+    {
+      clave: "nombre", titulo: "Nombre",
+      valor: (p) => p.nombre,
+      render: (p) => (
+        <span className="flex items-center gap-2.5 font-medium">
+          <span className="inline-block h-5 w-1 shrink-0 rounded-full"
+            style={{ backgroundColor: (p.family_id && colorFam.get(p.family_id)) || "#cbd5e1" }} aria-hidden />
+          {p.nombre}
+        </span>
+      ),
+    },
+    {
+      clave: "familia", titulo: "Familia",
+      valor: (p) => (p.family_id && nombreFam.get(p.family_id)) ?? null,
+      render: (p) => {
+        const n = p.family_id ? nombreFam.get(p.family_id) : null;
+        return n
+          ? <span className="text-muted-foreground">{n}<IrA href={`/familias/${p.family_id}`} titulo={n} /></span>
+          : <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
+      clave: "categorias", titulo: "Categorías",
+      valor: (p) => catsDe(p).map((cid) => nombreCat.get(cid)).filter(Boolean).join(", ") || null,
+      render: (p) => {
+        const ids = catsDe(p);
+        if (!ids.length) return <span className="text-muted-foreground">—</span>;
+        const principal = p.category_id ?? ids[0]!;
+        return (
+          <span className="inline-block max-w-56 truncate align-middle text-muted-foreground" title={ids.map((cid) => nombreCat.get(cid)).join(", ")}>
+            {ids.map((cid) => nombreCat.get(cid)).filter(Boolean).join(", ")}
+            <IrA href={`/categorias/${principal}`} titulo={nombreCat.get(principal) ?? "categoría"} />
+          </span>
+        );
+      },
+    },
+    { clave: "plu", titulo: "PLU", valor: (p) => p.plu, render: (p) => <span className="tabular-nums text-muted-foreground">{p.plu ?? "—"}</span> },
+    {
+      clave: "impuesto", titulo: "Impuesto",
+      valor: (p) => (p.clase_fiscal ? (claseLabel.get(p.clase_fiscal) ?? p.clase_fiscal) : `${p.tipo_impositivo}%`),
+      render: (p) => <span className="text-muted-foreground">{p.clase_fiscal ? (claseLabel.get(p.clase_fiscal) ?? p.clase_fiscal) : `${p.tipo_impositivo}%`}</span>,
+    },
+    {
+      clave: "prep", titulo: "Tipo de prep.",
+      valor: (p) => ESTACION_LABEL[estacionDe(p.estacion)],
+      render: (p) => <span className="text-muted-foreground">{ESTACION_LABEL[estacionDe(p.estacion)]}</span>,
+    },
+    { clave: "principal", titulo: "Principal", alinear: "centro", valor: (p) => siNo(p.es_principal), render: (p) => <SiNo v={p.es_principal} /> },
+    { clave: "anadido", titulo: "Añadido", alinear: "centro", valor: (p) => siNo(p.es_anadido), render: (p) => <SiNo v={p.es_anadido} /> },
+    { clave: "precio", titulo: "Precio", alinear: "der", valor: (p) => Number(p.precio), render: (p) => <span className="tabular-nums">{eur(p.precio)}</span> },
+    {
+      clave: "estado", titulo: "Estado", alinear: "der",
+      valor: (p) => estadoDe(p),
+      render: (p) => {
+        const e = estadoDe(p);
+        return <span className={`text-xs ${e === "Disponible" ? "text-emerald-600 dark:text-emerald-500" : "text-amber-600 dark:text-amber-500"}`}>{e}</span>;
+      },
+    },
+  ];
 
   return (
     <div className="w-full space-y-4">
@@ -139,91 +201,16 @@ export default function ProductosLista() {
           action={<Button onClick={() => router.push("/productos/nuevo")}><Plus className="h-4 w-4" /> Nuevo</Button>}
         />
       ) : (
-        <Card>
-          <CardContent className="px-0 py-0">
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1100px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Familia</TableHead>
-                    <TableHead>Categorías</TableHead>
-                    <TableHead>PLU</TableHead>
-                    <TableHead>Impuesto</TableHead>
-                    <TableHead>Tipo de prep.</TableHead>
-                    <TableHead className="text-center">Principal</TableHead>
-                    <TableHead className="text-center">Añadido</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Estado</TableHead>
-                    <TableHead className="w-20" aria-label="Acciones" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cargando && (
-                    <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
-                  )}
-                  {!cargando && filtrados.map((p) => {
-                    const del86 = p.agotado_hasta ? new Date(p.agotado_hasta).getTime() > ahora : false;
-                    let estado = "Disponible";
-                    if (!p.disponible) estado = "Agotado";
-                    else if (del86) estado = "86";
-                    return (
-                      <TableRow
-                        key={p.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => router.push(`/productos/${p.id}`)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/productos/${p.id}`); } }}
-                        className="group cursor-pointer hover:bg-surface-overlay"
-                      >
-                        <TableCell className="font-medium">
-                          <span className="flex items-center gap-2.5">
-                            <span className="inline-block h-5 w-1 shrink-0 rounded-full"
-                              style={{ backgroundColor: (p.family_id && colorFam.get(p.family_id)) || "#cbd5e1" }} aria-hidden />
-                            {p.nombre}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{(p.family_id && nombreFam.get(p.family_id)) ?? "—"}</TableCell>
-                        <TableCell className="max-w-56 truncate text-muted-foreground">
-                          {catsDe(p).map((cid) => nombreCat.get(cid)).filter(Boolean).join(", ") || "—"}
-                        </TableCell>
-                        <TableCell className="tabular-nums text-muted-foreground">{p.plu ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {p.clase_fiscal ? (claseLabel.get(p.clase_fiscal) ?? p.clase_fiscal) : `${p.tipo_impositivo}%`}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{ESTACION_LABEL[estacionDe(p.estacion)]}</TableCell>
-                        <TableCell className="text-center"><SiNo v={p.es_principal} /></TableCell>
-                        <TableCell className="text-center"><SiNo v={p.es_anadido} /></TableCell>
-                        <TableCell className="text-right tabular-nums">{eur(p.precio)}</TableCell>
-                        <TableCell className={`text-right text-xs ${estado === "Disponible" ? "text-emerald-600 dark:text-emerald-500" : "text-amber-600 dark:text-amber-500"}`}>
-                          {estado}
-                        </TableCell>
-                        <TableCell>
-                          <span className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Editar ${p.nombre}`}
-                              onClick={(e) => { e.stopPropagation(); router.push(`/productos/${p.id}`); }}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Eliminar ${p.nombre}`}
-                              onClick={(e) => eliminar(p, e)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {!cargando && prods.length > 0 && filtrados.length === 0 && (
-                    <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Sin resultados.</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="border-t border-border px-4 py-2 text-right text-xs text-muted-foreground">
-              {filtrados.length} producto{filtrados.length === 1 ? "" : "s"}
-            </div>
-          </CardContent>
-        </Card>
+        <TablaDatos
+          columnas={columnas}
+          filas={filtrados}
+          idDe={(p) => p.id}
+          onAbrir={(p) => router.push(`/productos/${p.id}`)}
+          onEliminar={eliminar}
+          exportarNombre="productos"
+          cargando={cargando}
+          vacio="Sin resultados."
+        />
       )}
     </div>
   );

@@ -1,15 +1,14 @@
 "use client";
 
-// Listado de FAMILIAS estilo Ágora: tabla densa a ancho completo con grupo
-// mayor, familia padre, orden de impresión y visibilidad (TPV / menús).
-// Clic en la fila = editar. Degrada si faltan 0058/0061/0065.
+// Listado de FAMILIAS estilo Ágora sobre TablaDatos: scroll con cabecera fija,
+// ordenación por columna, selección + exportar, acciones junto al nombre y
+// botón «ir a» en las referencias. Degrada si faltan 0058/0061/0065.
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Layers, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
@@ -21,14 +20,17 @@ interface Fila {
   color: string;
   orden_impresion: number;
   grupoMayor: string | null;
+  grupoMayorId: string | null;
   familiaPadre: string | null;
+  familiaPadreId: string | null;
   mostrar_venta: boolean;
   mostrar_menus: boolean;
   productos: number;
 }
 
-const SiNo = ({ v }: { v: boolean }) => (
-  <span className={v ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground"}>{v ? "Sí" : "No"}</span>
+const siNo = (v: boolean) => (v ? "Sí" : "No");
+const SiNo = ({ v }: Readonly<{ v: boolean }>) => (
+  <span className={v ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground"}>{siNo(v)}</span>
 );
 
 export default function FamiliasPage() {
@@ -41,7 +43,6 @@ export default function FamiliasPage() {
   useEffect(() => {
     const sb = supabaseBrowser();
     (async () => {
-      // Select completo (0058 + 0061 + 0065); si falla, base con aviso.
       type FamRow = {
         id: string; nombre: string; color: string | null; orden_impresion: number | null;
         grupo_mayor_id: string | null; familia_padre_id: string | null;
@@ -67,7 +68,6 @@ export default function FamiliasPage() {
       ]);
       const grupoPor = new Map(((gm as { id: string; nombre: string }[] | null) ?? []).map((g) => [g.id, g.nombre]));
       const famPor = new Map(fams.map((f) => [f.id, f.nombre]));
-      // Productos por familia directa (0065); si la columna no existe, 0.
       const nProds = new Map<string, number>();
       if (!prodRes.error) {
         for (const p of (prodRes.data as { family_id: string | null }[] | null) ?? []) {
@@ -81,7 +81,9 @@ export default function FamiliasPage() {
         color: f.color ?? "#64748b",
         orden_impresion: f.orden_impresion ?? 0,
         grupoMayor: f.grupo_mayor_id ? (grupoPor.get(f.grupo_mayor_id) ?? null) : null,
+        grupoMayorId: f.grupo_mayor_id,
         familiaPadre: f.familia_padre_id ? (famPor.get(f.familia_padre_id) ?? null) : null,
+        familiaPadreId: f.familia_padre_id,
         mostrar_venta: f.mostrar_venta ?? true,
         mostrar_menus: f.mostrar_menus ?? true,
         productos: nProds.get(f.id) ?? 0,
@@ -97,8 +99,7 @@ export default function FamiliasPage() {
       : filas;
   }, [filas, q]);
 
-  async function eliminar(f: Fila, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function eliminar(f: Fila) {
     const aviso = f.productos > 0
       ? `«${f.nombre}» tiene ${f.productos} producto(s). Quedarán sin familia. ¿Eliminar?`
       : `¿Eliminar la familia «${f.nombre}»?`;
@@ -109,16 +110,43 @@ export default function FamiliasPage() {
     setFilas((prev) => prev.filter((x) => x.id !== f.id));
   }
 
+  const columnas: ColumnaDatos<Fila>[] = [
+    {
+      clave: "nombre", titulo: "Nombre",
+      valor: (f) => f.nombre,
+      render: (f) => (
+        <span className="flex items-center gap-2.5 font-medium">
+          <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: f.color }} aria-hidden />
+          {f.nombre}
+        </span>
+      ),
+    },
+    {
+      clave: "grupoMayor", titulo: "Grupo mayor",
+      valor: (f) => f.grupoMayor,
+      render: (f) => f.grupoMayor
+        ? <span className="text-muted-foreground">{f.grupoMayor}{f.grupoMayorId && <IrA href={`/grupos-mayores/${f.grupoMayorId}`} titulo={f.grupoMayor} />}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      clave: "familiaPadre", titulo: "Familia padre",
+      valor: (f) => f.familiaPadre,
+      render: (f) => f.familiaPadre
+        ? <span className="text-muted-foreground">{f.familiaPadre}{f.familiaPadreId && <IrA href={`/familias/${f.familiaPadreId}`} titulo={f.familiaPadre} />}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
+    { clave: "productos", titulo: "Productos", alinear: "der", valor: (f) => f.productos, render: (f) => <span className="tabular-nums">{f.productos}</span> },
+    { clave: "ordenImp", titulo: "Orden imp. fact.", alinear: "der", valor: (f) => f.orden_impresion, render: (f) => <span className="tabular-nums text-muted-foreground">{f.orden_impresion}</span> },
+    { clave: "venta", titulo: "Mostrar en TPV", alinear: "centro", valor: (f) => siNo(f.mostrar_venta), render: (f) => <SiNo v={f.mostrar_venta} /> },
+    { clave: "menus", titulo: "Mostrar en menús", alinear: "centro", valor: (f) => siNo(f.mostrar_menus), render: (f) => <SiNo v={f.mostrar_menus} /> },
+  ];
+
   return (
     <div className="w-full space-y-4">
       <PageHeader
         title="Familias"
         description="Propiedades heredables del catálogo: los productos heredan de su familia los modificadores, el estilo y la visibilidad."
-        actions={
-          <Button onClick={() => router.push("/familias/nuevo")}>
-            <Plus className="h-4 w-4" /> Nuevo
-          </Button>
-        }
+        actions={<Button onClick={() => router.push("/familias/nuevo")}><Plus className="h-4 w-4" /> Nuevo</Button>}
       />
 
       {sinMigracion && (
@@ -140,70 +168,16 @@ export default function FamiliasPage() {
           action={<Button onClick={() => router.push("/familias/nuevo")}><Plus className="h-4 w-4" /> Nuevo</Button>}
         />
       ) : (
-        <Card>
-          <CardContent className="px-0 py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Grupo mayor</TableHead>
-                  <TableHead>Familia padre</TableHead>
-                  <TableHead className="text-right">Productos</TableHead>
-                  <TableHead className="text-right">Orden imp. fact.</TableHead>
-                  <TableHead className="text-center">Mostrar en TPV</TableHead>
-                  <TableHead className="text-center">Mostrar en menús</TableHead>
-                  <TableHead className="w-20" aria-label="Acciones" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && (
-                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
-                )}
-                {!loading && filtradas.map((f) => (
-                  <TableRow
-                    key={f.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(`/familias/${f.id}`)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/familias/${f.id}`); } }}
-                    className="group cursor-pointer hover:bg-surface-overlay"
-                  >
-                    <TableCell className="font-medium">
-                      <span className="flex items-center gap-2.5">
-                        <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: f.color }} aria-hidden />
-                        {f.nombre}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{f.grupoMayor ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{f.familiaPadre ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{f.productos}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{f.orden_impresion}</TableCell>
-                    <TableCell className="text-center"><SiNo v={f.mostrar_venta} /></TableCell>
-                    <TableCell className="text-center"><SiNo v={f.mostrar_menus} /></TableCell>
-                    <TableCell>
-                      <span className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Editar ${f.nombre}`}
-                          onClick={(e) => { e.stopPropagation(); router.push(`/familias/${f.id}`); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Eliminar ${f.nombre}`}
-                          onClick={(e) => eliminar(f, e)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && filas.length > 0 && filtradas.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Sin resultados para «{q}».</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <div className="border-t border-border px-4 py-2 text-right text-xs text-muted-foreground">
-              {filtradas.length} registro{filtradas.length === 1 ? "" : "s"}
-            </div>
-          </CardContent>
-        </Card>
+        <TablaDatos
+          columnas={columnas}
+          filas={filtradas}
+          idDe={(f) => f.id}
+          onAbrir={(f) => router.push(`/familias/${f.id}`)}
+          onEliminar={eliminar}
+          exportarNombre="familias"
+          cargando={loading}
+          vacio={`Sin resultados para «${q}».`}
+        />
       )}
     </div>
   );

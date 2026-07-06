@@ -213,8 +213,15 @@ export default function ProductoEditar() {
 
   // ── Categorías (m2m product_category; category_id = principal) ────────
   async function anadirCategoria(catId: string) {
-    const { error } = await sb.from("product_category").insert({ tenant_id: tenantId, product_id: id, category_id: catId });
-    if (error) { toast.error("No se pudo añadir la categoría."); return; }
+    // Upsert tolerante a duplicados; si la principal aún no tiene fila m2m
+    // (productos antiguos), se crea a la vez para que no "desaparezca".
+    const filas = [{ tenant_id: tenantId, product_id: id, category_id: catId }];
+    if (catsM2m.length === 0 && categoryId !== SIN_CAT && categoryId !== catId) {
+      filas.push({ tenant_id: tenantId, product_id: id, category_id: categoryId });
+    }
+    const { error } = await sb.from("product_category")
+      .upsert(filas, { onConflict: "product_id,category_id", ignoreDuplicates: true });
+    if (error) { toast.error(`No se pudo añadir la categoría: ${error.message}`); return; }
     if (categoryId === SIN_CAT) {
       await sb.from("product").update({ category_id: catId }).eq("id", id);
       setCategoryId(catId);
@@ -225,7 +232,7 @@ export default function ProductoEditar() {
   }
   async function quitarCategoria(catId: string) {
     const { error } = await sb.from("product_category").delete().eq("product_id", id).eq("category_id", catId);
-    if (error) { toast.error("No se pudo quitar la categoría."); return; }
+    if (error) { toast.error(`No se pudo quitar la categoría: ${error.message}`); return; }
     if (categoryId === catId) {
       const resto = catsM2m.filter((c) => c !== catId);
       const nueva = resto[0] ?? null;
@@ -649,14 +656,28 @@ export default function ProductoEditar() {
           <p className="text-sm text-muted-foreground">Guarda el producto para poder añadir formatos.</p>
         ) : (
           <>
-            <div className="flex flex-wrap gap-1.5">
+            {/* Añadir un formato: nombre + precio */}
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-40 flex-1 space-y-1.5">
+                <Label htmlFor="fmt-nombre">Nombre del formato</Label>
+                <Input id="fmt-nombre" value={nuevoFmt.nombre} onChange={(e) => setNuevoFmt((s) => ({ ...s, nombre: e.target.value }))} placeholder="Caña, Copa, Media ración…" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="fmt-precio">Precio €</Label>
+                <Input id="fmt-precio" className="w-28" inputMode="decimal" value={nuevoFmt.precio} onChange={(e) => setNuevoFmt((s) => ({ ...s, precio: e.target.value }))} placeholder="0,00" />
+              </div>
+              <Button type="button" variant="outline" onClick={addFormato} disabled={!nuevoFmt.nombre.trim() || !nuevoFmt.precio}>Añadir formato</Button>
+            </div>
+            {/* Plantillas: crean varios formatos de golpe, a 0 €, para poner el precio después */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span>Plantillas rápidas (crean varios de golpe, a 0 €, y luego pones los precios):</span>
               {PLANTILLAS_FORMATO.map((pl) => (
                 <button
                   key={pl.t}
                   type="button"
                   onClick={() => aplicarPlantilla(pl.nombres)}
                   title={`Crea los formatos ${pl.nombres.join(", ")} a precio 0`}
-                  className="rounded-full border border-input px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="rounded-full border border-input px-2.5 py-1 transition-colors hover:bg-accent hover:text-foreground"
                 >
                   + {pl.t}
                 </button>
@@ -678,11 +699,6 @@ export default function ProductoEditar() {
                   <button type="button" onClick={() => delFormato(ft.id)} className="text-destructive hover:underline">Quitar</button>
                 </div>
               ))}
-            </div>
-            <div className="flex gap-2">
-              <Input value={nuevoFmt.nombre} onChange={(e) => setNuevoFmt((s) => ({ ...s, nombre: e.target.value }))} placeholder="Formato (Caña…)" />
-              <Input className="w-24" inputMode="decimal" value={nuevoFmt.precio} onChange={(e) => setNuevoFmt((s) => ({ ...s, precio: e.target.value }))} placeholder="€" />
-              <Button type="button" variant="outline" onClick={addFormato} disabled={!nuevoFmt.nombre.trim() || !nuevoFmt.precio}>Añadir</Button>
             </div>
           </>
         )}

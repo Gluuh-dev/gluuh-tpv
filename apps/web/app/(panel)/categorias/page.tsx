@@ -1,14 +1,14 @@
 "use client";
 
-// Listado de CATEGORÍAS estilo Ágora: tabla densa a ancho completo con
-// categoría padre, familia y visibilidad (TPV / menús). Clic = editar.
+// Listado de CATEGORÍAS estilo Ágora sobre TablaDatos: ordenación, selección +
+// exportar, acciones junto al nombre y botón «ir a» hacia familia/padre.
+// Color propio de la categoría (0066) con herencia del de la familia.
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FolderTree, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { FolderTree, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
@@ -19,14 +19,17 @@ interface Fila {
   nombre: string;
   color: string;
   familia: string | null;
+  familiaId: string | null;
   padre: string | null;
+  padreId: string | null;
   mostrar_venta: boolean;
   mostrar_menus: boolean;
   productos: number;
 }
 
+const siNo = (v: boolean) => (v ? "Sí" : "No");
 const SiNo = ({ v }: Readonly<{ v: boolean }>) => (
-  <span className={v ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground"}>{v ? "Sí" : "No"}</span>
+  <span className={v ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground"}>{siNo(v)}</span>
 );
 
 export default function CategoriasPage() {
@@ -41,17 +44,17 @@ export default function CategoriasPage() {
     (async () => {
       type CatRow = {
         id: string; nombre: string; family_id: string | null; categoria_padre_id: string | null;
-        mostrar_venta: boolean | null; mostrar_menus: boolean | null;
+        color: string | null; mostrar_venta: boolean | null; mostrar_menus: boolean | null;
       };
       let cats: CatRow[] = [];
       const full = await sb.from("category")
-        .select("id,nombre,family_id,categoria_padre_id,mostrar_venta,mostrar_menus")
+        .select("id,nombre,family_id,categoria_padre_id,color,mostrar_venta,mostrar_menus")
         .order("orden");
       if (full.error) {
         setSinMigracion(true);
         const { data } = await sb.from("category").select("id,nombre,family_id").order("orden");
         cats = ((data as { id: string; nombre: string; family_id: string | null }[] | null) ?? []).map((c) => ({
-          ...c, categoria_padre_id: null, mostrar_venta: true, mostrar_menus: true,
+          ...c, categoria_padre_id: null, color: null, mostrar_venta: true, mostrar_menus: true,
         }));
       } else {
         cats = (full.data as CatRow[] | null) ?? [];
@@ -73,9 +76,12 @@ export default function CategoriasPage() {
         return {
           id: c.id,
           nombre: c.nombre,
-          color: fam?.color ?? "#cbd5e1",
+          // Color propio (0066); si no tiene, hereda el de la familia.
+          color: c.color ?? fam?.color ?? "#cbd5e1",
           familia: fam?.nombre ?? null,
+          familiaId: c.family_id,
           padre: c.categoria_padre_id ? (catPor.get(c.categoria_padre_id) ?? null) : null,
+          padreId: c.categoria_padre_id,
           mostrar_venta: c.mostrar_venta ?? true,
           mostrar_menus: c.mostrar_menus ?? true,
           productos: nProds.get(c.id) ?? 0,
@@ -92,8 +98,7 @@ export default function CategoriasPage() {
       : filas;
   }, [filas, q]);
 
-  async function eliminar(c: Fila, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function eliminar(c: Fila) {
     const aviso = c.productos > 0
       ? `«${c.nombre}» tiene ${c.productos} producto(s) asignados. ¿Eliminar la categoría?`
       : `¿Eliminar la categoría «${c.nombre}»?`;
@@ -103,6 +108,36 @@ export default function CategoriasPage() {
     toast.success("Categoría eliminada.");
     setFilas((prev) => prev.filter((x) => x.id !== c.id));
   }
+
+  const columnas: ColumnaDatos<Fila>[] = [
+    {
+      clave: "nombre", titulo: "Nombre",
+      valor: (f) => f.nombre,
+      render: (f) => (
+        <span className="flex items-center gap-2.5 font-medium">
+          <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: f.color }} aria-hidden />
+          {f.nombre}
+        </span>
+      ),
+    },
+    {
+      clave: "familia", titulo: "Familia",
+      valor: (f) => f.familia,
+      render: (f) => f.familia
+        ? <span className="text-muted-foreground">{f.familia}{f.familiaId && <IrA href={`/familias/${f.familiaId}`} titulo={f.familia} />}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      clave: "padre", titulo: "Categoría padre",
+      valor: (f) => f.padre,
+      render: (f) => f.padre
+        ? <span className="text-muted-foreground">{f.padre}{f.padreId && <IrA href={`/categorias/${f.padreId}`} titulo={f.padre} />}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
+    { clave: "productos", titulo: "Productos", alinear: "der", valor: (f) => f.productos, render: (f) => <span className="tabular-nums">{f.productos}</span> },
+    { clave: "venta", titulo: "Mostrar en TPV", alinear: "centro", valor: (f) => siNo(f.mostrar_venta), render: (f) => <SiNo v={f.mostrar_venta} /> },
+    { clave: "menus", titulo: "Mostrar en menús", alinear: "centro", valor: (f) => siNo(f.mostrar_menus), render: (f) => <SiNo v={f.mostrar_menus} /> },
+  ];
 
   return (
     <div className="w-full space-y-4">
@@ -115,7 +150,7 @@ export default function CategoriasPage() {
       {sinMigracion && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/15 px-4 py-3 text-sm text-amber-600 dark:text-amber-500">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <p>Faltan migraciones (0061/0065): categoría padre y visibilidad no se muestran.</p>
+          <p>Faltan migraciones (0061/0065/0066): padre, color propio y visibilidad no se muestran.</p>
         </div>
       )}
 
@@ -131,68 +166,16 @@ export default function CategoriasPage() {
           action={<Button onClick={() => router.push("/categorias/nuevo")}><Plus className="h-4 w-4" /> Nuevo</Button>}
         />
       ) : (
-        <Card>
-          <CardContent className="px-0 py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Familia</TableHead>
-                  <TableHead>Categoría padre</TableHead>
-                  <TableHead className="text-right">Productos</TableHead>
-                  <TableHead className="text-center">Mostrar en TPV</TableHead>
-                  <TableHead className="text-center">Mostrar en menús</TableHead>
-                  <TableHead className="w-20" aria-label="Acciones" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && (
-                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
-                )}
-                {!loading && filtradas.map((c) => (
-                  <TableRow
-                    key={c.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(`/categorias/${c.id}`)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/categorias/${c.id}`); } }}
-                    className="group cursor-pointer hover:bg-surface-overlay"
-                  >
-                    <TableCell className="font-medium">
-                      <span className="flex items-center gap-2.5">
-                        <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.color }} aria-hidden />
-                        {c.nombre}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{c.familia ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.padre ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.productos}</TableCell>
-                    <TableCell className="text-center"><SiNo v={c.mostrar_venta} /></TableCell>
-                    <TableCell className="text-center"><SiNo v={c.mostrar_menus} /></TableCell>
-                    <TableCell>
-                      <span className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Editar ${c.nombre}`}
-                          onClick={(e) => { e.stopPropagation(); router.push(`/categorias/${c.id}`); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Eliminar ${c.nombre}`}
-                          onClick={(e) => eliminar(c, e)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && filas.length > 0 && filtradas.length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Sin resultados para «{q}».</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <div className="border-t border-border px-4 py-2 text-right text-xs text-muted-foreground">
-              {filtradas.length} registro{filtradas.length === 1 ? "" : "s"}
-            </div>
-          </CardContent>
-        </Card>
+        <TablaDatos
+          columnas={columnas}
+          filas={filtradas}
+          idDe={(f) => f.id}
+          onAbrir={(f) => router.push(`/categorias/${f.id}`)}
+          onEliminar={eliminar}
+          exportarNombre="categorias"
+          cargando={loading}
+          vacio={`Sin resultados para «${q}».`}
+        />
       )}
     </div>
   );

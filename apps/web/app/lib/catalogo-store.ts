@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tipos del catálogo (compartidos por TPV, kiosko, KDS…).
 export interface Family { id: string; nombre: string; color: string }
-export interface Cat    { id: string; nombre: string; orden: number; family_id: string | null; foto_url?: string | null; mostrar_venta?: boolean }
+export interface Cat    { id: string; nombre: string; orden: number; family_id: string | null; foto_url?: string | null; mostrar_venta?: boolean; color?: string | null }
 export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null; family_id?: string | null }
 export interface Formato { id: string; product_id: string; nombre: string; precio: number }
 export interface ModOpcion { id: string; nombre: string; precio_extra: number }
@@ -63,11 +63,14 @@ export const useCatalogo = create<CatalogoState>()(
           const r1 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina`).eq("disponible", true).order("nombre");
           return r1.error ? sb.from("product").select(PROD_COLS).eq("disponible", true).order("nombre") : r1;
         };
-        // category.mostrar_venta (0061) puede no existir aún: si falla, reintenta sin ella.
+        // category.mostrar_venta (0061) y color propio (0066) pueden no existir aún:
+        // si el select falla, reintenta con menos columnas.
         const CAT_COLS = "id,nombre,orden,family_id";
         const cargarCats = async () => {
-          const r = await sb.from("category").select(`${CAT_COLS},mostrar_venta`).order("orden");
-          return r.error ? sb.from("category").select(CAT_COLS).order("orden") : r;
+          const r0 = await sb.from("category").select(`${CAT_COLS},mostrar_venta,color`).order("orden");
+          if (!r0.error) return r0;
+          const r1 = await sb.from("category").select(`${CAT_COLS},mostrar_venta`).order("orden");
+          return r1.error ? sb.from("category").select(CAT_COLS).order("orden") : r1;
         };
         // modifier_group.tipo (0064) puede no existir aún: reintenta sin la columna.
         const MG_COLS = "id,product_id,nombre,min_sel,max_sel";

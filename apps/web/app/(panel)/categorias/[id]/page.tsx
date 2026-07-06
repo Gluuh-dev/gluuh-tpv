@@ -51,6 +51,7 @@ export default function CategoriaEditarPage() {
   const [estacion, setEstacion] = useState<string>(SIN_ESTACION);
   // Panel Estilo
   const [textoBoton, setTextoBoton] = useState("");
+  const [colorPropio, setColorPropio] = useState<string | null>(null); // null = hereda el de la familia (0066)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [mostrarVenta, setMostrarVenta] = useState(true);
@@ -128,7 +129,7 @@ export default function CategoriaEditarPage() {
 
       if (!esNueva) {
         const full = await sb.from("category")
-          .select("nombre,family_id,orden,estacion,foto_url,categoria_padre_id,texto_boton,carta_nombre,carta_descripcion,mostrar_venta,mostrar_menus")
+          .select("nombre,family_id,orden,estacion,foto_url,categoria_padre_id,texto_boton,color,carta_nombre,carta_descripcion,mostrar_venta,mostrar_menus")
           .eq("id", id).maybeSingle();
         if (full.error) {
           setSin0065(true);
@@ -142,12 +143,13 @@ export default function CategoriaEditarPage() {
           const c = full.data as {
             nombre: string; family_id: string | null; orden: number | null; estacion: string | null;
             foto_url: string | null; categoria_padre_id: string | null; texto_boton: string | null;
-            carta_nombre: string | null; carta_descripcion: string | null;
+            color: string | null; carta_nombre: string | null; carta_descripcion: string | null;
             mostrar_venta: boolean | null; mostrar_menus: boolean | null;
           } | null;
           if (!c) { toast.error("No se pudo cargar la categoría."); router.push("/categorias"); return; }
           setNombre(c.nombre); setFamilyId(c.family_id ?? NINGUNO); setOrden(String(c.orden ?? 0));
           setEstacion(c.estacion ?? SIN_ESTACION); setFotoUrl(c.foto_url);
+          setColorPropio(c.color);
           setPadreId(c.categoria_padre_id ?? NINGUNO); setTextoBoton(c.texto_boton ?? "");
           setCartaNombre(c.carta_nombre ?? ""); setCartaDescripcion(c.carta_descripcion ?? "");
           setMostrarVenta(c.mostrar_venta ?? true); setMostrarMenus(c.mostrar_menus ?? true);
@@ -183,6 +185,7 @@ export default function CategoriaEditarPage() {
     if (!sin0065) {
       base.categoria_padre_id = padreId === NINGUNO ? null : padreId;
       base.texto_boton = textoBoton.trim() || null;
+      base.color = colorPropio;   // null = hereda el de la familia (0066)
       base.carta_nombre = cartaNombre.trim() || null;
       base.carta_descripcion = cartaDescripcion.trim() || null;
     }
@@ -330,6 +333,34 @@ export default function CategoriaEditarPage() {
                 <Input id="c-texto" value={textoBoton} onChange={(e) => setTextoBoton(e.target.value)} placeholder={nombre || "Texto del botón"} />
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label htmlFor="c-color">Color</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  id="c-color"
+                  type="color"
+                  value={colorPropio ?? colorHeredado}
+                  onChange={(e) => setColorPropio(e.target.value)}
+                  className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-input/30 p-1"
+                  aria-label="Selector de color de la categoría"
+                />
+                <Input
+                  value={colorPropio ?? ""}
+                  onChange={(e) => setColorPropio(e.target.value || null)}
+                  placeholder={`${colorHeredado} (de la familia)`}
+                  className="w-36 font-mono"
+                  aria-label="Color en hexadecimal"
+                />
+                {colorPropio && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setColorPropio(null)}>
+                    Heredar de la familia
+                  </Button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {colorPropio ? "Color propio de la categoría." : "Sin color propio: usa el de la familia."}
+              </p>
+            </div>
             <div className="space-y-1.5">
               <Label>Imagen</Label>
               <div className="flex items-center gap-3">
