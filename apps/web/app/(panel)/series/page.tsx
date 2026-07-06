@@ -1,22 +1,20 @@
 "use client";
 
 // Series de documento — gestor multi-serie sobre `invoice_series` (código,
-// descripción, tipo y predeterminada por tipo). Columnas tipo/predeterminada/
-// activa vienen de la migración 0055; si no está aplicada, la página cae a
-// editar `location.serie_factura` (lo que usa la facturación hoy) con aviso
-// ámbar — patrón de ordenar-productos.
+// descripción, tipo y predeterminada por tipo) en la tabla reutilizable del
+// panel. Columnas tipo/predeterminada/activa vienen de la 0055; si no está
+// aplicada, cae a editar `location.serie_factura` con aviso ámbar.
 // ponytail: la facturación aún lee location.serie_factura; migrará a elegir
 // serie de esta tabla por tipo más adelante.
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Eye, EyeOff, Star, TriangleAlert } from "lucide-react";
+import { Plus, Star, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { TablaDatos, type ColumnaDatos } from "@/components/tabla-datos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
 
 // prefijo = código de serie; nombre = descripción legible.
@@ -26,6 +24,7 @@ const TIPOS = [
   { v: "ABONO", t: "Abono" }, { v: "PRESUPUESTO", t: "Presupuesto" },
 ];
 const tipoLabel = (v: string) => TIPOS.find((t) => t.v === v)?.t ?? v;
+const siNo = (v: boolean) => (v ? "Sí" : "No");
 
 export default function Series() {
   const sb = supabaseBrowser();
@@ -61,7 +60,7 @@ export default function Series() {
     await sb.from("invoice_series").insert({
       tenant_id: tenantId, prefijo: codigo, nombre: f.descripcion.trim() || codigo, tipo: f.tipo,
     });
-    setF({ codigo: "", descripcion: "", tipo: "FACTURA" }); cargar();
+    setF({ codigo: "", descripcion: "", tipo: "FACTURA" }); await cargar();
   }
   // ponytail: "una predeterminada por tipo" se garantiza desde la UI (RLS acota
   // el update al tenant); sin índice único parcial hasta que haga falta forzarlo.
@@ -71,16 +70,50 @@ export default function Series() {
       await sb.from("invoice_series").update({ predeterminada: false }).eq("tipo", s.tipo).eq("predeterminada", true);
       await sb.from("invoice_series").update({ predeterminada: true }).eq("id", s.id);
     }
-    cargar();
+    await cargar();
   }
-  async function toggleActiva(s: Serie) { await sb.from("invoice_series").update({ activa: !s.activa }).eq("id", s.id); cargar(); }
-  async function del(id: string) { await sb.from("invoice_series").delete().eq("id", id); cargar(); }
+  async function toggleActiva(s: Serie) { await sb.from("invoice_series").update({ activa: !s.activa }).eq("id", s.id); await cargar(); }
+  async function del(s: Serie) {
+    if (!window.confirm(`¿Eliminar la serie «${s.prefijo || s.nombre}»?`)) return;
+    await sb.from("invoice_series").delete().eq("id", s.id); await cargar();
+  }
 
   async function guardarSerieFactura() {
     if (!locId) return;
     await sb.from("location").update({ serie_factura: serieFactura.trim() || "F" }).eq("id", locId);
     setGuardado(true); setTimeout(() => setGuardado(false), 2000);
   }
+
+  const columnas: ColumnaDatos<Serie>[] = [
+    {
+      clave: "codigo", titulo: "Código", valor: (s) => s.prefijo,
+      render: (s) => <span className={`font-mono font-semibold ${s.activa ? "" : "text-muted-foreground line-through"}`}>{s.prefijo || "—"}</span>,
+    },
+    { clave: "descripcion", titulo: "Descripción", valor: (s) => s.nombre, render: (s) => <span className={s.activa ? "" : "text-muted-foreground line-through"}>{s.nombre}</span> },
+    { clave: "tipo", titulo: "Tipo", valor: (s) => tipoLabel(s.tipo) },
+    {
+      clave: "predeterminada", titulo: "Predeterminada", alinear: "centro",
+      valor: (s) => siNo(s.predeterminada),
+      render: (s) => (
+        <button type="button" onClick={() => marcarPredeterminada(s)}
+          className={`inline-flex items-center gap-1 ${s.predeterminada ? "text-amber-500" : "text-muted-foreground/60 hover:text-amber-500"}`}
+          title={s.predeterminada ? `Predeterminada de ${tipoLabel(s.tipo)}` : "Marcar como predeterminada"}>
+          <Star className="h-4 w-4" fill={s.predeterminada ? "currentColor" : "none"} />
+        </button>
+      ),
+    },
+    {
+      clave: "activa", titulo: "Activa", alinear: "centro",
+      valor: (s) => siNo(s.activa),
+      render: (s) => (
+        <button type="button" onClick={() => toggleActiva(s)}
+          className={s.activa ? "font-medium text-emerald-600 dark:text-emerald-500" : "text-muted-foreground hover:text-foreground"}
+          title={s.activa ? "Activa (clic para desactivar)" : "Inactiva (clic para activar)"}>
+          {siNo(s.activa)}
+        </button>
+      ),
+    },
+  ];
 
   if (loading) return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -115,9 +148,9 @@ export default function Series() {
     );
   }
 
-  // ── Gestor multi-serie ─────────────────────────────────────────────────────
+  // ── Gestor multi-serie (tabla a alto completo) ─────────────────────────────
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader title="Series de documento" description="Series para numerar facturas, tickets, abonos y presupuestos. Marca una predeterminada por tipo." />
 
       <Card>
@@ -134,36 +167,14 @@ export default function Series() {
         </CardContent>
       </Card>
 
-      {list.length === 0 ? (
-        <EmptyState title="Sin series" description="Añade tu primera serie (por ejemplo código «F» de tipo Factura)." />
-      ) : (
-        <Card>
-          <CardContent className="divide-y divide-border p-0">
-            {list.map((s) => (
-              <div key={s.id} className="flex items-center justify-between px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <span className={`font-mono text-sm font-semibold ${s.activa ? "" : "text-muted-foreground line-through"}`}>{s.prefijo || "—"}</span>
-                  <span className={s.activa ? "text-(--text-secondary)" : "text-muted-foreground line-through"}>{s.nombre}</span>
-                  <Badge variant="secondary" className="font-normal">{tipoLabel(s.tipo)}</Badge>
-                  {s.predeterminada && <Badge className="bg-brand/15 font-normal text-brand">Predeterminada</Badge>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" aria-label={s.predeterminada ? "Quitar predeterminada" : "Marcar predeterminada"}
-                    title={s.predeterminada ? `Predeterminada de ${tipoLabel(s.tipo)}` : "Marcar como predeterminada"}
-                    className={s.predeterminada ? "text-amber-500" : "text-muted-foreground/50"} onClick={() => marcarPredeterminada(s)}>
-                    <Star className="h-4 w-4" fill={s.predeterminada ? "currentColor" : "none"} />
-                  </Button>
-                  <Button variant="ghost" size="icon" aria-label={s.activa ? "Ocultar" : "Mostrar"} title={s.activa ? "Activa" : "Inactiva"}
-                    className={s.activa ? "text-emerald-600" : "text-muted-foreground"} onClick={() => toggleActiva(s)}>
-                    {s.activa ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                  </Button>
-                  <Button variant="ghost" size="icon" aria-label="Eliminar" className="text-destructive" onClick={() => del(s.id)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <TablaDatos
+        columnas={columnas}
+        filas={list}
+        idDe={(s) => s.id}
+        onEliminar={del}
+        exportarNombre="series"
+        vacio="Sin series. Añade tu primera (por ejemplo código «F» de tipo Factura)."
+      />
     </div>
   );
 }

@@ -140,7 +140,7 @@ export default function CategoriasPage() {
   ];
 
   return (
-    <div className="w-full space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader
         title="Categorías"
         description="Las agrupaciones que ve el TPV: un producto puede estar en varias categorías a la vez."

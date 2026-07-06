@@ -66,7 +66,7 @@ export default function GruposMayoresPage() {
   ];
 
   return (
-    <div className="w-full space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader
         title="Grupos mayores"
         description="La división por encima de las familias: grupo mayor → familia → categoría → producto."

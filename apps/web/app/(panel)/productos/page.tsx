@@ -171,7 +171,7 @@ export default function ProductosLista() {
   ];
 
   return (
-    <div className="w-full space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader
         title="Productos"
         description={cargando ? "Cargando la carta…" : "Artículos de la carta con su familia, categorías y precios."}

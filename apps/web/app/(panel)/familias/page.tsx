@@ -142,7 +142,7 @@ export default function FamiliasPage() {
   ];
 
   return (
-    <div className="w-full space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader
         title="Familias"
         description="Propiedades heredables del catálogo: los productos heredan de su familia los modificadores, el estilo y la visibilidad."

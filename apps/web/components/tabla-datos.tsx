@@ -1,14 +1,17 @@
 "use client";
 
-// Tabla de listado estilo Ágora para el panel:
-// - scroll horizontal y vertical DENTRO de la tabla, con cabecera fija;
-// - ordenación pulsando la cabecera (asc → desc → sin orden);
-// - columna # y checks de selección con barra inferior de EXPORTAR (CSV) e imprimir;
-// - acciones (editar/eliminar) junto a la primera celda, al pasar el ratón o seleccionar;
-// - helper <IrA/> para celdas que referencian otra entidad (botón de "ir").
+// Tabla de listado reutilizable del panel (familias, categorías, productos,
+// grupos mayores, series…). Diseño profesional:
+// - ocupa SIEMPRE el 100% del alto de su columna flex (aunque haya 3 filas);
+// - scroll interno con cabecera fija; cabecera y footer en color distinto;
+// - filas cebra (una sí, otra no) + hover + selección;
+// - ordenación por cabecera: el chevron se oculta hasta hover/focus y muestra
+//   el sentido; si la columna ya ordena, queda resaltado (blanco) siempre;
+// - columna # y checks con barra inferior de exportar (CSV) e imprimir;
+// - acciones (editar/eliminar) junto a la primera celda; <IrA/> para referencias.
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, ExternalLink, Pencil, Printer, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, ExternalLink, Pencil, Printer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface ColumnaDatos<T> {
@@ -140,36 +143,50 @@ export function TablaDatos<T>({
     w.print();
   }
 
+  const thBase = "sticky top-0 z-10 border-b border-border bg-surface-muted px-3 py-2.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
+
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <div className="max-h-[70vh] overflow-auto">
+    // flex-1 + min-h-0: la tabla llena el alto de su columna flex (la página
+    // debe ser `flex h-full flex-col`). Con pocas filas, el cuerpo se estira igual.
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="sticky top-0 z-10 w-9 border-b border-border bg-surface px-2 py-2">
+              <th className={`${thBase} w-9 text-center`}>
                 <input
                   type="checkbox"
                   checked={todasSel}
                   onChange={toggleTodas}
                   aria-label="Seleccionar todo"
-                  className="align-middle"
+                  className="block h-4 w-4 accent-brand"
                 />
               </th>
-              <th className="sticky top-0 z-10 w-10 border-b border-border bg-surface px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">#</th>
+              <th className={`${thBase} w-10`}>#</th>
               {columnas.map((c) => {
                 const activa = orden?.clave === c.clave;
-                let Icono = ArrowUpDown;
-                if (activa) Icono = orden!.dir === 1 ? ArrowUp : ArrowDown;
+                // Activa: chevron del sentido actual, resaltado y siempre visible.
+                // Inactiva: chevron del sentido del PRÓXIMO clic (asc), oculto
+                // hasta hover/focus.
+                const Chevron = activa && orden!.dir === -1 ? ChevronDown : ChevronUp;
                 return (
-                  <th key={c.clave} className={`sticky top-0 z-10 border-b border-border bg-surface px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground ${alinClase(c.alinear)}`}>
+                  <th key={c.clave} className={`${thBase} ${alinClase(c.alinear)}`}>
                     <button
                       type="button"
                       onClick={() => pulsarCabecera(c.clave)}
-                      className="inline-flex items-center gap-1 hover:text-foreground"
+                      className="group/sort inline-flex items-center gap-1 rounded outline-none hover:text-foreground focus-visible:text-foreground"
                       title={`Ordenar por ${c.titulo}`}
+                      aria-label={`Ordenar por ${c.titulo}`}
                     >
                       {c.titulo}
-                      <Icono className={`h-3 w-3 ${activa ? "text-foreground" : "opacity-40"}`} aria-hidden />
+                      <Chevron
+                        className={`h-3.5 w-3.5 transition-opacity ${
+                          activa
+                            ? "text-foreground opacity-100"
+                            : "opacity-0 group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60"
+                        }`}
+                        aria-hidden
+                      />
                     </button>
                   </th>
                 );
@@ -178,51 +195,56 @@ export function TablaDatos<T>({
           </thead>
           <tbody>
             {cargando && (
-              <tr><td colSpan={columnas.length + 2} className="px-4 py-8 text-center text-muted-foreground">Cargando…</td></tr>
+              <tr><td colSpan={columnas.length + 2} className="px-4 py-10 text-center text-muted-foreground">Cargando…</td></tr>
             )}
             {!cargando && ordenadas.length === 0 && (
-              <tr><td colSpan={columnas.length + 2} className="px-4 py-8 text-center text-muted-foreground">{vacio ?? "Sin registros."}</td></tr>
+              <tr><td colSpan={columnas.length + 2} className="px-4 py-10 text-center text-muted-foreground">{vacio ?? "Sin registros."}</td></tr>
             )}
             {!cargando && ordenadas.map((f, i) => {
               const id = idDe(f);
               const marcada = sel.has(id);
+              // Cebra: base según paridad; selección y hover mandan por encima.
+              let fondo = i % 2 === 0 ? "bg-surface" : "bg-surface-overlay";
+              if (marcada) fondo = "bg-brand/10";
               return (
                 <tr
                   key={id}
                   onClick={onAbrir ? () => onAbrir(f) : undefined}
-                  className={`group ${onAbrir ? "cursor-pointer" : ""} ${marcada ? "bg-brand/10" : "hover:bg-surface-overlay"}`}
+                  className={`group ${fondo} ${onAbrir ? "cursor-pointer" : ""} hover:bg-surface-muted`}
                 >
-                  <td className="border-b border-border px-2 py-2">
+                  <td className="border-b border-border-muted px-2 py-2 text-center align-middle">
                     <input
                       type="checkbox"
                       checked={marcada}
                       onChange={() => toggleUna(id)}
                       onClick={(e) => e.stopPropagation()}
                       aria-label="Seleccionar fila"
-                      className="align-middle"
+                      className="mx-auto block h-4 w-4 accent-brand"
                     />
                   </td>
-                  <td className="border-b border-border px-2 py-2 tabular-nums text-muted-foreground">{i + 1}</td>
+                  <td className="border-b border-border-muted px-2 py-2 align-middle tabular-nums text-muted-foreground">{i + 1}</td>
                   {columnas.map((c, ci) => (
-                    <td key={c.clave} className={`border-b border-border px-3 py-2 ${alinClase(c.alinear)}`}>
+                    <td key={c.clave} className={`border-b border-border-muted px-3 py-2 align-middle ${alinClase(c.alinear)}`}>
                       {ci === 0 ? (
                         <span className="inline-flex items-center gap-1.5">
                           {c.render ? c.render(f) : String(c.valor(f) ?? "—")}
-                          {/* Acciones junto al nombre (estilo Ágora), visibles al pasar/seleccionar */}
-                          <span className={`inline-flex items-center gap-0.5 transition-opacity ${marcada ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                            {onAbrir && (
-                              <Button variant="outline" size="icon" className="h-6 w-6" aria-label="Editar"
-                                onClick={(e) => { e.stopPropagation(); onAbrir(f); }}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                            )}
-                            {onEliminar && (
-                              <Button variant="outline" size="icon" className="h-6 w-6 text-destructive" aria-label="Eliminar"
-                                onClick={(e) => { e.stopPropagation(); onEliminar(f); }}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </span>
+                          {/* Acciones junto al nombre, visibles al pasar/seleccionar */}
+                          {(onAbrir || onEliminar) && (
+                            <span className={`inline-flex items-center gap-0.5 transition-opacity ${marcada ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                              {onAbrir && (
+                                <Button variant="outline" size="icon" className="h-6 w-6" aria-label="Editar"
+                                  onClick={(e) => { e.stopPropagation(); onAbrir(f); }}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {onEliminar && (
+                                <Button variant="outline" size="icon" className="h-6 w-6 text-destructive" aria-label="Eliminar"
+                                  onClick={(e) => { e.stopPropagation(); onEliminar(f); }}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </span>
+                          )}
                         </span>
                       ) : (
                         c.render ? c.render(f) : <span className={c.valor(f) == null ? "text-muted-foreground" : undefined}>{String(c.valor(f) ?? "—")}</span>
@@ -235,8 +257,8 @@ export function TablaDatos<T>({
           </tbody>
         </table>
       </div>
-      {/* Barra inferior: selección + exportar (estilo Ágora, botones abajo) */}
-      <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
+      {/* Barra inferior (color distinto): selección + exportar/imprimir. */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-surface-muted px-3 py-2">
         <span className="text-xs text-muted-foreground">
           {sel.size > 0 ? `${sel.size} seleccionada${sel.size === 1 ? "" : "s"} · ` : ""}
           {filas.length} registro{filas.length === 1 ? "" : "s"}
