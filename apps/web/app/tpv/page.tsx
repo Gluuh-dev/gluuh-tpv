@@ -335,6 +335,22 @@ export default function TPV() {
     /* eslint-disable-next-line */
   }, []);
 
+  /* ── Refresco automático del catálogo (D3) ── Si desde el backoffice o desde
+       casa cambian productos/categorías/familias (p. ej. marcar un agotado), el
+       TPV se actualiza solo en segundos, sin recargar. Debounce 800 ms para
+       agrupar ráfagas. Si realtime no está en la publicación, no dispara (ok). */
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const recargar = () => { if (t) clearTimeout(t); t = setTimeout(() => { void useCatalogo.getState().cargar(sb, { force: true }); }, 800); };
+    const canal = sb.channel("tpv_catalogo")
+      .on("postgres_changes", { event: "*", schema: "public", table: "product" }, recargar)
+      .on("postgres_changes", { event: "*", schema: "public", table: "category" }, recargar)
+      .on("postgres_changes", { event: "*", schema: "public", table: "family" }, recargar)
+      .subscribe();
+    return () => { if (t) clearTimeout(t); void sb.removeChannel(canal); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ── Formas de pago (cobro) + anotaciones rápidas (chips). Best-effort. ── */
   useEffect(() => {
     sb.from("payment_method").select("id,nombre,tipo,abre_cajon,cuenta_arqueo").order("orden")

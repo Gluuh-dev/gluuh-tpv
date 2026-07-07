@@ -44,8 +44,17 @@ tarea (y se registra la sesión en `docs/sesiones/`).
 - ⏳ **Pendiente probar en vivo** con Desktop + impresoras reales; el móvil→cocina
   ya está cableado por la cola.
 
-Siguiente: **Bloque D** (abajo) y luego **B2-B5** (desplegar) cuando tengas la
-cuenta Cloudflare a mano.
+- ✅ **D1** (parcial): migración 0080 (heartbeat) + "● En línea/○ hace N" en
+  Módulos + el Desktop late cada 60 s. **Reconectar** queda pendiente (endpoint
+  a probar en vivo).
+- ✅ **D3**: el TPV se refresca solo al cambiar catálogo (realtime, debounce).
+- ✅ **0081**: publicadas en realtime product/category/family/print_job — sin
+  esto, C3 (impresión al instante) y D3 no dispararían. **Clave**: al crear
+  tablas nuevas que el cliente escuche, añadirlas a la publicación.
+
+Siguiente: **B2-B5** (desplegar en Cloudflare, con tu cuenta), **D2** (backup
+visible), **D4/D5** (auto-update, multi-impresora) y luego **Bloque E** (nodo
+local). Probar en vivo el flujo de impresión con Desktop + impresora real.
 
 ## BLOQUE A — Remates de identidad y plataforma (~1 día) ← HECHO ✅
 

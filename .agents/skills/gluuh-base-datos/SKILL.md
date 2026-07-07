@@ -15,7 +15,10 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0079`
+   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0081`
+   —realtime: publica product/category/family/print_job para las suscripciones
+   del TPV/Desktop. `0080` `device.ultima_conexion/version` + RPC
+   `device_heartbeat` (parque "en línea"). `0079`
    —**impresión compartida**: `printer` (rol/transporte/destino/device_id),
    `print_job` (cola por la nube, estado, idempotencia por client_id),
    `print_route` (estación × zona → impresora); RLS por tenant + `set_tenant_id()`.
