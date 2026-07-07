@@ -109,10 +109,10 @@ export function CommandPalette() {
           aria-label="Buscar en el panel"
         >
           <div
-            className="w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+            className="flex h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl md:h-[498px]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 border-b border-border px-3">
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-3">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <input
                 ref={inputRef}
@@ -124,7 +124,7 @@ export function CommandPalette() {
                 aria-label="Buscar"
               />
             </div>
-            <div className="max-h-[52vh] overflow-y-auto p-1.5">
+            <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
               {resultados.length === 0 ? (
                 <p className="px-3 py-8 text-center text-sm text-muted-foreground">Sin resultados para «{q}».</p>
               ) : (
@@ -144,7 +144,7 @@ export function CommandPalette() {
                 ))
               )}
             </div>
-            <div className="flex items-center gap-3 border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-3 border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
               <span><kbd className="font-mono">↑↓</kbd> moverse</span>
               <span><kbd className="font-mono">↵</kbd> abrir</span>
               <span><kbd className="font-mono">Esc</kbd> cerrar</span>

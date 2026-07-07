@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Fingerprint, Lock, ChevronUp, ChevronDown, ChevronRight, LayoutGrid, Palette, TriangleAlert } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronRight, LayoutGrid, Palette, TriangleAlert } from "lucide-react";
 import { BOTONES_TPV } from "../../tpv/components/ColumnaFunciones";
 import { getSetting, setSetting } from "../../lib/settings";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
@@ -11,8 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { registrarPasskey, passkeysSoportadas } from "@/lib/passkeys";
 import { PageHeader } from "@/components/ui/page-header";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -36,33 +34,6 @@ export default function Ajustes() {
   const [sin0069, setSin0069] = useState(false);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [pkMsg, setPkMsg] = useState("");
-  const [pkBusy, setPkBusy] = useState(false);
-  // Bloqueo combinable: al cerrar cuenta Y/O por inactividad (el botón "Bloquear"
-  // manual del TPV está siempre disponible, independiente de esto).
-  const [bloqueo, setBloqueo] = useState<{ alCobrar: boolean; inactividad: boolean; segundos: number }>({ alCobrar: false, inactividad: false, segundos: 120 });
-  const [bloqueoMsg, setBloqueoMsg] = useState("");
-
-  useEffect(() => {
-    getSetting<{ modo?: string; alCobrar?: boolean; inactividad?: boolean; segundos?: number }>("tpv.bloqueo")
-      .then((c) => {
-        if (!c) return;
-        if (c.alCobrar !== undefined || c.inactividad !== undefined) {
-          // formato nuevo (flags)
-          setBloqueo({ alCobrar: !!c.alCobrar, inactividad: !!c.inactividad, segundos: c.segundos ?? 120 });
-        } else {
-          // formato antiguo { modo } → flags
-          setBloqueo({ alCobrar: c.modo === "al_cobrar", inactividad: c.modo === "inactividad", segundos: c.segundos ?? 120 });
-        }
-      })
-      .catch(() => { /* sin config */ });
-  }, []);
-
-  async function guardarBloqueo() {
-    try { await setSetting("GLOBAL", "tpv.bloqueo", bloqueo); setBloqueoMsg("Guardado ✓"); }
-    catch (e) { setBloqueoMsg(`Error: ${e instanceof Error ? e.message : e}`); }
-  }
 
   // Orden de la columna de funciones del TPV
   const [ordenBtns, setOrdenBtns] = useState<{ id: string; label: string }[]>(BOTONES_TPV);
@@ -83,18 +54,6 @@ export default function Ajustes() {
   async function guardarOrden() {
     try { await setSetting("GLOBAL", "tpv.funciones.orden", ordenBtns.map((b) => b.id)); setOrdenMsg("Guardado ✓"); }
     catch (e) { setOrdenMsg(`Error: ${e instanceof Error ? e.message : e}`); }
-  }
-
-  useEffect(() => setMounted(true), []);
-
-  async function onRegistrarPasskey() {
-    setPkBusy(true); setPkMsg("");
-    try {
-      const { error } = await registrarPasskey(sb);
-      setPkMsg(error ? `Error: ${error.message}` : "Passkey registrada ✓ Ya puedes entrar con huella/Face ID.");
-    } catch {
-      setPkMsg("Tu dispositivo no permitió crear la passkey.");
-    } finally { setPkBusy(false); }
   }
 
   useEffect(() => {
@@ -260,40 +219,6 @@ export default function Ajustes() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><Lock className="h-4 w-4" /> Bloqueo del TPV</CardTitle>
-          <CardDescription>Cuándo se pone el velo de bloqueo del TPV (se re-identifica con PIN o pulsera; la cuenta en curso se conserva). El botón «Bloquear» del TPV está siempre disponible.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2">
-            <div>
-              <div className="text-sm font-medium">Al terminar cada cuenta</div>
-              <div className="text-xs text-muted-foreground">Tras cobrar, pide el camarero para la siguiente venta.</div>
-            </div>
-            <Switch checked={bloqueo.alCobrar} onCheckedChange={(v) => setBloqueo((b) => ({ ...b, alCobrar: v }))} aria-label="Bloquear al terminar cada cuenta" />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2">
-            <div>
-              <div className="text-sm font-medium">Por inactividad</div>
-              <div className="text-xs text-muted-foreground">Pone el velo tras un rato sin tocar la pantalla.</div>
-            </div>
-            <Switch checked={bloqueo.inactividad} onCheckedChange={(v) => setBloqueo((b) => ({ ...b, inactividad: v }))} aria-label="Bloquear por inactividad" />
-          </div>
-          {bloqueo.inactividad && (
-            <div className="flex items-center gap-2 pl-3 text-sm">
-              <Label>Bloquear tras</Label>
-              <Input type="number" min={15} className="w-24" value={bloqueo.segundos} onChange={(e) => setBloqueo((b) => ({ ...b, segundos: Number(e.target.value) || 120 }))} />
-              <span className="text-muted-foreground">segundos sin actividad</span>
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" onClick={guardarBloqueo}>Guardar</Button>
-            {bloqueoMsg && <span className="text-sm text-muted-foreground">{bloqueoMsg}</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4" /> Orden de botones del TPV</CardTitle>
           <CardDescription>Ordena la columna de funciones de la pantalla de venta (Aparcar, Dividir, Cliente…).</CardDescription>
         </CardHeader>
@@ -315,22 +240,6 @@ export default function Ajustes() {
         </CardContent>
       </Card>
 
-      {mounted && passkeysSoportadas() && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base"><Fingerprint className="h-4 w-4" /> Seguridad · acceso rápido</CardTitle>
-            <CardDescription>Registra una passkey para entrar con huella, Face ID o Windows Hello en este dispositivo, sin escribir la contraseña.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="outline" onClick={onRegistrarPasskey} disabled={pkBusy}>
-                <Fingerprint className="h-4 w-4" /> {pkBusy ? "Registrando…" : "Registrar passkey"}
-              </Button>
-              {pkMsg && <span className="text-sm text-muted-foreground">{pkMsg}</span>}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

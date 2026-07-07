@@ -44,6 +44,7 @@ export const NAV: NavEntry[] = [
     ] },
     { title: "Usuarios", items: [
       { href: "/perfiles", label: "Perfiles y permisos", roles: PROP }, { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
+      { href: "/seguridad", label: "Seguridad", roles: PROP },
     ] },
     { title: "Catalogo", items: [
       { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST }, { href: "/familias", label: "Familias", roles: GEST },

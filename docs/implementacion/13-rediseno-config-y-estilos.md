@@ -41,6 +41,14 @@ componentes compartidos en `apps/web/components/`.
   páginas sale de `NAV`, los datos por consulta a Supabase (debounce).
 - **Aceptación:** `Ctrl/⌘+K` abre el modal desde cualquier página; teclear
   «product…» lista páginas y productos; Enter navega; Esc cierra.
+- **Estado:** ✅ v1 hecho (`components/command-palette.tsx`, montado en el layout;
+  busca páginas de `NAV` + productos/familias/categorías; alto fijo 498px / móvil 70vh).
+- **Pendiente v2 (buscador completo):** que además indexe y encuentre
+  **opciones de configuración/ajustes** (p. ej. teclear «ticket de impresora» lleva
+  a la config de impresión, «bloqueo» a Seguridad…) y **sesiones/registros**
+  (docs/sesiones, auditoría). Idea: catálogo de opciones de config con
+  `{ label, keywords, href }` + índice de sesiones; agrupar resultados por tipo
+  (Página · Configuración · Producto · Sesión…). Pedido por el usuario 07-07-2026.
 
 > Nota: hoy las notificaciones ya son **Sileo** (`app/lib/toast.ts`, título corto
 > + detalle en el contenido, arriba a la derecha), el tema es claro/oscuro por
