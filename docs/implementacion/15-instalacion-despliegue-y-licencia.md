@@ -39,6 +39,31 @@ servicios (impresión compartida, backup, y en fase 2 cache LAN) pero **su caíd
 no impide vender** desde los demás. Diferencia deliberada con Ágora, donde el
 equipo maestro es la verdad y si muere, el local para.
 
+### 1.1 ¿Quién se conecta a qué IP? (la pregunta clave)
+
+**Ningún aparato se conecta a la IP de un TPV.** No existe "la IP del TPV 1" a
+la que apuntar el monitor de cocina. Todos los aparatos abren la **misma
+dirección** (la web de la aplicación) y es la nube quien los une en tiempo real:
+
+| Aparato | Se conecta a | Ejemplo |
+|---|---|---|
+| TPV (Gluuh Desktop) | URL del servidor (`config.json → servidor`) | `https://app.gluuh.com` |
+| **Monitor de cocina** | **la MISMA URL**, ruta `/cocina` | `https://app.gluuh.com/cocina` |
+| Comandera móvil | ídem, `/comandera` | — |
+| Kiosko / pantalla / cartelería | ídem, su ruta | — |
+| **Impresoras** | ← a ellas se conectan los equipos, por **IP fija de LAN, puerto 9100** | `192.168.1.201:9100` |
+
+Las únicas IPs que hay que apuntar en el local son las de las **impresoras**
+(Ethernet con IP fija o reserva DHCP). El monitor de cocina recibe las comandas
+por realtime desde la nube, no "desde un TPV": puedes apagar los 3 TPV y el KDS
+sigue recibiendo lo que manden las comanderas.
+
+**Fase 2 (servidor local / offline):** cuando exista el nodo del local, la URL
+para los aparatos de la LAN pasa a ser `http://IP-del-principal:3100`
+(autodescubierta por mDNS para no teclearla) y la nube queda detrás. El esquema
+no cambia — sigue sin haber conexiones TPV↔TPV; solo cambia **qué servidor
+sirve la web**.
+
 ---
 
 ## 2. Alta del cliente (lo hace Gluuh, nunca el cliente)
@@ -63,6 +88,49 @@ pendiente §11.2):
 > Estado: hecho (migración 0078 + `/admin` + `/instalar`). Pendiente: alta con
 > usuario+password en vez de email (decisión §11.2) y separar `/admin` a su
 > dominio (§11.1).
+
+### 2.1 La instalación en el local, paso a paso (guion del instalador)
+
+Con el pack de entrega en la mano, en **cada equipo** del local:
+
+```
+PASO 1 — Poner la app
+  PC de barra    → instalar Gluuh Desktop (.exe); arranca a la URL de serie
+  Cocina/kiosko  → navegador a la URL en pantalla completa (modo kiosk)
+  Móvil camarero → abrir la URL → "Añadir a pantalla de inicio" (PWA)
+
+PASO 2 — CÓDIGO DE INSTALACIÓN (una vez por equipo; lo teclea el instalador)
+  /instalar → 0000-0000-00000-0000-0000 → el equipo queda FIJADO a la empresa
+  ✔ Recordado PARA SIEMPRE (sobrevive reinicios y cierres)
+  ✘ Solo se cambia metiendo OTRO código válido — es decir, solo el técnico
+
+PASO 3 — IDENTIDAD DEL DISPOSITIVO (una vez por pantalla)
+  Backoffice → Dispositivos → Nuevo: nombre tpv_1 / tpv_2 / tpv_3 /
+  cocina_1 / kiosko_1…, módulo (TPV·KDS·COMANDERA·PANTALLA…) y su
+  estación/barra → sale un CÓDIGO DE 6 DÍGITOS (un solo uso, 10 min):
+  el "password de arranque" del dispositivo.
+  En el aparato: /conectar → teclearlo → guarda su credencial y salta
+  a su pantalla.
+  ✔ SIEMPRE conectado desde entonces (credencial de dispositivo persistente;
+    no caduca en uso, no se vuelve a pedir)
+  ✔ Robo/pérdida → se revoca desde el panel, sin tocar el aparato
+  ↻ ¿Formateo o borraron datos del navegador? Botón «Reconectar» en
+    Dispositivos → nuevo código para EL MISMO tpv_1 (conserva nombre,
+    estación e impresoras)
+
+PASO 4 — LOGIN DE OPERARIO (lo único del día a día)
+  Primera vez: tecnico / 1212 (probar todo) → luego cada camarero su clave.
+  La sesión del EQUIPO queda recordada; el cambio de camarero dentro del
+  TPV es por PIN rápido, sin cerrar la sesión del aparato. El TPV nunca
+  amanece deslogueado.
+```
+
+**Por qué el dispositivo NO lleva "usuario `tpv_1` + password fija"**: una
+password fija por aparato acaba en un post-it pegado al monitor y no se puede
+revocar sin cambiarla en todos. El **código de un solo uso** hace exactamente lo
+mismo (arrancar el aparato una vez) y deja el control en el panel: revocar y
+reconectar sin tocar contraseñas. El **nombre** sí es `tpv_1`, `tpv_2`,
+`cocina_1`… — autonumerado por tipo (GAP #14).
 
 ---
 
@@ -174,6 +242,35 @@ Con esto: cualquier terminal imprime en cualquier impresora, con cola, estado
 y reintentos visibles. (Las "Herramientas de impresión" de Ágora — test de
 tickets/etiquetas, cambiar impresora — se convierten en una sección de la Zona
 técnica: probar impresora, ver cola, reimprimir último.)
+
+### 6.1 Enrutado multi-barra: qué destino recibe cada línea (y con su mesa)
+
+La comandera **no elige impresora**: el camarero marca la **mesa** y envía.
+Cada **línea** de la comanda lleva su **estación** (heredada del producto o su
+categoría: COCINA/BARRA/…) y la comanda entera lleva **mesa + zona del plano +
+camarero + hora + notas**. El enrutado decide el destino con una regla
+configurable **estación × zona → impresora** (tabla `print_route`, GAP #13):
+
+| Estación de la línea | Zona de la mesa | Sale por |
+|---|---|---|
+| COCINA | (cualquiera) | **KDS cocina** (pantalla) + impresora cocina |
+| BARRA | Terraza → asignada a barra 1 | Impresora **barra 1** |
+| BARRA | Salón → asignada a barra 2 | Impresora **barra 2** |
+| BARRA | Reservado → asignada a barra 3 | Impresora **barra 3** |
+| (sin regla de zona) | — | Impresora por defecto de la estación |
+
+- La relación **zona → barra** se configura una vez en el backoffice (al crear
+  las zonas del plano se elige qué barra las sirve). Una mesa de la Terraza
+  pide 2 cañas y una hamburguesa → las cañas salen impresas en barra 1, la
+  hamburguesa en el KDS + impresora de cocina, y **ambas comandas llevan
+  "Mesa T4 · Terraza · Marta · 21:32"**.
+- ¿Forzar destino puntual (una ronda que prepara otra barra)? Selector
+  "enviar a…" opcional en el TPV — la excepción, no la norma.
+- **Varias pantallas**: puede haber un KDS por estación (cocina_1, barra_1…);
+  cada monitor se empareja con su estación y filtra solo lo suyo (ya soportado
+  por `device.estacion`, guía 10).
+- Los 4 tipos de ticket (cliente/pedido/camarero/cocinero) y su contenido
+  exacto están en la guía 10.
 
 ---
 
@@ -296,6 +393,9 @@ pieza gorda que decide "funciona sin fibra", y conviene calendarizarla.
 | 10 | **Límites por módulo** (`licencia_limites` jsonb: nº dispositivos, como el "8" de Ágora) | Vender por tamaño de local | 1 d | P2 |
 | 11 | **Offline real (PowerSync, guía 06)** | Vender sin internet | 2-3 sem | P1★ decidir fecha |
 | 12 | **Servicio Windows dedicado** (doc infraestructura) | Nodo del local robusto (arranque automático sin sesión) | 1-2 sem | P2 (con clientes reales) |
+| 13 | **Enrutado por zona** (`print_route`: estación × zona → impresora + zona→barra en el plano) | Multi-barra: cada sala imprime en SU barra, con la mesa en la comanda | 1-2 d | P0 (junto al 4) |
+| 14 | **Dispositivos: autonombre `tpv_N`/`cocina_N` + botón «Reconectar»** (nuevo código, misma identidad) | Instalar y reinstalar sin fricción, sin passwords fijas por aparato | 0,5 d | P1 |
+| 15 | **Sesión de equipo persistente** (instalación+dispositivo+sesión recordadas; cambio de camarero por PIN sin desloguear el aparato) | El TPV nunca amanece desconectado | 0,5 d | P1 |
 
 ## 12. Decisiones pendientes (bloquean los cambios 1-2)
 
@@ -314,4 +414,8 @@ pieza gorda que decide "funciona sin fibra", y conviene calendarizarla.
 del cliente aunque conozca la ruta; (b) alta de empresa entrega el pack completo
 y el cliente entra con usuario+password que cambia; (c) "Acerca de" muestra
 empresa, código, módulos y caducidad reales; (d) una comanda enviada desde un
-móvil emparejado sale por la impresora de cocina con la cola compartida.*
+móvil emparejado sale por la impresora de cocina con la cola compartida;
+(e) una mesa de una zona asignada a barra 2 imprime sus bebidas en la impresora
+de barra 2 con "Mesa · Zona · Camarero · Hora"; (f) tras reiniciar cualquier
+equipo, arranca en su pantalla sin pedir nada (instalación, dispositivo y
+sesión recordados).*
