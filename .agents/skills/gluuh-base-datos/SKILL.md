@@ -15,9 +15,16 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0077`
-   —login local por **usuario** (`app_user.usr_app` normalizado) + clave; `0073`/`0074`
-   `codigo`/`clave_hash`; `0071`/`0072` RLS con `operario_permite()`—, aplicadas).
+   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0078`
+   —**instalación por código**: `tenant.codigo_instalacion` único (4-4-5-4-4),
+   `handle_new_user` SOLO provisiona con `empresa_nombre` en metadata,
+   `verificar_clave_operario(p_tenant)` acotado a la empresa de la instalación,
+   `admin_sembrar_ejemplo()` (usuarios admin/camareros + catálogo demo);
+   `0077` login por `usr_app`; `0073`/`0074` `codigo`/`clave_hash`;
+   `0071`/`0072` RLS con `operario_permite()`—, aplicadas).
+   ⚠️ Pendiente 0078: el índice único `app_user_auth_user_id_unico` NO pudo
+   crearse (duplicado histórico del auth de Técnico); se crea al borrar el
+   tenant fantasma "Mi empresa" (limpieza pendiente de OK del usuario).
    Nueva migración = siguiente número libre + nombre descriptivo en snake_case.
    ⚠️ **`app_user.permisos` (0041) NUNCA se aplicó**: no existe en la BD. Los
    permisos viven SOLO en `perfil.permisos` (0048); el usuario los hereda por

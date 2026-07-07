@@ -14,7 +14,7 @@ const emailSintetico = (codigo: string, tenantId: string) =>
   `op.${codigo}.${tenantId.slice(0, 8)}@codigo.gluuh.local`;
 
 export async function POST(req: Request) {
-  const { usuario, clave } = await req.json().catch(() => ({}));
+  const { usuario, clave, tenant_id } = await req.json().catch(() => ({}));
   if (!usuario || !clave) return NextResponse.json({ error: "Falta el usuario o la clave" }, { status: 400 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,7 +22,13 @@ export async function POST(req: Request) {
   if (!url || !secret) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
 
   const admin = createClient(url, secret, { auth: { persistSession: false } });
-  const { data, error } = await admin.rpc("verificar_clave_operario", { p_usuario: String(usuario), p_clave: String(clave) });
+  // Instalación fijada a una empresa (0078): el operario SOLO puede entrar en su
+  // tenant, aunque usuario+clave coincidan en otra empresa.
+  const { data, error } = await admin.rpc("verificar_clave_operario", {
+    p_usuario: String(usuario),
+    p_clave: String(clave),
+    p_tenant: typeof tenant_id === "string" && tenant_id ? tenant_id : null,
+  });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const op = (Array.isArray(data) ? data[0] : data) as { id: string; tenant_id: string; nombre: string; codigo: string; auth_user_id: string | null } | undefined;
   if (!op) return NextResponse.json({ error: "Usuario o clave incorrectos" }, { status: 401 });

@@ -12,6 +12,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { traducirErrorAuth } from "@/lib/auth-errors";
 import { entrarConPasskey, passkeysSoportadas } from "@/lib/passkeys";
+import { leerInstalacion, type Instalacion } from "../lib/instalacion";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -24,8 +25,14 @@ export default function Login() {
   const [modo, setModo] = useState<"email" | "usuario">("email");
   const [usuario, setUsuario] = useState("");
   const [clave, setClave] = useState("");
+  // Instalación fijada a una empresa (0078): login por usuario acotado a su tenant.
+  const [instalacion, setInstalacion] = useState<Instalacion | null>(null);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    const i = leerInstalacion();
+    if (i) { setInstalacion(i); setModo("usuario"); }
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,7 +74,7 @@ export default function Login() {
       const r = await fetch("/api/entrar-operario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario: usuario.trim(), clave: clave.trim() }),
+        body: JSON.stringify({ usuario: usuario.trim(), clave: clave.trim(), tenant_id: instalacion?.tenantId ?? null }),
       });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "No se pudo entrar."); return; }
@@ -92,13 +99,19 @@ export default function Login() {
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">Iniciar sesión</CardTitle>
-            <CardDescription>Accede al panel de tu restaurante.</CardDescription>
+            <CardDescription>
+              {instalacion ? <>Equipo de <strong className="text-foreground">{instalacion.empresa}</strong>. Entra con tu usuario y clave.</> : "Accede al panel de tu restaurante."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex gap-0.5 rounded-md border border-border p-0.5 text-sm">
-              <button type="button" onClick={() => { setModo("email"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "email" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Email</button>
-              <button type="button" onClick={() => { setModo("usuario"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "usuario" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Usuario</button>
-            </div>
+            {/* Con instalación fijada no hay pestañas: el equipo es de UNA empresa y
+                se entra por usuario+clave (el acceso por email queda como enlace). */}
+            {!instalacion && (
+              <div className="mb-4 flex gap-0.5 rounded-md border border-border p-0.5 text-sm">
+                <button type="button" onClick={() => { setModo("email"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "email" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Email</button>
+                <button type="button" onClick={() => { setModo("usuario"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "usuario" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Usuario</button>
+              </div>
+            )}
 
             {modo === "email" ? (
               <form onSubmit={onSubmit} className="space-y-4">
@@ -133,6 +146,14 @@ export default function Login() {
 
             {error && <p className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
+            {instalacion && (
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                {modo === "usuario"
+                  ? <button type="button" className="hover:text-foreground hover:underline" onClick={() => { setModo("email"); setError(""); }}>Acceso con email (dueño / técnico)</button>
+                  : <button type="button" className="hover:text-foreground hover:underline" onClick={() => { setModo("usuario"); setError(""); }}>← Volver al acceso por usuario</button>}
+              </p>
+            )}
+
             {modo === "email" && mounted && passkeysSoportadas() && (
               <>
                 <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
@@ -145,9 +166,17 @@ export default function Login() {
             )}
           </CardContent>
         </Card>
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          ¿Tu restaurante aún no tiene acceso? <Link href="/registro" className="font-medium text-primary hover:underline">Solicítalo aquí</Link>
-        </p>
+        {instalacion ? (
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            ¿Cambiar la empresa de este equipo? <Link href="/instalar" className="hover:text-foreground hover:underline">Código de instalación</Link>
+          </p>
+        ) : (
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            ¿Tu restaurante aún no tiene acceso? <Link href="/registro" className="font-medium text-primary hover:underline">Solicítalo aquí</Link>
+            <br />
+            <Link href="/instalar" className="text-xs hover:text-foreground hover:underline">¿Equipo nuevo? Actívalo con tu código de instalación</Link>
+          </p>
+        )}
       </div>
     </main>
   );

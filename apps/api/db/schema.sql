@@ -49,6 +49,7 @@ CREATE TABLE tenant (
   clave_tecnica_hash text,         -- candado "Zona técnica" del backoffice, bcrypt (0045)
   licencia_hasta   date,                          -- caducidad de la licencia; NULL = sin licencia (0052)
   licencia_modulos text[] NOT NULL DEFAULT '{}',  -- módulos premium comprados (0052)
+  codigo_instalacion text,         -- nº de serie de la empresa (0000-0000-00000-0000-0000), único; fija cada instalación a su tenant (0078)
   activo        boolean NOT NULL DEFAULT true,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
