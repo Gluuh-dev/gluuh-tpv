@@ -37,7 +37,7 @@ export default function Inicio() {
     <main className="flex min-h-screen flex-col bg-background p-6 text-foreground">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-lg font-semibold">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand font-bold text-white">G</span>
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand font-bold text-brand-foreground">G</span>
           Gluuh <span className="text-muted-foreground">TPV</span>
           {empresa && <span className="ml-2 text-sm text-muted-foreground">· {empresa}</span>}
         </div>
@@ -53,7 +53,7 @@ export default function Inicio() {
             onClick={() => router.push("/tpv")}
             className="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-card p-10 shadow-sm transition-colors hover:border-brand hover:bg-brand/5"
           >
-            <span className="grid h-20 w-20 place-items-center rounded-2xl bg-brand text-white transition-transform group-hover:scale-105">
+            <span className="grid h-20 w-20 place-items-center rounded-2xl bg-brand text-brand-foreground transition-transform group-hover:scale-105">
               <ShoppingCart size={38} strokeWidth={1.5} />
             </span>
             <span className="text-xl font-semibold">TPV</span>

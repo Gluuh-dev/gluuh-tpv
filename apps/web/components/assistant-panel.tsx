@@ -58,7 +58,7 @@ function AssistantBody() {
             disabled={!value.trim()}
             title="Enviar mensaje"
             aria-label="Enviar mensaje"
-            className="w-8 h-8 rounded-full bg-brand text-white grid place-items-center disabled:opacity-40 hover:bg-brand-hover transition-colors"
+            className="w-8 h-8 rounded-full bg-brand text-brand-foreground grid place-items-center disabled:opacity-40 hover:bg-brand-hover transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -107,7 +107,7 @@ export function AssistantPanel() {
           onClick={toggle}
           title="Asistente (Ctrl+J)"
           aria-label="Asistente (Ctrl+J)"
-          className="fixed bottom-20 right-5 z-40 w-12 h-12 rounded-full shadow-lg ring-1 ring-border bg-brand text-white grid place-items-center hover:bg-brand-hover transition-colors"
+          className="fixed bottom-20 right-5 z-40 w-12 h-12 rounded-full shadow-lg ring-1 ring-border bg-brand text-brand-foreground grid place-items-center hover:bg-brand-hover transition-colors"
         >
           <Sparkles className="w-5 h-5" />
         </button>

@@ -119,7 +119,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       {/* Menú principal (rail): w-60 expandido · w-12 colapsado */}
       <nav className={`flex shrink-0 flex-col gap-0.5 border-r border-border bg-surface py-2 transition-all duration-300 ${railOpen ? "w-60 px-2" : "w-12 items-center"}`}>
         <div className={`mb-1 flex h-11 items-center gap-2 ${railOpen ? "px-1.5" : "justify-center"}`}>
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-brand text-[15px] font-bold text-white">G</div>
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-brand text-[15px] font-bold text-brand-foreground">G</div>
           {railOpen && <span className="text-[15px] font-semibold">Gluuh <span className="text-(--text-muted)">TPV</span></span>}
         </div>
         {nav.map((e) => {
@@ -186,7 +186,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <CommandPalette />
-            <a href="/tpv" className="flex h-7 items-center gap-1.5 rounded-md bg-brand px-2.5 font-medium text-white transition-colors hover:bg-brand-hover" title="Abrir la pantalla de venta">
+            <a href="/tpv" className="flex h-7 items-center gap-1.5 rounded-md bg-brand px-2.5 font-medium text-brand-foreground transition-colors hover:bg-brand-hover" title="Abrir la pantalla de venta">
               <Monitor className="h-4 w-4" /> <span className="hidden sm:inline">Ir al TPV</span>
             </a>
             <span className="hidden text-(--text-muted) sm:inline">{info?.nombre || info?.email}</span>
