@@ -412,10 +412,7 @@ export default function ProductoEditar() {
     <div className="w-full space-y-4 pb-16">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/productos" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Productos
-          </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo producto" : nombre || "Producto"}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo producto" : nombre || "Producto"}</h1>
         </div>
         {!esNuevo && (
           <Button variant="destructive" size="sm" onClick={eliminar}><Trash2 className="h-4 w-4" /> Eliminar</Button>

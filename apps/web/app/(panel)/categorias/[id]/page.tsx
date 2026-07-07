@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/app/lib/toast";
-import { ArrowLeft, Loader2, Trash2, TriangleAlert, Upload, X } from "lucide-react";
+import { Loader2, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { subirMedia } from "@/app/lib/branding";
 import { ESTACIONES, ESTACION_LABEL } from "@/app/lib/estaciones";
@@ -259,10 +259,7 @@ export default function CategoriaEditarPage() {
   return (
     <form onSubmit={guardar} className="w-full space-y-4 pb-16">
       <div>
-        <Link href="/categorias" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Categorías
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{esNueva ? "Nueva categoría" : nombre || "Editar categoría"}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{esNueva ? "Nueva categoría" : nombre || "Editar categoría"}</h1>
       </div>
 
       {sin0065 && (

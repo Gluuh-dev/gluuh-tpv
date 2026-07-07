@@ -4,8 +4,7 @@
 // permisos (catálogo agrupado + buscador). Insert si "nuevo", update si existe.
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Search, Trash2, TriangleAlert } from "lucide-react";
+import { Loader2, Search, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../../lib/supabaseBrowser";
 import { CATALOGO_PERMISOS, type MapaPermisos } from "../../../lib/permisos";
@@ -92,10 +91,7 @@ export default function PerfilEditarPage() {
   return (
     <form onSubmit={guardar} className="mx-auto w-full max-w-3xl space-y-4 pb-16">
       <div>
-        <Link href="/perfiles" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Perfiles
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo perfil" : nombre || "Editar perfil"}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo perfil" : nombre || "Editar perfil"}</h1>
       </div>
 
       <Card>

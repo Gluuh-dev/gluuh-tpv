@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert } from "lucide-react";
+import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronLeft } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type NavLink, type Rol } from "../lib/nav";
@@ -92,6 +92,17 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     return !(zonaOk && itemOk);
   }, [pathname, info]);
 
+  // Página de detalle: si la ruta es subruta de un item de menú (p. ej. /perfiles/xxx),
+  // la cabecera muestra «‹ volver + nombre de la lista» en vez de la hamburguesa.
+  const subpagina = useMemo(() => {
+    let item: NavLink | null = null;
+    let bestLen = -1;
+    for (const e of NAV) for (const sec of e.sections) for (const i of sec.items) {
+      if (i.href && pathname.startsWith(`${i.href}/`) && i.href.length > bestLen) { item = i; bestLen = i.href.length; }
+    }
+    return item?.href ? { volverA: item.href, titulo: item.label } : null;
+  }, [pathname]);
+
   async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
   function abrirEntrada(e: NavEntry) {
     setEntrada(e.id);
@@ -160,12 +171,18 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-surface px-3">
           <div className="flex items-center gap-1.5">
-            {!activa?.direct && (
-              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} onClick={toggleMenu}>
-                {menuOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            {subpagina ? (
+              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Volver" title="Volver" onClick={() => router.push(subpagina.volverA)}>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
+            ) : (
+              !activa?.direct && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} onClick={toggleMenu}>
+                  {menuOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                </Button>
+              )
             )}
-            <span className="text-[14px] font-semibold">{activa?.title}</span>
+            <span className="text-[14px] font-semibold">{subpagina ? subpagina.titulo : activa?.title}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <CommandPalette />

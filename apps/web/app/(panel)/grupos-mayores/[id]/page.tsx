@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/app/lib/toast";
-import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "../../../lib/supabaseBrowser";
 import { BuscarAnadir } from "@/components/buscar-anadir";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,10 +102,7 @@ export default function GrupoMayorEditarPage() {
   return (
     <form onSubmit={guardar} className="w-full space-y-4 pb-16">
       <div>
-        <Link href="/grupos-mayores" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Grupos mayores
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo grupo mayor" : nombre || "Editar grupo mayor"}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{esNuevo ? "Nuevo grupo mayor" : nombre || "Editar grupo mayor"}</h1>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
