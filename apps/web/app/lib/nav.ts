@@ -75,6 +75,7 @@ export const NAV: NavEntry[] = [
       { href: "/tipos-preparacion", label: "Tipos de preparacion", roles: GEST }, { href: "/ordenes-preparacion", label: "Ordenes de preparacion", roles: GEST }, { href: "/motivos-cancelacion", label: "Motivos de cancelacion", roles: GEST },
     ] },
     { title: "Tickets y entradas", items: [
+      { href: "/impresoras", label: "Impresoras", roles: GEST, perm: "tecnica" },
       { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST }, { href: "/plantillas-etiquetas", label: "Plantillas de etiquetas", roles: GEST },
       { href: "/plantillas-entradas", label: "Plantillas de entradas", roles: GEST }, { href: "/entradas", label: "Entradas", roles: GEST },
     ] },
