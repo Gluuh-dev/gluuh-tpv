@@ -71,8 +71,8 @@ export const NAV: NavEntry[] = [
     { title: "General", items: [{ href: "/almacenes", label: "Almacenes", roles: GEST }, { href: "/proveedores", label: "Proveedores", roles: GEST }, { href: "/unidades", label: "Unidades de medida", roles: GEST }] },
     { title: "Compras", items: [{ href: "/pedidos-a-proveedor", label: "Pedidos a proveedor", roles: GEST }, { href: "/albaranes-de-entrada", label: "Albaranes de entrada", roles: GEST }, { href: "/facturas-de-proveedor", label: "Facturas de proveedor", roles: GEST }] },
     { title: "Control de stock", items: [
-      { href: "/regularizacion-de-inventario", label: "Regularizacion de inventario", roles: GEST }, { href: "/variaciones-de-stock", label: "Variaciones de stock", roles: GEST }, { href: "/fabricaciones-escandallos", label: "Fabricaciones escandallos", roles: GEST },
-      { href: "/historico-de-movimientos", label: "Historico de movimientos", roles: GEST }, { href: "/cierres-de-almacen", label: "Cierres de almacen", roles: GEST },
+      { href: "/regularizacion-de-inventario", label: "Regularizacion de inventario", roles: GEST, perm: "compras.stock" }, { href: "/variaciones-de-stock", label: "Variaciones de stock", roles: GEST, perm: "compras.stock" }, { href: "/fabricaciones-escandallos", label: "Fabricaciones escandallos", roles: GEST, perm: "compras.stock" },
+      { href: "/historico-de-movimientos", label: "Historico de movimientos", roles: GEST, perm: "compras.stock" }, { href: "/cierres-de-almacen", label: "Cierres de almacen", roles: GEST, perm: "compras.stock" },
     ] },
     { title: "Herramientas", items: [{ href: "/exportar-productos", label: "Exportar productos", roles: GEST }, { href: "/aplicacion-web-almacen", label: "Aplicacion web almacen", roles: GEST }] },
   ] },
@@ -82,8 +82,8 @@ export const NAV: NavEntry[] = [
       { href: "/acciones-personalizadas", label: "Acciones personalizadas", roles: GEST }, { href: "/planos-de-mesas", label: "Planos de mesas", roles: GEST },
     ] },
     { title: "Precios", items: [
-      { href: "/exportar-precios", label: "Exportar precios Excel", roles: GEST }, { href: "/importar-precios", label: "Importar precios Excel", roles: GEST }, { href: "/modificacion-global-de-precios", label: "Modificacion global de precios", roles: GEST },
-      { href: "/ajustar-margenes", label: "Ajustar margenes", roles: GEST }, { href: "/programacion-de-tarifas", label: "Programacion de tarifas", roles: GEST },
+      { href: "/exportar-precios", label: "Exportar precios Excel", roles: GEST, perm: "herramientas.precios" }, { href: "/importar-precios", label: "Importar precios Excel", roles: GEST, perm: "herramientas.precios" }, { href: "/modificacion-global-de-precios", label: "Modificacion global de precios", roles: GEST, perm: "herramientas.precios" },
+      { href: "/ajustar-margenes", label: "Ajustar margenes", roles: GEST, perm: "herramientas.precios" }, { href: "/programacion-de-tarifas", label: "Programacion de tarifas", roles: GEST, perm: "herramientas.precios" },
     ] },
     { title: "VERI*FACTU", items: [{ href: "/visor-de-verifactu", label: "Visor de Verifactu", roles: PROP, perm: "admin.fiscal" }, { href: "/configuracion-verifactu", label: "Configuracion Verifactu", roles: PROP, perm: "admin.fiscal" }] },
     // Zona tecnica: paginas que configura el instalador (candado con clave tecnica).
@@ -95,8 +95,8 @@ export const NAV: NavEntry[] = [
     { title: "Control de efectivo", items: [{ href: "/caja", label: "Caja", roles: GEST }, { href: "/configuracion-de-caja", label: "Configuracion de caja", roles: PROP }] },
     { title: "Pasarela de pago", items: [{ href: "/configuracion-de-pago", label: "Configuracion de pago", roles: GEST }, { href: "/cobro-en-mesa", label: "Cobro en mesa", roles: GEST }] },
     { title: "Cartas digitales", items: [
-      { href: "/personalizar", label: "Marca y carteleria", roles: PROP }, { href: "/traducciones", label: "Traducciones", roles: GEST },
-      { href: "/pago-y-pedidos-qr", label: "Pago y pedidos QR", roles: GEST }, { href: "/generar-qrs", label: "Generar QRs", roles: GEST },
+      { href: "/personalizar", label: "Marca y carteleria", roles: PROP, perm: "cartas" }, { href: "/traducciones", label: "Traducciones", roles: GEST, perm: "cartas" },
+      { href: "/pago-y-pedidos-qr", label: "Pago y pedidos QR", roles: GEST, perm: "cartas" }, { href: "/generar-qrs", label: "Generar QRs", roles: GEST, perm: "cartas" },
     ] },
     { title: "Otros", items: [{ href: "/auditoria", label: "Auditoria", roles: PROP }] },
   ] },

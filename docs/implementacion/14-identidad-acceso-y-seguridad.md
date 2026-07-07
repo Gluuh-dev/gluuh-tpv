@@ -49,8 +49,10 @@ Grupos actuales (todos aplican de verdad):
   TPV los respeta con `puede(k)`.
 - **Zonas del panel**: `panel.operativa|admin|compras|herramientas|informes` — ocultan
   la zona del menú **y bloquean el acceso directo por URL** a sus páginas.
-- **Áreas sensibles**: `admin.usuarios`, `admin.catalogo`, `admin.fiscal`, `tecnica`
-  — marcan páginas concretas (campo `perm` en `lib/nav`); bloquean solo esas páginas.
+- **Por aplicación** (marcan páginas concretas, campo `perm` en `lib/nav`; bloquean
+  solo esas páginas): `admin.usuarios`, `admin.catalogo`, `admin.fiscal`
+  (Administración) · `compras.stock` (Control de stock) · `tecnica`,
+  `herramientas.precios`, `cartas` (Herramientas).
 
 Cada enlace del menú lleva su zona (por la entrada) y opcionalmente un `perm`; el
 **guardián de ruta** del layout muestra «Sin acceso» aunque escribas la URL. El

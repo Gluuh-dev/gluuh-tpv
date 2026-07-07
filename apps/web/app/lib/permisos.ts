@@ -36,12 +36,25 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
     ],
   },
   {
-    grupo: "Áreas sensibles (dentro de Administración)",
+    grupo: "Administración",
     permisos: [
       { id: "admin.usuarios", label: "Usuarios, perfiles y puntos de venta" },
       { id: "admin.catalogo", label: "Catálogo (familias, productos, precios)" },
       { id: "admin.fiscal", label: "Impuestos, series y VERI·FACTU" },
+    ],
+  },
+  {
+    grupo: "Compras y stock",
+    permisos: [
+      { id: "compras.stock", label: "Control de stock (inventario, movimientos, cierres)" },
+    ],
+  },
+  {
+    grupo: "Herramientas",
+    permisos: [
       { id: "tecnica", label: "Zona técnica (impresión, módulos, copias)" },
+      { id: "herramientas.precios", label: "Herramientas de precios (importar/exportar, márgenes)" },
+      { id: "cartas", label: "Cartas digitales (marca, traducciones, QR)" },
     ],
   },
 ];
