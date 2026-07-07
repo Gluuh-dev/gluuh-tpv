@@ -58,11 +58,19 @@ Las únicas IPs que hay que apuntar en el local son las de las **impresoras**
 por realtime desde la nube, no "desde un TPV": puedes apagar los 3 TPV y el KDS
 sigue recibiendo lo que manden las comanderas.
 
-**Fase 2 (servidor local / offline):** cuando exista el nodo del local, la URL
-para los aparatos de la LAN pasa a ser `http://IP-del-principal:3100`
-(autodescubierta por mDNS para no teclearla) y la nube queda detrás. El esquema
-no cambia — sigue sin haber conexiones TPV↔TPV; solo cambia **qué servidor
-sirve la web**.
+**Modo restaurante (OBJETIVO, decisión 07-07): los TPV NO dependen de
+internet.** Requisito de negocio: el local no puede dejar de vender por un corte
+de fibra. Por eso el despliegue estándar de un restaurante multi-terminal lleva
+**nodo local**: el PC principal (Servicio Gluuh) **sirve la app en LAN** y todos
+los aparatos se conectan a él — `http://IP-del-principal:3100`, autodescubierta
+por mDNS — no a internet. El nodo sincroniza con la nube cuando hay conexión;
+sin internet se vende, se comanda (móvil→KDS por Ethernet), se imprime y se
+cobra, y todo sube al reconectar. Sigue sin haber conexiones TPV↔TPV (todos
+hablan con el nodo), y la nube sigue siendo la verdad canónica: el nodo es un
+**espejo que manda en el local**, no la única copia (diferencia clave con
+Ágora: si muere el nodo, los terminales pueden tirar de nube y los datos están
+a salvo). Hasta que el nodo exista (GAP #11, la pieza grande), el modo es nube
+con **router 4G de respaldo** recomendado.
 
 ---
 
@@ -354,26 +362,32 @@ módulos; el cliente lo ve reflejado en Acerca de. (El canje de códigos
 
 ## 10. ¿Hace falta levantar un servicio central en el local?
 
-**Respuesta corta: hoy NO — y es una ventaja, no una carencia.**
+**Respuesta (decisión 07-07): SÍ — el nodo local es el estándar del restaurante
+multi-terminal, porque los TPV no deben depender de internet.** Pero al estilo
+Gluuh, no al de Ágora: el nodo **manda en el local** (sirve la app, los datos y
+el realtime por LAN) pero **no es la única copia** — sincroniza con la nube,
+que sigue siendo la verdad canónica.
 
-| | Ágora (equipo maestro) | Gluuh (hoy) | Gluuh (fase 2) |
+| | Ágora (equipo maestro) | Gluuh (interino, hasta el nodo) | **Gluuh (objetivo: nodo local)** |
 |---|---|---|---|
-| ¿Dónde está la BD del negocio? | En el PC maestro del local | En la nube | En la nube + réplica local (PowerSync) |
-| ¿Los TPV dependen de un equipo central? | **Sí** — si muere, el local para | **No** — cada uno habla con la nube | No — el nodo es mejora, no requisito |
-| ¿Qué hace el "equipo principal"? | Todo (BD, licencia, servidores :8983/:8984) | Impresión local + cajón + backup diario | + despachador `print_job` + cache LAN + puente hardware, como **Servicio Windows** con arranque automático |
-| ¿Sin internet? | Vende en LAN | ❌ no vende (limitación honesta actual) | ✅ vende offline y vuelca al volver (guía 06) |
+| ¿A qué se conectan los TPV/KDS/móviles? | Al maestro por IP:puerto | A la nube (URL) | **Al nodo por LAN** (`http://IP-principal:3100`, mDNS) |
+| ¿Dónde está la BD del negocio? | En el PC maestro (única) | En la nube | En la nube **+ espejo completo en el nodo** |
+| ¿Sin internet? | ✅ vende en LAN | ❌ no vende → **router 4G de respaldo obligatorio** | ✅ vende, comanda, imprime y cobra en LAN; encola y sube al volver (VERIFACTU se remite al reconectar) |
+| ¿Muere el equipo central? | ❌ el local se para; datos = último backup | (no aplica) | ✅ los terminales tiran de nube; no se pierde nada |
+| ¿Qué corre en el PC principal? | Todo (BD, licencia, :8983/:8984) | Desktop: impresión + cajón + backup diario | **Servicio Gluuh** (Windows Service, arranca al reiniciar sin sesión): web LAN + datos + realtime + print server + backup + sync |
 
-El papel de "servicio central" lo cumple gradualmente el **PC principal con
-Gluuh Desktop**: ya hace cola de impresión y backup; con §6 despachará la
-impresión de todo el local. El **Servicio Windows dedicado** (instalador MSI,
-arranque con el sistema sin sesión, auto-update firmado, mDNS) está diseñado en
-`docs/referencia/infraestructura/servicio-local-pc.md` y se aborda cuando haya
-clientes reales instalados — no antes, porque la app desktop cubre el papel.
+Camino de construcción (el nodo es LA pieza grande — 3-6 semanas):
 
-**La dependencia crítica real es internet** → la respuesta correcta no es una
-BD central en el PC (modelo con fecha de caducidad por VERIFACTU 2027), sino
-el **offline-first de la guía 06** (réplica SQLite por dispositivo). Esa es la
-pieza gorda que decide "funciona sin fibra", y conviene calendarizarla.
+1. **Ya construido y reutilizable**: cola de impresión persistente, backup
+   diario, emparejado de dispositivos, config `servidor` en Desktop (apuntar
+   los aparatos al nodo es cambiar esa URL).
+2. **Nodo v1** (guías 06 + `servicio-local-pc.md`): el PC principal sirve la
+   web en LAN + espejo de datos del tenant + realtime local + sync bidireccional
+   con numeración offline (`number_range`) e idempotencia. Empaquetado primero
+   dentro de Gluuh Desktop (proceso del TPV principal), después como **Servicio
+   Windows** con instalador y arranque automático (GAP #12).
+3. **Interino mientras tanto**: modo nube + router 4G de respaldo (~30 €/mes) —
+   el mismo respaldo que instalan los distribuidores de Ágora.
 
 ---
 
@@ -391,8 +405,8 @@ pieza gorda que decide "funciona sin fibra", y conviene calendarizarla.
 | 8 | **Refresco automático del catálogo del TPV** (realtime/focus) | Cambios desde casa aparecen sin recargar | 0,5-1 d | P1 |
 | 9 | **Auto-update de Gluuh Desktop** (electron-updater) | Parque actualizado sin visitas | 1-2 d | P1 |
 | 10 | **Límites por módulo** (`licencia_limites` jsonb: nº dispositivos, como el "8" de Ágora) | Vender por tamaño de local | 1 d | P2 |
-| 11 | **Offline real (PowerSync, guía 06)** | Vender sin internet | 2-3 sem | P1★ decidir fecha |
-| 12 | **Servicio Windows dedicado** (doc infraestructura) | Nodo del local robusto (arranque automático sin sesión) | 1-2 sem | P2 (con clientes reales) |
+| 11 | **Nodo local del restaurante** (el PC principal sirve app + datos + realtime en LAN y sincroniza con la nube; PowerSync + `number_range`, guías 06 + `servicio-local-pc.md`) | **Vender/comandar/imprimir SIN internet** — requisito del negocio: los TPV se conectan al nodo, no a internet | 3-6 sem | **P0★ — la pieza grande, calendarizar** |
+| 12 | **Empaquetar el nodo como Servicio Windows** (instalador MSI, arranque al reiniciar sin sesión, auto-update firmado, mDNS) | Nodo robusto de producción (v1 puede vivir dentro de Gluuh Desktop del equipo principal) | 1-2 sem | P1 (tras el 11) |
 | 13 | **Enrutado por zona** (`print_route`: estación × zona → impresora + zona→barra en el plano) | Multi-barra: cada sala imprime en SU barra, con la mesa en la comanda | 1-2 d | P0 (junto al 4) |
 | 14 | **Dispositivos: autonombre `tpv_N`/`cocina_N` + botón «Reconectar»** (nuevo código, misma identidad) | Instalar y reinstalar sin fricción, sin passwords fijas por aparato | 0,5 d | P1 |
 | 15 | **Sesión de equipo persistente** (instalación+dispositivo+sesión recordadas; cambio de camarero por PIN sin desloguear el aparato) | El TPV nunca amanece desconectado | 0,5 d | P1 |
@@ -407,6 +421,10 @@ pieza gorda que decide "funciona sin fibra", y conviene calendarizarla.
 3. **Backoffice del cliente**: ¿solo en la nube (`app.gluuh.com`) y la app
    instalada solo operativa (TPV/cocina/comandera)? → Es lo que dice CLAUDE.md
    y el modelo de este doc; **confirmar** porque condiciona el instalador.
+4. **Calendario del nodo local (GAP #11)**: ¿se construye ANTES de instalar al
+   primer cliente (retrasa la salida ~1 mes pero cumple "sin internet" desde el
+   día 1), o el piloto sale en modo nube + router 4G y el nodo llega en la
+   siguiente versión? → Decisión de negocio pura; lo técnico está diseñado.
 
 ---
 
