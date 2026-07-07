@@ -15,9 +15,9 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0069`,
-   aplicada). Nueva migración = siguiente número libre + nombre descriptivo
-   en snake_case.
+   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0070`
+   —`app_user.perfil_id`—, aplicada). Nueva migración = siguiente número libre +
+   nombre descriptivo en snake_case.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
    delete cascade` + RLS** con `current_tenant_id()` (patrón de cualquier tabla
    de `0001_init.sql`). El trigger `set_tenant_id()` (`0004`) autorrellena el

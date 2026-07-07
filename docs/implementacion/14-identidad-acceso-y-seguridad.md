@@ -38,29 +38,32 @@ Gestión: página **`/empleados`** («Usuarios y PIN»): alta (`crear_empleado`)
 editar nombre/email/rol/activo/permisos, cambiar PIN (`cambiar_pin`), asignar/quitar
 pulsera (`asignar_pulsera`), y desbloquear intentos.
 
-## A.2 · Permisos de operario — los 5 flags
-`app_user.permisos` (jsonb, `0041`); mismas claves que `perfil.permisos` (`0048`):
+## A.2 · Permisos — catálogo estilo Ágora (`app/lib/permisos.ts`)
+`app_user.permisos` (jsonb, `0041`) y `perfil.permisos` (`0048`) guardan un mapa
+`{ id: permitido }`. El **catálogo** de ids (igual para todos los clientes) vive en
+**código** (`app/lib/permisos.ts`), agrupado por *aplicación* (permiso = aplicación
+× acción, como Ágora). Semántica: ausente o `true` = **permitido**; `false` = bloqueado.
 
-| clave | qué permite |
-|---|---|
-| `modificar` | Modificar la cuenta (cantidades, precio, notas) |
-| `descuento` | Aplicar descuentos |
-| `borrar` | Borrar / anular cuenta |
-| `invitar` | Invitaciones y consumo propio |
-| `cobrar` | Cobrar |
+Grupos actuales (los que ya se aplican de verdad):
+- **Punto de venta**: `modificar`, `descuento`, `borrar`, `invitar`, `cobrar` — el
+  TPV los respeta con `puede(k)`.
+- **Acceso al panel**: `panel.operativa|admin|compras|herramientas|informes` — el
+  layout oculta esa zona del menú si está a `false`.
 
-Se aplican **solo en el TPV**: `puede(k)` gatea esos botones/acciones. Sin el flag,
-el TPV bloquea esa acción a ese operario. (En el panel **no** intervienen.)
+Se añaden más grupos conforme se cablea su aplicación (caja, almacén, informes…).
 
-## A.3 · Perfiles — tabla `perfil`
-- `perfil` (`0020`) + `permisos` jsonb (`0048`): CRUD real en **`/perfiles`**
-  (nombre, descripción y los 5 flags de A.2).
-- **Uso hoy = plantilla**: en `/empleados`, «Aplicar perfil…» **copia**
-  `perfil.permisos` dentro de `app_user.permisos` (una sola vez).
-- **Límite**: no hay `app_user.perfil_id`, así que el perfil **no queda vinculado**
-  al empleado (si luego cambias el perfil, los empleados ya «aplicados» no se
-  actualizan). `perfil.permisos` **no se lee en runtime**; el TPV solo mira
-  `app_user.permisos`.
+> El **PDF del manual de Ágora NO enumera** el catálogo permiso-a-permiso (solo la
+> mecánica y 3 perfiles: Administrador/Encargado/Camarero + algún permiso suelto).
+> Por eso el catálogo lo definimos nosotros con su estructura y lo ampliamos.
+
+## A.3 · Perfiles — tabla `perfil` · ✅ vinculados 07-07-2026
+- `perfil` (`0020`) + `permisos` jsonb (`0048`): CRUD en **`/perfiles`**, ahora como
+  **matriz estilo Ágora** (permisos agrupados por aplicación + buscador + copiar perfil).
+- **Vínculo real (`0070`)**: `app_user.perfil_id` liga el operario a su perfil. En
+  `/empleados`, asignar un perfil **copia** `perfil.permisos` a `app_user.permisos`
+  y guarda `perfil_id`.
+- Semántica: `app_user.permisos` es el conjunto **efectivo** (lo leen el TPV y el
+  panel); el perfil es la **plantilla** que lo rellena y se puede reajustar por empleado.
 
 ## A.4 · En el TPV: identificación, velo y atribución (implementado)
 - **Identificación**: sin operario → **rejilla de operarios** (`listar_operarios`)
@@ -76,11 +79,11 @@ el TPV bloquea esa acción a ese operario. (En el panel **no** intervienen.)
 - **Atribución**: cada línea y el pedido se sellan con el operario (`user_id`,
   `0059`); marca visual de iniciales cuando hay más de un camarero en la cuenta.
 
-## A.5 · En el panel: gating por rol
-- El menú (`lib/nav.ts`) y el layout filtran por **rol** (4 valores) + on/off de
-  **módulos** (licencia), con `puede(rol, roles)`.
-- **Los perfiles/permisos NO afectan al panel** — solo a botones del TPV. «Quién
-  entra en Configuración por perfil» está **pendiente** (B).
+## A.5 · En el panel: rol + perfil · ✅ 07-07-2026
+- El menú (`lib/nav.ts`) filtra por **rol** (4 valores) + **módulos** (licencia).
+- **Y ahora por perfil**: el layout oculta una zona del menú si su permiso
+  `panel.<id>` está a `false` en `app_user.permisos`. **PROPIETARIO** lo ve todo (no
+  se autobloquea) y sin permisos = todo visible (compatibilidad).
 
 ## A.6 · Zona técnica (candado del instalador)
 - `tenant.clave_tecnica_hash` (`0045`) + RPCs `validar_clave_tecnica` /
@@ -196,7 +199,7 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
 | # | Sesión | Depende de | Estado / notas |
 |---|--------|-----------|-------|
 | SA1 | **Seguridad** (zona técnica + bloqueo TPV + quién entra en config) | — | 🟡 página `/seguridad` v1 (07-07); falta bloqueo por eventos (B.3) y quién-entra por perfil |
-| SA2 | **Operarios**: login local código+clave + lista de camareros con PIN + sesión de dispositivo «recordar» + **perfil_id** + gating de panel por perfil + autoría | — | Reusa `app_user`/`perfil`/`validar_pin`; falta `perfil_id` y código legible |
+| SA2 | **Operarios**: login local código+clave + lista de camareros con PIN + sesión de dispositivo «recordar» + **perfil_id** + gating de panel por perfil + autoría | — | 🟡 `perfil_id` + panel-por-perfil + matriz Ágora ✅ (07-07); falta login código+clave y código legible |
 | SA3 | **Activación por licencia** + **superficies por puerta** | SA2, Electron (guía 03) | Reusa `activar_licencia` |
 | SA4 | **Abrir y cerrar día** (fondo + caja Z) **por terminal**, consolidado | — | Multi-TPV (restaurante + N barras) |
 | SA5 | **Config rápida** dentro del TPV (slide-over por perfil) | SA2 | Sin salir a la config detallada |
@@ -205,8 +208,9 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
 ## B.7 · Huecos (planificado en docs, NO en código)
 1. **`audit_log`** (tabla + escrituras). Hoy solo el sucedáneo `/auditoria`.
 2. **Código de operario legible + login código+clave** (hoy nombre+PIN).
-3. **`app_user.perfil_id` + gating de panel por perfil** (hoy perfil = copia puntual;
-   panel solo por rol de 4 valores).
+3. ✅ **Hecho (07-07)**: `app_user.perfil_id` (0070) + panel por perfil (zonas
+   `panel.<id>`) + matriz de permisos estilo Ágora. Falta: ampliar el catálogo
+   (caja, almacén, informes granular…) y perfiles predefinidos listos para clonar.
 4. **Bloqueo por eventos de mesa** (hoy solo `alCobrar`/`inactividad`).
 5. **Abrir/cerrar día y caja por terminal**.
 
