@@ -3,23 +3,32 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
 import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
 
-// Alta de empresa COMPLETA en un paso. SOLO el técnico de Gluuh (es_admin_plataforma):
-// datos + dirección + módulos + duración → crea la cuenta (el trigger provisiona
-// tenant/propietario/location SOLO con empresa_nombre en metadata, 0078), fija la
-// licencia, genera el CÓDIGO DE INSTALACIÓN único (0000-0000-00000-0000-0000) que
-// fija cada instalación a su empresa, y siembra usuarios y catálogo de ejemplo.
+// Alta de empresa COMPLETA en un paso. SOLO el técnico de Gluuh (es_admin_plataforma).
+// Decisiones guía 15 §12: el cliente NO tiene email de login — se le genera un
+// USUARIO (del nombre, editable) + password inicial aleatoria con CAMBIO
+// OBLIGATORIO en el primer login (metadata debe_cambiar_password). El alta
+// también fija licencia (módulos+duración), genera el CÓDIGO DE INSTALACIÓN
+// único (0000-0000-00000-0000-0000), la clave técnica, y siembra usuarios y
+// catálogo de ejemplo.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Clave técnica legible para el instalador: 8 caracteres sin ambiguos (0/O, 1/l/I).
+// Legible sin ambiguos (0/O, 1/l/I): clave técnica y password inicial.
 const ALFABETO_CLAVE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-function generarClaveTecnica(): string {
-  return Array.from({ length: 8 }, () => ALFABETO_CLAVE[randomInt(ALFABETO_CLAVE.length)]).join("");
-}
+const legible = (n: number) => Array.from({ length: n }, () => ALFABETO_CLAVE[randomInt(ALFABETO_CLAVE.length)]).join("");
 
 // Código de instalación: dígitos aleatorios (CSPRNG) en grupos 4-4-5-4-4.
 const dig = (n: number) => Array.from({ length: n }, () => randomInt(10)).join("");
 const generarCodigoInstalacion = () => `${dig(4)}-${dig(4)}-${dig(5)}-${dig(4)}-${dig(4)}`;
+
+// Usuario de acceso del cliente: minúsculas, sin acentos, solo a-z0-9
+// ("Bar Pepe" → "barpepe"). Único a nivel de plataforma.
+const normalizarUsuario = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+
+// Cuenta interna de Supabase Auth de la empresa (el cliente nunca ve este email;
+// entra tecleando solo su usuario). Dominio distinto del de operarios (@codigo.*).
+const emailCuenta = (usr: string) => `${usr}@cuentas.gluuh.local`;
 
 // Quita claves sin valor (para updates parciales).
 const conValor = (o: Record<string, unknown>) =>
@@ -50,7 +59,7 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   if (Object.keys(loc).length) await admin.from("location").update(loc).eq("tenant_id", tid);
 
   // Clave técnica de la "Zona técnica" (RPC 0045); se devuelve UNA VEZ.
-  let claveTecnica: string | null = generarClaveTecnica();
+  let claveTecnica: string | null = legible(8);
   const { error: eClave } = await admin.rpc("admin_establecer_clave_tecnica", { p_tenant: tid, p_clave: claveTecnica });
   if (eClave) claveTecnica = null; // la clave se podrá fijar después
 
@@ -77,14 +86,28 @@ export async function POST(req: Request) {
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
   if (!esAdmin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { empresa, email, password, cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos } = await req.json();
-  if (!empresa || !email || !password) return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+  const { empresa, usuario, cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos } = await req.json();
+  if (!empresa) return NextResponse.json({ error: "Falta el nombre de la empresa" }, { status: 400 });
+  const usr = normalizarUsuario(String(usuario || empresa));
+  if (usr.length < 3) return NextResponse.json({ error: "El usuario debe tener al menos 3 letras o números" }, { status: 400 });
 
   const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+  const passwordInicial = legible(10);
   const { data, error } = await admin.auth.admin.createUser({
-    email, password, email_confirm: true, user_metadata: { empresa_nombre: empresa },
+    email: emailCuenta(usr),
+    password: passwordInicial,
+    email_confirm: true,
+    // empresa_nombre dispara el aprovisionamiento del trigger (0078);
+    // debe_cambiar_password fuerza el cambio en el primer login.
+    user_metadata: { empresa_nombre: empresa, nombre: usr, debe_cambiar_password: true },
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    const duplicado = /already|registered|exists/i.test(error.message);
+    return NextResponse.json(
+      { error: duplicado ? `El usuario «${usr}» ya existe: elige otro.` : error.message },
+      { status: duplicado ? 409 : 400 },
+    );
+  }
 
   const { data: au } = await admin
     .from("app_user")
@@ -92,11 +115,11 @@ export async function POST(req: Request) {
     .eq("auth_user_id", data.user?.id ?? "")
     .maybeSingle();
   if (!au?.tenant_id) {
-    return NextResponse.json({ ok: true, userId: data.user?.id, claveTecnica: null, codigoInstalacion: null });
+    return NextResponse.json({ ok: true, usuario: usr, passwordInicial, claveTecnica: null, codigoInstalacion: null });
   }
 
   const { codigoInstalacion, claveTecnica } = await aprovisionar(admin, au.tenant_id as string, {
     cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos,
   });
-  return NextResponse.json({ ok: true, userId: data.user?.id, claveTecnica, codigoInstalacion });
+  return NextResponse.json({ ok: true, usuario: usr, passwordInicial, claveTecnica, codigoInstalacion });
 }

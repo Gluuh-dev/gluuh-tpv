@@ -34,6 +34,8 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      // Cuenta recién entregada (alta de Gluuh): obliga a crear su contraseña.
+      if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
       const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
       // En vivo: el usuario hereda los permisos de su perfil (perfil_id); sin
       // perfil = acceso completo. Editar el perfil se refleja al recargar.

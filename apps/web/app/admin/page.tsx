@@ -7,7 +7,6 @@ import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { MODULOS, type DefModulo } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,10 +26,13 @@ export default function Admin() {
   const [estado, setEstado] = useState<"cargando" | "no-auth" | "ok">("cargando");
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [f, setF] = useState({ empresa: "", email: "", password: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[] });
+  const [f, setF] = useState({ empresa: "", usuario: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[] });
+  // El usuario se autogenera del nombre ("Bar Pepe" → barpepe) hasta que se toque a mano.
+  const [usrManual, setUsrManual] = useState(false);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
-  // Resultado del alta (código de instalación + clave técnica): se enseña UNA vez en grande.
-  const [alta, setAlta] = useState<{ codigo: string | null; clave: string | null } | null>(null);
+  // Pack de entrega del alta (usuario+password, código de instalación, clave técnica):
+  // se enseña UNA vez en grande — la password no se vuelve a mostrar.
+  const [alta, setAlta] = useState<{ codigo: string | null; clave: string | null; usuario: string; password: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [lic, setLic] = useState<{ tenantId: string; meses: string; modulos: string[] }>({ tenantId: "", meses: "12", modulos: [] });
   const [licBusy, setLicBusy] = useState(false);
@@ -58,6 +60,10 @@ export default function Admin() {
     /* eslint-disable-next-line */
   }, []);
 
+  // "Bar Pepe" → "barpepe" (minúsculas, sin acentos, solo a-z0-9).
+  const normalizarUsuario = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+
   async function crear(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setMsg(null); setAlta(null);
@@ -70,9 +76,10 @@ export default function Admin() {
     const out = await res.json();
     setBusy(false);
     if (!res.ok) { setMsg({ t: "err", x: out.error ?? "Error" }); return; }
-    setMsg({ t: "ok", x: `Empresa "${f.empresa}" creada. Acceso propietario: ${f.email}. Usuarios sembrados: tecnico/1212 · admin/1111 · camarero/2222.` });
-    setAlta({ codigo: out.codigoInstalacion ?? null, clave: out.claveTecnica ?? null });
-    setF({ empresa: "", email: "", password: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] });
+    setMsg({ t: "ok", x: `Empresa "${f.empresa}" creada. Operarios sembrados: tecnico/1212 · admin/1111 · camarero/2222.` });
+    setAlta({ codigo: out.codigoInstalacion ?? null, clave: out.claveTecnica ?? null, usuario: out.usuario ?? "", password: out.passwordInicial ?? "" });
+    setF({ empresa: "", usuario: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] });
+    setUsrManual(false);
     cargar();
   }
 
@@ -121,7 +128,13 @@ export default function Admin() {
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UserPlus className="h-4 w-4" /> Nueva empresa</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={crear} className="space-y-3">
-                <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input required value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input required value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value, ...(usrManual ? {} : { usuario: normalizarUsuario(e.target.value) }) })} /></div>
+                <div className="space-y-1.5">
+                  <Label>Usuario de acceso (backoffice)</Label>
+                  <Input required minLength={3} value={f.usuario} placeholder="barpepe"
+                    onChange={(e) => { setUsrManual(true); setF({ ...f, usuario: normalizarUsuario(e.target.value) }); }} />
+                  <p className="text-[11px] text-muted-foreground">Con él entra el cliente (sin email). La password inicial se genera sola y la cambia en su primer acceso.</p>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>CIF/NIF</Label><Input value={f.cif} onChange={(e) => setF({ ...f, cif: e.target.value })} /></div>
                   <div className="space-y-1.5"><Label>Teléfono</Label><Input value={f.telefono} onChange={(e) => setF({ ...f, telefono: e.target.value })} /></div>
@@ -132,8 +145,6 @@ export default function Admin() {
                   <div className="space-y-1.5"><Label>C. P.</Label><Input value={f.codigoPostal} onChange={(e) => setF({ ...f, codigoPostal: e.target.value })} /></div>
                 </div>
                 <div className="space-y-1.5"><Label>Provincia</Label><Input value={f.provincia} onChange={(e) => setF({ ...f, provincia: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Email de acceso (propietario)</Label><Input type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Contraseña inicial</Label><PasswordInput required minLength={6} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
                 <div className="space-y-1.5">
                   <Label>Duración de la licencia</Label>
                   <Select value={f.meses} onValueChange={(v) => setF({ ...f, meses: v })}>
@@ -158,12 +169,16 @@ export default function Admin() {
                 </div>
                 <Button className="w-full" disabled={busy}>{busy ? "Creando…" : "Crear empresa"}</Button>
                 {msg && <p className={`text-sm ${msg.t === "ok" ? "text-emerald-600" : "text-destructive"}`}>{msg.x}</p>}
-                {alta?.codigo && (
-                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-center">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Código de instalación</p>
-                    <p className="mt-1 font-mono text-lg font-bold tracking-wider">{alta.codigo}</p>
-                    {alta.clave && <p className="mt-2 text-sm text-muted-foreground">Clave técnica: <span className="font-mono font-semibold text-foreground">{alta.clave}</span> (no se vuelve a mostrar)</p>}
-                    <p className="mt-1.5 text-xs text-muted-foreground">Con este código se activa cada equipo del cliente en /instalar.</p>
+                {alta && (
+                  <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
+                    <p className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">Pack de entrega — apúntalo, no se vuelve a mostrar</p>
+                    <div className="grid gap-1 text-sm">
+                      <p>Usuario backoffice: <span className="font-mono font-semibold">{alta.usuario}</span></p>
+                      <p>Password inicial: <span className="font-mono font-semibold">{alta.password}</span> <span className="text-xs text-muted-foreground">(la cambia al entrar)</span></p>
+                      {alta.codigo && <p>Código de instalación: <span className="font-mono font-semibold tracking-wider">{alta.codigo}</span></p>}
+                      {alta.clave && <p>Clave técnica: <span className="font-mono font-semibold">{alta.clave}</span></p>}
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground">El código activa cada equipo del cliente en /instalar; el usuario+password es su acceso al backoffice.</p>
                   </div>
                 )}
               </form>

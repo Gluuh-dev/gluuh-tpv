@@ -34,6 +34,14 @@ export default function Login() {
     if (i) { setInstalacion(i); setModo("usuario"); }
   }, []);
 
+  // Tras iniciar sesión: las cuentas de empresa recién creadas (alta de Gluuh,
+  // metadata debe_cambiar_password) pasan primero por /cambiar-password.
+  async function irTrasLogin() {
+    const { data: { user } } = await supabaseBrowser().auth.getUser();
+    if (user?.user_metadata?.debe_cambiar_password) { window.location.href = "/cambiar-password"; return; }
+    window.location.href = window.gluuh ? "/inicio" : "/dashboard";
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setCargando(true);
@@ -46,7 +54,7 @@ export default function Login() {
     });
     setCargando(false);
     if (error) setError(traducirErrorAuth(error.message));
-    else window.location.href = "/dashboard";
+    else await irTrasLogin();
   }
 
   async function onPasskey() {
@@ -56,7 +64,7 @@ export default function Login() {
       const { error } = await entrarConPasskey(supabaseBrowser());
       if (error) setError(traducirErrorAuth(error.message));
       // En Gluuh Desktop, al lanzador (elegir TPV/Ajustes); en navegador, al panel.
-      else window.location.href = window.gluuh ? "/inicio" : "/dashboard";
+      else await irTrasLogin();
     } catch (e) {
       setError("No se pudo usar la passkey en este dispositivo.");
     } finally {
@@ -64,23 +72,43 @@ export default function Login() {
     }
   }
 
-  // Login local por código+clave: la ruta verifica y prepara la cuenta sintética;
+  // Operario local (usr_app+clave): la ruta verifica y prepara la cuenta sintética;
   // luego completamos la sesión con signInWithPassword (email interno devuelto).
+  async function entrarOperario(): Promise<string | null> {
+    const r = await fetch("/api/entrar-operario", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuario: usuario.trim(), clave: clave.trim(), tenant_id: instalacion?.tenantId ?? null }),
+    });
+    const j = await r.json();
+    if (!r.ok) return j.error ?? "No se pudo entrar.";
+    const { error } = await supabaseBrowser().auth.signInWithPassword({ email: j.email, password: j.secret });
+    return error ? traducirErrorAuth(error.message) : null;
+  }
+
+  // "Bar Pepe" → barpepe (igual que el alta): cuenta de EMPRESA del backoffice.
+  const normUsuario = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+
   async function onSubmitUsuario(e: React.FormEvent) {
     e.preventDefault();
     setCargando(true);
     setError("");
     try {
-      const r = await fetch("/api/entrar-operario", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario: usuario.trim(), clave: clave.trim(), tenant_id: instalacion?.tenantId ?? null }),
-      });
-      const j = await r.json();
-      if (!r.ok) { setError(j.error ?? "No se pudo entrar."); return; }
-      const { error } = await supabaseBrowser().auth.signInWithPassword({ email: j.email, password: j.secret });
-      if (error) setError(traducirErrorAuth(error.message));
-      else window.location.href = window.gluuh ? "/inicio" : "/dashboard";
+      let fallo: string | null;
+      if (instalacion) {
+        // Equipo instalado: operario de SU empresa (acotado por tenant).
+        fallo = await entrarOperario();
+      } else {
+        // Nube/backoffice: cuenta de empresa (usuario del alta). Si no cuadra,
+        // probamos operario (compatibilidad y desarrollo sin instalación).
+        const { error } = await supabaseBrowser().auth.signInWithPassword({
+          email: `${normUsuario(usuario)}@cuentas.gluuh.local`,
+          password: clave.trim(),
+        });
+        fallo = error ? await entrarOperario() : null;
+      }
+      if (fallo) setError(fallo);
+      else await irTrasLogin();
     } catch {
       setError("No se pudo conectar con el servidor.");
     } finally {

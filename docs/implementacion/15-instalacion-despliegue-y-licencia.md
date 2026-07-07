@@ -450,9 +450,12 @@ Requisitos comunes del equipo del nodo:
    construye el nodo (GAP #11). Ningún cliente se instala sin funcionar sin
    internet. Un único equipo por local lo levanta (mini-PC dedicado
    recomendado, §10.1).
-5. **Hosting**: hay dominio comprado y la web aún no está desplegada →
-   desplegar (Vercel, con `app.` y `admin.` como dominios del mismo proyecto)
-   forma parte de los P0.
+5. **Hosting**: el dominio es **`gluuh.com`** y está en **Vercel**, sirviendo
+   una plantilla ("Growix", supabase-nextjs-template) que **hay que eliminar**.
+   Objetivo: `www.` = landing comercial, `app.gluuh.com` = backoffice+TPV nube,
+   `admin.gluuh.com` = plataforma (proxy por Host ya implementado; poner
+   `PLATAFORMA_HOSTS=admin.gluuh.com` en el proyecto). Desplegar `apps/web`
+   sustituyendo la plantilla forma parte de los P0.
 
 ---
 
