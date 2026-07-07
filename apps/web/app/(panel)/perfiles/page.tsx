@@ -13,6 +13,7 @@ import { TablaDatos, type ColumnaDatos } from "@/components/tabla-datos";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface Fila { id: string; nombre: string; descripcion: string; permisos: MapaPermisos; empleados: number }
 type PerfilRow = { id: string; nombre: string; descripcion: string | null; permisos?: MapaPermisos };
@@ -93,7 +94,7 @@ export default function PerfilesPage() {
     { clave: "descripcion", titulo: "Descripción", valor: (f) => f.descripcion, render: (f) => <span className="text-muted-foreground">{f.descripcion || "—"}</span> },
     {
       clave: "acceso", titulo: "Acceso", valor: (f) => resumen(f.permisos),
-      render: (f) => <span className={Object.values(f.permisos).some((v) => v === false) ? "text-amber-600 dark:text-amber-500" : "text-emerald-600 dark:text-emerald-500"}>{resumen(f.permisos)}</span>,
+      render: (f) => <Badge variant={Object.values(f.permisos).includes(false) ? "warning" : "success"}>{resumen(f.permisos)}</Badge>,
     },
     { clave: "empleados", titulo: "Empleados", alinear: "der", valor: (f) => f.empleados, render: (f) => <span className="tabular-nums">{f.empleados}</span> },
   ];
