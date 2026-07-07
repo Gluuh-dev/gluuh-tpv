@@ -1,7 +1,8 @@
 "use client";
 
 // Buscador global del panel (estilo Supabase): botón en la cabecera + atajo
-// Ctrl/⌘+K → modal centrado que busca en TODO: páginas del panel (lib/nav) y
+// Ctrl/⌘+K → modal centrado que busca en TODO: páginas del panel (lib/nav),
+// ajustes por concepto (sinónimos ocultos: "impresora", "iva", "backup"…) y
 // datos (productos, familias, categorías). Teclado ↑↓ Enter Esc. Sin dependencias.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,18 +10,40 @@ import { Search, CornerDownLeft } from "lucide-react";
 import { NAV } from "@/app/lib/nav";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 
-interface Item { tipo: string; label: string; sub?: string; href: string }
+interface Item { tipo: string; label: string; sub?: string; href: string; keys?: string }
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-// Páginas del panel (estáticas, desde el menú); una por href.
+// Sinónimos por href: palabras que la gente busca pero no están en la etiqueta.
+// Se buscan pero no se muestran (así "ticket de impresora" encuentra la config
+// de impresión y de plantillas). Solo hrefs que existen en el nav.
+const SINONIMOS: Record<string, string> = {
+  "/configuracion-de-impresion": "impresora imprimir impresion papel driver rollo comanda",
+  "/plantillas-ticket": "ticket recibo impresora imprimir papel plantilla",
+  "/impuestos": "iva igic ipsi impuesto fiscal tipo gravamen recargo",
+  "/formas-de-pago": "pago tarjeta efectivo bizum cobro datafono metalico",
+  "/configuracion-de-pago": "pago datafono tarjeta cobro terminal",
+  "/personalizar": "logo marca color tema branding aspecto imagen fondo",
+  "/series": "serie numeracion factura numero fiscal",
+  "/empleados": "usuario empleado camarero operario clave acceso pin",
+  "/perfiles": "permiso rol acceso seguridad perfil",
+  "/seguridad": "seguridad contrasena clave acceso bloqueo pin",
+  "/configuracion-de-caja": "caja apertura cierre arqueo fondo efectivo",
+  "/configuracion-de-botones": "boton teclado atajo tecla",
+  "/copias-de-seguridad": "backup copia respaldo restaurar seguridad",
+  "/alergenos": "alergeno gluten lactosa frutos-secos",
+  "/planos-de-mesas": "mesa plano sala distribucion salon",
+  "/configuracion-verifactu": "verifactu aeat factura fiscal certificado",
+};
+
+// Páginas del panel (estáticas, desde el menú); una por href, con sinónimos.
 const PAGINAS: Item[] = Array.from(
   new Map(
     NAV.flatMap((e) =>
       e.sections.flatMap((s) =>
         s.items
           .filter((i) => i.href && !i.soon)
-          .map((i) => ({ tipo: "Página", label: i.label, sub: e.title, href: i.href! })),
+          .map((i) => ({ tipo: "Página", label: i.label, sub: e.title, href: i.href!, keys: SINONIMOS[i.href!] })),
       ),
     ).map((p) => [p.href, p]),
   ).values(),
@@ -71,8 +94,14 @@ export function CommandPalette() {
   const resultados = useMemo(() => {
     const term = norm(q.trim());
     if (!term) return PAGINAS.slice(0, 8); // sin texto: accesos rápidos a páginas
+    // Tokens con AND: cada palabra debe aparecer en etiqueta+sección+sinónimos.
+    // Así "ticket de impresora" encuentra la config aunque las palabras estén sueltas.
+    const tokens = term.split(/\s+/).filter(Boolean);
     const todo = [...PAGINAS, ...datos];
-    return todo.filter((i) => norm(i.label).includes(term) || (i.sub ? norm(i.sub).includes(term) : false)).slice(0, 50);
+    return todo.filter((i) => {
+      const heno = norm(`${i.label} ${i.sub ?? ""} ${i.keys ?? ""}`);
+      return tokens.every((t) => heno.includes(t));
+    }).slice(0, 50);
   }, [q, datos]);
 
   useEffect(() => { setSel(0); }, [q]);
@@ -119,7 +148,7 @@ export function CommandPalette() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={onKey}
-                placeholder="Buscar páginas, productos, familias, categorías…"
+                placeholder="Buscar páginas, ajustes, productos…"
                 className="h-11 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 aria-label="Buscar"
               />
