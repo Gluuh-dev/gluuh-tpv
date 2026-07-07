@@ -72,3 +72,13 @@ export function permite(permisos: MapaPermisos | null | undefined, id: string): 
 
 /** Clave de permiso para la zona (entrada de menú) `navId`. */
 export const permisoZona = (navId: string) => `panel.${navId}`;
+
+/** Perfiles recomendados listos para clonar/ajustar (mejor que empezar de cero).
+ *  Se siembran al crear la empresa y con el botón de /perfiles. */
+export interface PerfilRecomendado { nombre: string; descripcion: string; permisos: MapaPermisos }
+export const PERFILES_RECOMENDADOS: PerfilRecomendado[] = [
+  { nombre: "Administrador", descripcion: "Acceso total al panel y al TPV.", permisos: {} },
+  { nombre: "Encargado", descripcion: "Todo menos la zona técnica del instalador.", permisos: { tecnica: false } },
+  { nombre: "Camarero", descripcion: "Solo operativa (TPV); sin backoffice.", permisos: { "panel.admin": false, "panel.compras": false, "panel.herramientas": false, "panel.informes": false } },
+  { nombre: "Informes", descripcion: "Solo la sección de Informes.", permisos: { "panel.operativa": false, "panel.admin": false, "panel.compras": false, "panel.herramientas": false } },
+];

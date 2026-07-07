@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "@/app/lib/toast";
 import { Copy, Pencil, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
-import { CATALOGO_PERMISOS, type MapaPermisos } from "../../lib/permisos";
+import { CATALOGO_PERMISOS, PERFILES_RECOMENDADOS, type MapaPermisos } from "../../lib/permisos";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,6 @@ import { Textarea } from "@/components/ui/textarea";
 interface Perfil { id: string; nombre: string; descripcion: string | null; permisos?: MapaPermisos }
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-
-// Perfiles recomendados listos para clonar/ajustar (mejor que empezar de cero).
-// permisos: ausente/true = permitido; false = bloqueado (ver lib/permisos).
-const RECOMENDADOS: { nombre: string; descripcion: string; permisos: MapaPermisos }[] = [
-  { nombre: "Administrador", descripcion: "Acceso total al panel y al TPV.", permisos: {} },
-  { nombre: "Encargado", descripcion: "Todo menos la zona técnica del instalador.", permisos: { tecnica: false } },
-  { nombre: "Camarero", descripcion: "Solo operativa (TPV); sin backoffice.", permisos: { "panel.admin": false, "panel.compras": false, "panel.herramientas": false, "panel.informes": false } },
-  { nombre: "Informes", descripcion: "Solo la sección de Informes.", permisos: { "panel.operativa": false, "panel.admin": false, "panel.compras": false, "panel.herramientas": false } },
-];
 
 export default function Perfiles() {
   const sb = supabaseBrowser();
@@ -118,7 +109,7 @@ export default function Perfiles() {
   // Siembra los perfiles recomendados que aún no existan (por nombre).
   async function crearRecomendados() {
     const existentes = new Set(perfiles.map((p) => p.nombre.toLowerCase()));
-    const nuevos = RECOMENDADOS.filter((r) => !existentes.has(r.nombre.toLowerCase()));
+    const nuevos = PERFILES_RECOMENDADOS.filter((r) => !existentes.has(r.nombre.toLowerCase()));
     if (!nuevos.length) { toast.info("Los perfiles recomendados ya existen."); return; }
     const rows = nuevos.map((r) => ({ tenant_id: tenantId, nombre: r.nombre, descripcion: r.descripcion, ...(sinMigracion ? {} : { permisos: r.permisos }) }));
     const cols = sinMigracion ? "id,nombre,descripcion" : "id,nombre,descripcion,permisos";

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
+import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
 
 // Crea una cuenta de empresa. SOLO el administrador de plataforma (Gluuh).
 // Verifica al llamante con su token (es_admin_plataforma) y luego usa la clave
@@ -51,6 +52,10 @@ export async function POST(req: Request) {
       p_clave: claveTecnica,
     });
     if (eClave) claveTecnica = null; // la empresa queda creada; la clave se podrá fijar después
+    // Perfiles recomendados listos para asignar (best-effort; el botón de /perfiles es el respaldo).
+    await admin.from("perfil").insert(
+      PERFILES_RECOMENDADOS.map((r) => ({ tenant_id: au.tenant_id, nombre: r.nombre, descripcion: r.descripcion, permisos: r.permisos })),
+    );
   } else {
     claveTecnica = null;
   }
