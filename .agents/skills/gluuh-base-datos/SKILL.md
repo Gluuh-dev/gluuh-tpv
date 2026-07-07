@@ -15,9 +15,12 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0070`
-   —`app_user.perfil_id`—, aplicada). Nueva migración = siguiente número libre +
-   nombre descriptivo en snake_case.
+   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0071`
+   —RLS de escritura de perfil/app_user con `operario_permite()`—, aplicada).
+   Nueva migración = siguiente número libre + nombre descriptivo en snake_case.
+   ⚠️ **`app_user.permisos` (0041) NUNCA se aplicó**: no existe en la BD. Los
+   permisos viven SOLO en `perfil.permisos` (0048); el usuario los hereda por
+   `app_user.perfil_id` (0070). No la uses.
 2. **Toda tabla nueva lleva `tenant_id uuid not null references tenant(id) on
    delete cascade` + RLS** con `current_tenant_id()` (patrón de cualquier tabla
    de `0001_init.sql`). El trigger `set_tenant_id()` (`0004`) autorrellena el

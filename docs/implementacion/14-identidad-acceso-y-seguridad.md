@@ -27,20 +27,22 @@ Columnas relevantes (`0001_init` + ampliaciones):
   `CAMARERO`, `COCINA`. En el alta la UI solo ofrece ENCARGADO/CAMARERO/COCINA;
   `PROPIETARIO` lo pone el trigger al crear la empresa.
 - **`pin_hash`** (bcrypt) y **`pulsera_hash`** (bcrypt, RFID/NFC).
-- **`permisos` jsonb** — 5 flags de acción (`0041`), ver A.2.
+- **`perfil_id`** (`0070`) — perfil asignado; de él **hereda** sus permisos (A.2/A.3).
+  (`app_user.permisos` de 0041 **nunca se aplicó**: no existe.)
 - **`pin_intentos` + `pin_bloqueado_hasta`** (`0054`) — anti-fuerza-bruta **por
   tenant** (5 fallos → bloqueo creciente). Es a nivel de tenant a propósito: un
   PIN erróneo no identifica a quién lo tecleó.
 - `activo`, `auth_user_id`. (`password_hash` existe pero es **vestigial**.)
-- **No existe** columna de código de operario legible ni **`perfil_id`**.
+- **No existe** columna de código de operario legible.
 
 Gestión: página **`/empleados`** («Usuarios y PIN»): alta (`crear_empleado`),
 editar nombre/email/rol/activo/permisos, cambiar PIN (`cambiar_pin`), asignar/quitar
 pulsera (`asignar_pulsera`), y desbloquear intentos.
 
 ## A.2 · Permisos — catálogo estilo Ágora (`app/lib/permisos.ts`)
-`app_user.permisos` (jsonb, `0041`) y `perfil.permisos` (`0048`) guardan un mapa
-`{ id: permitido }`. El **catálogo** de ids (igual para todos los clientes) vive en
+`perfil.permisos` (jsonb, `0048`) guarda un mapa `{ id: permitido }`; el usuario lo
+**hereda** por `perfil_id` (A.3). No hay permisos por usuario (`app_user.permisos`
+de 0041 **nunca se aplicó**). El **catálogo** de ids (igual para todos los clientes) vive en
 **código** (`app/lib/permisos.ts`), agrupado por *aplicación* (permiso = aplicación
 × acción, como Ágora). Semántica: ausente o `true` = **permitido**; `false` = bloqueado.
 
@@ -70,7 +72,7 @@ Se añaden más grupos conforme se cablea su aplicación (caja, almacén, inform
   `/empleados` el usuario **solo elige perfil** (sin permisos sueltos por usuario).
 - **En vivo (modelo Ágora)**: el TPV y el panel resuelven los permisos **del perfil**
   (`perfil(permisos)` vía `perfil_id`); **editar un perfil afecta a la vez a todos sus
-  usuarios**. Sin perfil → `app_user.permisos` propios (compat) o todo permitido.
+  usuarios**. Sin perfil → todo permitido. No hay permisos sueltos por usuario.
 
 ## A.4 · En el TPV: identificación, velo y atribución (implementado)
 - **Identificación**: sin operario → **rejilla de operarios** (`listar_operarios`)
@@ -90,8 +92,8 @@ Se añaden más grupos conforme se cablea su aplicación (caja, almacén, inform
 - El menú (`lib/nav.ts`) filtra por **rol** (4 valores) + **módulos** (licencia).
 - **Y ahora por perfil**: el layout oculta del menú lo no permitido **y un guardián
   de ruta bloquea el acceso directo por URL** (pantalla «Sin acceso»), según los
-  permisos **efectivos** (del perfil, o propios si no tiene) — zona `panel.<id>` y el
-  `perm` del enlace. **PROPIETARIO** lo ve todo; sin permisos = todo visible.
+  permisos **del perfil** — zona `panel.<id>` y el `perm` del enlace. **PROPIETARIO**
+  lo ve todo; sin perfil = todo visible.
 
 ## A.6 · Zona técnica (candado del instalador)
 - `tenant.clave_tecnica_hash` (`0045`) + RPCs `validar_clave_tecnica` /
@@ -221,9 +223,10 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
    (caja, almacén, informes granular…) y perfiles predefinidos listos para clonar.
 4. **Bloqueo por eventos de mesa** (hoy solo `alCobrar`/`inactividad`).
 5. **Abrir/cerrar día y caja por terminal**.
-6. **Respaldo RLS de permisos**: el gating por perfil es de **cliente** (menú +
-   guardián de ruta). Los permisos sensibles (fiscal, usuarios, técnica) deberían
-   respaldarse además en **RLS/policies** del backend, no solo ocultarse en la UI.
+6. **Respaldo RLS de permisos** (parcial): ✅ la **escritura** de `perfil` y
+   `app_user` ya está respaldada en RLS (`operario_permite('admin.usuarios')`,
+   `0071`) — bloquea la autoescalada. **Falta** extender a otras áreas sensibles
+   (fiscal, catálogo…) y, si se quiere, gatear lecturas.
 
 ## B.8 · Preguntas abiertas
 - Formato exacto del **código de operario** (¿lo genera el sistema, editable?).
