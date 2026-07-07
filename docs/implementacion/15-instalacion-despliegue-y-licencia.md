@@ -435,20 +435,24 @@ Requisitos comunes del equipo del nodo:
 | 14 | **Dispositivos: autonombre `tpv_N`/`cocina_N` + botón «Reconectar»** (nuevo código, misma identidad) | Instalar y reinstalar sin fricción, sin passwords fijas por aparato | 0,5 d | P1 |
 | 15 | **Sesión de equipo persistente** (instalación+dispositivo+sesión recordadas; cambio de camarero por PIN sin desloguear el aparato) | El TPV nunca amanece desconectado | 0,5 d | P1 |
 
-## 12. Decisiones pendientes (bloquean los cambios 1-2)
+## 12. Decisiones (TOMADAS el 07-07-2026)
 
-1. **Separación de plataforma**: ¿opción A (mismo código, dominio + middleware)
-   o B (app aparte en el monorepo)? → Recomendación: **A ya**, B cuando la
-   plataforma crezca.
-2. **Usuario del cliente**: ¿lo eliges tú en el alta (campo libre) o se genera
-   del nombre (`Bar Pepe` → `barpepe`)? → Recomendación: **se genera + editable**.
-3. **Backoffice del cliente**: ¿solo en la nube (`app.gluuh.com`) y la app
-   instalada solo operativa (TPV/cocina/comandera)? → Es lo que dice CLAUDE.md
-   y el modelo de este doc; **confirmar** porque condiciona el instalador.
-4. **Calendario del nodo local (GAP #11)**: ¿se construye ANTES de instalar al
-   primer cliente (retrasa la salida ~1 mes pero cumple "sin internet" desde el
-   día 1), o el piloto sale en modo nube + router 4G y el nodo llega en la
-   siguiente versión? → Decisión de negocio pura; lo técnico está diseñado.
+1. **Separación de plataforma → opción A**: dominio `admin.gluuh.com` +
+   middleware por Host (`apps/web/proxy.ts`, env `PLATAFORMA_HOSTS`); en
+   cualquier otro host, /admin y /api/admin devuelven 404. La app aparte (B)
+   queda para cuando la plataforma crezca.
+2. **Usuario del cliente → generado + editable**: del nombre (`Bar Pepe` →
+   `barpepe`), editable en el alta; password inicial aleatoria y **cambio
+   obligatorio en el primer login**.
+3. **Backoffice del cliente → solo en la nube** (`app.gluuh.com`); la app
+   instalada en el local es solo operativa (TPV/cocina/comandera/pantallas).
+4. **Nodo local → ANTES del primer cliente**: tras los P0 cortos (1-4) se
+   construye el nodo (GAP #11). Ningún cliente se instala sin funcionar sin
+   internet. Un único equipo por local lo levanta (mini-PC dedicado
+   recomendado, §10.1).
+5. **Hosting**: hay dominio comprado y la web aún no está desplegada →
+   desplegar (Vercel, con `app.` y `admin.` como dominios del mismo proyecto)
+   forma parte de los P0.
 
 ---
 
