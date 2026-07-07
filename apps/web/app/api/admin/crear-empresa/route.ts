@@ -56,6 +56,9 @@ export async function POST(req: Request) {
     await admin.from("perfil").insert(
       PERFILES_RECOMENDADOS.map((r) => ({ tenant_id: au.tenant_id, nombre: r.nombre, descripcion: r.descripcion, permisos: r.permisos })),
     );
+    // Operarios por defecto: técnico (PIN 1212, acceso total en TPV) y PIN 1111 al
+    // dueño. Ambos cambiables una vez dentro. Best-effort.
+    await admin.rpc("admin_sembrar_operarios_defecto", { p_tenant: au.tenant_id });
   } else {
     claveTecnica = null;
   }

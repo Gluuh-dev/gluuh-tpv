@@ -178,7 +178,7 @@ export default function TPV() {
 
   /* ── Operario activo (quién opera; persiste hasta "Salir") ── */
   const [operario, setOperario] = useState<{ id: string; nombre: string } | null>(null);
-  const [operarios, setOperarios] = useState<{ id: string; nombre: string; rol: string }[]>([]);
+  const [operarios, setOperarios] = useState<{ id: string; nombre: string; rol: string; codigo: string | null }[]>([]);
   const [pinUser, setPinUser] = useState<{ id: string; nombre: string } | null>(null);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
@@ -301,7 +301,7 @@ export default function TPV() {
       // Operario activo desde localStorage (persiste hasta "Salir") + lista de operarios
       try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
       const { data: ops } = await sb.rpc("listar_operarios");
-      setOperarios((ops as { id: string; nombre: string; rol: string }[]) ?? []);
+      setOperarios((ops as { id: string; nombre: string; rol: string; codigo: string | null }[]) ?? []);
       setMarca(await leerBranding(sb));
       const { data: loc } = await sb.from("location").select("id,territorio_fiscal,nombre,razon_social,cif,direccion").limit(1).maybeSingle();
       const { data: u }   = await sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle();
@@ -1784,7 +1784,7 @@ export default function TPV() {
               >
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-brand/15 text-lg text-brand">{o.nombre.charAt(0).toUpperCase()}</span>
                 <span className="mt-1">{o.nombre}</span>
-                <span className="text-xs font-normal text-muted-foreground">{o.rol}</span>
+                <span className="font-mono text-xs font-normal text-muted-foreground">#{o.codigo}</span>
               </button>
             ))}
             {operarios.length === 0 && (

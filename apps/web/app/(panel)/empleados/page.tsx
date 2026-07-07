@@ -24,6 +24,7 @@ import { PageHeader } from "@/components/ui/page-header";
 interface Empleado {
   id: string;
   nombre: string;
+  codigo?: string | null;
   email: string | null;
   rol: string;
   activo: boolean;
@@ -74,7 +75,7 @@ export default function Empleados() {
   async function cargar() {
     const { data } = await sb
       .from("app_user")
-      .select("id,nombre,email,rol,activo,perfil_id,pulsera_hash,pin_bloqueado_hasta")
+      .select("id,nombre,codigo,email,rol,activo,perfil_id,pulsera_hash,pin_bloqueado_hasta")
       .order("nombre");
     setLista((data as Empleado[]) ?? []);
     // Perfiles para el selector (el usuario hereda sus permisos por perfil_id).
@@ -232,7 +233,9 @@ export default function Empleados() {
               >
                 <TableCell>
                   <div className="font-medium">{e.nombre}</div>
-                  {e.email && <div className="text-xs text-muted-foreground">{e.email}</div>}
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-mono">#{e.codigo}</span>{e.email ? ` · ${e.email}` : ""}
+                  </div>
                 </TableCell>
                 <TableCell><Badge variant="secondary">{rolTexto(e.rol)}</Badge></TableCell>
                 <TableCell>
@@ -282,6 +285,9 @@ export default function Empleados() {
                 <div className="space-y-1.5">
                   <Label htmlFor="emp-nombre">Nombre</Label>
                   <Input id="emp-nombre" value={b.nombre} onChange={(e) => setB({ ...b, nombre: e.target.value })} placeholder="Ana García" />
+                  {editor.modo === "editar" && emp?.codigo && (
+                    <p className="text-[11px] text-muted-foreground">Código de operario <span className="font-mono text-foreground">#{emp.codigo}</span> — lo identifica en el TPV.</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="emp-email">Email (opcional)</Label>
