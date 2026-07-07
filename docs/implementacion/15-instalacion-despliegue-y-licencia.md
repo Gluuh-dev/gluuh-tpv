@@ -450,12 +450,17 @@ Requisitos comunes del equipo del nodo:
    construye el nodo (GAP #11). Ningún cliente se instala sin funcionar sin
    internet. Un único equipo por local lo levanta (mini-PC dedicado
    recomendado, §10.1).
-5. **Hosting**: el dominio es **`gluuh.com`** y está en **Vercel**, sirviendo
-   una plantilla ("Growix", supabase-nextjs-template) que **hay que eliminar**.
-   Objetivo: `www.` = landing comercial, `app.gluuh.com` = backoffice+TPV nube,
-   `admin.gluuh.com` = plataforma (proxy por Host ya implementado; poner
-   `PLATAFORMA_HOSTS=admin.gluuh.com` en el proyecto). Desplegar `apps/web`
-   sustituyendo la plantilla forma parte de los P0.
+5. **Hosting**: el dominio es **`gluuh.com`** (hoy en Vercel con una plantilla
+   "Growix" que hay que eliminar). Estructura confirmada: `www.` = página
+   comercial · `app.gluuh.com` = clientes (login usuario+password) ·
+   `admin.gluuh.com` = solo Gluuh (email; en cualquier otro host ni existe —
+   proxy por Host, env `PLATAFORMA_HOSTS=admin.gluuh.com`). Los subdominios son
+   gratis (mismo dominio). **Hosting elegido: Cloudflare** (plan gratis con uso
+   comercial permitido, sin "dormirse"; Next.js vía adaptador OpenNext; DNS
+   incluido) — el plan Hobby de Vercel prohíbe uso comercial. Coste fijo real a
+   vigilar: **Supabase Pro (25 $/mes) al primer cliente** (el plan gratis pausa
+   el proyecto tras ~1 semana de inactividad y no tiene PITR). Hasta vender:
+   0 €/mes.
 
 ---
 
