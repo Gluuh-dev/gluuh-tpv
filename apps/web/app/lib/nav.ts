@@ -43,7 +43,7 @@ export const NAV: NavEntry[] = [
       { href: "/ajustes", label: "Empresa y local", roles: PROP },
       { href: "/series", label: "Series", roles: PROP, perm: "admin.fiscal" }, { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST },
       { href: "/plantillas-etiquetas", label: "Plantillas de etiquetas", roles: GEST }, { href: "/periodos-servicio", label: "Periodos de servicio", roles: GEST }, { href: "/tipos-cliente", label: "Tipos de clientes", roles: GEST },
-      { href: "/clientes", label: "Clientes", roles: GEST }, { href: "/reservas", label: "Reservas", roles: GEST, modulo: "RESERVAS" }, { href: "/puntos-venta", label: "Puntos de venta", roles: PROP },
+      { href: "/clientes", label: "Clientes", roles: GEST }, { href: "/reservas", label: "Reservas", roles: GEST, modulo: "RESERVAS" }, { href: "/puntos-venta", label: "Puntos de venta", roles: PROP, perm: "admin.usuarios" },
     ] },
     { title: "Usuarios", items: [
       { href: "/perfiles", label: "Perfiles y permisos", roles: PROP, perm: "admin.usuarios" }, { href: "/empleados", label: "Usuarios y PIN", roles: GEST, perm: "admin.usuarios" },

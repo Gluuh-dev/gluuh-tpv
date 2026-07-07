@@ -7,7 +7,7 @@
 // Si 0048 no está aplicada, el CRUD sigue y los permisos quedan deshabilitados.
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "@/app/lib/toast";
-import { Copy, Pencil, Plus, Search, Trash2, TriangleAlert } from "lucide-react";
+import { Copy, Pencil, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { CATALOGO_PERMISOS, type MapaPermisos } from "../../lib/permisos";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,6 +20,15 @@ import { Textarea } from "@/components/ui/textarea";
 interface Perfil { id: string; nombre: string; descripcion: string | null; permisos?: MapaPermisos }
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+// Perfiles recomendados listos para clonar/ajustar (mejor que empezar de cero).
+// permisos: ausente/true = permitido; false = bloqueado (ver lib/permisos).
+const RECOMENDADOS: { nombre: string; descripcion: string; permisos: MapaPermisos }[] = [
+  { nombre: "Administrador", descripcion: "Acceso total al panel y al TPV.", permisos: {} },
+  { nombre: "Encargado", descripcion: "Todo menos la zona técnica del instalador.", permisos: { tecnica: false } },
+  { nombre: "Camarero", descripcion: "Solo operativa (TPV); sin backoffice.", permisos: { "panel.admin": false, "panel.compras": false, "panel.herramientas": false, "panel.informes": false } },
+  { nombre: "Informes", descripcion: "Solo la sección de Informes.", permisos: { "panel.operativa": false, "panel.admin": false, "panel.compras": false, "panel.herramientas": false } },
+];
 
 export default function Perfiles() {
   const sb = supabaseBrowser();
@@ -106,6 +115,19 @@ export default function Perfiles() {
     toast.success(`Perfil copiado: "${nombre}".`);
   }
 
+  // Siembra los perfiles recomendados que aún no existan (por nombre).
+  async function crearRecomendados() {
+    const existentes = new Set(perfiles.map((p) => p.nombre.toLowerCase()));
+    const nuevos = RECOMENDADOS.filter((r) => !existentes.has(r.nombre.toLowerCase()));
+    if (!nuevos.length) { toast.info("Los perfiles recomendados ya existen."); return; }
+    const rows = nuevos.map((r) => ({ tenant_id: tenantId, nombre: r.nombre, descripcion: r.descripcion, ...(sinMigracion ? {} : { permisos: r.permisos }) }));
+    const cols = sinMigracion ? "id,nombre,descripcion" : "id,nombre,descripcion,permisos";
+    const { data, error } = await sb.from("perfil").insert(rows).select(cols);
+    if (error) { toast.error(error.message); return; }
+    setPerfiles((prev) => [...prev, ...((data as unknown as Perfil[]) ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    toast.success(`Creados ${nuevos.length} perfiles recomendados.`);
+  }
+
   async function guardarPermisos() {
     if (!sel || sinMigracion) return;
     setGuardando(true);
@@ -146,9 +168,12 @@ export default function Perfiles() {
         {/* Lista + alta/edición */}
         <Card className="self-start">
           <CardContent className="space-y-3">
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => void crearRecomendados()}>
+              <Sparkles className="h-4 w-4" /> Crear perfiles recomendados
+            </Button>
             <div className="space-y-1">
               {perfiles.length === 0 && (
-                <p className="py-2 text-sm text-(--text-muted)">Aún no hay perfiles. Crea el primero abajo.</p>
+                <p className="py-2 text-sm text-(--text-muted)">Aún no hay perfiles. Usa «Crear perfiles recomendados» o crea uno abajo.</p>
               )}
               {perfiles.map((p) => (
                 <div
