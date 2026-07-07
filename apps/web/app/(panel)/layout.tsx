@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronRight } from "lucide-react";
+import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type NavLink, type Rol } from "../lib/nav";
@@ -148,9 +148,9 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             className={`flex h-9 items-center gap-2.5 rounded-md bg-brand text-[13px] font-medium text-brand-foreground transition-colors hover:bg-brand-hover ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
             <Monitor className="h-4 w-4 shrink-0" />{railOpen && <span>Ir al TPV</span>}
           </a>
-          <button onClick={toggleRail} title={railOpen ? "Contraer" : "Expandir"}
+          <button onClick={toggleRail} title={railOpen ? "Contraer menú" : "Expandir menú"}
             className={`flex h-9 items-center gap-2.5 rounded-md text-[13px] text-(--text-muted) transition-colors hover:bg-surface-overlay hover:text-foreground ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
-            {railOpen ? <PanelLeftClose className="h-4 w-4 shrink-0" /> : <PanelLeft className="h-4 w-4 shrink-0" />}{railOpen && <span>Contraer</span>}
+            {railOpen ? <ChevronsLeft className="h-4 w-4 shrink-0" /> : <ChevronsRight className="h-4 w-4 shrink-0" />}{railOpen && <span>Contraer</span>}
           </button>
           <div className={`mt-1 flex items-center gap-2 border-t border-border pt-2 ${railOpen ? "" : "flex-col"}`}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-surface-muted text-[12px] font-semibold text-foreground" title={info?.nombre || info?.email}>
@@ -174,9 +174,12 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           items con marcador (amarillo al activar). */}
       {verSubmenu && (
         <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
-          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3.5 text-[14px] font-semibold">
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border py-2 pl-3.5 pr-2 text-[14px] font-semibold">
             {activa.icon && <activa.icon className="h-4 w-4 shrink-0 text-(--text-muted)" aria-hidden />}
-            <span className="truncate">{activa.title}</span>
+            <span className="flex-1 truncate">{activa.title}</span>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Ocultar menú" title="Ocultar menú" onClick={toggleMenu}>
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
           </div>
           <div className="flex-1 overflow-y-auto px-2.5 py-2.5">
             {activa.sections.map((sec, si) => (
@@ -208,9 +211,9 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-surface px-3">
           <div className="flex min-w-0 items-center gap-1.5">
-            {!activa?.direct && (
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} onClick={toggleMenu}>
-                {menuOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            {!activa?.direct && !menuOpen && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Mostrar menú" title="Mostrar menú" onClick={toggleMenu}>
+                <PanelLeft className="h-4 w-4" />
               </Button>
             )}
             <nav aria-label="Ruta" className="flex min-w-0 items-center gap-1 text-[13px]">
