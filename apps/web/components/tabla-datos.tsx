@@ -201,7 +201,7 @@ export function TablaDatos<T>({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface">
       {/* Barra superior: acciones (izq.) + filtros + buscador (der.) */}
       {hayBarra && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-2 py-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {onNuevo && (
               <Button size="sm" onClick={onNuevo}><Plus className="h-4 w-4" /> Nuevo</Button>
