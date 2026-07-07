@@ -71,7 +71,7 @@ export default function Login() {
       });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "No se pudo entrar."); return; }
-      const { error } = await supabaseBrowser().auth.signInWithPassword({ email: j.email, password: clave.trim() });
+      const { error } = await supabaseBrowser().auth.signInWithPassword({ email: j.email, password: j.secret });
       if (error) setError(traducirErrorAuth(error.message));
       else window.location.href = window.gluuh ? "/inicio" : "/dashboard";
     } catch {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { randomBytes } from "node:crypto";
 
 // Login local por USUARIO (nombre) + clave (backoffice sin email). Verifica
 // (verificar_clave_operario, solo operarios sin email) y asegura una cuenta auth
@@ -27,17 +28,20 @@ export async function POST(req: Request) {
   if (!op) return NextResponse.json({ error: "Usuario o clave incorrectos" }, { status: 401 });
 
   const email = emailSintetico(op.codigo, op.tenant_id);
-  // Asegurar cuenta auth sintética con contraseña = clave (nunca toca un email real:
-  // verificar_clave_operario ya excluye operarios con email).
+  // La clave (4+ díg.) ya se verificó contra clave_hash. La contraseña de la cuenta
+  // sintética es un TOKEN aleatorio fuerte (Supabase exige ≥6) que se fija ahora y se
+  // devuelve para que el cliente inicie sesión. Nunca toca un email real (verificar
+  // excluye operarios con email).
+  const passSesion = randomBytes(24).toString("base64url");
   if (op.auth_user_id) {
-    const { error: e } = await admin.auth.admin.updateUserById(op.auth_user_id, { password: String(clave) });
+    const { error: e } = await admin.auth.admin.updateUserById(op.auth_user_id, { password: passSesion });
     if (e) return NextResponse.json({ error: e.message }, { status: 500 });
   } else {
-    const { data: creado, error: e } = await admin.auth.admin.createUser({ email, password: String(clave), email_confirm: true });
+    const { data: creado, error: e } = await admin.auth.admin.createUser({ email, password: passSesion, email_confirm: true });
     if (e || !creado.user) return NextResponse.json({ error: e?.message ?? "No se pudo preparar el acceso" }, { status: 500 });
     const { error: e2 } = await admin.from("app_user").update({ auth_user_id: creado.user.id }).eq("id", op.id);
     if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, email });
+  return NextResponse.json({ ok: true, email, secret: passSesion });
 }
