@@ -10,9 +10,9 @@ el plan de mejoras**. Decisión vigente: lo avanzado de identidad/acceso se
 # Parte A · Cómo funciona hoy
 
 ## A.0 · Dos planos de acceso (no confundir)
-1. **Backoffice (panel)** — **Supabase Auth**: email+contraseña o **passkey** →
-   sesión del navegador. Es «en qué empresa/usuario estoy». El dueño entra así
-   también **en remoto** desde casa.
+1. **Backoffice (panel)** — **Supabase Auth**: email+contraseña o **passkey**
+   (dueño/técnico/remoto), o **código+clave** de operario en el dispositivo local
+   (`0074`, vía cuenta auth sintética) → sesión del navegador con tenant/rol.
 2. **TPV (operativa)** — sobre esa sesión de dispositivo, cada **operario** se
    identifica con **PIN** o **pulsera**. Es «quién opera esta cuenta ahora».
 
@@ -149,9 +149,11 @@ Reúne hoy: **bloqueo del TPV** (`tpv.bloqueo`), **clave técnica** (cambiarla) 
 (setting DEVICE / `gluuh_device`) y no se vuelve a pedir. Reusa `activar_licencia`.
 
 **Capa 2 · Operarios (cada acción)**:
-- Operarios con **código legible tipo «admin 45689»** (nombre + número) **+ clave**,
-  **sin email**. Falta añadir el **código de operario** legible y que el login local
-  sea código+clave (hoy es nombre+PIN).
+- ✅ Operarios con **código legible** (`app_user.codigo`, número único por tenant, `0073`)
+  **+ clave de acceso** (`clave_hash`, `0074`), **sin email**. **Login local por
+  código+clave** hecho: `/api/entrar-codigo` verifica y usa una **cuenta auth
+  sintética** para dar sesión con tenant/rol (RLS + permisos aplican). El PIN sigue
+  siendo solo para el TPV.
 - **Perfiles vinculados**: añadir **`app_user.perfil_id`** y que el runtime lea el
   perfil (o resuelva `permisos` desde el perfil), en vez de copiar una vez. El menú
   del panel pasa a mirar el **perfil**, no solo el rol.
@@ -211,7 +213,7 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
 | # | Sesión | Depende de | Estado / notas |
 |---|--------|-----------|-------|
 | SA1 | **Seguridad** (zona técnica + bloqueo TPV + quién entra en config) | — | 🟡 página `/seguridad` v1 (07-07); falta bloqueo por eventos (B.3) y quién-entra por perfil |
-| SA2 | **Operarios**: login local código+clave + lista de camareros con PIN + sesión de dispositivo «recordar» + **perfil_id** + gating de panel por perfil + autoría | — | 🟡 `perfil_id` + panel-por-perfil + matriz Ágora ✅ (07-07); falta login código+clave y código legible |
+| SA2 | **Operarios**: login local código+clave + lista de camareros con PIN + sesión de dispositivo «recordar» + **perfil_id** + gating de panel por perfil + autoría | — | ✅ (07-07): perfil_id, panel-por-perfil, matriz Ágora, **código legible** (0073) y **login código+clave** (0074). Falta: sesión «recordar» del dispositivo |
 | SA3 | **Activación por licencia** + **superficies por puerta** | SA2, Electron (guía 03) | Reusa `activar_licencia` |
 | SA4 | **Abrir y cerrar día** (fondo + caja Z) **por terminal**, consolidado | — | Multi-TPV (restaurante + N barras) |
 | SA5 | **Config rápida** dentro del TPV (slide-over por perfil) | SA2 | Sin salir a la config detallada |

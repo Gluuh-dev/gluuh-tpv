@@ -147,6 +147,7 @@ CREATE TABLE app_user (
   pulsera_hash    text,            -- código de pulsera RFID/NFC hasheado (0037)
   perfil_id       uuid,            -- perfil asignado (0070); el usuario hereda perfil.permisos
   codigo          text,            -- código legible del operario, único por tenant (0073)
+  clave_hash      text,            -- clave de acceso al panel por código (bcrypt, 0074)
   pin_intentos        int NOT NULL DEFAULT 0,   -- backoff login por PIN (0054)
   pin_bloqueado_hasta timestamptz,              -- backoff login por PIN (0054)
   rol             text NOT NULL DEFAULT 'CAMARERO'

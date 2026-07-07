@@ -70,6 +70,7 @@ export default function Empleados() {
   const [b, setB] = useState<Borrador>({ nombre: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
   const [pin, setPin] = useState("");
   const [pulseraCodigo, setPulseraCodigo] = useState("");
+  const [claveAcceso, setClaveAcceso] = useState("");
   const [guardando, setGuardando] = useState(false);
 
   async function cargar() {
@@ -99,12 +100,12 @@ export default function Empleados() {
 
   function abrirAlta() {
     setB({ nombre: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
-    setPin(""); setPulseraCodigo("");
+    setPin(""); setPulseraCodigo(""); setClaveAcceso("");
     setEditor({ modo: "alta" });
   }
   function abrirEditar(e: Empleado) {
     setB({ nombre: e.nombre, email: e.email ?? "", rol: e.rol, activo: e.activo, perfil_id: e.perfil_id ?? null });
-    setPin(""); setPulseraCodigo("");
+    setPin(""); setPulseraCodigo(""); setClaveAcceso("");
     setEditor({ modo: "editar", id: e.id });
   }
 
@@ -174,6 +175,17 @@ export default function Empleados() {
     if (error) { toast.error(error.message); return; }
     toast.success(`PIN de ${emp.nombre} actualizado.`);
     setPin("");
+  }
+
+  // Clave de acceso al PANEL por código (operarios sin email). La verifica el login
+  // por código; el PIN es solo para el TPV. Distinta cosa.
+  async function cambiarClaveAcceso() {
+    if (!emp) return;
+    if (claveAcceso.trim().length < 4) { toast.error("La clave debe tener al menos 4 caracteres."); return; }
+    const { error } = await sb.rpc("cambiar_clave_operario", { p_user_id: emp.id, p_clave: claveAcceso.trim() });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Clave de acceso de ${emp.nombre} actualizada.`);
+    setClaveAcceso("");
   }
 
   const q = busqueda.trim().toLowerCase();
@@ -340,6 +352,16 @@ export default function Empleados() {
                       />
                       <Button variant="outline" disabled={pin.trim().length < 4} onClick={() => void cambiarPin()}>Guardar PIN</Button>
                     </div>
+                  </div>
+
+                  {/* Clave de acceso al PANEL por código (operarios sin email) */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="emp-clave">Clave de acceso al panel</Label>
+                    <div className="flex gap-2">
+                      <Input id="emp-clave" type="password" autoComplete="off" value={claveAcceso} onChange={(e) => setClaveAcceso(e.target.value)} placeholder="Para entrar por código (4+)" />
+                      <Button variant="outline" disabled={claveAcceso.trim().length < 4} onClick={() => void cambiarClaveAcceso()}>Guardar clave</Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">Entra al panel con su código {emp!.codigo ? <b className="font-mono">#{emp!.codigo}</b> : null} + esta clave, sin email. El PIN es solo para el TPV.</p>
                   </div>
 
                   {/* Perfil (en vivo): el usuario hereda los permisos de su perfil */}

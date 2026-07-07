@@ -20,6 +20,10 @@ export default function Login() {
   const [cargando, setCargando] = useState(false);
   const [conPasskey, setConPasskey] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Dos vías: email+contraseña (dueño/técnico/remoto) o código+clave (operario local).
+  const [modo, setModo] = useState<"email" | "codigo">("email");
+  const [codigo, setCodigo] = useState("");
+  const [clave, setClave] = useState("");
 
   useEffect(() => setMounted(true), []);
 
@@ -53,6 +57,30 @@ export default function Login() {
     }
   }
 
+  // Login local por código+clave: la ruta verifica y prepara la cuenta sintética;
+  // luego completamos la sesión con signInWithPassword (email interno devuelto).
+  async function onSubmitCodigo(e: React.FormEvent) {
+    e.preventDefault();
+    setCargando(true);
+    setError("");
+    try {
+      const r = await fetch("/api/entrar-codigo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: codigo.trim(), clave: clave.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok) { setError(j.error ?? "No se pudo entrar."); return; }
+      const { error } = await supabaseBrowser().auth.signInWithPassword({ email: j.email, password: clave.trim() });
+      if (error) setError(traducirErrorAuth(error.message));
+      else window.location.href = window.gluuh ? "/inicio" : "/dashboard";
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setCargando(false);
+    }
+  }
+
   return (
     <main className="relative grid min-h-screen place-items-center bg-background p-6 text-foreground">
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
@@ -67,22 +95,45 @@ export default function Login() {
             <CardDescription>Accede al panel de tu restaurante.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" placeholder="tucorreo@restaurante.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Contraseña</Label>
-                <PasswordInput id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              </div>
-              <Button type="submit" className="w-full" disabled={cargando}>
-                <LogIn className="h-4 w-4" /> {cargando ? "Entrando…" : "Entrar"}
-              </Button>
-              {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-            </form>
+            <div className="mb-4 flex gap-0.5 rounded-md border border-border p-0.5 text-sm">
+              <button type="button" onClick={() => { setModo("email"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "email" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Email</button>
+              <button type="button" onClick={() => { setModo("codigo"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "codigo" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Código de operario</button>
+            </div>
 
-            {mounted && passkeysSoportadas() && (
+            {modo === "email" ? (
+              <form onSubmit={onSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" autoComplete="email" placeholder="tucorreo@restaurante.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <PasswordInput id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                </div>
+                <Button type="submit" className="w-full" disabled={cargando}>
+                  <LogIn className="h-4 w-4" /> {cargando ? "Entrando…" : "Entrar"}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={onSubmitCodigo} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="codigo">Código de operario</Label>
+                  <Input id="codigo" inputMode="numeric" autoComplete="off" placeholder="12345" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="clave">Clave</Label>
+                  <PasswordInput id="clave" autoComplete="off" value={clave} onChange={(e) => setClave(e.target.value)} required />
+                </div>
+                <Button type="submit" className="w-full" disabled={cargando}>
+                  <LogIn className="h-4 w-4" /> {cargando ? "Entrando…" : "Entrar"}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">Tu código lo ves en el TPV, junto a tu nombre.</p>
+              </form>
+            )}
+
+            {error && <p className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+
+            {modo === "email" && mounted && passkeysSoportadas() && (
               <>
                 <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="h-px flex-1 bg-border" /> o <span className="h-px flex-1 bg-border" />
