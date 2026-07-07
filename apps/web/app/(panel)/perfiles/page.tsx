@@ -1,260 +1,137 @@
 "use client";
 
-// Perfiles y permisos, estilo Ágora: permiso = (Aplicación, acción). El catálogo
-// (agrupado) vive en lib/permisos.ts; aquí se editan los concedidos del perfil
-// (perfil.permisos, 0048). Desde Empleados se asigna un perfil a cada empleado
-// (app_user.perfil_id, 0070) y se copian sus permisos a app_user.permisos.
-// Si 0048 no está aplicada, el CRUD sigue y los permisos quedan deshabilitados.
-import { useEffect, useMemo, useState } from "react";
+// Listado de PERFILES sobre TablaDatos (como familias/productos): la edición va a
+// /perfiles/[id]. Los perfiles recomendados se siembran si la tabla está vacía, así
+// que siempre hay de dónde partir. Degrada si falta 0048 (perfil.permisos).
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ShieldCheck, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "@/app/lib/toast";
-import { Copy, Pencil, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
-import { CATALOGO_PERMISOS, PERFILES_RECOMENDADOS, type MapaPermisos } from "../../lib/permisos";
+import { PERFILES_RECOMENDADOS, type MapaPermisos } from "../../lib/permisos";
+import { TablaDatos, type ColumnaDatos } from "@/components/tabla-datos";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
-interface Perfil { id: string; nombre: string; descripcion: string | null; permisos?: MapaPermisos }
+interface Fila { id: string; nombre: string; descripcion: string; permisos: MapaPermisos; empleados: number }
+type PerfilRow = { id: string; nombre: string; descripcion: string | null; permisos?: MapaPermisos };
 
-const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const resumen = (p: MapaPermisos) => {
+  const bloq = Object.values(p).filter((v) => v === false).length;
+  return bloq === 0 ? "Acceso total" : `${bloq} bloqueado${bloq === 1 ? "" : "s"}`;
+};
 
-export default function Perfiles() {
-  const sb = supabaseBrowser();
-  const [tenantId, setTenantId] = useState("");
-  const [perfiles, setPerfiles] = useState<Perfil[]>([]);
-  const [selId, setSelId] = useState<string | null>(null);
+export default function PerfilesPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [filas, setFilas] = useState<Fila[]>([]);
   const [sinMigracion, setSinMigracion] = useState(false);
-  const [form, setForm] = useState({ nombre: "", descripcion: "" });
-  const [editId, setEditId] = useState<string | null>(null);
-  const [permForm, setPermForm] = useState<MapaPermisos>({});
-  const [permBusqueda, setPermBusqueda] = useState("");
-  const [guardando, setGuardando] = useState(false);
 
-  useEffect(() => {
-    void (async () => {
+  const cargar = useCallback(async () => {
+    const sb = supabaseBrowser();
+    let perfiles: PerfilRow[] = [];
+    const conPerm = await sb.from("perfil").select("id,nombre,descripcion,permisos").order("nombre");
+    if (conPerm.error) {
+      setSinMigracion(true);
+      const { data } = await sb.from("perfil").select("id,nombre,descripcion").order("nombre");
+      perfiles = (data as PerfilRow[] | null) ?? [];
+    } else {
+      perfiles = (conPerm.data as PerfilRow[] | null) ?? [];
+    }
+
+    // Sembrar recomendados si no hay ninguno (así siempre están de inicio).
+    if (perfiles.length === 0 && !conPerm.error) {
       const { data: t } = await sb.from("tenant").select("id").limit(1).maybeSingle();
-      setTenantId((t as { id: string } | null)?.id ?? "");
-      // Con permisos; si la columna no existe aún (0048 sin aplicar) → aviso.
-      const conPermisos = await sb.from("perfil").select("id,nombre,descripcion,permisos").order("nombre");
-      if (conPermisos.error) {
-        const { data } = await sb.from("perfil").select("id,nombre,descripcion").order("nombre");
-        setPerfiles((data as Perfil[]) ?? []);
-        setSinMigracion(true);
-      } else {
-        setPerfiles((conPermisos.data as Perfil[]) ?? []);
+      const tid = (t as { id: string } | null)?.id;
+      if (tid) {
+        const { error } = await sb.from("perfil").insert(
+          PERFILES_RECOMENDADOS.map((r) => ({ tenant_id: tid, nombre: r.nombre, descripcion: r.descripcion, permisos: r.permisos })),
+        );
+        if (error) toast.error(`No se pudieron crear los perfiles recomendados: ${error.message}`);
+        else {
+          const { data } = await sb.from("perfil").select("id,nombre,descripcion,permisos").order("nombre");
+          perfiles = (data as PerfilRow[] | null) ?? [];
+        }
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }
+
+    const { data: us } = await sb.from("app_user").select("perfil_id");
+    const nPor = new Map<string, number>();
+    for (const u of (us as { perfil_id: string | null }[] | null) ?? []) {
+      if (u.perfil_id) nPor.set(u.perfil_id, (nPor.get(u.perfil_id) ?? 0) + 1);
+    }
+
+    setFilas(perfiles.map((p) => ({
+      id: p.id, nombre: p.nombre, descripcion: p.descripcion ?? "",
+      permisos: p.permisos ?? {}, empleados: nPor.get(p.id) ?? 0,
+    })));
+    setLoading(false);
   }, []);
 
-  const sel = perfiles.find((p) => p.id === selId) ?? null;
+  useEffect(() => { void cargar(); }, [cargar]);
 
-  function seleccionar(p: Perfil) {
-    setSelId(p.id);
-    setPermForm({ ...(p.permisos ?? {}) });
-    setPermBusqueda("");
+  async function eliminar(f: Fila) {
+    const { error } = await supabaseBrowser().from("perfil").delete().eq("id", f.id);
+    if (error) { toast.error(`No se pudo eliminar: ${error.message}`); return; }
+    setFilas((prev) => prev.filter((x) => x.id !== f.id));
+  }
+  async function duplicar(f: Fila) {
+    const sb = supabaseBrowser();
+    const { data: t } = await sb.from("tenant").select("id").limit(1).maybeSingle();
+    const { error } = await sb.from("perfil").insert({
+      tenant_id: (t as { id: string } | null)?.id, nombre: `${f.nombre} - copia`,
+      descripcion: f.descripcion || null, permisos: f.permisos,
+    });
+    if (error) { toast.error(`No se pudo duplicar: ${error.message}`); return; }
+    toast.success("Perfil duplicado.");
+    await cargar();
   }
 
-  function abrirEditar(p: Perfil) {
-    setEditId(p.id);
-    setForm({ nombre: p.nombre, descripcion: p.descripcion ?? "" });
-  }
-
-  async function guardarFicha(e: React.FormEvent) {
-    e.preventDefault();
-    const nombre = form.nombre.trim();
-    if (!nombre) return;
-    const payload = { nombre, descripcion: form.descripcion.trim() || null };
-    if (editId) {
-      const { error } = await sb.from("perfil").update(payload).eq("id", editId);
-      if (error) { toast.error(error.message); return; }
-      setPerfiles((prev) => prev.map((p) => (p.id === editId ? { ...p, ...payload } : p)).sort((a, b) => a.nombre.localeCompare(b.nombre)));
-      setEditId(null);
-    } else {
-      const { data, error } = await sb.from("perfil").insert({ tenant_id: tenantId, ...payload }).select("id,nombre,descripcion").single();
-      if (error) { toast.error(error.message); return; }
-      const nuevo = data as Perfil;
-      setPerfiles((prev) => [...prev, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-      seleccionar(nuevo);
-    }
-    setForm({ nombre: "", descripcion: "" });
-  }
-
-  async function borrar(p: Perfil) {
-    if (!confirm(`¿Eliminar el perfil "${p.nombre}"?`)) return;
-    const { error } = await sb.from("perfil").delete().eq("id", p.id);
-    if (error) { toast.error(error.message); return; }
-    setPerfiles((prev) => prev.filter((x) => x.id !== p.id));
-    if (selId === p.id) setSelId(null);
-    if (editId === p.id) { setEditId(null); setForm({ nombre: "", descripcion: "" }); }
-  }
-
-  // Copiar perfil (como Ágora): duplica con " (copia)" y sus mismos permisos.
-  async function copiar(p: Perfil) {
-    const nombre = `${p.nombre} (copia)`;
-    const base = { tenant_id: tenantId, nombre, descripcion: p.descripcion };
-    const insert = sinMigracion ? base : { ...base, permisos: p.permisos ?? {} };
-    const cols = sinMigracion ? "id,nombre,descripcion" : "id,nombre,descripcion,permisos";
-    const { data, error } = await sb.from("perfil").insert(insert).select(cols).single();
-    if (error) { toast.error(error.message); return; }
-    const nuevo = data as unknown as Perfil;
-    setPerfiles((prev) => [...prev, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-    seleccionar(nuevo);
-    toast.success(`Perfil copiado: "${nombre}".`);
-  }
-
-  // Siembra los perfiles recomendados que aún no existan (por nombre).
-  async function crearRecomendados() {
-    const existentes = new Set(perfiles.map((p) => p.nombre.toLowerCase()));
-    const nuevos = PERFILES_RECOMENDADOS.filter((r) => !existentes.has(r.nombre.toLowerCase()));
-    if (!nuevos.length) { toast.info("Los perfiles recomendados ya existen."); return; }
-    const rows = nuevos.map((r) => ({ tenant_id: tenantId, nombre: r.nombre, descripcion: r.descripcion, ...(sinMigracion ? {} : { permisos: r.permisos }) }));
-    const cols = sinMigracion ? "id,nombre,descripcion" : "id,nombre,descripcion,permisos";
-    const { data, error } = await sb.from("perfil").insert(rows).select(cols);
-    if (error) { toast.error(error.message); return; }
-    setPerfiles((prev) => [...prev, ...((data as unknown as Perfil[]) ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-    toast.success(`Creados ${nuevos.length} perfiles recomendados.`);
-  }
-
-  async function guardarPermisos() {
-    if (!sel || sinMigracion) return;
-    setGuardando(true);
-    const { error } = await sb.from("perfil").update({ permisos: permForm }).eq("id", sel.id);
-    setGuardando(false);
-    if (error) { toast.error(error.message); return; }
-    setPerfiles((prev) => prev.map((p) => (p.id === sel.id ? { ...p, permisos: { ...permForm } } : p)));
-    toast.success(`Permisos del perfil "${sel.nombre}" guardados.`);
-  }
-
-  // Catálogo filtrado por el buscador (por permiso o por grupo).
-  const grupos = useMemo(() => {
-    const q = norm(permBusqueda.trim());
-    if (!q) return CATALOGO_PERMISOS;
-    return CATALOGO_PERMISOS
-      .map((g) => ({ ...g, permisos: g.permisos.filter((p) => norm(p.label).includes(q) || norm(g.grupo).includes(q)) }))
-      .filter((g) => g.permisos.length > 0);
-  }, [permBusqueda]);
+  const columnas: ColumnaDatos<Fila>[] = [
+    { clave: "nombre", titulo: "Nombre", valor: (f) => f.nombre, render: (f) => <span className="font-medium">{f.nombre}</span> },
+    { clave: "descripcion", titulo: "Descripción", valor: (f) => f.descripcion, render: (f) => <span className="text-muted-foreground">{f.descripcion || "—"}</span> },
+    {
+      clave: "acceso", titulo: "Acceso", valor: (f) => resumen(f.permisos),
+      render: (f) => <span className={Object.values(f.permisos).some((v) => v === false) ? "text-amber-600 dark:text-amber-500" : "text-emerald-600 dark:text-emerald-500"}>{resumen(f.permisos)}</span>,
+    },
+    { clave: "empleados", titulo: "Empleados", alinear: "der", valor: (f) => f.empleados, render: (f) => <span className="tabular-nums">{f.empleados}</span> },
+  ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader
         title="Perfiles y permisos"
-        description="Permisos por aplicación (estilo Ágora). Asigna un perfil a cada empleado en Personal; sus permisos se aplican en el TPV y en el panel."
+        description="Cada perfil define qué puede hacer y a qué zonas entra quien lo tenga. Asígnalos a los empleados en Personal."
       />
 
       {sinMigracion && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/15 px-4 py-3 text-sm text-amber-600 dark:text-amber-500">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <p>
-            Falta aplicar la migración <strong>0048</strong> (columna <code>perfil.permisos</code>) en la
-            base de datos. Puedes crear y editar perfiles, pero sus permisos no se pueden guardar todavía.
-          </p>
+          <p>Falta la migración <strong>0048</strong> (<code>perfil.permisos</code>): los permisos no se pueden editar.</p>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-        {/* Lista + alta/edición */}
-        <Card className="self-start">
-          <CardContent className="space-y-3">
-            <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => void crearRecomendados()}>
-              <Sparkles className="h-4 w-4" /> Crear perfiles recomendados
-            </Button>
-            <div className="space-y-1">
-              {perfiles.length === 0 && (
-                <p className="py-2 text-sm text-(--text-muted)">Aún no hay perfiles. Usa «Crear perfiles recomendados» o crea uno abajo.</p>
-              )}
-              {perfiles.map((p) => (
-                <div
-                  key={p.id}
-                  className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm ${
-                    selId === p.id ? "bg-surface-muted font-medium" : "hover:bg-surface-overlay"
-                  }`}
-                >
-                  <button type="button" onClick={() => seleccionar(p)} className="flex-1 text-left">
-                    <span>{p.nombre}</span>
-                    {p.descripcion && <span className="block text-xs font-normal text-(--text-muted)">{p.descripcion}</span>}
-                  </button>
-                  <button type="button" onClick={() => void copiar(p)} aria-label={`Copiar ${p.nombre}`} title="Copiar perfil"
-                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100">
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" onClick={() => abrirEditar(p)} aria-label={`Editar ${p.nombre}`} title="Editar"
-                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" onClick={() => void borrar(p)} aria-label={`Eliminar ${p.nombre}`} title="Eliminar"
-                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-destructive group-hover:opacity-100">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={guardarFicha} className="space-y-2 border-t border-border pt-3">
-              <div className="space-y-1.5">
-                <Label>{editId ? "Editar perfil" : "Nuevo perfil"}</Label>
-                <Input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre (p. ej. Encargado)" />
-              </div>
-              <Textarea rows={2} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} placeholder="Descripción (opcional)" />
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={!form.nombre.trim()}>
-                  {editId ? "Guardar cambios" : <><Plus className="h-4 w-4" /> Crear perfil</>}
-                </Button>
-                {editId && (
-                  <Button type="button" size="sm" variant="outline" onClick={() => { setEditId(null); setForm({ nombre: "", descripcion: "" }); }}>
-                    Cancelar
-                  </Button>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Matriz de permisos del perfil seleccionado */}
-        <Card className="self-start">
-          <CardContent>
-            {!sel ? (
-              <p className="py-6 text-center text-sm text-(--text-muted)">Selecciona un perfil para editar sus permisos.</p>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <h3 className="font-semibold">Permisos de {sel.nombre}</h3>
-                  <p className="text-sm text-(--text-muted)">Marcado = permitido. Desmarca lo que quieras bloquear a quien tenga este perfil.</p>
-                </div>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                  <Input className="pl-8" placeholder="Buscar permiso…" value={permBusqueda} onChange={(e) => setPermBusqueda(e.target.value)} />
-                </div>
-                <div className="space-y-4">
-                  {grupos.map((g) => (
-                    <div key={g.grupo} className="space-y-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{g.grupo}</p>
-                      {g.permisos.map((p) => (
-                        <label key={p.id} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={permForm[p.id] !== false}
-                            disabled={sinMigracion}
-                            onChange={(e) => setPermForm((s) => ({ ...s, [p.id]: e.target.checked }))}
-                          />
-                          {p.label}
-                        </label>
-                      ))}
-                    </div>
-                  ))}
-                  {grupos.length === 0 && <p className="py-4 text-center text-sm text-(--text-muted)">Sin permisos para «{permBusqueda}».</p>}
-                </div>
-                <Button onClick={() => void guardarPermisos()} disabled={sinMigracion || guardando}>
-                  {guardando ? "Guardando…" : "Guardar permisos"}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {!loading && filas.length === 0 ? (
+        <EmptyState
+          icon={<ShieldCheck className="h-8 w-8" />}
+          title="Sin perfiles todavía"
+          description="Crea el primer perfil de permisos."
+          action={<Button onClick={() => router.push("/perfiles/nuevo")}><Plus className="h-4 w-4" /> Nuevo</Button>}
+        />
+      ) : (
+        <TablaDatos
+          columnas={columnas}
+          filas={filas}
+          idDe={(f) => f.id}
+          onNuevo={() => router.push("/perfiles/nuevo")}
+          onAbrir={(f) => router.push(`/perfiles/${f.id}`)}
+          onCopiar={duplicar}
+          onEliminar={eliminar}
+          exportarNombre="perfiles"
+          cargando={loading}
+        />
+      )}
     </div>
   );
 }
