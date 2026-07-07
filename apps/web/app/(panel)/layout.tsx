@@ -11,6 +11,7 @@ import { permite, permisoZona, type MapaPermisos } from "../lib/permisos";
 import { modulosInactivos } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
+import { StatusBar } from "@/components/status-bar";
 import { CommandPalette } from "@/components/command-palette";
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos }
@@ -229,6 +230,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             </div>
           ) : children}
         </main>
+        <StatusBar empresa={info?.empresa} />
       </div>
     </div>
   );
