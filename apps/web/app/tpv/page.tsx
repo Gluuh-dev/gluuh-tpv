@@ -572,11 +572,16 @@ export default function TPV() {
       .catch(() => { /* orden por defecto */ });
   }, []);
 
-  /* ── Permisos del operario activo (qué puede hacer en el TPV) ── */
+  /* ── Permisos del operario activo (qué puede hacer en el TPV) ──
+     En vivo (como Ágora): si el operario tiene perfil, mandan los permisos del
+     perfil; si no, los suyos propios (compat). Editar el perfil se refleja aquí. */
   useEffect(() => {
     if (!operario) { setPermisos({}); return; }
-    sb.from("app_user").select("permisos").eq("id", operario.id).maybeSingle()
-      .then(({ data }) => setPermisos((data?.permisos as Record<string, boolean>) ?? {}));
+    sb.from("app_user").select("permisos,perfil(permisos)").eq("id", operario.id).maybeSingle()
+      .then(({ data }) => {
+        const d = data as { permisos?: Record<string, boolean>; perfil?: { permisos?: Record<string, boolean> } | null } | null;
+        setPermisos((d?.perfil?.permisos ?? d?.permisos) ?? {});
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operario]);
 

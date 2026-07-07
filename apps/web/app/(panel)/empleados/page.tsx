@@ -22,7 +22,6 @@ import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
 import { type MapaPermisos } from "../../lib/permisos";
 
-interface Permisos { modificar?: boolean; descuento?: boolean; borrar?: boolean; invitar?: boolean; cobrar?: boolean }
 interface Empleado {
   id: string;
   nombre: string;
@@ -42,21 +41,7 @@ const ROLES = [
   { v: "ENCARGADO", t: "Encargado/a" },
 ];
 
-const PERMISOS: [keyof Permisos, string][] = [
-  ["modificar", "Modificar la cuenta (cantidades, precio, notas)"],
-  ["descuento", "Aplicar descuentos"],
-  ["borrar", "Borrar / anular cuenta"],
-  ["invitar", "Invitaciones y consumo propio"],
-  ["cobrar", "Cobrar"],
-];
-
 const rolTexto = (v: string) => ROLES.find((r) => r.v === v)?.t ?? v;
-
-// Ausente/true = permitido; sólo cuenta como bloqueado un `false` explícito.
-function resumenPermisos(p?: MapaPermisos | null): string {
-  const activos = PERMISOS.filter(([k]) => p?.[k] !== false).length;
-  return activos === PERMISOS.length ? "Todos" : `${activos} de ${PERMISOS.length}`;
-}
 
 const estaBloqueado = (e: Empleado) =>
   !!e.pin_bloqueado_hasta && new Date(e.pin_bloqueado_hasta).getTime() > Date.now();
@@ -139,7 +124,7 @@ export default function Empleados() {
       toast.success(`Empleado «${b.nombre.trim()}» creado con su PIN.`);
     } else {
       const { error } = await sb.from("app_user").update({
-        nombre: b.nombre.trim(), email: b.email.trim() || null, rol: b.rol, activo: b.activo, permisos: b.permisos, perfil_id: b.perfil_id,
+        nombre: b.nombre.trim(), email: b.email.trim() || null, rol: b.rol, activo: b.activo, perfil_id: b.perfil_id,
       }).eq("id", editor.id);
       setGuardando(false);
       if (error) { toast.error(error.message); return; }
@@ -227,7 +212,7 @@ export default function Empleados() {
               <TableHead>Rol</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-center">Pulsera</TableHead>
-              <TableHead>Permisos</TableHead>
+              <TableHead>Perfil</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -265,7 +250,7 @@ export default function Empleados() {
                     ? <Check className="mx-auto h-4 w-4 text-emerald-500" aria-label="Con pulsera" />
                     : <span className="text-(--text-muted)" aria-label="Sin pulsera">—</span>}
                 </TableCell>
-                <TableCell className="text-(--text-secondary)">{resumenPermisos(e.permisos)}</TableCell>
+                <TableCell className="text-(--text-secondary)">{perfiles.find((p) => p.id === e.perfil_id)?.nombre ?? "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -353,31 +338,21 @@ export default function Empleados() {
                     </div>
                   </div>
 
-                  {/* Perfil + permisos */}
+                  {/* Perfil (en vivo): el usuario hereda los permisos de su perfil */}
                   <div className="space-y-2">
                     <Label>Perfil</Label>
                     {perfiles.length > 0 ? (
-                      <Select value={b.perfil_id ?? undefined} onValueChange={(id) => { const p = perfiles.find((x) => x.id === id); setB((s) => ({ ...s, perfil_id: id, permisos: p ? { ...(p.permisos ?? {}) } : s.permisos })); }}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Sin perfil — permisos manuales" /></SelectTrigger>
+                      <Select value={b.perfil_id ?? undefined} onValueChange={(id) => setB((s) => ({ ...s, perfil_id: id }))}>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Sin perfil (acceso completo)" /></SelectTrigger>
                         <SelectContent>{perfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-[11px] text-muted-foreground">Crea perfiles en Administración → Perfiles y permisos para asignarlos aquí.</p>
+                      <p className="text-[11px] text-muted-foreground">Crea perfiles en <a href="/perfiles" className="underline underline-offset-2">Perfiles y permisos</a> para asignarlos aquí.</p>
                     )}
-                    <p className="text-[11px] text-muted-foreground">El perfil decide sus permisos del TPV y a qué zonas del panel entra. Abajo puedes ajustar los del TPV para este empleado.</p>
-                    <Label className="pt-1">Permisos rápidos del TPV</Label>
-                    <div className="space-y-1.5">
-                      {PERMISOS.map(([k, t]) => (
-                        <label key={k} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px]">
-                          <input
-                            type="checkbox"
-                            checked={b.permisos[k] !== false}
-                            onChange={(e) => setB((s) => ({ ...s, permisos: { ...s.permisos, [k]: e.target.checked } }))}
-                          />
-                          {t}
-                        </label>
-                      ))}
-                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Los permisos (TPV y zonas del panel) los decide el <strong>perfil</strong>. Edítalos en{" "}
+                      <a href="/perfiles" className="underline underline-offset-2">Perfiles y permisos</a>: el cambio afecta a la vez a todos sus usuarios.
+                    </p>
                   </div>
 
                   {/* Pulsera */}
