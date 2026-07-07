@@ -56,14 +56,14 @@ Se añaden más grupos conforme se cablea su aplicación (caja, almacén, inform
 > mecánica y 3 perfiles: Administrador/Encargado/Camarero + algún permiso suelto).
 > Por eso el catálogo lo definimos nosotros con su estructura y lo ampliamos.
 
-## A.3 · Perfiles — tabla `perfil` · ✅ vinculados 07-07-2026
-- `perfil` (`0020`) + `permisos` jsonb (`0048`): CRUD en **`/perfiles`**, ahora como
+## A.3 · Perfiles — tabla `perfil` · ✅ en vivo 07-07-2026
+- `perfil` (`0020`) + `permisos` jsonb (`0048`): CRUD en **`/perfiles`**, como
   **matriz estilo Ágora** (permisos agrupados por aplicación + buscador + copiar perfil).
-- **Vínculo real (`0070`)**: `app_user.perfil_id` liga el operario a su perfil. En
-  `/empleados`, asignar un perfil **copia** `perfil.permisos` a `app_user.permisos`
-  y guarda `perfil_id`.
-- Semántica: `app_user.permisos` es el conjunto **efectivo** (lo leen el TPV y el
-  panel); el perfil es la **plantilla** que lo rellena y se puede reajustar por empleado.
+- **Vínculo (`0070`)**: `app_user.perfil_id` liga el operario a su perfil. En
+  `/empleados` el usuario **solo elige perfil** (sin permisos sueltos por usuario).
+- **En vivo (modelo Ágora)**: el TPV y el panel resuelven los permisos **del perfil**
+  (`perfil(permisos)` vía `perfil_id`); **editar un perfil afecta a la vez a todos sus
+  usuarios**. Sin perfil → `app_user.permisos` propios (compat) o todo permitido.
 
 ## A.4 · En el TPV: identificación, velo y atribución (implementado)
 - **Identificación**: sin operario → **rejilla de operarios** (`listar_operarios`)
@@ -82,8 +82,8 @@ Se añaden más grupos conforme se cablea su aplicación (caja, almacén, inform
 ## A.5 · En el panel: rol + perfil · ✅ 07-07-2026
 - El menú (`lib/nav.ts`) filtra por **rol** (4 valores) + **módulos** (licencia).
 - **Y ahora por perfil**: el layout oculta una zona del menú si su permiso
-  `panel.<id>` está a `false` en `app_user.permisos`. **PROPIETARIO** lo ve todo (no
-  se autobloquea) y sin permisos = todo visible (compatibilidad).
+  `panel.<id>` está a `false` en los permisos **efectivos** (del perfil, o propios si
+  no tiene). **PROPIETARIO** lo ve todo (no se autobloquea); sin permisos = todo visible.
 
 ## A.6 · Zona técnica (candado del instalador)
 - `tenant.clave_tecnica_hash` (`0045`) + RPCs `validar_clave_tecnica` /
