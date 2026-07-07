@@ -28,7 +28,26 @@ tarea (y se registra la sesión en `docs/sesiones/`).
 
 ---
 
-## BLOQUE A — Remates de identidad y plataforma (~1 día) ← EMPEZAR AQUÍ
+## Avance sesión noche 07-07 (revisar por la mañana)
+
+- ✅ **Bloque A completo** (A1-A6): rate-limit en entrar-operario; gestión de
+  empresa en /admin (reset password, renovar licencia, regenerar código, email
+  de contacto); guard del TPV a /cambiar-password; empleados con perfil en el
+  alta. `cambiar_pin` ya existía; A4/A6 ya estaban.
+- ✅ **B1**: config Cloudflare/OpenNext lista (`wrangler.jsonc`,
+  `open-next.config.ts`, scripts `deploy:cf`, deps, `DEPLOY.md`). Falta
+  desplegar (necesita tu cuenta Cloudflare) — bloque B2-B5.
+- ✅ **Bloque C impresión** (C1-C5): migración 0079 (printer/print_job/
+  print_route); página /impresoras (CRUD + probar + enrutado por barra);
+  despachador en Desktop (PrintDispatcher, realtime, reclamo atómico); enrutado
+  de comandas (elegirImpresora verificado; móvil encola a la cola compartida).
+- ⏳ **Pendiente probar en vivo** con Desktop + impresoras reales; el móvil→cocina
+  ya está cableado por la cola.
+
+Siguiente: **Bloque D** (abajo) y luego **B2-B5** (desplegar) cuando tengas la
+cuenta Cloudflare a mano.
+
+## BLOQUE A — Remates de identidad y plataforma (~1 día) ← HECHO ✅
 
 | # | Tarea | Dónde | Listo cuando |
 |---|---|---|---|

@@ -37,6 +37,19 @@ interface Dispositivo {
   grupo_punto_venta_id: string | null;
   /** Estación del monitor KDS (0068); null = la global del módulo Cocina. */
   estacion: string | null;
+  /** Última señal de vida del equipo (0080); null = nunca conectó. */
+  ultima_conexion?: string | null;
+}
+
+// "En línea" si latió en los últimos 3 min; si no, hace cuánto (aprox.).
+function estadoConexion(iso: string | null | undefined): { enLinea: boolean; texto: string } | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 180_000) return { enLinea: true, texto: "En línea" };
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return { enLinea: false, texto: `hace ${min} min` };
+  const h = Math.floor(min / 60);
+  return { enLinea: false, texto: h < 24 ? `hace ${h} h` : `hace ${Math.floor(h / 24)} d` };
 }
 
 interface GrupoPV { id: string; nombre: string }
@@ -95,7 +108,11 @@ function FilaDispositivo({ d, gruposPV, onGrupo, onEstacion, onDesvincular }: {
         <p className="truncate text-[12.5px] font-medium">{d.nombre}</p>
         <p className="text-[11px]">
           {d.vinculado_at
-            ? <span className="text-emerald-500">Vinculado</span>
+            ? (() => {
+                const c = estadoConexion(d.ultima_conexion);
+                if (!c) return <span className="text-emerald-500">Vinculado</span>;
+                return <span className={c.enLinea ? "text-emerald-500" : "text-muted-foreground"}>{c.enLinea ? "● En línea" : `○ ${c.texto}`}</span>;
+              })()
             : codigoVivo(d)
               ? <span className="tabular-nums text-amber-500">Esperando el código {d.codigo_vinculacion}</span>
               : <span className="text-muted-foreground">Sin vincular</span>}
@@ -389,7 +406,7 @@ export default function Modulos() {
     const sb = supabaseBrowser();
     // Con grupo de puntos de venta (0067) y estación del monitor (0068);
     // si faltan las columnas, degrada por tramos.
-    const BASE = "id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at";
+    const BASE = "id, nombre, tipo, modulo, codigo_vinculacion, codigo_expira, vinculado_at, ultima_conexion";
     const r0 = await sb.from("device").select(`${BASE}, grupo_punto_venta_id, estacion`).order("created_at", { ascending: false });
     if (!r0.error) {
       setDispositivos((r0.data as Dispositivo[]) ?? []);

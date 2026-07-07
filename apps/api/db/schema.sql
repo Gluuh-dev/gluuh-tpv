@@ -106,6 +106,9 @@ CREATE TABLE device (
   grupo_punto_venta_id uuid REFERENCES grupo_punto_venta(id) ON DELETE SET NULL,
   -- Estación del monitor KDS (0068); null = la global del módulo Cocina
   estacion        text,
+  -- Salud del parque (0080): heartbeat y versión de la app del equipo
+  ultima_conexion timestamptz,
+  version         text,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );

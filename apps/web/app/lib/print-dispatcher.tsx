@@ -63,6 +63,11 @@ export function PrintDispatcher() {
       for (const j of (pend as { id: string; printer_id: string }[] | null) ?? []) await procesar(j.id, j.printer_id);
     })();
 
+    // Heartbeat: marca este equipo "en línea" para el panel de dispositivos (D1).
+    const latir = () => { void sb.rpc("device_heartbeat", { p_device: miDevice, p_version: g!.version ?? null }); };
+    latir();
+    const heartbeat = setInterval(latir, 60_000);
+
     // Nuevos trabajos en tiempo real.
     const canal = sb.channel("print_job_dispatch")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "print_job" }, (payload) => {
@@ -71,7 +76,7 @@ export function PrintDispatcher() {
       })
       .subscribe();
 
-    return () => { vivo = false; void sb.removeChannel(canal); };
+    return () => { vivo = false; clearInterval(heartbeat); void sb.removeChannel(canal); };
   }, []);
 
   return null;
