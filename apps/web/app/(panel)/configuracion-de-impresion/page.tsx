@@ -21,8 +21,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 
 type Ancho = 58 | 80;
 // Misma forma que ConfigImpresion (lib/impresion.ts, la única fuente de verdad),
@@ -41,16 +39,6 @@ const DOCS = [
   { k: "COMANDA_BARRA", t: "Comanda de barra" },
   { k: "TICKET_CAMARERO", t: "Ticket para camarero" },
 ];
-// Toggles booleanos del diseño, agrupados como en el ticket: cabecera y cuerpo.
-type ToggleKey = "nombre" | "cif" | "direccion" | "fecha" | "mesaOperario" | "lineas" | "desglose" | "total" | "qr" | "logo";
-const TOGGLES_CABECERA: [ToggleKey, string][] = [
-  ["nombre", "Nombre del local"], ["cif", "CIF"], ["direccion", "Dirección"],
-];
-const TOGGLES_CUERPO: [ToggleKey, string][] = [
-  ["fecha", "Fecha y hora"], ["mesaOperario", "Mesa y camarero"], ["lineas", "Líneas del pedido"],
-  ["desglose", "Desglose de impuestos"], ["total", "Total"],
-];
-
 function Toggle({ on, onClick, label }: { on: boolean; onClick(): void; label: string }) {
   return (
     <button type="button" onClick={onClick} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent">
@@ -102,9 +90,6 @@ export default function ConfiguracionImpresion() {
     })();
   }, []);
 
-  function setTicket<K extends keyof DisenoTicket>(k: K, v: DisenoTicket[K]) {
-    setCfg((c) => ({ ...c, ticket: { ...c.ticket, [k]: v } }));
-  }
   function addImpresora() {
     setCfg((c) => ({
       ...c,
@@ -172,70 +157,17 @@ export default function ConfiguracionImpresion() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
-          {/* Diseño del ticket */}
+          {/* El diseño del ticket vive en Plantillas de ticket (Administración → General). */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Diseño del ticket</CardTitle>
-              <CardDescription>El ticket se imprime en blanco y negro. Elige qué líneas quieres mostrar.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="flex items-center gap-2">
-                <Label className="text-sm">Ancho de papel</Label>
-                {[58, 80].map((a) => (
-                  <button key={a} type="button" onClick={() => setTicket("anchoMm", a as Ancho)}
-                    className={`rounded-md border px-3 py-1.5 text-sm ${cfg.ticket.anchoMm === a ? "border-brand bg-brand/10 text-brand" : "border-border"}`}>
-                    {a} mm
-                  </button>
-                ))}
+            <CardContent className="flex items-center justify-between gap-3 pt-6">
+              <div className="flex items-center gap-2.5 text-sm">
+                <Printer className="h-4 w-4 text-muted-foreground" aria-hidden />
+                <span>
+                  <span className="block font-medium">Diseño del ticket</span>
+                  <span className="block text-[11px] text-muted-foreground">Cabecera, líneas, pie y QR se editan en Plantillas de ticket.</span>
+                </span>
               </div>
-
-              {/* Cabecera */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cabecera</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="flex items-center gap-2">
-                    <div className="min-w-0 flex-1"><Toggle label="Logo de tickets" on={!!cfg.ticket.logo} onClick={() => setTicket("logo", !cfg.ticket.logo)} /></div>
-                    {logoUrl && <img src={logoUrl} alt="Logo de tickets" className="h-9 w-9 shrink-0 rounded border border-border bg-white object-contain p-0.5" />}
-                  </div>
-                  {TOGGLES_CABECERA.map(([k, t]) => (
-                    <Toggle key={k} label={t} on={cfg.ticket[k] !== false} onClick={() => setTicket(k, cfg.ticket[k] === false)} />
-                  ))}
-                </div>
-                {cfg.ticket.logo && !logoUrl && (
-                  <p className="text-xs text-muted-foreground">No hay logo de tickets ni de marca: añádelo en Personalización → Marca.</p>
-                )}
-                {cfg.ticket.logo && (
-                  <p className="text-xs text-muted-foreground">El logo se imprime desde el navegador y en la vista previa; en térmicas ESC/POS está pendiente.</p>
-                )}
-                <div className="space-y-1.5">
-                  <Label>Texto bajo el nombre</Label>
-                  <Textarea rows={2} value={cfg.ticket.cabecera ?? ""} onChange={(e) => setTicket("cabecera", e.target.value)} placeholder={"Cafetería · Terraza"} />
-                </div>
-              </div>
-
-              {/* Cuerpo */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cuerpo</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {TOGGLES_CUERPO.map(([k, t]) => (
-                    <Toggle key={k} label={t} on={cfg.ticket[k] !== false} onClick={() => setTicket(k, cfg.ticket[k] === false)} />
-                  ))}
-                </div>
-              </div>
-
-              {/* Pie */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pie</p>
-                <div className="space-y-1.5">
-                  <Label>Mensaje de pie (una frase por línea)</Label>
-                  <Textarea rows={3} value={cfg.ticket.pie ?? ""} onChange={(e) => setTicket("pie", e.target.value)} placeholder={"¡Gracias por su visita!\nSíguenos en @mibar"} />
-                </div>
-                <Toggle label="QR VERI*FACTU + leyenda" on={cfg.ticket.qr !== false} onClick={() => setTicket("qr", cfg.ticket.qr === false)} />
-                <p className="text-xs text-muted-foreground">
-                  Con VERI*FACTU activo, el QR y la leyenda son obligatorios en facturas reales y no se pueden quitar
-                  (hoy VERI*FACTU está desactivado: este ajuste solo afecta a la vista previa y a tickets de prueba).
-                </p>
-              </div>
+              <Link href="/plantillas-ticket" className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-surface-overlay">Editar diseño</Link>
             </CardContent>
           </Card>
 
