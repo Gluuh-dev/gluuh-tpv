@@ -35,11 +35,11 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
       const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
-      // En vivo: el usuario refleja los permisos de su perfil (perfil_id); si no
-      // tiene perfil, los suyos propios (compat). Editar el perfil se refleja al recargar.
-      const { data: u } = await sb.from("app_user").select("nombre,rol,permisos,perfil(permisos)").eq("auth_user_id", session.user.id).maybeSingle();
+      // En vivo: el usuario hereda los permisos de su perfil (perfil_id); sin
+      // perfil = acceso completo. Editar el perfil se refleja al recargar.
+      const { data: u } = await sb.from("app_user").select("nombre,rol,perfil(permisos)").eq("auth_user_id", session.user.id).maybeSingle();
       const perfilRel = (u as { perfil?: { permisos?: MapaPermisos } | null } | null)?.perfil;
-      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: (perfilRel?.permisos ?? (u?.permisos as MapaPermisos)) ?? {} });
+      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: perfilRel?.permisos ?? {} });
       setLoading(false);
     })();
   }, [router]);

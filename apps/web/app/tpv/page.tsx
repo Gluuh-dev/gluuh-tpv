@@ -577,10 +577,10 @@ export default function TPV() {
      perfil; si no, los suyos propios (compat). Editar el perfil se refleja aquí. */
   useEffect(() => {
     if (!operario) { setPermisos({}); return; }
-    sb.from("app_user").select("permisos,perfil(permisos)").eq("id", operario.id).maybeSingle()
+    sb.from("app_user").select("perfil(permisos)").eq("id", operario.id).maybeSingle()
       .then(({ data }) => {
-        const d = data as { permisos?: Record<string, boolean>; perfil?: { permisos?: Record<string, boolean> } | null } | null;
-        setPermisos((d?.perfil?.permisos ?? d?.permisos) ?? {});
+        const d = data as { perfil?: { permisos?: Record<string, boolean> } | null } | null;
+        setPermisos(d?.perfil?.permisos ?? {});
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operario]);

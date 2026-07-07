@@ -145,8 +145,7 @@ CREATE TABLE app_user (
   password_hash   text,            -- Argon2/bcrypt (backoffice)
   pin_hash        text,            -- PIN del camarero en TPV/comandera
   pulsera_hash    text,            -- código de pulsera RFID/NFC hasheado (0037)
-  permisos        jsonb NOT NULL DEFAULT '{}',  -- flags de permisos en el TPV (0041)
-  perfil_id       uuid,            -- perfil asignado; FK abajo, tras CREATE TABLE perfil (0070)
+  perfil_id       uuid,            -- perfil asignado (0070); el usuario hereda perfil.permisos
   pin_intentos        int NOT NULL DEFAULT 0,   -- backoff login por PIN (0054)
   pin_bloqueado_hasta timestamptz,              -- backoff login por PIN (0054)
   rol             text NOT NULL DEFAULT 'CAMARERO'

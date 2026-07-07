@@ -4,7 +4,7 @@
 // fila, se abre un panel lateral (slide-over) con la edición del empleado. El
 // botón "Nuevo empleado" abre el mismo panel en modo alta.
 //   · alta:        RPC crear_empleado(p_nombre,p_email,p_rol,p_pin)
-//   · datos/perm.: UPDATE directo sobre app_user (nombre,email,rol,activo,permisos)
+//   · datos:       UPDATE directo sobre app_user (nombre,email,rol,activo,perfil_id)
 //   · pulsera:     RPC asignar_pulsera(p_user_id,p_codigo)  (p_codigo="" => quita)
 //   · desbloqueo:  UPDATE app_user (pin_intentos=0, pin_bloqueado_hasta=null)
 //   · cambiar PIN: RPC cambiar_pin(p_user_id,p_pin)  ← ver nota más abajo.
@@ -20,7 +20,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
-import { type MapaPermisos } from "../../lib/permisos";
 
 interface Empleado {
   id: string;
@@ -28,12 +27,11 @@ interface Empleado {
   email: string | null;
   rol: string;
   activo: boolean;
-  permisos?: MapaPermisos | null;
   perfil_id?: string | null;
   pulsera_hash?: string | null;
   pin_bloqueado_hasta?: string | null;
 }
-interface Perfil { id: string; nombre: string; permisos?: MapaPermisos }
+interface Perfil { id: string; nombre: string }
 
 const ROLES = [
   { v: "CAMARERO", t: "Camarero/a" },
@@ -46,7 +44,7 @@ const rolTexto = (v: string) => ROLES.find((r) => r.v === v)?.t ?? v;
 const estaBloqueado = (e: Empleado) =>
   !!e.pin_bloqueado_hasta && new Date(e.pin_bloqueado_hasta).getTime() > Date.now();
 
-type Borrador = { nombre: string; email: string; rol: string; activo: boolean; permisos: MapaPermisos; perfil_id: string | null };
+type Borrador = { nombre: string; email: string; rol: string; activo: boolean; perfil_id: string | null };
 type Editor = { modo: "alta" } | { modo: "editar"; id: string };
 
 function Switch({ checked, onChange, label }: { checked: boolean; onChange(): void; label: string }) {
@@ -68,7 +66,7 @@ export default function Empleados() {
   const [busqueda, setBusqueda] = useState("");
 
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [b, setB] = useState<Borrador>({ nombre: "", email: "", rol: "CAMARERO", activo: true, permisos: {}, perfil_id: null });
+  const [b, setB] = useState<Borrador>({ nombre: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
   const [pin, setPin] = useState("");
   const [pulseraCodigo, setPulseraCodigo] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -76,11 +74,11 @@ export default function Empleados() {
   async function cargar() {
     const { data } = await sb
       .from("app_user")
-      .select("id,nombre,email,rol,activo,permisos,perfil_id,pulsera_hash,pin_bloqueado_hasta")
+      .select("id,nombre,email,rol,activo,perfil_id,pulsera_hash,pin_bloqueado_hasta")
       .order("nombre");
     setLista((data as Empleado[]) ?? []);
-    // Perfiles = plantilla de permisos (0048). Si no está aplicada, no se muestra.
-    const perf = await sb.from("perfil").select("id,nombre,permisos").order("nombre");
+    // Perfiles para el selector (el usuario hereda sus permisos por perfil_id).
+    const perf = await sb.from("perfil").select("id,nombre").order("nombre");
     setPerfiles(perf.error ? [] : ((perf.data as Perfil[]) ?? []));
   }
   useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, []);
@@ -99,12 +97,12 @@ export default function Empleados() {
   function cerrar() { setEditor(null); }
 
   function abrirAlta() {
-    setB({ nombre: "", email: "", rol: "CAMARERO", activo: true, permisos: {}, perfil_id: null });
+    setB({ nombre: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
     setPin(""); setPulseraCodigo("");
     setEditor({ modo: "alta" });
   }
   function abrirEditar(e: Empleado) {
-    setB({ nombre: e.nombre, email: e.email ?? "", rol: e.rol, activo: e.activo, permisos: { ...(e.permisos ?? {}) }, perfil_id: e.perfil_id ?? null });
+    setB({ nombre: e.nombre, email: e.email ?? "", rol: e.rol, activo: e.activo, perfil_id: e.perfil_id ?? null });
     setPin(""); setPulseraCodigo("");
     setEditor({ modo: "editar", id: e.id });
   }
