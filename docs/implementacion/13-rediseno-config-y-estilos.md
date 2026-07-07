@@ -69,7 +69,13 @@ entre páginas, con `staleTime` e invalidación al crear/editar/eliminar.
 
 ## Sesiones (por orden de ejecución)
 
-### S1 · Empresa y Local  ★ EN CURSO
+### S1 · Empresa y Local  ✔ campos hechos (07-07-2026)
+> Hecho: `/ajustes` rehecho como ficha profesional a dos columnas (Datos
+> administrativos · Contacto · Ubicación · Fiscalidad) + migración **0069**
+> (columnas de empresa/ubicación/contacto en `location`). Pendiente de esta
+> sesión: sacar de la página el **bloqueo TPV** (→ S2), la **marca** (→ S3) y el
+> **orden de botones** (→ S4), y el **footer E1**.
+
 Rehacer `/ajustes` (`app/(panel)/ajustes/page.tsx`) como **ficha de empresa
 profesional** con los bloques de la referencia del cliente (captura Ágora):
 
@@ -167,6 +173,13 @@ pendiente — PrintJob no soporta imagen»).
 - **Persistencia:** ajustes de comportamiento (bloqueo, orden de botones) siguen
   en `setting` (GLOBAL/LOCAL/DEVICE), no en columnas nuevas (regla del repo).
   Datos de empresa/local → columnas de `location` (S1).
+- **Copia en la nube de la config del terminal (por hacer):** el `config.json`
+  del escritorio (IP del servidor, impresora, backup) ya es editable desde
+  Configuración (`components/config-terminal.tsx`), pero vive **solo en local**.
+  Guardarlo TAMBIÉN en `setting` ámbito **DEVICE** (Supabase) como respaldo, para
+  recuperarlo si se pierde el equipo. Necesita la identidad de dispositivo limpia
+  (guía 14). Es el destino que ya anticipa el `ponytail:` de
+  `apps/desktop/src/config.ts` («config.json migra a setting DEVICE»).
 - **BD por MCP** (token personal ya configurado); espejo en `apps/api/db/schema.sql`.
 - Orden sugerido: **E1 → E2 → S1 → S5 → S2 → S3 → S4 → S6** (los estilos primero
   para no rehacer footers; S5 es barato y quita la confusión del menú cuanto

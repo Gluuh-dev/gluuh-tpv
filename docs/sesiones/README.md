@@ -10,4 +10,5 @@ El estado global del producto (✅/🟡/❌) vive en el
 
 | Fecha | Frente trabajado |
 |-------|------------------|
-| [06-07-2026](2026-07-06-traspaso.md) | Catálogo modelo Glop (m2m producto–categoría, `mostrar_venta`), endurecimiento BD (0061–0063), TPV adaptado · Sesión 2: reorganización completa de `docs/` y skill `gluuh-registro` · Sesión 3: **Fase 2 — biblioteca de modificadores con herencia** COMPLETA (0064 aplicada y registrada por MCP, semilla en Bar Demo, herencia verificada en vivo) |
+| [06-07-2026](2026-07-06-traspaso.md) | Catálogo modelo Glop (m2m producto–categoría, `mostrar_venta`), endurecimiento BD (0061–0063), TPV adaptado · Sesión 2: reorganización completa de `docs/` y skill `gluuh-registro` · Sesión 3: **Fase 2 — biblioteca de modificadores con herencia** COMPLETA (0064 aplicada y registrada por MCP, semilla en Bar Demo, herencia verificada en vivo) · Sesiones 4–10: fichas Ágora (0065), color categoría (0066), catálogo relleno, Fase 3b (0067), monitores/impresoras (0068), Sileo |
+| [07-07-2026](2026-07-07-traspaso.md) | TablaDatos (barra Nuevo/Duplicar/Editar/Eliminar + buscador + sticky), instalador Windows generado, IP servidor configurable en Configuración, Empresa y Local (0069), guías 13/14 de rediseño y acceso |
