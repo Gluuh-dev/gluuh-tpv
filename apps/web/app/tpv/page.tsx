@@ -300,6 +300,8 @@ export default function TPV() {
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      // Cuenta de empresa recién entregada: primero crea su contraseña.
+      if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
       // Operario activo desde localStorage (persiste hasta "Salir") + lista de operarios
       try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
       const { data: ops } = await sb.rpc("listar_operarios");

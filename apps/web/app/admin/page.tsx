@@ -26,7 +26,7 @@ export default function Admin() {
   const [estado, setEstado] = useState<"cargando" | "no-auth" | "ok">("cargando");
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [f, setF] = useState({ empresa: "", usuario: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[] });
+  const [f, setF] = useState({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[] });
   // El usuario se autogenera del nombre ("Bar Pepe" → barpepe) hasta que se toque a mano.
   const [usrManual, setUsrManual] = useState(false);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
@@ -38,6 +38,8 @@ export default function Admin() {
   const [licBusy, setLicBusy] = useState(false);
   const [licCodigo, setLicCodigo] = useState<string | null>(null);
   const [licErr, setLicErr] = useState<string | null>(null);
+  // Resultado de una acción de soporte sobre una empresa (reset pass / código / renovar).
+  const [acc, setAcc] = useState<{ t: "ok" | "err"; x: string } | null>(null);
 
   async function cargar() {
     const [{ data: e }, { data: l }] = await Promise.all([
@@ -78,7 +80,7 @@ export default function Admin() {
     if (!res.ok) { setMsg({ t: "err", x: out.error ?? "Error" }); return; }
     setMsg({ t: "ok", x: `Empresa "${f.empresa}" creada. Operarios sembrados: tecnico/1212 · admin/1111 · camarero/2222.` });
     setAlta({ codigo: out.codigoInstalacion ?? null, clave: out.claveTecnica ?? null, usuario: out.usuario ?? "", password: out.passwordInicial ?? "" });
-    setF({ empresa: "", usuario: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] });
+    setF({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] });
     setUsrManual(false);
     cargar();
   }
@@ -108,6 +110,25 @@ export default function Admin() {
     setLicCodigo(out.codigo);
   }
 
+  // Acción de soporte sobre una empresa (reset password / regenerar código /
+  // renovar licencia directa). Devuelve el dato sensible una sola vez.
+  async function accionEmpresa(accion: string, tenantId: string, extra?: Record<string, unknown>) {
+    setAcc(null);
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch("/api/admin/empresa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ accion, tenantId, ...extra }),
+    });
+    const out = await res.json();
+    if (!res.ok) { setAcc({ t: "err", x: out.error ?? "Error" }); return; }
+    if (out.passwordInicial) setAcc({ t: "ok", x: `Nueva password (apúntala, la cambia al entrar): ${out.passwordInicial}` });
+    else if (out.codigoInstalacion) setAcc({ t: "ok", x: `Nuevo código de instalación: ${out.codigoInstalacion}` });
+    else if (out.licenciaHasta) setAcc({ t: "ok", x: `Licencia renovada hasta ${new Date(out.licenciaHasta).toLocaleDateString("es-ES")}` });
+    else setAcc({ t: "ok", x: "Hecho." });
+    cargar();
+  }
+
   if (estado === "cargando") return <div className="grid min-h-screen place-items-center text-muted-foreground">Cargando…</div>;
   if (estado === "no-auth") return (
     <div className="grid min-h-screen place-items-center p-6 text-center">
@@ -134,6 +155,10 @@ export default function Admin() {
                   <Input required minLength={3} value={f.usuario} placeholder="barpepe"
                     onChange={(e) => { setUsrManual(true); setF({ ...f, usuario: normalizarUsuario(e.target.value) }); }} />
                   <p className="text-[11px] text-muted-foreground">Con él entra el cliente (sin email). La password inicial se genera sola y la cambia en su primer acceso.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email de contacto <span className="text-muted-foreground">(opcional)</span></Label>
+                  <Input type="email" value={f.emailContacto} onChange={(e) => setF({ ...f, emailContacto: e.target.value })} placeholder="avisos de caducidad — no es para entrar" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>CIF/NIF</Label><Input value={f.cif} onChange={(e) => setF({ ...f, cif: e.target.value })} /></div>
@@ -188,8 +213,9 @@ export default function Admin() {
           <Card className="lg:col-span-2">
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4" /> Empresas ({empresas.length})</CardTitle></CardHeader>
             <CardContent className="px-0">
+              {acc && <p className={`mx-6 mb-2 rounded-md px-3 py-2 text-sm ${acc.t === "ok" ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{acc.x}</p>}
               <Table>
-                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Acceso</TableHead><TableHead>Código de instalación</TableHead><TableHead>Licencia</TableHead><TableHead>Alta</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Contacto</TableHead><TableHead>Código de instalación</TableHead><TableHead>Licencia</TableHead><TableHead>Soporte</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {empresas.map((e) => (
                     <TableRow key={e.id}>
@@ -197,7 +223,12 @@ export default function Admin() {
                       <TableCell className="text-muted-foreground">{e.email_admin}</TableCell>
                       <TableCell className="font-mono text-xs">{e.codigo_instalacion ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{e.licencia_hasta ? `hasta ${new Date(e.licencia_hasta).toLocaleDateString("es-ES")}` : "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{new Date(e.created_at).toLocaleDateString("es-ES")}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => accionEmpresa("reset-password", e.id)}>Reset pass</Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => accionEmpresa("regenerar-codigo", e.id)}>Código</Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -242,7 +273,11 @@ export default function Admin() {
                 ))}
               </div>
             </div>
-            <Button disabled={licBusy || !lic.tenantId} onClick={generarLicencia}>{licBusy ? "Generando…" : "Generar código"}</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={!lic.tenantId} onClick={() => accionEmpresa("renovar-licencia", lic.tenantId, { meses: Number(lic.meses), modulos: lic.modulos })}>Aplicar a la empresa</Button>
+              <Button variant="outline" disabled={licBusy || !lic.tenantId} onClick={generarLicencia}>{licBusy ? "Generando…" : "Generar código canjeable"}</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">«Aplicar» renueva la licencia al momento (el cliente no hace nada). «Código canjeable» genera un GLUH-… que el cliente activa en Módulos.</p>
             {licErr && <p className="text-sm text-destructive">{licErr}</p>}
             {licCodigo && (
               <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-center">

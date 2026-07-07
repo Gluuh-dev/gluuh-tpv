@@ -40,7 +40,7 @@ type Admin = SupabaseClient;
 // la empresa queda creada aunque falle una pieza (se puede rehacer desde /admin).
 async function aprovisionar(admin: Admin, tid: string, datos: {
   cif?: string; direccion?: string; poblacion?: string; provincia?: string;
-  codigoPostal?: string; telefono?: string; meses?: unknown; modulos?: unknown;
+  codigoPostal?: string; telefono?: string; emailContacto?: string; meses?: unknown; modulos?: unknown;
 }): Promise<{ codigoInstalacion: string | null; claveTecnica: string | null }> {
   // Código de instalación único (reintento ante la remotísima colisión).
   let codigoInstalacion: string | null = null;
@@ -54,7 +54,9 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   const meses = Number.isInteger(datos.meses) && (datos.meses as number) > 0 ? (datos.meses as number) : null;
   const hasta = meses ? (() => { const d = new Date(); d.setMonth(d.getMonth() + meses); return d.toISOString().slice(0, 10); })() : null;
   const mods = Array.isArray(datos.modulos) ? datos.modulos.filter((m: unknown) => typeof m === "string") : [];
-  await admin.from("tenant").update(conValor({ cif: datos.cif, licencia_hasta: hasta, licencia_modulos: hasta ? mods : null })).eq("id", tid);
+  // email_admin = email de CONTACTO (avisos de caducidad), no de login. El
+  // trigger lo dejó con el email sintético; se sobrescribe si se indicó uno real.
+  await admin.from("tenant").update(conValor({ cif: datos.cif, email_admin: datos.emailContacto, licencia_hasta: hasta, licencia_modulos: hasta ? mods : null })).eq("id", tid);
   const loc = conValor({ direccion: datos.direccion, poblacion: datos.poblacion, provincia: datos.provincia, codigo_postal: datos.codigoPostal, telefono: datos.telefono, cif: datos.cif });
   if (Object.keys(loc).length) await admin.from("location").update(loc).eq("tenant_id", tid);
 
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
   if (!esAdmin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { empresa, usuario, cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos } = await req.json();
+  const { empresa, usuario, emailContacto, cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos } = await req.json();
   if (!empresa) return NextResponse.json({ error: "Falta el nombre de la empresa" }, { status: 400 });
   const usr = normalizarUsuario(String(usuario || empresa));
   if (usr.length < 3) return NextResponse.json({ error: "El usuario debe tener al menos 3 letras o números" }, { status: 400 });
@@ -119,7 +121,7 @@ export async function POST(req: Request) {
   }
 
   const { codigoInstalacion, claveTecnica } = await aprovisionar(admin, au.tenant_id as string, {
-    cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos,
+    cif, direccion, poblacion, provincia, codigoPostal, telefono, emailContacto, meses, modulos,
   });
   return NextResponse.json({ ok: true, usuario: usr, passwordInicial, claveTecnica, codigoInstalacion });
 }

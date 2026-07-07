@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
+import { excedeLimite, ipDe } from "../dispositivos/limite";
 
 // Login local por USUARIO (nombre) + clave (backoffice sin email). Verifica
 // (verificar_clave_operario, solo operarios sin email) y asegura una cuenta auth
@@ -14,6 +15,12 @@ const emailSintetico = (codigo: string, tenantId: string) =>
   `op.${codigo}.${tenantId.slice(0, 8)}@codigo.gluuh.local`;
 
 export async function POST(req: Request) {
+  // Anti fuerza bruta de claves de operario (mismo mecanismo que el emparejado):
+  // 10 intentos/min por IP. Las claves suelen ser de 4 dígitos → imprescindible.
+  if (excedeLimite(`operario:${ipDe(req)}`, 10)) {
+    return NextResponse.json({ error: "Demasiados intentos. Espera un minuto e inténtalo de nuevo." }, { status: 429 });
+  }
+
   const { usuario, clave, tenant_id } = await req.json().catch(() => ({}));
   if (!usuario || !clave) return NextResponse.json({ error: "Falta el usuario o la clave" }, { status: 400 });
 
