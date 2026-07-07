@@ -44,12 +44,17 @@ pulsera (`asignar_pulsera`), y desbloquear intentos.
 **código** (`app/lib/permisos.ts`), agrupado por *aplicación* (permiso = aplicación
 × acción, como Ágora). Semántica: ausente o `true` = **permitido**; `false` = bloqueado.
 
-Grupos actuales (los que ya se aplican de verdad):
+Grupos actuales (todos aplican de verdad):
 - **Punto de venta**: `modificar`, `descuento`, `borrar`, `invitar`, `cobrar` — el
   TPV los respeta con `puede(k)`.
-- **Acceso al panel**: `panel.operativa|admin|compras|herramientas|informes` — el
-  layout oculta esa zona del menú si está a `false`.
+- **Zonas del panel**: `panel.operativa|admin|compras|herramientas|informes` — ocultan
+  la zona del menú **y bloquean el acceso directo por URL** a sus páginas.
+- **Áreas sensibles**: `admin.usuarios`, `admin.catalogo`, `admin.fiscal`, `tecnica`
+  — marcan páginas concretas (campo `perm` en `lib/nav`); bloquean solo esas páginas.
 
+Cada enlace del menú lleva su zona (por la entrada) y opcionalmente un `perm`; el
+**guardián de ruta** del layout muestra «Sin acceso» aunque escribas la URL. El
+enforcement es de **cliente** (falta respaldo RLS de los permisos sensibles, B.7).
 Se añaden más grupos conforme se cablea su aplicación (caja, almacén, informes…).
 
 > El **PDF del manual de Ágora NO enumera** el catálogo permiso-a-permiso (solo la
@@ -81,9 +86,10 @@ Se añaden más grupos conforme se cablea su aplicación (caja, almacén, inform
 
 ## A.5 · En el panel: rol + perfil · ✅ 07-07-2026
 - El menú (`lib/nav.ts`) filtra por **rol** (4 valores) + **módulos** (licencia).
-- **Y ahora por perfil**: el layout oculta una zona del menú si su permiso
-  `panel.<id>` está a `false` en los permisos **efectivos** (del perfil, o propios si
-  no tiene). **PROPIETARIO** lo ve todo (no se autobloquea); sin permisos = todo visible.
+- **Y ahora por perfil**: el layout oculta del menú lo no permitido **y un guardián
+  de ruta bloquea el acceso directo por URL** (pantalla «Sin acceso»), según los
+  permisos **efectivos** (del perfil, o propios si no tiene) — zona `panel.<id>` y el
+  `perm` del enlace. **PROPIETARIO** lo ve todo; sin permisos = todo visible.
 
 ## A.6 · Zona técnica (candado del instalador)
 - `tenant.clave_tecnica_hash` (`0045`) + RPCs `validar_clave_tecnica` /
@@ -213,6 +219,9 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
    (caja, almacén, informes granular…) y perfiles predefinidos listos para clonar.
 4. **Bloqueo por eventos de mesa** (hoy solo `alCobrar`/`inactividad`).
 5. **Abrir/cerrar día y caja por terminal**.
+6. **Respaldo RLS de permisos**: el gating por perfil es de **cliente** (menú +
+   guardián de ruta). Los permisos sensibles (fiscal, usuarios, técnica) deberían
+   respaldarse además en **RLS/policies** del backend, no solo ocultarse en la UI.
 
 ## B.8 · Preguntas abiertas
 - Formato exacto del **código de operario** (¿lo genera el sistema, editable?).
