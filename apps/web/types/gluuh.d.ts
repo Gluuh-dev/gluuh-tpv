@@ -15,6 +15,14 @@ interface GluuhEvento {
   datos?: unknown;
 }
 
+// Config local del terminal (config.json). Espejo de ConfigTerminal del desktop.
+interface GluuhConfigTerminal {
+  /** URL/IP del equipo donde corre la web (p. ej. "http://192.168.1.10:3100"). */
+  servidor?: string;
+  impresora?: { uri: string; tipo?: "EPSON" | "STAR"; ancho?: number };
+  backup?: { hora?: string; destino?: string };
+}
+
 interface GluuhDesktop {
   version: string;
   device: { id: string; nombre: string } | null;
@@ -26,6 +34,10 @@ interface GluuhDesktop {
     nombreCarpeta: string,
     ficheros: { nombre: string; contenido: string; base64?: boolean }[],
   ): Promise<{ ok: boolean; ruta?: string; error?: string }>;
+  /** Lee la config local del terminal (config.json). */
+  leerConfigTerminal(): Promise<GluuhConfigTerminal>;
+  /** Guarda la config local del terminal; si cambia `servidor`, recarga la app. */
+  guardarConfigTerminal(cfg: GluuhConfigTerminal): Promise<{ ok: boolean; error?: string }>;
   onEvento(cb: (evento: GluuhEvento) => void): () => void;
 }
 

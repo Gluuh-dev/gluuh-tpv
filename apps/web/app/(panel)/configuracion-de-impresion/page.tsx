@@ -15,6 +15,7 @@ import {
 import { ESTACIONES, ESTACION_LABEL, type Estacion } from "../../lib/estaciones";
 import { leerBranding } from "../../lib/branding";
 import { ZonaTecnica, ClaveTecnicaCard } from "@/components/zona-tecnica";
+import { ConfigTerminal } from "@/components/config-terminal";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -165,6 +166,9 @@ export default function ConfiguracionImpresion() {
     <ZonaTecnica>
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Configuración de impresión" description="Diseña el ticket, define tus impresoras y decide qué sale en cada una." />
+
+      {/* Servidor/IP y backup del terminal (app de escritorio). */}
+      <ConfigTerminal />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">

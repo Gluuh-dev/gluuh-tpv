@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("gluuh", {
   publicarTicketVisor: (datos: unknown) => ipcRenderer.send("gluuh:visor", datos),
   guardarBackup: (nombreCarpeta: string, ficheros: unknown) =>
     ipcRenderer.invoke("gluuh:guardar-backup", nombreCarpeta, ficheros),
+  leerConfigTerminal: () => ipcRenderer.invoke("gluuh:leer-config"),
+  guardarConfigTerminal: (cfg: unknown) => ipcRenderer.invoke("gluuh:guardar-config", cfg),
   onEvento: (cb: (evento: { tipo: string; datos?: unknown }) => void) => {
     const listener = (_e: unknown, evento: { tipo: string; datos?: unknown }) => cb(evento);
     ipcRenderer.on("gluuh:evento", listener);

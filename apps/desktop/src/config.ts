@@ -1,7 +1,7 @@
 // Configuración local del terminal (userData/config.json).
 // ponytail: fichero editable a mano hasta que exista la pantalla de ajustes
 // del dispositivo; entonces esta config migra a `setting` ámbito DEVICE.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { ConfigImpresora } from "@gluuh/hardware";
 
@@ -31,5 +31,8 @@ export function leerConfig(userData: string): ConfigTerminal {
     return {};
   }
 }
-// ponytail: guardarConfig() se añadirá con la pantalla de ajustes del dispositivo;
-// hoy config.json se edita a mano, así que no existe escritor todavía.
+
+/** Escribe config.json (lo edita la sección de Configuración vía window.gluuh). */
+export function guardarConfig(userData: string, cfg: ConfigTerminal): void {
+  writeFileSync(ruta(userData), JSON.stringify(cfg, null, 2), "utf8");
+}

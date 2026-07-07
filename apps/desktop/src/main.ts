@@ -7,7 +7,7 @@ import { app, BrowserWindow, ipcMain, screen, shell } from "electron";
 import path from "node:path";
 import type { PrintJob } from "@gluuh/hardware";
 import { crearPlanificadorDiario, guardarBackupEnDisco, type FicheroBackup } from "./backup";
-import { leerConfig } from "./config";
+import { leerConfig, guardarConfig, type ConfigTerminal } from "./config";
 import { guardarIdentidad, leerIdentidad, type Identidad } from "./identidad";
 import { ColaImpresion } from "./impresion";
 import { crearVisorSiHaySegundaPantalla, publicarEnVisor } from "./visor";
@@ -122,6 +122,23 @@ app.whenReady().then(() => {
   ipcMain.handle("gluuh:guardar-backup", (_e, nombreCarpeta: string, ficheros: FicheroBackup[]) => {
     const destino = leerConfig(userData).backup?.destino ?? "";
     return guardarBackupEnDisco(destino, nombreCarpeta, ficheros);
+  });
+  // Configuración del terminal (config.json) editable desde la web.
+  ipcMain.handle("gluuh:leer-config", () => leerConfig(userData));
+  ipcMain.handle("gluuh:guardar-config", (_e, cfg: ConfigTerminal) => {
+    try {
+      guardarConfig(userData, cfg);
+      // Si cambió el servidor, aplicarlo sin reiniciar: recargar a la nueva URL.
+      if (cfg.servidor) {
+        try {
+          const u = normalizaUrl(cfg.servidor);
+          if (u !== URL_BASE) { URL_BASE = u; ORIGEN = new URL(u).origin; ventana?.loadURL(`${URL_BASE}/inicio`); }
+        } catch { /* URL inválida: no se recarga, se corregirá al reintentar */ }
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
   });
 
   // ── Ventanas ────────────────────────────────────────────────────────────
