@@ -7,7 +7,10 @@ export type Rol = "PROPIETARIO" | "ENCARGADO" | "CAMARERO" | "COCINA";
 // `modulo`: la entrada se oculta si la empresa tiene ese módulo desactivado
 // (tabla tenant_module; catálogo en lib/modulos.ts). Tipado contra MODULOS para
 // que un typo (p. ej. "CARTELERÍA") no compile.
-export interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean; blank?: boolean; modulo?: Modulo }
+// `perm`: permiso de perfil (lib/permisos) que además de rol/módulo gatea esta
+// página — oculta del menú y bloquea el acceso directo por URL. Sin `perm`, la
+// página se gatea solo por la zona (panel.<id> de su entrada).
+export interface NavLink { href?: string; label: string; roles?: Rol[]; soon?: boolean; blank?: boolean; modulo?: Modulo; perm?: string }
 export interface NavSection { title?: string; items: NavLink[] }
 export interface NavEntry { id: string; title: string; icon: LucideIcon; sections: NavSection[]; direct?: boolean; index?: string }
 
@@ -38,22 +41,22 @@ export const NAV: NavEntry[] = [
   { id: "admin", title: "Administracion", icon: Landmark, index: "/administracion", sections: [
     { title: "General", items: [
       { href: "/ajustes", label: "Empresa y local", roles: PROP },
-      { href: "/series", label: "Series", roles: PROP }, { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST },
+      { href: "/series", label: "Series", roles: PROP, perm: "admin.fiscal" }, { href: "/plantillas-ticket", label: "Plantillas de ticket", roles: GEST },
       { href: "/plantillas-etiquetas", label: "Plantillas de etiquetas", roles: GEST }, { href: "/periodos-servicio", label: "Periodos de servicio", roles: GEST }, { href: "/tipos-cliente", label: "Tipos de clientes", roles: GEST },
       { href: "/clientes", label: "Clientes", roles: GEST }, { href: "/reservas", label: "Reservas", roles: GEST, modulo: "RESERVAS" }, { href: "/puntos-venta", label: "Puntos de venta", roles: PROP },
     ] },
     { title: "Usuarios", items: [
-      { href: "/perfiles", label: "Perfiles y permisos", roles: PROP }, { href: "/empleados", label: "Usuarios y PIN", roles: GEST },
-      { href: "/seguridad", label: "Seguridad", roles: PROP },
+      { href: "/perfiles", label: "Perfiles y permisos", roles: PROP, perm: "admin.usuarios" }, { href: "/empleados", label: "Usuarios y PIN", roles: GEST, perm: "admin.usuarios" },
+      { href: "/seguridad", label: "Seguridad", roles: PROP, perm: "admin.usuarios" },
     ] },
     { title: "Catalogo", items: [
-      { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST }, { href: "/familias", label: "Familias", roles: GEST },
-      { href: "/categorias", label: "Categorias", roles: GEST }, { href: "/productos", label: "Productos", roles: GEST },
-      { href: "/modificadores", label: "Modificadores", roles: GEST },
-      { href: "/menus", label: "Menus", roles: GEST }, { href: "/alergenos", label: "Alergenos", roles: GEST }, { href: "/etiquetas", label: "Etiquetas de productos", roles: GEST },
+      { href: "/grupos-mayores", label: "Grupos mayores", roles: GEST, perm: "admin.catalogo" }, { href: "/familias", label: "Familias", roles: GEST, perm: "admin.catalogo" },
+      { href: "/categorias", label: "Categorias", roles: GEST, perm: "admin.catalogo" }, { href: "/productos", label: "Productos", roles: GEST, perm: "admin.catalogo" },
+      { href: "/modificadores", label: "Modificadores", roles: GEST, perm: "admin.catalogo" },
+      { href: "/menus", label: "Menus", roles: GEST, perm: "admin.catalogo" }, { href: "/alergenos", label: "Alergenos", roles: GEST, perm: "admin.catalogo" }, { href: "/etiquetas", label: "Etiquetas de productos", roles: GEST, perm: "admin.catalogo" },
     ] },
     { title: "Tarifas y precios", items: [
-      { href: "/impuestos", label: "Impuestos", roles: PROP }, { href: "/formas-pago", label: "Formas de pago", roles: GEST },
+      { href: "/impuestos", label: "Impuestos", roles: PROP, perm: "admin.fiscal" }, { href: "/formas-pago", label: "Formas de pago", roles: GEST },
       { href: "/centros-venta", label: "Centros de venta", roles: GEST }, { href: "/tarifas", label: "Tarifas", roles: GEST }, { href: "/promociones", label: "Promociones", roles: GEST },
       { href: "/descuentos", label: "Descuentos", roles: GEST },
     ] },
@@ -82,12 +85,12 @@ export const NAV: NavEntry[] = [
       { href: "/exportar-precios", label: "Exportar precios Excel", roles: GEST }, { href: "/importar-precios", label: "Importar precios Excel", roles: GEST }, { href: "/modificacion-global-de-precios", label: "Modificacion global de precios", roles: GEST },
       { href: "/ajustar-margenes", label: "Ajustar margenes", roles: GEST }, { href: "/programacion-de-tarifas", label: "Programacion de tarifas", roles: GEST },
     ] },
-    { title: "VERI*FACTU", items: [{ href: "/visor-de-verifactu", label: "Visor de Verifactu", roles: PROP }, { href: "/configuracion-verifactu", label: "Configuracion Verifactu", roles: PROP }] },
+    { title: "VERI*FACTU", items: [{ href: "/visor-de-verifactu", label: "Visor de Verifactu", roles: PROP, perm: "admin.fiscal" }, { href: "/configuracion-verifactu", label: "Configuracion Verifactu", roles: PROP, perm: "admin.fiscal" }] },
     // Zona tecnica: paginas que configura el instalador (candado con clave tecnica).
     { title: "Zona tecnica", items: [
-      { href: "/configuracion-de-impresion", label: "Impresion", roles: GEST },
-      { href: "/modulos", label: "Modulos y pantallas", roles: PROP },
-      { href: "/copias-de-seguridad", label: "Copias de seguridad", roles: PROP },
+      { href: "/configuracion-de-impresion", label: "Impresion", roles: GEST, perm: "tecnica" },
+      { href: "/modulos", label: "Modulos y pantallas", roles: PROP, perm: "tecnica" },
+      { href: "/copias-de-seguridad", label: "Copias de seguridad", roles: PROP, perm: "tecnica" },
     ] },
     { title: "Control de efectivo", items: [{ href: "/caja", label: "Caja", roles: GEST }, { href: "/configuracion-de-caja", label: "Configuracion de caja", roles: PROP }] },
     { title: "Pasarela de pago", items: [{ href: "/configuracion-de-pago", label: "Configuracion de pago", roles: GEST }, { href: "/cobro-en-mesa", label: "Cobro en mesa", roles: GEST }] },

@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor } from "lucide-react";
+import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
-import { NAV, puede, type NavEntry, type Rol } from "../lib/nav";
+import { NAV, puede, type NavEntry, type NavLink, type Rol } from "../lib/nav";
 import { permite, permisoZona, type MapaPermisos } from "../lib/permisos";
 import { modulosInactivos } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
@@ -61,13 +61,36 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         sections: e.sections
           .map((sec) => ({
             ...sec,
-            items: sec.items.filter((i) => puede(rol, i.roles) && !(i.modulo && modulosOff.has(i.modulo))),
+            items: sec.items.filter((i) => puede(rol, i.roles) && !(i.modulo && modulosOff.has(i.modulo)) && (rol === "PROPIETARIO" || !i.perm || permite(permisos, i.perm))),
           }))
           .filter((sec) => sec.items.length > 0),
       })).filter((e) => e.sections.length > 0);
   }, [info?.rol, info?.permisos, modulosOff]);
 
   const activa = nav.find((e) => e.id === entrada) ?? nav[0];
+
+  // Guardián de ruta: bloquea el acceso DIRECTO (por URL) a una página cuyo
+  // permiso no concede el perfil — no basta con ocultarla del menú. Busca el item
+  // de menú de mejor prefijo para la ruta actual y comprueba su zona (panel.<id>)
+  // y su `perm`. PROPIETARIO nunca se bloquea; páginas fuera del menú no se tocan.
+  const denegado = useMemo(() => {
+    const rol = info?.rol;
+    const permisos = info?.permisos ?? {};
+    if (!info || rol === "PROPIETARIO") return false;
+    let entry: NavEntry | null = null;
+    let item: NavLink | null = null;
+    let bestLen = -1;
+    for (const e of NAV) for (const sec of e.sections) for (const i of sec.items) {
+      if (i.href && (i.href === pathname || pathname.startsWith(`${i.href}/`)) && i.href.length > bestLen) {
+        entry = e; item = i; bestLen = i.href.length;
+      }
+    }
+    if (!entry) entry = NAV.find((e) => e.index === pathname) ?? null;
+    if (!entry) return false;
+    const zonaOk = entry.id === "inicio" || entry.id === "ayuda" || permite(permisos, permisoZona(entry.id));
+    const itemOk = !item?.perm || permite(permisos, item.perm);
+    return !(zonaOk && itemOk);
+  }, [pathname, info]);
 
   async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
   function abrirEntrada(e: NavEntry) {
@@ -154,7 +177,19 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-[13px]" onClick={salir}><LogOut className="h-4 w-4" /> Salir</Button>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-5">{children}</main>
+        <main className="flex-1 overflow-y-auto p-5">
+          {denegado ? (
+            <div className="grid h-full place-items-center">
+              <div className="max-w-sm rounded-lg border border-border bg-surface p-6 text-center">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface-muted">
+                  <ShieldAlert className="h-5 w-5 text-(--text-muted)" aria-hidden />
+                </div>
+                <h1 className="mt-3 text-[16px] font-semibold">Sin acceso</h1>
+                <p className="mt-1 text-[12.5px] text-(--text-secondary)">Tu perfil no tiene permiso para esta página. Si crees que es un error, habla con el administrador.</p>
+              </div>
+            </div>
+          ) : children}
+        </main>
       </div>
       <AssistantPanel />
     </div>
