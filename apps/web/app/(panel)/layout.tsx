@@ -11,6 +11,7 @@ import { modulosInactivos } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AssistantPanel } from "@/components/assistant-panel";
+import { CommandPalette } from "@/components/command-palette";
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol }
 
@@ -134,7 +135,8 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             )}
             <span className="text-[14px] font-semibold">{activa?.title}</span>
           </div>
-          <div className="flex items-center gap-1 text-[13px]">
+          <div className="flex items-center gap-1.5 text-[13px]">
+            <CommandPalette />
             <a href="/tpv" className="flex h-7 items-center gap-1.5 rounded-md bg-brand px-2.5 font-medium text-white transition-colors hover:bg-brand-hover" title="Abrir la pantalla de venta">
               <Monitor className="h-4 w-4" /> <span className="hidden sm:inline">Ir al TPV</span>
             </a>
