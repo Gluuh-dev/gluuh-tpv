@@ -105,7 +105,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       if (i.href && (i.href === pathname || pathname.startsWith(`${i.href}/`)) && i.href.length > bestLen) { item = i; bestLen = i.href.length; }
     }
     if (item?.href) {
-      crumbs.push({ label: item.label, href: item.href });
+      if (item.href !== activa?.index) crumbs.push({ label: item.label, href: item.href });
       if (pathname !== item.href) {
         const seg = pathname.slice(item.href.length + 1).split("/")[0];
         crumbs.push({ label: seg === "nuevo" ? "Nuevo" : "Editar" });
