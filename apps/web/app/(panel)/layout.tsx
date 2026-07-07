@@ -3,20 +3,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type NavLink, type Rol } from "../lib/nav";
 import { permite, permisoZona, type MapaPermisos } from "../lib/permisos";
 import { modulosInactivos } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/user-menu";
 import { CommandPalette } from "@/components/command-palette";
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos }
-
-// Iniciales para el avatar (nombre o email).
-const iniciales = (s: string) => s.trim().split(/[\s@.]+/).map((w) => w[0] ?? "").slice(0, 2).join("").toUpperCase() || "?";
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -113,7 +110,6 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     return crumbs;
   }, [pathname, activa]);
 
-  async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
   function abrirEntrada(e: NavEntry) {
     setEntrada(e.id);
     if (!e.direct) setMenuOpen(true);
@@ -142,7 +138,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             </button>
           );
         })}
-        {/* Acciones inferiores: Ir al TPV · Contraer · usuario (avatar) + salir */}
+        {/* Acciones inferiores: Ir al TPV y, abajo del todo, abrir/cerrar el rail */}
         <div className="mt-auto flex flex-col gap-0.5">
           <a href="/tpv" title="Abrir la pantalla de venta"
             className={`flex h-9 items-center gap-2.5 rounded-md bg-brand text-[13px] font-medium text-brand-foreground transition-colors hover:bg-brand-hover ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
@@ -152,21 +148,6 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             className={`flex h-9 items-center gap-2.5 rounded-md text-[13px] text-(--text-muted) transition-colors hover:bg-surface-overlay hover:text-foreground ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
             {railOpen ? <ChevronsLeft className="h-4 w-4 shrink-0" /> : <ChevronsRight className="h-4 w-4 shrink-0" />}{railOpen && <span>Contraer</span>}
           </button>
-          <div className={`mt-1 flex items-center gap-2 border-t border-border pt-2 ${railOpen ? "" : "flex-col"}`}>
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-surface-muted text-[12px] font-semibold text-foreground" title={info?.nombre || info?.email}>
-              {iniciales(info?.nombre || info?.email || "")}
-            </span>
-            {railOpen && (
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12.5px] font-medium text-foreground">{info?.nombre || info?.email}</div>
-                <div className="truncate text-[11px] capitalize text-(--text-muted)">{info?.rol?.toLowerCase()}</div>
-              </div>
-            )}
-            <button onClick={salir} title="Cerrar sesión" aria-label="Cerrar sesión"
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-(--text-muted) transition-colors hover:bg-surface-overlay hover:text-foreground">
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       </nav>
 
@@ -232,7 +213,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           </div>
           <div className="flex shrink-0 items-center gap-1.5 text-[13px]">
             <CommandPalette />
-            <ThemeToggle />
+            <UserMenu nombre={info?.nombre} rol={info?.rol} email={info?.email} />
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-5">
