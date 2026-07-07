@@ -31,6 +31,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown, Search,
   Receipt, Store, Armchair, Sun, ShoppingBag, CalendarCheck,
   Beer, Coffee, CupSoda, Wine, Beef, Sandwich, Pizza, UtensilsCrossed, Croissant, CakeSlice, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useSurfaceTheme } from "@/app/lib/surface-theme";
 import { IconGift } from "@tabler/icons-react";
 
 /* ─── Tipos ─── */
@@ -202,7 +203,8 @@ export default function TPV() {
   const [modalCliente, setModalCliente] = useState(false);
   const [modalPasarMesa, setModalPasarMesa] = useState(false);
   const [modalUtilidades, setModalUtilidades] = useState(false);
-  const { resolvedTheme, setTheme } = useTheme();   // toggle claro/oscuro desde Utilidades
+  const { resolvedTheme } = useTheme();
+  const { setSurfaceTheme } = useSurfaceTheme("tpv");   // tema propio del TPV (independiente del panel)
   const [modalAparcados, setModalAparcados] = useState(false);
   const [modalDividir, setModalDividir] = useState(false);
   const [modalInvitar, setModalInvitar] = useState(false);
@@ -2484,7 +2486,7 @@ export default function TPV() {
                 )}
                 <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
                 <button type="button" onClick={() => { setModalUtilidades(false); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
-              <button type="button" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
+              <button type="button" onClick={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
                 <button type="button" onClick={() => { setModalUtilidades(false); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
               </div>
               <button type="button" onClick={() => setModalUtilidades(false)} className="btn-ghost mt-3 w-full">Cerrar</button>
@@ -3145,7 +3147,7 @@ export default function TPV() {
               )}
               <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
               <button type="button" onClick={() => { setModalUtilidades(false); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
-              <button type="button" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
+              <button type="button" onClick={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
               <button type="button" onClick={() => { setModalUtilidades(false); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
             </div>
             <button type="button" onClick={() => setModalUtilidades(false)} className="btn-ghost mt-3 w-full">Cerrar</button>
