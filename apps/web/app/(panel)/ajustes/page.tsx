@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Fingerprint, Lock, ChevronUp, ChevronDown, ChevronRight, LayoutGrid, Palette } from "lucide-react";
+import { Fingerprint, Lock, ChevronUp, ChevronDown, ChevronRight, LayoutGrid, Palette, TriangleAlert } from "lucide-react";
 import { BOTONES_TPV } from "../../tpv/components/ColumnaFunciones";
 import { getSetting, setSetting } from "../../lib/settings";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
@@ -28,7 +28,12 @@ export default function Ajustes() {
   const sb = supabaseBrowser();
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [locationId, setLocationId] = useState<string | null>(null);
-  const [f, setF] = useState({ empresa: "", nombre: "", direccion: "", cif: "", razon_social: "", territorio_fiscal: "PENINSULA_BALEARES", serie_factura: "F" });
+  const [f, setF] = useState({
+    empresa: "", nombre: "", nombre_comercial: "", direccion: "", cif: "", razon_social: "",
+    poblacion: "", provincia: "", codigo_postal: "", contacto: "", telefono: "", email: "", web: "",
+    territorio_fiscal: "PENINSULA_BALEARES", serie_factura: "F",
+  });
+  const [sin0069, setSin0069] = useState(false);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -95,17 +100,33 @@ export default function Ajustes() {
   useEffect(() => {
     (async () => {
       const { data: t } = await sb.from("tenant").select("id,nombre").limit(1).maybeSingle();
-      const { data: l } = await sb.from("location").select("id,nombre,direccion,cif,razon_social,territorio_fiscal,serie_factura").limit(1).maybeSingle();
+      // Columnas de empresa/ubicación/contacto (0069); si no existen, degrada.
+      const COLS_BASE = "id,nombre,direccion,cif,razon_social,territorio_fiscal,serie_factura";
+      let l = (await sb.from("location").select(`${COLS_BASE},nombre_comercial,poblacion,provincia,codigo_postal,contacto,telefono,email,web`).limit(1).maybeSingle()).data as Record<string, string | null> | null;
+      if (!l) {
+        const r = await sb.from("location").select(COLS_BASE).limit(1).maybeSingle();
+        if (r.error) setSin0069(true);
+        l = r.data as Record<string, string | null> | null;
+      }
       setTenantId(t?.id ?? null);
-      setLocationId(l?.id ?? null);
+      setLocationId((l?.id as string | undefined) ?? null);
+      const v = (k: string) => (l?.[k] as string | null) ?? "";
       setF({
         empresa: t?.nombre ?? "",
-        nombre: l?.nombre ?? "",
-        direccion: l?.direccion ?? "",
-        cif: l?.cif === "PENDIENTE" ? "" : l?.cif ?? "",
-        razon_social: l?.razon_social ?? "",
-        territorio_fiscal: l?.territorio_fiscal ?? "PENINSULA_BALEARES",
-        serie_factura: l?.serie_factura ?? "F",
+        nombre: v("nombre"),
+        nombre_comercial: v("nombre_comercial"),
+        direccion: v("direccion"),
+        cif: l?.cif === "PENDIENTE" ? "" : v("cif"),
+        razon_social: v("razon_social"),
+        poblacion: v("poblacion"),
+        provincia: v("provincia"),
+        codigo_postal: v("codigo_postal"),
+        contacto: v("contacto"),
+        telefono: v("telefono"),
+        email: v("email"),
+        web: v("web"),
+        territorio_fiscal: v("territorio_fiscal") || "PENINSULA_BALEARES",
+        serie_factura: v("serie_factura") || "F",
       });
     })();
     /* eslint-disable-next-line */
@@ -116,46 +137,104 @@ export default function Ajustes() {
     setSaving(true);
     setMsg("");
     if (tenantId) await sb.from("tenant").update({ nombre: f.empresa }).eq("id", tenantId);
-    if (locationId) await sb.from("location").update({
-      nombre: f.nombre, direccion: f.direccion, cif: f.cif || "PENDIENTE",
-      razon_social: f.razon_social, territorio_fiscal: f.territorio_fiscal, serie_factura: f.serie_factura,
-    }).eq("id", locationId);
+    if (locationId) {
+      const base: Record<string, unknown> = {
+        nombre: f.nombre, direccion: f.direccion, cif: f.cif || "PENDIENTE",
+        razon_social: f.razon_social, territorio_fiscal: f.territorio_fiscal, serie_factura: f.serie_factura,
+      };
+      if (!sin0069) Object.assign(base, {
+        nombre_comercial: f.nombre_comercial || null, poblacion: f.poblacion || null,
+        provincia: f.provincia || null, codigo_postal: f.codigo_postal || null,
+        contacto: f.contacto || null, telefono: f.telefono || null,
+        email: f.email || null, web: f.web || null,
+      });
+      await sb.from("location").update(base).eq("id", locationId);
+    }
     setSaving(false);
     setMsg("Guardado ✓");
   }
 
+  const campo = (label: string, k: keyof typeof f, extra?: { placeholder?: string; type?: string }) => (
+    <div className="space-y-1.5">
+      <Label htmlFor={`f-${k}`}>{label}</Label>
+      <Input id={`f-${k}`} type={extra?.type} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} placeholder={extra?.placeholder} />
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
-        title="Ajustes"
-        description="Datos fiscales del local (necesarios para la facturación VERIFACTU)."
+        title="Empresa y local"
+        description="Datos administrativos, ubicación, contacto y fiscalidad del local."
       />
-      <Card>
-        <CardContent className="pt-6">
-          <form className="space-y-4" onSubmit={guardar}>
-            <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })} /></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5"><Label>Nombre del local</Label><Input value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>CIF/NIF</Label><Input value={f.cif} onChange={(e) => setF({ ...f, cif: e.target.value })} placeholder="B12345678" /></div>
-            </div>
-            <div className="space-y-1.5"><Label>Razón social</Label><Input value={f.razon_social} onChange={(e) => setF({ ...f, razon_social: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Dirección</Label><Input value={f.direccion} onChange={(e) => setF({ ...f, direccion: e.target.value })} /></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5"><Label>Territorio fiscal</Label>
+
+      {sin0069 && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-500/15 px-4 py-3 text-sm text-amber-600 dark:text-amber-500">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p>Falta aplicar la migración <strong>0069</strong>: los campos de nombre comercial, población, provincia, CP y contacto no se guardan todavía.</p>
+        </div>
+      )}
+
+      <form onSubmit={guardar} className="space-y-6">
+        <div className="grid gap-6 xl:grid-cols-2">
+          {/* Datos administrativos */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Datos administrativos</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {campo("Nombre de la empresa", "empresa")}
+              {campo("Nombre comercial", "nombre_comercial", { placeholder: "Nombre visible del local" })}
+              {campo("Nombre fiscal (razón social)", "razon_social")}
+              {campo("CIF / NIF", "cif", { placeholder: "B12345678" })}
+            </CardContent>
+          </Card>
+
+          {/* Contacto */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Contacto</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {campo("Persona de contacto", "contacto")}
+              {campo("Teléfono", "telefono", { type: "tel" })}
+              {campo("Email", "email", { type: "email", placeholder: "info@turestaurante.com" })}
+              {campo("Página web", "web", { placeholder: "https://…" })}
+            </CardContent>
+          </Card>
+
+          {/* Ubicación */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Ubicación</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {campo("Nombre del local", "nombre")}
+              {campo("Dirección", "direccion")}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {campo("Población", "poblacion")}
+                {campo("Provincia", "provincia")}
+              </div>
+              <div className="w-40">{campo("Código postal", "codigo_postal")}</div>
+            </CardContent>
+          </Card>
+
+          {/* Fiscalidad */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Fiscalidad</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Territorio fiscal</Label>
                 <Select value={f.territorio_fiscal} onValueChange={(v) => setF({ ...f, territorio_fiscal: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>{TERRITORIOS.map((t) => <SelectItem key={t.v} value={t.v}>{t.t}</SelectItem>)}</SelectContent>
                 </Select>
+                <p className="text-[11px] text-muted-foreground">Decide IVA / IGIC / IPSI y el régimen de facturación.</p>
               </div>
-              <div className="space-y-1.5"><Label>Serie de factura</Label><Input value={f.serie_factura} onChange={(e) => setF({ ...f, serie_factura: e.target.value })} /></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
-              {msg && <span className="text-sm text-emerald-600">{msg}</span>}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="w-40">{campo("Serie de factura", "serie_factura")}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
+          {msg && <span className="text-sm text-emerald-600">{msg}</span>}
+        </div>
+      </form>
 
       <Card>
         <CardContent className="space-y-3 pt-6">

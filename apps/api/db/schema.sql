@@ -69,6 +69,15 @@ CREATE TABLE location (
   regimen_facturacion text NOT NULL DEFAULT 'VERIFACTU'
                     CHECK (regimen_facturacion IN ('VERIFACTU','TICKETBAI','BATUZ','OTRO')),
   serie_factura   text NOT NULL DEFAULT 'F',
+  -- Ficha de empresa (0069): datos administrativos, ubicación y contacto
+  nombre_comercial text,
+  poblacion       text,
+  provincia       text,
+  codigo_postal   text,
+  contacto        text,                    -- persona de contacto
+  telefono        text,
+  email           text,
+  web             text,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
