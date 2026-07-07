@@ -146,7 +146,7 @@ reconectar sin tocar contraseñas. El **nombre** sí es `tpv_1`, `tpv_2`,
 
 | Sitio | Qué se instala | Cómo se activa | Qué hace |
 |---|---|---|---|
-| **PC principal** (barra 1 / mostrador) | **Gluuh Desktop** (Electron) | Código de instalación → emparejado como dispositivo TPV | TPV + **cola de impresión local** (persistente, reintenta cada 15 s) + cajón + **copia de seguridad diaria** a carpeta/USB + visor cliente opcional |
+| **PC principal / servidor del local** (el TPV de caja o un mini-PC dedicado sin pantalla, §10.1) | **Gluuh Desktop** hoy; **Servicio Gluuh** (nodo) como objetivo | Código de instalación → (si es TPV) emparejado como dispositivo | Nodo del local: base de datos espejo + web en LAN + **cola de impresión** (persistente, reintenta cada 15 s) + cajón + **copia de seguridad diaria** a carpeta/USB |
 | **PC/tablet de cada barra extra** | Gluuh Desktop (o navegador en modo kiosk) | Ídem (cada equipo se empareja con su nombre: "Barra 2"…) | TPV con su impresora |
 | **Cocina** | Nada que instalar: **pantalla KDS** = navegador/mini-PC/tablet apuntando a `/cocina` | Código de vinculación de 6 dígitos (Dispositivos → genera código → la pantalla lo canjea en `/conectar`) | Monitor de comandas en tiempo real |
 | **Móviles de camareros** | Nada: PWA `/comandera` (Expo nativo, fase posterior) | Código de 6 dígitos por dispositivo | Tomar comandas en mesa; imprime SIEMPRE vía cola compartida (§6), nunca en local |
@@ -388,6 +388,30 @@ Camino de construcción (el nodo es LA pieza grande — 3-6 semanas):
    Windows** con instalador y arranque automático (GAP #12).
 3. **Interino mientras tanto**: modo nube + router 4G de respaldo (~30 €/mes) —
    el mismo respaldo que instalan los distribuidores de Ágora.
+
+### 10.1 ¿Dónde vive el nodo? Dos montajes, un solo nodo por local
+
+**Regla: UN único equipo del local levanta el servicio** (base de datos espejo
++ central del local). Los demás son clientes. Dos formas de montarlo, mismo
+software:
+
+| Montaje | Para quién | Hardware | Notas |
+|---|---|---|---|
+| **Nodo dentro del TPV principal** | Bar pequeño (1-2 terminales) | El propio PC del TPV de caja | El servicio corre de fondo con el TPV; sin coste extra de hardware |
+| **Mini-PC servidor dedicado** ★ recomendado en restaurantes | Locales con varias barras/terminales | Mini-PC **sin pantalla ni teclado**, guardado en el rack/almacén/oficina: 4+ núcleos, 8-16 GB RAM, SSD 256 GB, **Ethernet al switch** | Nadie lo usa ni lo apaga; etiqueta "SERVIDOR GLUUH — NO APAGAR"; es el "equipo maestro" de Ágora pero sin su riesgo (la nube respalda) |
+
+Requisitos comunes del equipo del nodo:
+
+- **IP fija** en la LAN (o reserva DHCP) — es la dirección a la que se conectan
+  todos los aparatos.
+- **Ethernet, no WiFi** (el nodo es el corazón de la LAN).
+- **Arranque automático**: Windows Service con inicio al encender (sin sesión)
+  + BIOS con *AC Power On* (si vuelve la luz, el servidor vuelve solo)
+  + reinicio ante fallo.
+- **SAI/UPS pequeño** recomendado (aguanta cortes breves; el router del local
+  enchufado al mismo SAI para no perder la LAN).
+- El **backup a USB/carpeta** (§7) se configura en este equipo: el disco USB va
+  enchufado al servidor, no a un TPV.
 
 ---
 
