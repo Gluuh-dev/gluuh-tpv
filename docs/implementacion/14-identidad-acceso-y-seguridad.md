@@ -223,10 +223,12 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
    (caja, almacén, informes granular…) y perfiles predefinidos listos para clonar.
 4. **Bloqueo por eventos de mesa** (hoy solo `alCobrar`/`inactividad`).
 5. **Abrir/cerrar día y caja por terminal**.
-6. **Respaldo RLS de permisos** (parcial): ✅ la **escritura** de `perfil` y
-   `app_user` ya está respaldada en RLS (`operario_permite('admin.usuarios')`,
-   `0071`) — bloquea la autoescalada. **Falta** extender a otras áreas sensibles
-   (fiscal, catálogo…) y, si se quiere, gatear lecturas.
+6. **Respaldo RLS de permisos** (parcial): ✅ escritura de `perfil`/`app_user`
+   (`admin.usuarios`, `0071`) — bloquea la autoescalada; ✅ escritura de catálogo
+   `family`/`category`/`modifier_group` (`admin.catalogo`, `0072`). `tax_rate`
+   (fiscal) ya está cerrado (RLS sin políticas → solo por RPC). **Falta**: `product`
+   pide un **permiso de acción de TPV** (lo escribe el TPV: agotado/creación rápida);
+   `setting` es transversal; y, si se quiere, gatear lecturas.
 
 ## B.8 · Preguntas abiertas
 - Formato exacto del **código de operario** (¿lo genera el sistema, editable?).
