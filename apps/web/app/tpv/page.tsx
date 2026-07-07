@@ -243,6 +243,9 @@ export default function TPV() {
   // de contenido) y sus botones se estiran con flex-1 → sin altura fija ni hueco.
   const [permisos, setPermisos] = useState<Record<string, boolean>>({});
   const puede = (k: string) => permisos[k] !== false;   // ausente = permitido
+  // Igual que puede() pero avisa si está bloqueado; para gatear acciones con feedback.
+  const exige = (k: string) => { if (permisos[k] === false) { toast.warning("Tu perfil no permite esta acción."); return false; } return true; };
+  const abrirCajonManual = () => { if (exige("abrir_cajon")) void window.gluuh?.abrirCajon(); };
   // Bloqueo = VELO (overlay que conserva la cuenta), NO logout. Combinable:
   // al cerrar cuenta y/o por inactividad; el botón "Bloquear" siempre disponible.
   const [bloqueoAlCobrar, setBloqueoAlCobrar] = useState(false);
@@ -1356,6 +1359,7 @@ export default function TPV() {
 
   // Aparcar: guarda la cuenta con una etiqueta y dispara la comanda (como Glop).
   async function aparcar() {
+    if (!exige("aparcar")) return;
     if (!unidades) return;
     setBusy(true);
     try {
@@ -1561,6 +1565,7 @@ export default function TPV() {
     setMenuAbierto(null);
   }
   async function toggleAgotado(p: Prod, agotar: boolean) {
+    if (!exige("agotado")) return;
     let hasta: string | null = null;
     if (agotar) { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(6, 0, 0, 0); hasta = d.toISOString(); }
     await sb.from("product").update({ agotado_hasta: hasta }).eq("id", p.id);
@@ -1576,6 +1581,7 @@ export default function TPV() {
     catch (err) { console.error(err); }
   }
   async function crearProductoRapido(anadir: boolean) {
+    if (!exige("crear_producto")) return;
     const precio = Number(nuevoProd.precio.replace(",", "."));
     const categoria = nuevoProd.categoryId || catSel;
     if (!nuevoProd.nombre.trim() || !precio || !categoria) return;
@@ -2364,7 +2370,7 @@ export default function TPV() {
           <footer className="flex-none border-t border-border bg-surface px-2 py-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <button type="button" onClick={() => { setMesaSel(null); setMesaSelInfo(null); setEditandoPlano(true); setPaletaAbierta(true); }} className="btn-ghost">Editar salón</button>
-              <button type="button" onClick={() => void window.gluuh?.abrirCajon()} className="btn-ghost">Abrir cajón</button>
+              <button type="button" onClick={abrirCajonManual} className="btn-ghost">Abrir cajón</button>
               <button type="button" onClick={() => mesaSel && abrirNotaMesa(mesaSel)} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Notas mesa</button>
               <button type="button" onClick={() => mesaSel && dividirMesa(mesaSel)} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Dividir pagos</button>
               <button type="button" onClick={() => mesaSel && iniciarTraspaso(mesaSel, "LINEAS")} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Trasp. líneas</button>
@@ -2474,7 +2480,7 @@ export default function TPV() {
               <h3 className="mb-3 font-semibold">Ajustes</h3>
               <div className="space-y-1.5">
                 {typeof window !== "undefined" && window.gluuh && (
-                  <button type="button" onClick={() => { setModalUtilidades(false); void window.gluuh?.abrirCajon(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
+                  <button type="button" onClick={() => { setModalUtilidades(false); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
                 )}
                 <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
                 <button type="button" onClick={() => { setModalUtilidades(false); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
@@ -2558,7 +2564,7 @@ export default function TPV() {
     onPreparar: () => enviarCocina("PENDIENTE"),
     onMarchar: () => enviarCocina("EN_PREPARACION"),
     // Utilidades ancladas al fondo del rail (movidas desde el teclado).
-    onAbrirCajon: () => void window.gluuh?.abrirCajon(),
+    onAbrirCajon: abrirCajonManual,
     onUtilidades: () => setModalUtilidades(true),
     onImprimir: imprimirRecibo,
     imprimirDisabled: !ticket && !unidades,
@@ -2886,7 +2892,7 @@ export default function TPV() {
           onAceptar={dividirAceptar}
           onCobrarTodos={() => { setModalDividir(false); setModalCobrar(true); }}
           onCancelar={() => setModalDividir(false)}
-          onAbrirCajon={() => void window.gluuh?.abrirCajon()}
+          onAbrirCajon={abrirCajonManual}
         />
       )}
 
@@ -3135,7 +3141,7 @@ export default function TPV() {
             <h3 className="mb-3 font-semibold">Utilidades</h3>
             <div className="space-y-1.5">
               {window.gluuh && (
-                <button type="button" onClick={() => { setModalUtilidades(false); void window.gluuh?.abrirCajon(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
+                <button type="button" onClick={() => { setModalUtilidades(false); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
               )}
               <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
               <button type="button" onClick={() => { setModalUtilidades(false); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>

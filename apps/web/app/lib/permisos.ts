@@ -23,6 +23,10 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
       { id: "borrar", label: "Borrar / anular líneas o cuenta" },
       { id: "invitar", label: "Invitaciones y consumo propio" },
       { id: "cobrar", label: "Cobrar" },
+      { id: "aparcar", label: "Aparcar y recuperar cuentas" },
+      { id: "agotado", label: "Marcar productos agotados («86»)" },
+      { id: "crear_producto", label: "Crear productos desde el TPV" },
+      { id: "abrir_cajon", label: "Abrir el cajón" },
     ],
   },
   {

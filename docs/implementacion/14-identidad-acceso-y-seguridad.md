@@ -47,8 +47,10 @@ de 0041 **nunca se aplicó**). El **catálogo** de ids (igual para todos los cli
 × acción, como Ágora). Semántica: ausente o `true` = **permitido**; `false` = bloqueado.
 
 Grupos actuales (todos aplican de verdad):
-- **Punto de venta**: `modificar`, `descuento`, `borrar`, `invitar`, `cobrar` — el
-  TPV los respeta con `puede(k)`.
+- **Punto de venta**: `modificar`, `descuento`, `borrar`, `invitar`, `cobrar`,
+  `aparcar`, `agotado`, `crear_producto`, `abrir_cajon` — el TPV los respeta con
+  `puede(k)`/`exige(k)` (en **cliente**: el operador se identifica por PIN, no es el
+  `auth.uid()` de la sesión, por eso estas acciones no van por RLS).
 - **Zonas del panel**: `panel.operativa|admin|compras|herramientas|informes` — ocultan
   la zona del menú **y bloquean el acceso directo por URL** a sus páginas.
 - **Por aplicación** (marcan páginas concretas, campo `perm` en `lib/nav`; bloquean
@@ -226,9 +228,10 @@ vs **operario activo** (PIN/pulsera, firma cada acción). El **bloqueo** decide
 6. **Respaldo RLS de permisos** (parcial): ✅ escritura de `perfil`/`app_user`
    (`admin.usuarios`, `0071`) — bloquea la autoescalada; ✅ escritura de catálogo
    `family`/`category`/`modifier_group` (`admin.catalogo`, `0072`). `tax_rate`
-   (fiscal) ya está cerrado (RLS sin políticas → solo por RPC). **Falta**: `product`
-   pide un **permiso de acción de TPV** (lo escribe el TPV: agotado/creación rápida);
-   `setting` es transversal; y, si se quiere, gatear lecturas.
+   (fiscal) ya está cerrado (RLS sin políticas → solo por RPC). `product` lo escribe
+   el TPV (agotado/creación rápida), ya gateado en **cliente** por `agotado`/
+   `crear_producto` (el operador va por PIN, no por `auth.uid()`, así que no puede ir
+   por RLS). **Falta** (opcional): `setting` (transversal) y gatear lecturas.
 
 ## B.8 · Preguntas abiertas
 - Formato exacto del **código de operario** (¿lo genera el sistema, editable?).
