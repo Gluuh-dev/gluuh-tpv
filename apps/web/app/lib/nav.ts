@@ -139,5 +139,8 @@ export const NAV: NavEntry[] = [
       { href: "/diario-de-facturas", label: "Diario de facturas", roles: GEST }, { href: "/diario-de-pedidos", label: "Diario de pedidos", roles: GEST }, { href: "/diario-de-cierres-de-caja", label: "Diario de cierres de caja", roles: GEST }, { href: "/diario-de-ventas", label: "Diario de ventas", roles: GEST },
     ] },
   ] },
-  { id: "ayuda", title: "Ayuda", icon: Info, sections: [{ items: [{ href: "/documentacion", label: "Documentacion", roles: GEST }] }] },
+  { id: "ayuda", title: "Ayuda", icon: Info, sections: [{ items: [
+    { href: "/documentacion", label: "Documentacion", roles: GEST },
+    { href: "/acerca-de", label: "Acerca de / Licencia", roles: GEST },
+  ] }] },
 ];

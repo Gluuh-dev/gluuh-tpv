@@ -14,7 +14,7 @@ import { UserMenu } from "@/components/user-menu";
 import { StatusBar } from "@/components/status-bar";
 import { CommandPalette } from "@/components/command-palette";
 
-interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos }
+interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos; licenciaHasta: string | null }
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -36,12 +36,12 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       if (!session) { router.replace("/login"); return; }
       // Cuenta recién entregada (alta de Gluuh): obliga a crear su contraseña.
       if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
-      const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
+      const { data: t } = await sb.from("tenant").select("nombre,licencia_hasta").limit(1).maybeSingle();
       // En vivo: el usuario hereda los permisos de su perfil (perfil_id); sin
       // perfil = acceso completo. Editar el perfil se refleja al recargar.
       const { data: u } = await sb.from("app_user").select("nombre,rol,perfil(permisos)").eq("auth_user_id", session.user.id).maybeSingle();
       const perfilRel = (u as { perfil?: { permisos?: MapaPermisos } | null } | null)?.perfil;
-      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: perfilRel?.permisos ?? {} });
+      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: perfilRel?.permisos ?? {}, licenciaHasta: (t as { licencia_hasta?: string | null } | null)?.licencia_hasta ?? null });
       setLoading(false);
     })();
   }, [router]);
@@ -232,7 +232,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             </div>
           ) : children}
         </main>
-        <StatusBar empresa={info?.empresa} />
+        <StatusBar empresa={info?.empresa} licenciaHasta={info?.licenciaHasta} />
       </div>
     </div>
   );
