@@ -39,20 +39,20 @@
 
   .dark {
     /* Paleta oscura "Gluuh cian" (del mockup del cliente): grises fríos + acento turquesa. */
-    --scale-1:#0f1216; --scale-2:#171b22; --scale-3:#1d222b; --scale-4:#232a34;
-    --scale-5:#2b333f; --scale-6:#2e3742; --scale-7:#3c4653; --scale-8:#4a5563;
-    --scale-9:#5f6b7a; --scale-10:#8b97a6; --scale-11:#b7c2cf; --scale-12:#e9edf2;
+    --scale-1:#14171d; --scale-2:#1c212b; --scale-3:#242a35; --scale-4:#2c3340;
+    --scale-5:#353d4a; --scale-6:#3f4956; --scale-7:#4b5768; --scale-8:#5d6a7a;
+    --scale-9:#727e8e; --scale-10:#98a2b0; --scale-11:#c2ccd8; --scale-12:#eef1f6;
 
-    --bg-default:#0f1216; --bg-surface:#171b22;
-    --bg-overlay:#232a34; --bg-muted:#2b333f;
-    --input-bg:#1d222b;
+    --bg-default:#14171d; --bg-surface:#1c212b;
+    --bg-overlay:#242a35; --bg-muted:#2c3340;
+    --input-bg:#212731;
 
-    --border-muted:#252d37; --border-default:#2e3742; --border-strong:#3c4653;
+    --border-muted:#2a313d; --border-default:#38414f; --border-strong:#4b5768;
 
-    --text-muted:#8b97a6; --text-secondary:#b7c2cf; --text-primary:#e9edf2;
+    --text-muted:#98a2b0; --text-secondary:#c2ccd8; --text-primary:#eef1f6;
     --brand:#19b6cc; --brand-hover:#33c3d6; --brand-active:#0e8fa2; --brand-muted: rgba(25,182,204,.16);
     --accent-soft:#12333a;  /* teal sólido del mockup para seleccionado/activo (oscuro) */
-    --boton-bg:#1d222b; --boton-tono:#6f7987;    /* botón de acción rail/fila: fondo + texto/filo (oscuro) */
+    --boton-bg:#212731; --boton-tono:#7f8b9a;    /* botón de acción rail/fila: fondo + texto/filo (oscuro) */
     --success:#34b476; --warning:#d0a24a; --danger:#cf5346; --info:#3ba7e0;
     color-scheme: dark;
   }
