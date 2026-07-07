@@ -7,6 +7,7 @@ import { estacionDe, ESTACION_LABEL } from "../lib/estaciones";
 import { ASSETS, ASSETS_LEGACY, FORMAS_MESA, assetPorId, mesaPorCapacidad, dim, type PlanoAsset } from "../lib/plano-assets";
 import { leerBranding, BRANDING_DEFAULT, subirMedia, type Branding } from "../lib/branding";
 import { imprimirTicket, imprimirComanda, resolverImpresora, formatearTicket, guardarTicketComoFichero, type TicketImpresion, type ConfigImpresion } from "../lib/impresion";
+import { encolarComandas } from "../lib/print-routing";
 import { claveBase, claveDeLinea, claveParaAnadir } from "./clave-linea";
 import { toast } from "@/app/lib/toast";
 import { getSetting } from "../lib/settings";
@@ -693,18 +694,30 @@ export default function TPV() {
     void imprimirTicket(doc, diseno, destTicket, { logoUrl: logoTicket });
   }
 
-  // Comandas de cocina/barra: al MARCHAR, imprime en cada impresora (por IP) solo
-  // los artículos de su partida, sin precios. Solo en Gluuh Desktop (impresoras reales).
+  // Comandas de cocina/barra: al MARCHAR, imprime los artículos de cada partida
+  // sin precios. En Gluuh Desktop imprime en local (por IP, latencia cero); en
+  // móvil/navegador encola a la cola COMPARTIDA (print_job) enrutando por
+  // estación × zona → impresora, y la despacha un Desktop (guía 15 §6.1).
   function imprimirComandas() {
-    if (typeof window === "undefined" || !window.gluuh) return;
+    if (typeof window === "undefined") return;
     const contexto = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra";
-    for (const [estacion, tipoDoc] of [["COCINA", "COMANDA_COCINA"], ["BARRA", "COMANDA_BARRA"]] as const) {
-      const lineas = lineasComanda()
+    const grupos = (["COCINA", "BARRA", "CAMARERO"] as const).map((estacion) => ({
+      estacion,
+      lineas: lineasComanda()
         .filter((l) => l.estacion === estacion)
-        .map((l) => ({ cantidad: l.cantidad, nombre: nombreDeKey(l.id, "nombre_cocina"), nota: notas[l.id]?.trim() || undefined }));
-      if (!lineas.length) continue;
-      void imprimirComanda({ contexto, operario: operario?.nombre, nota: notaMesa || undefined, lineas }, estacion, resolverImpresora(cfgImpresion, tipoDoc));
+        .map((l) => ({ cantidad: l.cantidad, nombre: nombreDeKey(l.id, "nombre_cocina"), nota: notas[l.id]?.trim() || undefined })),
+    }));
+
+    if (window.gluuh) {
+      for (const [estacion, tipoDoc] of [["COCINA", "COMANDA_COCINA"], ["BARRA", "COMANDA_BARRA"]] as const) {
+        const lineas = grupos.find((g) => g.estacion === estacion)?.lineas ?? [];
+        if (!lineas.length) continue;
+        void imprimirComanda({ contexto, operario: operario?.nombre, nota: notaMesa || undefined, lineas }, estacion, resolverImpresora(cfgImpresion, tipoDoc));
+      }
+      return;
     }
+    // Sin Desktop: cola compartida (la comandera móvil hace salir la comanda en cocina).
+    void encolarComandas(sb, { contexto, roomId: mesa?.room_id ?? null, operario: operario?.nombre, grupos });
   }
 
   /* ── Operaciones de comanda ── */
