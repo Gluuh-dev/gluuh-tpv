@@ -259,12 +259,8 @@ export default function Empleados() {
                 </TableCell>
                 <TableCell><Badge variant="secondary">{rolTexto(e.rol)}</Badge></TableCell>
                 <TableCell>
-                  <span className={e.activo ? "text-emerald-500" : "text-(--text-muted)"}>
-                    {e.activo ? "Activo" : "Inactivo"}
-                  </span>
-                  {estaBloqueado(e) && (
-                    <Badge className="ml-2 border-amber-500/20 bg-amber-500/15 text-amber-500">Bloqueado</Badge>
-                  )}
+                  <Badge variant={e.activo ? "success" : "secondary"}>{e.activo ? "Activo" : "Inactivo"}</Badge>
+                  {estaBloqueado(e) && <Badge variant="warning" className="ml-1.5">Bloqueado</Badge>}
                 </TableCell>
                 <TableCell className="text-center">
                   {e.pulsera_hash
