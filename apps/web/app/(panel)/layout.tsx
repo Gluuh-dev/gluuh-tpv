@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronLeft } from "lucide-react";
+import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor, ShieldAlert, ChevronRight } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type NavLink, type Rol } from "../lib/nav";
@@ -15,6 +15,9 @@ import { AssistantPanel } from "@/components/assistant-panel";
 import { CommandPalette } from "@/components/command-palette";
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos }
+
+// Iniciales para el avatar (nombre o email).
+const iniciales = (s: string) => s.trim().split(/[\s@.]+/).map((w) => w[0] ?? "").slice(0, 2).join("").toUpperCase() || "?";
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -92,16 +95,24 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     return !(zonaOk && itemOk);
   }, [pathname, info]);
 
-  // Página de detalle: si la ruta es subruta de un item de menú (p. ej. /perfiles/xxx),
-  // la cabecera muestra «‹ volver + nombre de la lista» en vez de la hamburguesa.
-  const subpagina = useMemo(() => {
+  // Migas de ruta para la cabecera (en toda página): entrada › lista › [detalle].
+  const migas = useMemo(() => {
+    const crumbs: { label: string; href?: string }[] = [];
+    if (activa) crumbs.push({ label: activa.title, href: activa.index });
     let item: NavLink | null = null;
     let bestLen = -1;
     for (const e of NAV) for (const sec of e.sections) for (const i of sec.items) {
-      if (i.href && pathname.startsWith(`${i.href}/`) && i.href.length > bestLen) { item = i; bestLen = i.href.length; }
+      if (i.href && (i.href === pathname || pathname.startsWith(`${i.href}/`)) && i.href.length > bestLen) { item = i; bestLen = i.href.length; }
     }
-    return item?.href ? { volverA: item.href, titulo: item.label } : null;
-  }, [pathname]);
+    if (item?.href) {
+      crumbs.push({ label: item.label, href: item.href });
+      if (pathname !== item.href) {
+        const seg = pathname.slice(item.href.length + 1).split("/")[0];
+        crumbs.push({ label: seg === "nuevo" ? "Nuevo" : "Editar" });
+      }
+    }
+    return crumbs;
+  }, [pathname, activa]);
 
   async function salir() { await supabaseBrowser().auth.signOut(); router.replace("/login"); }
   function abrirEntrada(e: NavEntry) {
@@ -132,10 +143,32 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             </button>
           );
         })}
-        <button onClick={toggleRail} title={railOpen ? "Contraer" : "Expandir"}
-          className={`mt-auto flex h-9 items-center gap-2.5 rounded-md text-[13px] text-(--text-muted) transition-colors hover:bg-surface-overlay hover:text-foreground ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
-          {railOpen ? <PanelLeftClose className="h-4 w-4 shrink-0" /> : <PanelLeft className="h-4 w-4 shrink-0" />}{railOpen && <span>Contraer</span>}
-        </button>
+        {/* Acciones inferiores: Ir al TPV · Contraer · usuario (avatar) + salir */}
+        <div className="mt-auto flex flex-col gap-0.5">
+          <a href="/tpv" title="Abrir la pantalla de venta"
+            className={`flex h-9 items-center gap-2.5 rounded-md bg-brand text-[13px] font-medium text-brand-foreground transition-colors hover:bg-brand-hover ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
+            <Monitor className="h-4 w-4 shrink-0" />{railOpen && <span>Ir al TPV</span>}
+          </a>
+          <button onClick={toggleRail} title={railOpen ? "Contraer" : "Expandir"}
+            className={`flex h-9 items-center gap-2.5 rounded-md text-[13px] text-(--text-muted) transition-colors hover:bg-surface-overlay hover:text-foreground ${railOpen ? "px-2.5" : "w-8 justify-center"}`}>
+            {railOpen ? <PanelLeftClose className="h-4 w-4 shrink-0" /> : <PanelLeft className="h-4 w-4 shrink-0" />}{railOpen && <span>Contraer</span>}
+          </button>
+          <div className={`mt-1 flex items-center gap-2 border-t border-border pt-2 ${railOpen ? "" : "flex-col"}`}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-surface-muted text-[12px] font-semibold text-foreground" title={info?.nombre || info?.email}>
+              {iniciales(info?.nombre || info?.email || "")}
+            </span>
+            {railOpen && (
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12.5px] font-medium text-foreground">{info?.nombre || info?.email}</div>
+                <div className="truncate text-[11px] capitalize text-(--text-muted)">{info?.rol?.toLowerCase()}</div>
+              </div>
+            )}
+            <button onClick={salir} title="Cerrar sesión" aria-label="Cerrar sesión"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-(--text-muted) transition-colors hover:bg-surface-overlay hover:text-foreground">
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </nav>
 
       {/* Submenú al lado (w-56) */}
@@ -170,28 +203,29 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       {/* Contenido */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-surface px-3">
-          <div className="flex items-center gap-1.5">
-            {subpagina ? (
-              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Volver" title="Volver" onClick={() => router.push(subpagina.volverA)}>
-                <ChevronLeft className="h-4 w-4" />
+          <div className="flex min-w-0 items-center gap-1.5">
+            {!activa?.direct && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} onClick={toggleMenu}>
+                {menuOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
               </Button>
-            ) : (
-              !activa?.direct && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} onClick={toggleMenu}>
-                  {menuOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-                </Button>
-              )
             )}
-            <span className="text-[14px] font-semibold">{subpagina ? subpagina.titulo : activa?.title}</span>
+            <nav aria-label="Ruta" className="flex min-w-0 items-center gap-1 text-[13px]">
+              {migas.map((m, i) => {
+                const last = i === migas.length - 1;
+                return (
+                  <span key={`${m.label}-${i}`} className="flex min-w-0 items-center gap-1">
+                    {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-(--text-muted)" aria-hidden />}
+                    {m.href && !last
+                      ? <Link href={m.href} className="truncate text-(--text-secondary) transition-colors hover:text-foreground">{m.label}</Link>
+                      : <span className={`truncate ${last ? "font-semibold text-foreground" : "text-(--text-secondary)"}`}>{m.label}</span>}
+                  </span>
+                );
+              })}
+            </nav>
           </div>
-          <div className="flex items-center gap-1.5 text-[13px]">
+          <div className="flex shrink-0 items-center gap-1.5 text-[13px]">
             <CommandPalette />
-            <a href="/tpv" className="flex h-7 items-center gap-1.5 rounded-md bg-brand px-2.5 font-medium text-brand-foreground transition-colors hover:bg-brand-hover" title="Abrir la pantalla de venta">
-              <Monitor className="h-4 w-4" /> <span className="hidden sm:inline">Ir al TPV</span>
-            </a>
-            <span className="hidden text-(--text-muted) sm:inline">{info?.nombre || info?.email}</span>
             <ThemeToggle />
-            <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-[13px]" onClick={salir}><LogOut className="h-4 w-4" /> Salir</Button>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-5">
