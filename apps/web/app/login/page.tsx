@@ -20,9 +20,9 @@ export default function Login() {
   const [cargando, setCargando] = useState(false);
   const [conPasskey, setConPasskey] = useState(false);
   const [mounted, setMounted] = useState(false);
-  // Dos vías: email+contraseña (dueño/técnico/remoto) o código+clave (operario local).
-  const [modo, setModo] = useState<"email" | "codigo">("email");
-  const [codigo, setCodigo] = useState("");
+  // Dos vías: email+contraseña (dueño/técnico/remoto) o usuario+clave (operario local).
+  const [modo, setModo] = useState<"email" | "usuario">("email");
+  const [usuario, setUsuario] = useState("");
   const [clave, setClave] = useState("");
 
   useEffect(() => setMounted(true), []);
@@ -59,15 +59,15 @@ export default function Login() {
 
   // Login local por código+clave: la ruta verifica y prepara la cuenta sintética;
   // luego completamos la sesión con signInWithPassword (email interno devuelto).
-  async function onSubmitCodigo(e: React.FormEvent) {
+  async function onSubmitUsuario(e: React.FormEvent) {
     e.preventDefault();
     setCargando(true);
     setError("");
     try {
-      const r = await fetch("/api/entrar-codigo", {
+      const r = await fetch("/api/entrar-operario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo: codigo.trim(), clave: clave.trim() }),
+        body: JSON.stringify({ usuario: usuario.trim(), clave: clave.trim() }),
       });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "No se pudo entrar."); return; }
@@ -97,7 +97,7 @@ export default function Login() {
           <CardContent>
             <div className="mb-4 flex gap-0.5 rounded-md border border-border p-0.5 text-sm">
               <button type="button" onClick={() => { setModo("email"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "email" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Email</button>
-              <button type="button" onClick={() => { setModo("codigo"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "codigo" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Código de operario</button>
+              <button type="button" onClick={() => { setModo("usuario"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "usuario" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Usuario</button>
             </div>
 
             {modo === "email" ? (
@@ -115,10 +115,10 @@ export default function Login() {
                 </Button>
               </form>
             ) : (
-              <form onSubmit={onSubmitCodigo} className="space-y-4">
+              <form onSubmit={onSubmitUsuario} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="codigo">Código de operario</Label>
-                  <Input id="codigo" inputMode="numeric" autoComplete="off" placeholder="12345" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+                  <Label htmlFor="usuario">Usuario</Label>
+                  <Input id="usuario" autoComplete="username" autoCapitalize="none" placeholder="tu usuario" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="clave">Clave</Label>
@@ -127,7 +127,7 @@ export default function Login() {
                 <Button type="submit" className="w-full" disabled={cargando}>
                   <LogIn className="h-4 w-4" /> {cargando ? "Entrando…" : "Entrar"}
                 </Button>
-                <p className="text-center text-xs text-muted-foreground">Tu código lo ves en el TPV, junto a tu nombre.</p>
+                <p className="text-center text-xs text-muted-foreground">Con tu usuario y clave del panel (operarios sin email).</p>
               </form>
             )}
 

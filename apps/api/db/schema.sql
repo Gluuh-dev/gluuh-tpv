@@ -147,7 +147,8 @@ CREATE TABLE app_user (
   pulsera_hash    text,            -- código de pulsera RFID/NFC hasheado (0037)
   perfil_id       uuid,            -- perfil asignado (0070); el usuario hereda perfil.permisos
   codigo          text,            -- código legible del operario, único por tenant (0073)
-  clave_hash      text,            -- clave de acceso al panel por código (bcrypt, 0074)
+  usr_app         text,            -- usuario de login normalizado, único por tenant (0077)
+  clave_hash      text,            -- clave de acceso al panel por usuario (bcrypt, 0074)
   pin_intentos        int NOT NULL DEFAULT 0,   -- backoff login por PIN (0054)
   pin_bloqueado_hasta timestamptz,              -- backoff login por PIN (0054)
   rol             text NOT NULL DEFAULT 'CAMARERO'
@@ -159,6 +160,7 @@ CREATE TABLE app_user (
 CREATE UNIQUE INDEX idx_user_email ON app_user (email) WHERE email IS NOT NULL;
 CREATE INDEX idx_user_tenant ON app_user (tenant_id, id);
 CREATE UNIQUE INDEX idx_app_user_codigo ON app_user (tenant_id, codigo) WHERE codigo IS NOT NULL; -- 0073
+CREATE UNIQUE INDEX idx_app_user_usr_app ON app_user (tenant_id, usr_app) WHERE usr_app IS NOT NULL; -- 0077
 
 -- Fichajes / control horario
 CREATE TABLE shift (

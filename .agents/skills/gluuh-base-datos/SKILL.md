@@ -15,10 +15,10 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0074`
-   —login local por código+clave (`app_user.clave_hash` + `verificar_clave_operario`);
-   `0073` `app_user.codigo` + semilla; `0071`/`0072` RLS con `operario_permite()`—,
-   aplicadas). Nueva migración = siguiente número libre + nombre descriptivo en snake_case.
+   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0077`
+   —login local por **usuario** (`app_user.usr_app` normalizado) + clave; `0073`/`0074`
+   `codigo`/`clave_hash`; `0071`/`0072` RLS con `operario_permite()`—, aplicadas).
+   Nueva migración = siguiente número libre + nombre descriptivo en snake_case.
    ⚠️ **`app_user.permisos` (0041) NUNCA se aplicó**: no existe en la BD. Los
    permisos viven SOLO en `perfil.permisos` (0048); el usuario los hereda por
    `app_user.perfil_id` (0070). No la uses.

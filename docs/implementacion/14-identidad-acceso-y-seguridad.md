@@ -11,8 +11,9 @@ el plan de mejoras**. Decisión vigente: lo avanzado de identidad/acceso se
 
 ## A.0 · Dos planos de acceso (no confundir)
 1. **Backoffice (panel)** — **Supabase Auth**: email+contraseña o **passkey**
-   (dueño/técnico/remoto), o **código+clave** de operario en el dispositivo local
-   (`0074`, vía cuenta auth sintética) → sesión del navegador con tenant/rol.
+   (dueño/técnico/remoto), o **usuario+clave** de operario en el dispositivo local
+   (`app_user.usr_app` normalizado, `0077`; clave `0074`; vía cuenta auth sintética)
+   → sesión del navegador con tenant/rol.
 2. **TPV (operativa)** — sobre esa sesión de dispositivo, cada **operario** se
    identifica con **PIN** o **pulsera**. Es «quién opera esta cuenta ahora».
 
@@ -149,11 +150,11 @@ Reúne hoy: **bloqueo del TPV** (`tpv.bloqueo`), **clave técnica** (cambiarla) 
 (setting DEVICE / `gluuh_device`) y no se vuelve a pedir. Reusa `activar_licencia`.
 
 **Capa 2 · Operarios (cada acción)**:
-- ✅ Operarios con **código legible** (`app_user.codigo`, número único por tenant, `0073`)
-  **+ clave de acceso** (`clave_hash`, `0074`), **sin email**. **Login local por
-  código+clave** hecho: `/api/entrar-codigo` verifica y usa una **cuenta auth
-  sintética** para dar sesión con tenant/rol (RLS + permisos aplican). El PIN sigue
-  siendo solo para el TPV.
+- ✅ Operarios con **usuario** (`app_user.usr_app`, normalizado y único por tenant,
+  `0077`), **código legible** (`codigo`, `0073`) **+ clave de acceso** (`clave_hash`,
+  `0074`), **sin email**. **Login local por usuario+clave** hecho:
+  `/api/entrar-operario` verifica y usa una **cuenta auth sintética** para dar sesión
+  con tenant/rol (RLS + permisos aplican). El PIN sigue siendo solo para el TPV.
 - **Perfiles vinculados**: añadir **`app_user.perfil_id`** y que el runtime lea el
   perfil (o resuelva `permisos` desde el perfil), en vez de copiar una vez. El menú
   del panel pasa a mirar el **perfil**, no solo el rol.

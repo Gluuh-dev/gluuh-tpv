@@ -25,6 +25,7 @@ interface Empleado {
   id: string;
   nombre: string;
   codigo?: string | null;
+  usr_app?: string | null;
   email: string | null;
   rol: string;
   activo: boolean;
@@ -41,11 +42,13 @@ const ROLES = [
 ];
 
 const rolTexto = (v: string) => ROLES.find((r) => r.v === v)?.t ?? v;
+// Usuario de login normalizado: minúsculas, sin acentos, sin espacios (igual que en BD).
+const normUsr = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "");
 
 const estaBloqueado = (e: Empleado) =>
   !!e.pin_bloqueado_hasta && new Date(e.pin_bloqueado_hasta).getTime() > Date.now();
 
-type Borrador = { nombre: string; email: string; rol: string; activo: boolean; perfil_id: string | null };
+type Borrador = { nombre: string; usr_app: string; email: string; rol: string; activo: boolean; perfil_id: string | null };
 type Editor = { modo: "alta" } | { modo: "editar"; id: string };
 
 function Switch({ checked, onChange, label }: { checked: boolean; onChange(): void; label: string }) {
@@ -67,7 +70,7 @@ export default function Empleados() {
   const [busqueda, setBusqueda] = useState("");
 
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [b, setB] = useState<Borrador>({ nombre: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
+  const [b, setB] = useState<Borrador>({ nombre: "", usr_app: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
   const [pin, setPin] = useState("");
   const [pulseraCodigo, setPulseraCodigo] = useState("");
   const [claveAcceso, setClaveAcceso] = useState("");
@@ -76,7 +79,7 @@ export default function Empleados() {
   async function cargar() {
     const { data } = await sb
       .from("app_user")
-      .select("id,nombre,codigo,email,rol,activo,perfil_id,pulsera_hash,pin_bloqueado_hasta")
+      .select("id,nombre,codigo,usr_app,email,rol,activo,perfil_id,pulsera_hash,pin_bloqueado_hasta")
       .order("nombre");
     setLista((data as Empleado[]) ?? []);
     // Perfiles para el selector (el usuario hereda sus permisos por perfil_id).
@@ -99,12 +102,12 @@ export default function Empleados() {
   function cerrar() { setEditor(null); }
 
   function abrirAlta() {
-    setB({ nombre: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
+    setB({ nombre: "", usr_app: "", email: "", rol: "CAMARERO", activo: true, perfil_id: null });
     setPin(""); setPulseraCodigo(""); setClaveAcceso("");
     setEditor({ modo: "alta" });
   }
   function abrirEditar(e: Empleado) {
-    setB({ nombre: e.nombre, email: e.email ?? "", rol: e.rol, activo: e.activo, perfil_id: e.perfil_id ?? null });
+    setB({ nombre: e.nombre, usr_app: e.usr_app ?? "", email: e.email ?? "", rol: e.rol, activo: e.activo, perfil_id: e.perfil_id ?? null });
     setPin(""); setPulseraCodigo(""); setClaveAcceso("");
     setEditor({ modo: "editar", id: e.id });
   }
@@ -116,15 +119,19 @@ export default function Empleados() {
     setGuardando(true);
     if (editor.modo === "alta") {
       if (pin.trim().length < 4) { toast.error("El PIN debe tener al menos 4 dígitos."); setGuardando(false); return; }
-      const { error } = await sb.rpc("crear_empleado", {
+      const { data: nuevoId, error } = await sb.rpc("crear_empleado", {
         p_nombre: b.nombre.trim(), p_email: b.email.trim(), p_rol: b.rol, p_pin: pin.trim(),
       });
+      // crear_empleado no toma usuario; se fija aparte (el trigger lo normaliza).
+      if (!error && b.usr_app.trim() && nuevoId) {
+        await sb.from("app_user").update({ usr_app: b.usr_app.trim() }).eq("id", nuevoId as string);
+      }
       setGuardando(false);
       if (error) { toast.error(error.message); return; }
       toast.success(`Empleado «${b.nombre.trim()}» creado con su PIN.`);
     } else {
       const { error } = await sb.from("app_user").update({
-        nombre: b.nombre.trim(), email: b.email.trim() || null, rol: b.rol, activo: b.activo, perfil_id: b.perfil_id,
+        nombre: b.nombre.trim(), usr_app: b.usr_app.trim() || null, email: b.email.trim() || null, rol: b.rol, activo: b.activo, perfil_id: b.perfil_id,
       }).eq("id", editor.id);
       setGuardando(false);
       if (error) { toast.error(error.message); return; }
@@ -246,7 +253,8 @@ export default function Empleados() {
                 <TableCell>
                   <div className="font-medium">{e.nombre}</div>
                   <div className="text-xs text-muted-foreground">
-                    <span className="font-mono">#{e.codigo}</span>{e.email ? ` · ${e.email}` : ""}
+                    {e.usr_app ? <span className="font-medium text-foreground">{e.usr_app}</span> : null}
+                    {e.usr_app ? " · " : ""}<span className="font-mono">#{e.codigo}</span>{e.email ? ` · ${e.email}` : ""}
                   </div>
                 </TableCell>
                 <TableCell><Badge variant="secondary">{rolTexto(e.rol)}</Badge></TableCell>
@@ -300,6 +308,11 @@ export default function Empleados() {
                   {editor.modo === "editar" && emp?.codigo && (
                     <p className="text-[11px] text-muted-foreground">Código de operario <span className="font-mono text-foreground">#{emp.codigo}</span> — lo identifica en el TPV.</p>
                   )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="emp-usr">Usuario (para entrar al panel)</Label>
+                  <Input id="emp-usr" autoCapitalize="none" value={b.usr_app} onChange={(e) => setB({ ...b, usr_app: normUsr(e.target.value) })} placeholder="p. ej. maria" />
+                  <p className="text-[11px] text-muted-foreground">Sin espacios ni acentos, en minúsculas. Con esto + su clave entra al panel (sin email).</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="emp-email">Email (opcional)</Label>
@@ -361,7 +374,7 @@ export default function Empleados() {
                       <Input id="emp-clave" type="password" autoComplete="off" value={claveAcceso} onChange={(e) => setClaveAcceso(e.target.value)} placeholder="Para entrar por código (4+)" />
                       <Button variant="outline" disabled={claveAcceso.trim().length < 4} onClick={() => void cambiarClaveAcceso()}>Guardar clave</Button>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">Entra al panel con su código {emp!.codigo ? <b className="font-mono">#{emp!.codigo}</b> : null} + esta clave, sin email. El PIN es solo para el TPV.</p>
+                    <p className="text-[11px] text-muted-foreground">Entra al panel con su <b>usuario</b> {emp?.usr_app ? <b className="font-mono text-foreground">{emp.usr_app}</b> : "(sin usuario)"} + esta clave, sin email. El PIN es solo para el TPV.</p>
                   </div>
 
                   {/* Perfil (en vivo): el usuario hereda los permisos de su perfil */}
