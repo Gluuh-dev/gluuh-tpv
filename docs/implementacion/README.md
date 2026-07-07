@@ -27,6 +27,7 @@ pensada para ejecutarla tal cual (por una persona o por un agente).
 | [12-conectar-tpv-modales-y-carta.md](12-conectar-tpv-modales-y-carta.md) | Cablear el TPV: variaciones, modificadores, anotaciones, dividir, cobrar; props de los 3 modales nuevos y tablas implicadas | pendiente cablear | ejecutable |
 | [13-rediseno-config-y-estilos.md](13-rediseno-config-y-estilos.md) | ★ Backlog por sesiones: footer fijo + buscador global, Empresa y Local, Seguridad, Marca, orden de botones TPV, arreglar navegación | pendiente | por sesiones |
 | [14-identidad-acceso-y-seguridad.md](14-identidad-acceso-y-seguridad.md) | ★ Análisis + plan: activación por licencia, operarios con código+clave y perfiles, superficies por puerta, zona técnica→Seguridad, cerrar día, audit_log | análisis | por sesiones |
+| [15-instalacion-despliegue-y-licencia.md](15-instalacion-despliegue-y-licencia.md) | ★ Qué se instala en cada sitio (PC/móviles/cocina), caso 3 barras, impresión compartida (print_job), backups con horario, acceso remoto, "Acerca de/Licencia" estilo Ágora, ¿servicio central? + GAP priorizado | análisis + GAP | por sesiones |
 
 Las guías 01–04 son independientes entre sí salvo lo indicado en cada una (03 y 04
 comparten la identidad de dispositivo). La 05 y la 07 requieren la 02 (el refactor)
