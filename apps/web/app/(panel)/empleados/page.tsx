@@ -3,11 +3,11 @@
 // Personal / empleados — patrón "tabla Ágora": lista en tabla y, al pulsar una
 // fila, se abre un panel lateral (slide-over) con la edición del empleado. El
 // botón "Nuevo empleado" abre el mismo panel en modo alta.
-//   · alta:        RPC crear_empleado(p_nombre,p_email,p_rol,p_pin)
+//   · alta:        RPC crear_empleado(p_nombre,p_email,p_rol,p_pin) + usr_app y perfil_id aparte
 //   · datos:       UPDATE directo sobre app_user (nombre,email,rol,activo,perfil_id)
 //   · pulsera:     RPC asignar_pulsera(p_user_id,p_codigo)  (p_codigo="" => quita)
 //   · desbloqueo:  UPDATE app_user (pin_intentos=0, pin_bloqueado_hasta=null)
-//   · cambiar PIN: RPC cambiar_pin(p_user_id,p_pin)  ← ver nota más abajo.
+//   · cambiar PIN: RPC cambiar_pin(p_user_id,p_pin)  (bcrypt en servidor, 0074)
 import { useEffect, useState } from "react";
 import { Check, LockOpen, UserPlus, X } from "lucide-react";
 import { toast } from "@/app/lib/toast";
@@ -122,9 +122,12 @@ export default function Empleados() {
       const { data: nuevoId, error } = await sb.rpc("crear_empleado", {
         p_nombre: b.nombre.trim(), p_email: b.email.trim(), p_rol: b.rol, p_pin: pin.trim(),
       });
-      // crear_empleado no toma usuario; se fija aparte (el trigger lo normaliza).
-      if (!error && b.usr_app.trim() && nuevoId) {
-        await sb.from("app_user").update({ usr_app: b.usr_app.trim() }).eq("id", nuevoId as string);
+      // crear_empleado no toma usuario ni perfil; se fijan aparte (el trigger normaliza usr_app).
+      if (!error && nuevoId && (b.usr_app.trim() || b.perfil_id)) {
+        const extra: Record<string, unknown> = {};
+        if (b.usr_app.trim()) extra.usr_app = b.usr_app.trim();
+        if (b.perfil_id) extra.perfil_id = b.perfil_id;
+        await sb.from("app_user").update(extra).eq("id", nuevoId as string);
       }
       setGuardando(false);
       if (error) { toast.error(error.message); return; }
@@ -324,12 +327,23 @@ export default function Empleados() {
               </div>
 
               {editor.modo === "alta" ? (
-                <div className="space-y-1.5">
-                  <Label htmlFor="emp-pin">PIN (4+ dígitos)</Label>
-                  <Input
-                    id="emp-pin" required minLength={4} inputMode="numeric" value={pin}
-                    onChange={(e) => setPin(e.target.value)} placeholder="1234"
-                  />
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="emp-pin">PIN (4+ dígitos)</Label>
+                    <Input
+                      id="emp-pin" required minLength={4} inputMode="numeric" value={pin}
+                      onChange={(e) => setPin(e.target.value)} placeholder="1234"
+                    />
+                  </div>
+                  {perfiles.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label>Perfil (permisos)</Label>
+                      <Select value={b.perfil_id ?? undefined} onValueChange={(id) => setB((s) => ({ ...s, perfil_id: id }))}>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Sin perfil (acceso completo)" /></SelectTrigger>
+                        <SelectContent>{perfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
