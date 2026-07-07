@@ -10,6 +10,12 @@ build/
 out/
 *.tsbuildinfo
 
+# Cloudflare / OpenNext
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
+.dev.vars
+
 # Tauri / Rust
 apps/desktop/src-tauri/target/
 

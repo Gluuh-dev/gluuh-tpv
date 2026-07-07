@@ -137,6 +137,45 @@ CREATE TABLE licencia (
 );
 CREATE INDEX idx_licencia_tenant ON licencia (tenant_id);
 
+-- Impresión compartida (0079). printer: impresoras del local. print_job: cola por
+-- la nube (cualquier terminal encola; el equipo con la impresora despacha).
+-- print_route: estación × zona → impresora (multi-barra). RLS por tenant + trigger.
+CREATE TABLE printer (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  location_id uuid REFERENCES location(id) ON DELETE SET NULL,
+  nombre      text NOT NULL,
+  rol         text NOT NULL DEFAULT 'TICKETS' CHECK (rol IN ('TICKETS','COCINA','BARRA','ETIQUETAS')),
+  transporte  text NOT NULL DEFAULT 'RED' CHECK (transporte IN ('RED','USB')),
+  destino     text,                     -- "192.168.1.201:9100" (RED) o ruta/id USB
+  ancho       int  NOT NULL DEFAULT 48,
+  tipo        text NOT NULL DEFAULT 'EPSON' CHECK (tipo IN ('EPSON','STAR')),
+  device_id   uuid REFERENCES device(id) ON DELETE SET NULL, -- equipo que la despacha
+  activa      boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE print_job (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  printer_id    uuid NOT NULL REFERENCES printer(id) ON DELETE CASCADE,
+  payload       jsonb NOT NULL,
+  estado        text NOT NULL DEFAULT 'ENCOLADO' CHECK (estado IN ('ENCOLADO','IMPRESO','ERROR')),
+  intentos      int  NOT NULL DEFAULT 0,
+  error         text,
+  origen_device uuid,
+  client_id     text,                    -- idempotencia
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE print_route (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id  uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  estacion   text NOT NULL,              -- order_line.estacion
+  room_id    uuid REFERENCES room(id) ON DELETE CASCADE, -- null = cualquier zona
+  printer_id uuid NOT NULL REFERENCES printer(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Usuarios (empleados). Login backoffice (email+pass) y TPV (PIN).
 CREATE TABLE app_user (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),

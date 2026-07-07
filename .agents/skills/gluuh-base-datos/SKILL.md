@@ -15,8 +15,11 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0078`
-   —**instalación por código**: `tenant.codigo_instalacion` único (4-4-5-4-4),
+   numeradas secuencialmente (`0001`…; a 07-07-2026 la última es `0079`
+   —**impresión compartida**: `printer` (rol/transporte/destino/device_id),
+   `print_job` (cola por la nube, estado, idempotencia por client_id),
+   `print_route` (estación × zona → impresora); RLS por tenant + `set_tenant_id()`.
+   `0078` **instalación por código**: `tenant.codigo_instalacion` único (4-4-5-4-4),
    `handle_new_user` SOLO provisiona con `empresa_nombre` en metadata,
    `verificar_clave_operario(p_tenant)` acotado a la empresa de la instalación,
    `admin_sembrar_ejemplo()` (usuarios admin/camareros + catálogo demo);
