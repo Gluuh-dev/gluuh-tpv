@@ -146,6 +146,7 @@ CREATE TABLE app_user (
   pin_hash        text,            -- PIN del camarero en TPV/comandera
   pulsera_hash    text,            -- código de pulsera RFID/NFC hasheado (0037)
   permisos        jsonb NOT NULL DEFAULT '{}',  -- flags de permisos en el TPV (0041)
+  perfil_id       uuid,            -- perfil asignado; FK abajo, tras CREATE TABLE perfil (0070)
   pin_intentos        int NOT NULL DEFAULT 0,   -- backoff login por PIN (0054)
   pin_bloqueado_hasta timestamptz,              -- backoff login por PIN (0054)
   rol             text NOT NULL DEFAULT 'CAMARERO'
@@ -177,6 +178,11 @@ CREATE TABLE perfil (
   permisos    jsonb NOT NULL DEFAULT '{}',  -- mismo formato que app_user.permisos; ausente = permitido (0048)
   created_at  timestamptz DEFAULT now()
 );
+-- Vínculo operario ↔ perfil (0070). El FK va aquí porque perfil se define después
+-- de app_user; el panel resuelve las zonas del menú desde app_user.permisos.
+ALTER TABLE app_user
+  ADD CONSTRAINT app_user_perfil_id_fkey FOREIGN KEY (perfil_id) REFERENCES perfil(id) ON DELETE SET NULL;
+CREATE INDEX idx_app_user_tenant_perfil ON app_user (tenant_id, perfil_id);
 
 -- =============================================================================
 --  2. CATÁLOGO (carta, productos, inventario)

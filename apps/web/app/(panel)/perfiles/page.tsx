@@ -1,15 +1,15 @@
 "use client";
 
-// Perfiles de permisos: CRUD de perfiles (tabla perfil) + los mismos 5 flags
-// de permisos del TPV que app_user.permisos (ausente = permitido), guardados
-// en perfil.permisos (migración 0048). Desde Empleados se puede "aplicar
-// perfil" para copiar estos flags a un empleado.
-// Si la migración aún no está aplicada, el CRUD sigue funcionando y los
-// permisos quedan deshabilitados con aviso.
-import { useEffect, useState } from "react";
+// Perfiles y permisos, estilo Ágora: permiso = (Aplicación, acción). El catálogo
+// (agrupado) vive en lib/permisos.ts; aquí se editan los concedidos del perfil
+// (perfil.permisos, 0048). Desde Empleados se asigna un perfil a cada empleado
+// (app_user.perfil_id, 0070) y se copian sus permisos a app_user.permisos.
+// Si 0048 no está aplicada, el CRUD sigue y los permisos quedan deshabilitados.
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "@/app/lib/toast";
-import { Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Copy, Pencil, Plus, Search, Trash2, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { CATALOGO_PERMISOS, type MapaPermisos } from "../../lib/permisos";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,17 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-interface Permisos { modificar?: boolean; descuento?: boolean; borrar?: boolean; invitar?: boolean; cobrar?: boolean }
-interface Perfil { id: string; nombre: string; descripcion: string | null; permisos?: Permisos }
+interface Perfil { id: string; nombre: string; descripcion: string | null; permisos?: MapaPermisos }
 
-// Misma lista y claves que (panel)/empleados/page.tsx y app/tpv (0041).
-const PERMISOS: [keyof Permisos, string][] = [
-  ["modificar", "Modificar la cuenta (cantidades, precio, notas)"],
-  ["descuento", "Aplicar descuentos"],
-  ["borrar", "Borrar / anular cuenta"],
-  ["invitar", "Invitaciones y consumo propio"],
-  ["cobrar", "Cobrar"],
-];
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export default function Perfiles() {
   const sb = supabaseBrowser();
@@ -37,7 +29,8 @@ export default function Perfiles() {
   const [sinMigracion, setSinMigracion] = useState(false);
   const [form, setForm] = useState({ nombre: "", descripcion: "" });
   const [editId, setEditId] = useState<string | null>(null);
-  const [permForm, setPermForm] = useState<Permisos>({});
+  const [permForm, setPermForm] = useState<MapaPermisos>({});
+  const [permBusqueda, setPermBusqueda] = useState("");
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -62,6 +55,7 @@ export default function Perfiles() {
   function seleccionar(p: Perfil) {
     setSelId(p.id);
     setPermForm({ ...(p.permisos ?? {}) });
+    setPermBusqueda("");
   }
 
   function abrirEditar(p: Perfil) {
@@ -98,6 +92,20 @@ export default function Perfiles() {
     if (editId === p.id) { setEditId(null); setForm({ nombre: "", descripcion: "" }); }
   }
 
+  // Copiar perfil (como Ágora): duplica con " (copia)" y sus mismos permisos.
+  async function copiar(p: Perfil) {
+    const nombre = `${p.nombre} (copia)`;
+    const base = { tenant_id: tenantId, nombre, descripcion: p.descripcion };
+    const insert = sinMigracion ? base : { ...base, permisos: p.permisos ?? {} };
+    const cols = sinMigracion ? "id,nombre,descripcion" : "id,nombre,descripcion,permisos";
+    const { data, error } = await sb.from("perfil").insert(insert).select(cols).single();
+    if (error) { toast.error(error.message); return; }
+    const nuevo = data as unknown as Perfil;
+    setPerfiles((prev) => [...prev, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    seleccionar(nuevo);
+    toast.success(`Perfil copiado: "${nombre}".`);
+  }
+
   async function guardarPermisos() {
     if (!sel || sinMigracion) return;
     setGuardando(true);
@@ -108,11 +116,20 @@ export default function Perfiles() {
     toast.success(`Permisos del perfil "${sel.nombre}" guardados.`);
   }
 
+  // Catálogo filtrado por el buscador (por permiso o por grupo).
+  const grupos = useMemo(() => {
+    const q = norm(permBusqueda.trim());
+    if (!q) return CATALOGO_PERMISOS;
+    return CATALOGO_PERMISOS
+      .map((g) => ({ ...g, permisos: g.permisos.filter((p) => norm(p.label).includes(q) || norm(g.grupo).includes(q)) }))
+      .filter((g) => g.permisos.length > 0);
+  }, [permBusqueda]);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Perfiles y permisos"
-        description="Plantillas de permisos del TPV. Desde Empleados puedes aplicar un perfil a cada empleado."
+        description="Permisos por aplicación (estilo Ágora). Asigna un perfil a cada empleado en Personal; sus permisos se aplican en el TPV y en el panel."
       />
 
       {sinMigracion && (
@@ -125,7 +142,7 @@ export default function Perfiles() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
         {/* Lista + alta/edición */}
         <Card className="self-start">
           <CardContent className="space-y-3">
@@ -144,22 +161,16 @@ export default function Perfiles() {
                     <span>{p.nombre}</span>
                     {p.descripcion && <span className="block text-xs font-normal text-(--text-muted)">{p.descripcion}</span>}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => abrirEditar(p)}
-                    aria-label={`Editar ${p.nombre}`}
-                    title="Editar"
-                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                  >
+                  <button type="button" onClick={() => void copiar(p)} aria-label={`Copiar ${p.nombre}`} title="Copiar perfil"
+                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100">
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" onClick={() => abrirEditar(p)} aria-label={`Editar ${p.nombre}`} title="Editar"
+                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100">
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void borrar(p)}
-                    aria-label={`Eliminar ${p.nombre}`}
-                    title="Eliminar"
-                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-destructive group-hover:opacity-100"
-                  >
+                  <button type="button" onClick={() => void borrar(p)} aria-label={`Eliminar ${p.nombre}`} title="Eliminar"
+                    className="grid h-7 w-7 place-items-center rounded-md text-(--text-muted) opacity-0 hover:bg-accent hover:text-destructive group-hover:opacity-100">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -169,18 +180,9 @@ export default function Perfiles() {
             <form onSubmit={guardarFicha} className="space-y-2 border-t border-border pt-3">
               <div className="space-y-1.5">
                 <Label>{editId ? "Editar perfil" : "Nuevo perfil"}</Label>
-                <Input
-                  value={form.nombre}
-                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                  placeholder="Nombre (p. ej. Encargado)"
-                />
+                <Input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre (p. ej. Encargado)" />
               </div>
-              <Textarea
-                rows={2}
-                value={form.descripcion}
-                onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-                placeholder="Descripción (opcional)"
-              />
+              <Textarea rows={2} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} placeholder="Descripción (opcional)" />
               <div className="flex gap-2">
                 <Button type="submit" size="sm" disabled={!form.nombre.trim()}>
                   {editId ? "Guardar cambios" : <><Plus className="h-4 w-4" /> Crear perfil</>}
@@ -195,33 +197,39 @@ export default function Perfiles() {
           </CardContent>
         </Card>
 
-        {/* Permisos del perfil seleccionado */}
+        {/* Matriz de permisos del perfil seleccionado */}
         <Card className="self-start">
           <CardContent>
             {!sel ? (
-              <p className="py-6 text-center text-sm text-(--text-muted)">
-                Selecciona un perfil para editar sus permisos.
-              </p>
+              <p className="py-6 text-center text-sm text-(--text-muted)">Selecciona un perfil para editar sus permisos.</p>
             ) : (
               <div className="space-y-3">
                 <div>
                   <h3 className="font-semibold">Permisos de {sel.nombre}</h3>
-                  <p className="text-sm text-(--text-muted)">
-                    Lo que puede hacer en el TPV quien tenga este perfil. Desmarca lo que quieras bloquear.
-                  </p>
+                  <p className="text-sm text-(--text-muted)">Marcado = permitido. Desmarca lo que quieras bloquear a quien tenga este perfil.</p>
                 </div>
-                <div className="space-y-1.5">
-                  {PERMISOS.map(([k, t]) => (
-                    <label key={k} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={permForm[k] !== false}
-                        disabled={sinMigracion}
-                        onChange={(e) => setPermForm((s) => ({ ...s, [k]: e.target.checked }))}
-                      />
-                      {t}
-                    </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                  <Input className="pl-8" placeholder="Buscar permiso…" value={permBusqueda} onChange={(e) => setPermBusqueda(e.target.value)} />
+                </div>
+                <div className="space-y-4">
+                  {grupos.map((g) => (
+                    <div key={g.grupo} className="space-y-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{g.grupo}</p>
+                      {g.permisos.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={permForm[p.id] !== false}
+                            disabled={sinMigracion}
+                            onChange={(e) => setPermForm((s) => ({ ...s, [p.id]: e.target.checked }))}
+                          />
+                          {p.label}
+                        </label>
+                      ))}
+                    </div>
                   ))}
+                  {grupos.length === 0 && <p className="py-4 text-center text-sm text-(--text-muted)">Sin permisos para «{permBusqueda}».</p>}
                 </div>
                 <Button onClick={() => void guardarPermisos()} disabled={sinMigracion || guardando}>
                   {guardando ? "Guardando…" : "Guardar permisos"}

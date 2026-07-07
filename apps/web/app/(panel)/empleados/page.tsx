@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
+import { type MapaPermisos } from "../../lib/permisos";
 
 interface Permisos { modificar?: boolean; descuento?: boolean; borrar?: boolean; invitar?: boolean; cobrar?: boolean }
 interface Empleado {
@@ -28,11 +29,12 @@ interface Empleado {
   email: string | null;
   rol: string;
   activo: boolean;
-  permisos?: Permisos | null;
+  permisos?: MapaPermisos | null;
+  perfil_id?: string | null;
   pulsera_hash?: string | null;
   pin_bloqueado_hasta?: string | null;
 }
-interface Perfil { id: string; nombre: string; permisos?: Permisos }
+interface Perfil { id: string; nombre: string; permisos?: MapaPermisos }
 
 const ROLES = [
   { v: "CAMARERO", t: "Camarero/a" },
@@ -51,7 +53,7 @@ const PERMISOS: [keyof Permisos, string][] = [
 const rolTexto = (v: string) => ROLES.find((r) => r.v === v)?.t ?? v;
 
 // Ausente/true = permitido; sólo cuenta como bloqueado un `false` explícito.
-function resumenPermisos(p?: Permisos | null): string {
+function resumenPermisos(p?: MapaPermisos | null): string {
   const activos = PERMISOS.filter(([k]) => p?.[k] !== false).length;
   return activos === PERMISOS.length ? "Todos" : `${activos} de ${PERMISOS.length}`;
 }
@@ -59,7 +61,7 @@ function resumenPermisos(p?: Permisos | null): string {
 const estaBloqueado = (e: Empleado) =>
   !!e.pin_bloqueado_hasta && new Date(e.pin_bloqueado_hasta).getTime() > Date.now();
 
-type Borrador = { nombre: string; email: string; rol: string; activo: boolean; permisos: Permisos };
+type Borrador = { nombre: string; email: string; rol: string; activo: boolean; permisos: MapaPermisos; perfil_id: string | null };
 type Editor = { modo: "alta" } | { modo: "editar"; id: string };
 
 function Switch({ checked, onChange, label }: { checked: boolean; onChange(): void; label: string }) {
@@ -81,7 +83,7 @@ export default function Empleados() {
   const [busqueda, setBusqueda] = useState("");
 
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [b, setB] = useState<Borrador>({ nombre: "", email: "", rol: "CAMARERO", activo: true, permisos: {} });
+  const [b, setB] = useState<Borrador>({ nombre: "", email: "", rol: "CAMARERO", activo: true, permisos: {}, perfil_id: null });
   const [pin, setPin] = useState("");
   const [pulseraCodigo, setPulseraCodigo] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -89,7 +91,7 @@ export default function Empleados() {
   async function cargar() {
     const { data } = await sb
       .from("app_user")
-      .select("id,nombre,email,rol,activo,permisos,pulsera_hash,pin_bloqueado_hasta")
+      .select("id,nombre,email,rol,activo,permisos,perfil_id,pulsera_hash,pin_bloqueado_hasta")
       .order("nombre");
     setLista((data as Empleado[]) ?? []);
     // Perfiles = plantilla de permisos (0048). Si no está aplicada, no se muestra.
@@ -112,12 +114,12 @@ export default function Empleados() {
   function cerrar() { setEditor(null); }
 
   function abrirAlta() {
-    setB({ nombre: "", email: "", rol: "CAMARERO", activo: true, permisos: {} });
+    setB({ nombre: "", email: "", rol: "CAMARERO", activo: true, permisos: {}, perfil_id: null });
     setPin(""); setPulseraCodigo("");
     setEditor({ modo: "alta" });
   }
   function abrirEditar(e: Empleado) {
-    setB({ nombre: e.nombre, email: e.email ?? "", rol: e.rol, activo: e.activo, permisos: { ...(e.permisos ?? {}) } });
+    setB({ nombre: e.nombre, email: e.email ?? "", rol: e.rol, activo: e.activo, permisos: { ...(e.permisos ?? {}) }, perfil_id: e.perfil_id ?? null });
     setPin(""); setPulseraCodigo("");
     setEditor({ modo: "editar", id: e.id });
   }
@@ -137,7 +139,7 @@ export default function Empleados() {
       toast.success(`Empleado «${b.nombre.trim()}» creado con su PIN.`);
     } else {
       const { error } = await sb.from("app_user").update({
-        nombre: b.nombre.trim(), email: b.email.trim() || null, rol: b.rol, activo: b.activo, permisos: b.permisos,
+        nombre: b.nombre.trim(), email: b.email.trim() || null, rol: b.rol, activo: b.activo, permisos: b.permisos, perfil_id: b.perfil_id,
       }).eq("id", editor.id);
       setGuardando(false);
       if (error) { toast.error(error.message); return; }
@@ -351,15 +353,19 @@ export default function Empleados() {
                     </div>
                   </div>
 
-                  {/* Permisos */}
+                  {/* Perfil + permisos */}
                   <div className="space-y-2">
-                    <Label>Permisos en el TPV</Label>
-                    {perfiles.length > 0 && (
-                      <Select onValueChange={(id) => { const p = perfiles.find((x) => x.id === id); if (p) setB((s) => ({ ...s, permisos: { ...(p.permisos ?? {}) } })); }}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Aplicar perfil…" /></SelectTrigger>
+                    <Label>Perfil</Label>
+                    {perfiles.length > 0 ? (
+                      <Select value={b.perfil_id ?? undefined} onValueChange={(id) => { const p = perfiles.find((x) => x.id === id); setB((s) => ({ ...s, perfil_id: id, permisos: p ? { ...(p.permisos ?? {}) } : s.permisos })); }}>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Sin perfil — permisos manuales" /></SelectTrigger>
                         <SelectContent>{perfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent>
                       </Select>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">Crea perfiles en Administración → Perfiles y permisos para asignarlos aquí.</p>
                     )}
+                    <p className="text-[11px] text-muted-foreground">El perfil decide sus permisos del TPV y a qué zonas del panel entra. Abajo puedes ajustar los del TPV para este empleado.</p>
+                    <Label className="pt-1">Permisos rápidos del TPV</Label>
                     <div className="space-y-1.5">
                       {PERMISOS.map(([k, t]) => (
                         <label key={k} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px]">

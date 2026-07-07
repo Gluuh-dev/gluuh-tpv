@@ -7,13 +7,14 @@ import { LogOut, ExternalLink, PanelLeftClose, PanelLeft, Monitor } from "lucide
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { useUI } from "../lib/ui-store";
 import { NAV, puede, type NavEntry, type Rol } from "../lib/nav";
+import { permite, permisoZona, type MapaPermisos } from "../lib/permisos";
 import { modulosInactivos } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AssistantPanel } from "@/components/assistant-panel";
 import { CommandPalette } from "@/components/command-palette";
 
-interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol }
+interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos }
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -34,8 +35,8 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
       const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
-      const { data: u } = await sb.from("app_user").select("nombre,rol").eq("auth_user_id", session.user.id).maybeSingle();
-      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO" });
+      const { data: u } = await sb.from("app_user").select("nombre,rol,permisos").eq("auth_user_id", session.user.id).maybeSingle();
+      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: (u?.permisos as MapaPermisos) ?? {} });
       setLoading(false);
     })();
   }, [router]);
@@ -47,16 +48,21 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
 
   const nav = useMemo(() => {
     const rol = info?.rol ?? "PROPIETARIO";
-    return NAV.map((e) => ({
-      ...e,
-      sections: e.sections
-        .map((sec) => ({
-          ...sec,
-          items: sec.items.filter((i) => puede(rol, i.roles) && !(i.modulo && modulosOff.has(i.modulo))),
-        }))
-        .filter((sec) => sec.items.length > 0),
-    })).filter((e) => e.sections.length > 0);
-  }, [info?.rol, modulosOff]);
+    const permisos = info?.permisos ?? {};
+    return NAV
+      // El perfil puede ocultar zonas del menú (permiso panel.<id>); Inicio y Ayuda
+      // siempre visibles y el PROPIETARIO lo ve todo (para no autobloquearse).
+      .filter((e) => rol === "PROPIETARIO" || e.id === "inicio" || e.id === "ayuda" || permite(permisos, permisoZona(e.id)))
+      .map((e) => ({
+        ...e,
+        sections: e.sections
+          .map((sec) => ({
+            ...sec,
+            items: sec.items.filter((i) => puede(rol, i.roles) && !(i.modulo && modulosOff.has(i.modulo))),
+          }))
+          .filter((sec) => sec.items.length > 0),
+      })).filter((e) => e.sections.length > 0);
+  }, [info?.rol, info?.permisos, modulosOff]);
 
   const activa = nav.find((e) => e.id === entrada) ?? nav[0];
 
