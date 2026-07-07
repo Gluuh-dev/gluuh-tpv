@@ -69,12 +69,17 @@ Casi todo está; el trabajo es **recomponer**, no construir de cero.
 ## Instalación y primer arranque (asistente de escritorio)
 Al instalar la app (Electron, guía 03), antes de poder usarla:
 1. **Aceptar** (condiciones / continuar) — obligatorio.
-2. **Directorio de copia de seguridad** — dónde guarda los backups locales (el
+2. **IP/URL del servidor** — el equipo donde corre la web (p. ej.
+   `http://192.168.1.10:3100`). **Todas las IP (servidor, impresoras…) son
+   configurables luego en Configuración.** Ya cableado: el desktop lee
+   `config.json` → `servidor` en runtime (precedencia config > `GLUUH_URL` >
+   localhost), sin re-empaquetar.
+3. **Directorio de copia de seguridad** — dónde guarda los backups locales (el
    backup local ya existe: `exportarBackupLocal` / `gluuh.guardarBackup`).
-3. **Código tenant** (código de licencia, Capa 1) — **obligatorio: sin meterlo
+4. **Código tenant** (código de licencia, Capa 1) — **obligatorio: sin meterlo
    NO se puede continuar**. Liga la instalación al tenant + módulos + tiempo activo.
-4. Resumen de **qué se va a instalar**.
-5. Paso final: **crear el primer usuario** o **cambiar la clave de admin**
+5. Resumen de **qué se va a instalar**.
+6. Paso final: **crear el primer usuario** o **cambiar la clave de admin**
    (no dejar 1111 por defecto).
 
 El código tenant se puede **actualizar una vez dentro** (renovación/cambio de

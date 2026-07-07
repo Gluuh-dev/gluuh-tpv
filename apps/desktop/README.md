@@ -28,11 +28,14 @@ Fichero `config.json` en la carpeta de datos de la app
 
 ```json
 {
+  "servidor": "http://192.168.1.10:3100",
   "impresora": { "uri": "tcp://192.168.1.50:9100", "tipo": "EPSON", "ancho": 42 },
   "backup": { "hora": "03:30", "destino": "E:\\backups-gluuh" }
 }
 ```
 
+- **servidor**: URL/IP del equipo donde corre la web (se pide al instalar y se
+  edita en Configuración). Sin ella se usa `GLUUH_URL` o `http://localhost:3100`.
 - **impresora**: térmica ESC/POS por red (puerto 9100). Sin config, la web cae a
   `window.print()`. USB: compartirla en Windows como impresora de red (driver
   serie pendiente).

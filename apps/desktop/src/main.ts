@@ -12,9 +12,12 @@ import { guardarIdentidad, leerIdentidad, type Identidad } from "./identidad";
 import { ColaImpresion } from "./impresion";
 import { crearVisorSiHaySegundaPantalla, publicarEnVisor } from "./visor";
 
-// URL de la web (en dev, el servidor Next local; en prod, el despliegue).
-const URL_BASE = (process.env.GLUUH_URL ?? "http://localhost:3100").replace(/\/tpv\/?$/, "");
-const ORIGEN = new URL(URL_BASE).origin;
+// URL/IP de la web. Precedencia: config.json del terminal (editable, se mete al
+// instalar y luego en Configuración) > GLUUH_URL (env de empaquetado) > localhost.
+// Se resuelve al arrancar (whenReady), cuando ya hay userData.
+const normalizaUrl = (u: string) => u.trim().replace(/\/tpv\/?$/, "").replace(/\/+$/, "");
+let URL_BASE = normalizaUrl(process.env.GLUUH_URL ?? "http://localhost:3100");
+let ORIGEN = new URL(URL_BASE).origin;
 
 // Ruta inicial según el módulo con el que se vinculó el terminal. Duplica el
 // RUTA_MODULO de la web (apps/web/app/lib/modulos.ts) porque el proceso main no
@@ -91,6 +94,13 @@ function inicializarUpdater(): void {
 
 app.whenReady().then(() => {
   const userData = app.getPath("userData");
+  // IP/URL del servidor configurable en config.json (la mete el instalador y se
+  // edita en Configuración). Si está mal escrita, se mantiene el valor por defecto.
+  const servidor = leerConfig(userData).servidor;
+  if (servidor) {
+    try { const u = normalizaUrl(servidor); ORIGEN = new URL(u).origin; URL_BASE = u; }
+    catch { /* servidor inválido: se conserva GLUUH_URL / localhost */ }
+  }
   identidad = leerIdentidad(userData);
   cola = new ColaImpresion(userData, () => leerConfig(userData).impresora, notificarWeb);
 

@@ -6,6 +6,10 @@ import path from "node:path";
 import type { ConfigImpresora } from "@gluuh/hardware";
 
 export interface ConfigTerminal {
+  /** URL/IP base del servidor de la web (p. ej. "http://192.168.1.10:3100").
+   *  Se pide al instalar y es editable en Configuración. Sin ella se usa la env
+   *  GLUUH_URL o, en su defecto, http://localhost:3100. */
+  servidor?: string;
   /** Impresora ESC/POS; sin ella la impresión cae a window.print() en la web. */
   impresora?: ConfigImpresora;
   backup?: {
