@@ -4,6 +4,7 @@
 // 0083) y estado de suscripción compartido por la lista, la ficha y Suscripciones.
 export interface ResumenEmpresa {
   id: string;
+  slug: string | null;   // URL de la ficha (/admin/empresas/bar-demo); null si falta la 0089
   nombre: string;
   cif: string | null;
   email_admin: string | null;
@@ -40,3 +41,10 @@ export function estadoSuscripcion(hasta: string | null): EstadoSub {
 
 export const fechaCorta = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+// La ficha se enlaza por slug (URL legible); UUID como fallback pre-0089.
+export const urlEmpresa = (e: Pick<ResumenEmpresa, "id" | "slug">) => `/admin/empresas/${e.slug ?? e.id}`;
+
+// Resuelve el parámetro de la URL (slug o UUID) contra el resumen ya cargado.
+export const buscarEmpresa = (lista: ResumenEmpresa[], param: string) =>
+  lista.find((e) => e.slug === param || e.id === param) ?? null;

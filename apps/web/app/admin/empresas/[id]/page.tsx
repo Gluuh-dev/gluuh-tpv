@@ -10,7 +10,7 @@ import Link from "next/link";
 import { ArrowLeft, Building2, KeyRound, Package, Users, MonitorSmartphone, Puzzle, CreditCard, RefreshCw, Pencil } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { MODULOS, type DefModulo } from "@/app/lib/modulos";
-import { estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "@/app/lib/admin-empresas";
+import { buscarEmpresa, estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "@/app/lib/admin-empresas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,20 +52,21 @@ export default function FichaEmpresa() {
 
   async function cargar() {
     const sb = supabaseBrowser();
-    const [{ data: r }, { data: d }] = await Promise.all([
-      sb.rpc("admin_resumen_empresas"),
-      sb.rpc("admin_dispositivos_empresa", { p_tenant: id }),
-    ]);
-    const fila = ((r as ResumenEmpresa[] | null) ?? []).find((e) => e.id === id) ?? null;
+    // El parámetro de la URL es el slug (o el UUID en enlaces antiguos): se
+    // resuelve contra el resumen y el resto de llamadas usan el UUID real.
+    const { data: r } = await sb.rpc("admin_resumen_empresas");
+    const fila = buscarEmpresa(((r as ResumenEmpresa[] | null) ?? []), id);
     setEmp(fila);
-    if (fila) {
-      setRen({ meses: "12", modulos: fila.licencia_modulos ?? [] });
-      setLim({ dispositivos: fila.licencia_limites?.dispositivos ? String(fila.licencia_limites.dispositivos) : "", usuarios: fila.licencia_limites?.usuarios ? String(fila.licencia_limites.usuarios) : "" });
-      setFac({ ciclo: fila.ciclo_pago ?? "", forma: fila.forma_pago ?? "", precio: fila.precio_periodo != null ? String(fila.precio_periodo) : "", proximo: fila.proximo_pago ?? "" });
-    }
+    if (!fila) { setCargando(false); return; }
+    setRen({ meses: "12", modulos: fila.licencia_modulos ?? [] });
+    setLim({ dispositivos: fila.licencia_limites?.dispositivos ? String(fila.licencia_limites.dispositivos) : "", usuarios: fila.licencia_limites?.usuarios ? String(fila.licencia_limites.usuarios) : "" });
+    setFac({ ciclo: fila.ciclo_pago ?? "", forma: fila.forma_pago ?? "", precio: fila.precio_periodo != null ? String(fila.precio_periodo) : "", proximo: fila.proximo_pago ?? "" });
+    const [{ data: d }, { data: h }] = await Promise.all([
+      sb.rpc("admin_dispositivos_empresa", { p_tenant: fila.id }),
+      // Historial de pagos (RLS: es_admin_plataforma permite leer pago_gluuh).
+      sb.from("pago_gluuh").select("id,fecha,importe,concepto,metodo").eq("tenant_id", fila.id).order("fecha", { ascending: false }),
+    ]);
     setDisp((d as Disp[] | null) ?? []);
-    // Historial de pagos (RLS: es_admin_plataforma permite leer pago_gluuh).
-    const { data: h } = await sb.from("pago_gluuh").select("id,fecha,importe,concepto,metodo").eq("tenant_id", id).order("fecha", { ascending: false });
     setHistorial((h as typeof historial | null) ?? []);
     // Tarifas para el desglose del mensual.
     const { data: tf } = await sb.from("tarifa_plataforma").select("clave,etiqueta,precio");
@@ -80,7 +81,7 @@ export default function FichaEmpresa() {
     const res = await fetch("/api/admin/empresa", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ accion, tenantId: id, ...extra }),
+      body: JSON.stringify({ accion, tenantId: emp?.id ?? id, ...extra }),
     });
     const out = await res.json();
     if (!res.ok) { setMsg({ t: "err", x: out.error ?? "Error" }); return; }

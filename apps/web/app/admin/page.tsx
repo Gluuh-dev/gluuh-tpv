@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Package, Users, MonitorSmartphone } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
-import { estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "../lib/admin-empresas";
+import { estadoSuscripcion, fechaCorta, urlEmpresa, type ResumenEmpresa } from "../lib/admin-empresas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +54,7 @@ export default function Empresas() {
               {empresas.map((e) => {
                 const sub = estadoSuscripcion(e.licencia_hasta);
                 return (
-                  <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(`/admin/empresas/${e.id}`)}>
+                  <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(urlEmpresa(e))}>
                     <TableCell>
                       <div className="flex items-center gap-2 font-medium">
                         {e.nombre}

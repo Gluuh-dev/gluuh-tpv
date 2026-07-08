@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, AlertTriangle } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
-import { estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "@/app/lib/admin-empresas";
+import { estadoSuscripcion, fechaCorta, urlEmpresa, type ResumenEmpresa } from "@/app/lib/admin-empresas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -67,7 +67,7 @@ export default function Suscripciones() {
                 const pagoDias = e.proximo_pago ? Math.floor((new Date(e.proximo_pago).getTime() - Date.now()) / 86_400_000) : null;
                 const pagoPronto = pagoDias !== null && pagoDias <= 15;
                 return (
-                  <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(`/admin/empresas/${e.id}`)}>
+                  <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(urlEmpresa(e))}>
                     <TableCell className="font-medium">{e.nombre}</TableCell>
                     <TableCell><Badge variant={sub.variant}>{sub.texto}</Badge></TableCell>
                     <TableCell className="text-muted-foreground">{fechaCorta(e.licencia_hasta)}</TableCell>
