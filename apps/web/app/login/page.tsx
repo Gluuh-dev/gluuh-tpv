@@ -27,11 +27,19 @@ export default function Login() {
   const [clave, setClave] = useState("");
   // Instalación fijada a una empresa (0078): login por usuario acotado a su tenant.
   const [instalacion, setInstalacion] = useState<Instalacion | null>(null);
+  // Host de plataforma (admin.gluuh.com): login SOLO por email (sin pestaña
+  // Usuario, que es para operarios/cliente).
+  const [esPlataforma, setEsPlataforma] = useState(false);
+  const [recordar, setRecordar] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    const plataforma = window.location.hostname.startsWith("admin.");
+    if (plataforma) { setEsPlataforma(true); setModo("email"); }
+    // Recordar cuenta: pre-rellena el último email usado.
+    try { const e = localStorage.getItem("gluuh:email"); if (e) setEmail(e); else setRecordar(false); } catch { /* sin almacenamiento */ }
     const i = leerInstalacion();
-    if (i) { setInstalacion(i); setModo("usuario"); }
+    if (i && !plataforma) { setInstalacion(i); setModo("usuario"); }
   }, []);
 
   // Tras iniciar sesión: las cuentas de empresa recién creadas (alta de Gluuh,
@@ -53,8 +61,10 @@ export default function Login() {
       password: password.trim(),
     });
     setCargando(false);
-    if (error) setError(traducirErrorAuth(error.message));
-    else await irTrasLogin();
+    if (error) { setError(traducirErrorAuth(error.message)); return; }
+    // Recordar cuenta: guarda o borra el email para la próxima vez.
+    try { if (recordar) localStorage.setItem("gluuh:email", email.trim()); else localStorage.removeItem("gluuh:email"); } catch { /* sin almacenamiento */ }
+    await irTrasLogin();
   }
 
   async function onPasskey() {
@@ -116,6 +126,10 @@ export default function Login() {
     }
   }
 
+  let descripcion: React.ReactNode = "Accede al panel de tu restaurante.";
+  if (esPlataforma) descripcion = "Acceso del equipo de Gluuh.";
+  else if (instalacion) descripcion = <>Equipo de <strong className="text-foreground">{instalacion.empresa}</strong>. Entra con tu usuario y clave.</>;
+
   return (
     <main className="relative grid min-h-screen place-items-center bg-background p-6 text-foreground">
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
@@ -126,15 +140,13 @@ export default function Login() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Iniciar sesión</CardTitle>
-            <CardDescription>
-              {instalacion ? <>Equipo de <strong className="text-foreground">{instalacion.empresa}</strong>. Entra con tu usuario y clave.</> : "Accede al panel de tu restaurante."}
-            </CardDescription>
+            <CardTitle className="text-xl">{esPlataforma ? "Plataforma Gluuh" : "Iniciar sesión"}</CardTitle>
+            <CardDescription>{descripcion}</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Con instalación fijada no hay pestañas: el equipo es de UNA empresa y
-                se entra por usuario+clave (el acceso por email queda como enlace). */}
-            {!instalacion && (
+            {/* En plataforma (admin.gluuh.com) o con instalación fijada no hay
+                pestañas: plataforma = solo email; instalación = solo usuario+clave. */}
+            {!instalacion && !esPlataforma && (
               <div className="mb-4 flex gap-0.5 rounded-md border border-border p-0.5 text-sm">
                 <button type="button" onClick={() => { setModo("email"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "email" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Email</button>
                 <button type="button" onClick={() => { setModo("usuario"); setError(""); }} className={`flex-1 rounded px-2 py-1.5 transition-colors ${modo === "usuario" ? "bg-surface-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}>Usuario</button>
@@ -151,6 +163,10 @@ export default function Login() {
                   <Label htmlFor="password">Contraseña</Label>
                   <PasswordInput id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
+                <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted-foreground">
+                  <input type="checkbox" checked={recordar} onChange={(e) => setRecordar(e.target.checked)} className="accent-primary" />
+                  Recordar mi cuenta
+                </label>
                 <Button type="submit" className="w-full" disabled={cargando}>
                   <LogIn className="h-4 w-4" /> {cargando ? "Entrando…" : "Entrar"}
                 </Button>
@@ -194,7 +210,7 @@ export default function Login() {
             )}
           </CardContent>
         </Card>
-        {instalacion ? (
+        {!esPlataforma && (instalacion ? (
           <p className="mt-6 text-center text-xs text-muted-foreground">
             ¿Cambiar la empresa de este equipo? <Link href="/instalar" className="hover:text-foreground hover:underline">Código de instalación</Link>
           </p>
@@ -204,7 +220,7 @@ export default function Login() {
             <br />
             <Link href="/instalar" className="text-xs hover:text-foreground hover:underline">¿Equipo nuevo? Actívalo con tu código de instalación</Link>
           </p>
-        )}
+        ))}
       </div>
     </main>
   );
