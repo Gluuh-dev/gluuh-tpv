@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Building2, UserPlus, LogOut, KeyRound } from "lucide-react";
+import { Building2, UserPlus, KeyRound } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { MODULOS, type DefModulo } from "../lib/modulos";
 import { Button } from "@/components/ui/button";
@@ -22,8 +21,6 @@ const MODULOS_PREMIUM = (Object.entries(MODULOS) as [string, DefModulo][])
 
 export default function Admin() {
   const sb = supabaseBrowser();
-  const router = useRouter();
-  const [estado, setEstado] = useState<"cargando" | "no-auth" | "ok">("cargando");
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [f, setF] = useState({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[] });
@@ -50,17 +47,9 @@ export default function Admin() {
     setLeads((l as Lead[]) ?? []);
   }
 
-  useEffect(() => {
-    (async () => {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
-      const { data: esAdmin } = await sb.rpc("es_admin_plataforma");
-      if (!esAdmin) { setEstado("no-auth"); return; }
-      await cargar();
-      setEstado("ok");
-    })();
-    /* eslint-disable-next-line */
-  }, []);
+  // La sesión y el gate es_admin_plataforma los resuelve la consola
+  // (ConsolaPlataforma en admin/layout.tsx); aquí solo se cargan los datos.
+  useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, []);
 
   // "Bar Pepe" → "barpepe" (minúsculas, sin acentos, solo a-z0-9).
   const normalizarUsuario = (s: string) =>
@@ -129,21 +118,8 @@ export default function Admin() {
     cargar();
   }
 
-  if (estado === "cargando") return <div className="grid min-h-screen place-items-center text-muted-foreground">Cargando…</div>;
-  if (estado === "no-auth") return (
-    <div className="grid min-h-screen place-items-center p-6 text-center">
-      <Card className="max-w-sm p-6"><h1 className="text-lg font-semibold">Acceso restringido</h1><p className="mt-2 text-muted-foreground">Esta zona es solo para el administrador de Gluuh.</p><Button className="mt-4" onClick={() => router.replace("/login")}>Iniciar sesión</Button></Card>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
-        <div className="flex items-center gap-2 font-semibold"><span className="grid h-8 w-8 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span> Gluuh · Administración de plataforma</div>
-        <Button variant="ghost" onClick={async () => { await sb.auth.signOut(); router.replace("/login"); }}><LogOut className="h-4 w-4" /> Salir</Button>
-      </header>
-
-      <div className="mx-auto max-w-5xl space-y-8 p-6">
+    <div className="mx-auto max-w-5xl space-y-8">
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-1">
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UserPlus className="h-4 w-4" /> Nueva empresa</CardTitle></CardHeader>
@@ -304,7 +280,6 @@ export default function Admin() {
             </Table>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
