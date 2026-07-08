@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, UserPlus, KeyRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { UserPlus, Package, Users, MonitorSmartphone } from "lucide-react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { MODULOS, type DefModulo } from "../lib/modulos";
+import { estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "../lib/admin-empresas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface Empresa { id: string; nombre: string; plan: string; email_admin: string | null; created_at: string; codigo_instalacion: string | null; licencia_hasta: string | null }
 interface Lead { id: string; nombre: string | null; email: string | null; telefono: string | null; mensaje: string | null; created_at: string }
 
 // Módulos premium que se venden por licencia (marcados en lib/modulos.ts).
@@ -21,7 +23,8 @@ const MODULOS_PREMIUM = (Object.entries(MODULOS) as [string, DefModulo][])
 
 export default function Admin() {
   const sb = supabaseBrowser();
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const router = useRouter();
+  const [empresas, setEmpresas] = useState<ResumenEmpresa[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [f, setF] = useState({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[], importar: ["catalogo", "impuestos", "formas_pago", "tickets"] as string[] });
   // El usuario se autogenera del nombre ("Bar Pepe" → barpepe) hasta que se toque a mano.
@@ -31,19 +34,13 @@ export default function Admin() {
   // se enseña UNA vez en grande — la password no se vuelve a mostrar.
   const [alta, setAlta] = useState<{ codigo: string | null; clave: string | null; usuario: string; password: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [lic, setLic] = useState<{ tenantId: string; meses: string; modulos: string[] }>({ tenantId: "", meses: "12", modulos: [] });
-  const [licBusy, setLicBusy] = useState(false);
-  const [licCodigo, setLicCodigo] = useState<string | null>(null);
-  const [licErr, setLicErr] = useState<string | null>(null);
-  // Resultado de una acción de soporte sobre una empresa (reset pass / código / renovar).
-  const [acc, setAcc] = useState<{ t: "ok" | "err"; x: string } | null>(null);
 
   async function cargar() {
     const [{ data: e }, { data: l }] = await Promise.all([
-      sb.from("tenant").select("id,nombre,plan,email_admin,created_at,codigo_instalacion,licencia_hasta").order("created_at", { ascending: false }),
+      sb.rpc("admin_resumen_empresas"),
       sb.from("contact_request").select("id,nombre,email,telefono,mensaje,created_at").order("created_at", { ascending: false }).limit(50),
     ]);
-    setEmpresas((e as Empresa[]) ?? []);
+    setEmpresas((e as ResumenEmpresa[]) ?? []);
     setLeads((l as Lead[]) ?? []);
   }
 
@@ -74,11 +71,6 @@ export default function Admin() {
     cargar();
   }
 
-  const toggleMod = (k: string) => setLic((s) => ({
-    ...s,
-    modulos: s.modulos.includes(k) ? s.modulos.filter((m) => m !== k) : [...s.modulos, k],
-  }));
-
   const toggleModAlta = (k: string) => setF((s) => ({
     ...s,
     modulos: s.modulos.includes(k) ? s.modulos.filter((m) => m !== k) : [...s.modulos, k],
@@ -96,39 +88,6 @@ export default function Admin() {
     importar: s.importar.includes(k) ? s.importar.filter((m) => m !== k) : [...s.importar, k],
   }));
 
-  async function generarLicencia() {
-    if (!lic.tenantId) { setLicErr("Elige una empresa."); return; }
-    setLicBusy(true); setLicErr(null); setLicCodigo(null);
-    const { data: { session } } = await sb.auth.getSession();
-    const res = await fetch("/api/admin/generar-licencia", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ tenantId: lic.tenantId, meses: Number(lic.meses), modulos: lic.modulos }),
-    });
-    const out = await res.json();
-    setLicBusy(false);
-    if (!res.ok) { setLicErr(out.error ?? "Error"); return; }
-    setLicCodigo(out.codigo);
-  }
-
-  // Acción de soporte sobre una empresa (reset password / regenerar código /
-  // renovar licencia directa). Devuelve el dato sensible una sola vez.
-  async function accionEmpresa(accion: string, tenantId: string, extra?: Record<string, unknown>) {
-    setAcc(null);
-    const { data: { session } } = await sb.auth.getSession();
-    const res = await fetch("/api/admin/empresa", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ accion, tenantId, ...extra }),
-    });
-    const out = await res.json();
-    if (!res.ok) { setAcc({ t: "err", x: out.error ?? "Error" }); return; }
-    if (out.passwordInicial) setAcc({ t: "ok", x: `Nueva password (apúntala, la cambia al entrar): ${out.passwordInicial}` });
-    else if (out.codigoInstalacion) setAcc({ t: "ok", x: `Nuevo código de instalación: ${out.codigoInstalacion}` });
-    else if (out.licenciaHasta) setAcc({ t: "ok", x: `Licencia renovada hasta ${new Date(out.licenciaHasta).toLocaleDateString("es-ES")}` });
-    else setAcc({ t: "ok", x: "Hecho." });
-    cargar();
-  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -211,84 +170,33 @@ export default function Admin() {
           </Card>
 
           <Card className="lg:col-span-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4" /> Empresas ({empresas.length})</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base">Empresas ({empresas.length})</CardTitle></CardHeader>
             <CardContent className="px-0">
-              {acc && <p className={`mx-6 mb-2 rounded-md px-3 py-2 text-sm ${acc.t === "ok" ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{acc.x}</p>}
               <Table>
-                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Contacto</TableHead><TableHead>Código de instalación</TableHead><TableHead>Licencia</TableHead><TableHead>Soporte</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Suscripción</TableHead><TableHead className="text-center">Prod.</TableHead><TableHead className="text-center">Usu.</TableHead><TableHead className="text-center">Disp.</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {empresas.map((e) => (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-medium">{e.nombre}</TableCell>
-                      <TableCell className="text-muted-foreground">{e.email_admin}</TableCell>
-                      <TableCell className="font-mono text-xs">{e.codigo_instalacion ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{e.licencia_hasta ? `hasta ${new Date(e.licencia_hasta).toLocaleDateString("es-ES")}` : "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => accionEmpresa("reset-password", e.id)}>Reset pass</Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => accionEmpresa("regenerar-codigo", e.id)}>Código</Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {empresas.length === 0 && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Aún no hay empresas. Crea la primera →</TableCell></TableRow>}
+                  {empresas.map((e) => {
+                    const sub = estadoSuscripcion(e.licencia_hasta);
+                    return (
+                      <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(`/admin/empresas/${e.id}`)}>
+                        <TableCell>
+                          <div className="flex items-center gap-2 font-medium">{e.nombre} {e.es_plantilla && <Badge variant="info">Plantilla</Badge>}</div>
+                          <div className="text-[11px] text-muted-foreground">{e.codigo_instalacion ?? "sin código"}</div>
+                        </TableCell>
+                        <TableCell><Badge variant={sub.variant}>{sub.texto}</Badge> <span className="text-[11px] text-muted-foreground">{fechaCorta(e.licencia_hasta)}</span></TableCell>
+                        <TableCell className="text-center tabular-nums text-muted-foreground"><Package className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{e.n_productos}</TableCell>
+                        <TableCell className="text-center tabular-nums text-muted-foreground"><Users className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{e.n_usuarios}</TableCell>
+                        <TableCell className="text-center tabular-nums text-muted-foreground"><MonitorSmartphone className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{e.n_dispositivos_online}/{e.n_dispositivos}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+              <p className="px-6 pt-2 text-[11px] text-muted-foreground">Pulsa una empresa para ver su ficha (suscripción, módulos, dispositivos y acciones).</p>
             </CardContent>
           </Card>
         </div>
-
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><KeyRound className="h-4 w-4" /> Generar licencia</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Empresa</Label>
-                <Select value={lic.tenantId} onValueChange={(v) => setLic({ ...lic, tenantId: v })}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Elige empresa…" /></SelectTrigger>
-                  <SelectContent>
-                    {empresas.map((e) => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Duración</Label>
-                <Select value={lic.meses} onValueChange={(v) => setLic({ ...lic, meses: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="12">12 meses</SelectItem>
-                    <SelectItem value="24">24 meses</SelectItem>
-                    <SelectItem value="36">36 meses</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Módulos incluidos</Label>
-              <div className="flex flex-wrap gap-2">
-                {MODULOS_PREMIUM.map(({ k, nombre }) => (
-                  <label key={k} className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
-                    <input type="checkbox" checked={lic.modulos.includes(k)} onChange={() => toggleMod(k)} className="accent-primary" />
-                    {nombre}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={!lic.tenantId} onClick={() => accionEmpresa("renovar-licencia", lic.tenantId, { meses: Number(lic.meses), modulos: lic.modulos })}>Aplicar a la empresa</Button>
-              <Button variant="outline" disabled={licBusy || !lic.tenantId} onClick={generarLicencia}>{licBusy ? "Generando…" : "Generar código canjeable"}</Button>
-            </div>
-            <p className="text-xs text-muted-foreground">«Aplicar» renueva la licencia al momento (el cliente no hace nada). «Código canjeable» genera un GLUH-… que el cliente activa en Módulos.</p>
-            {licErr && <p className="text-sm text-destructive">{licErr}</p>}
-            {licCodigo && (
-              <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-center">
-                <p className="font-mono text-2xl font-bold tracking-widest">{licCodigo}</p>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  Apúntalo y dáselo al cliente: lo activa en «Módulos». No se vuelve a mostrar.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader><CardTitle className="text-base">Solicitudes de acceso ({leads.length})</CardTitle></CardHeader>

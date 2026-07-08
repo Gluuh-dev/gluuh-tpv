@@ -15,7 +15,11 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 08-07-2026 la última es `0082`
+   numeradas secuencialmente (`0001`…; a 08-07-2026 la última es `0083`
+   —RPCs de la consola de plataforma `admin_resumen_empresas()` (suscripción,
+   módulos, nº productos/usuarios/dispositivos por tenant) y
+   `admin_dispositivos_empresa(p_tenant)`; ambas SECURITY DEFINER acotadas por
+   `es_admin_plataforma()`. `0082`
    —**plantilla base**: `tenant.es_plantilla` (único parcial); el tenant
    `ca44a7c7` pasa a "Plantilla base"; `admin_sembrar_ejemplo` solo crea usuarios
    base (el catálogo se clona de la plantilla, TS `clonar-plantilla.ts`).
