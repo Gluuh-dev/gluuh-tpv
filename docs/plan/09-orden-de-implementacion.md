@@ -52,9 +52,17 @@ tarea (y se registra la sesión en `docs/sesiones/`).
   esto, C3 (impresión al instante) y D3 no dispararían. **Clave**: al crear
   tablas nuevas que el cliente escuche, añadirlas a la publicación.
 
-Siguiente: **B2-B5** (desplegar en Cloudflare, con tu cuenta), **D2** (backup
-visible), **D4/D5** (auto-update, multi-impresora) y luego **Bloque E** (nodo
-local). Probar en vivo el flujo de impresión con Desktop + impresora real.
+- ✅ **B2-B5 DESPLEGADO (08-07)**: web en producción en **Cloudflare Workers**
+  (OpenNext), Worker `gluuh`, dominios **app.gluuh.com** (cliente) y
+  **admin.gluuh.com** (plataforma). Deploy automático al hacer push a `main`
+  (Workers Builds ↔ GitHub). Detalles y gotchas en `apps/web/DEPLOY.md` y la
+  memoria `despliegue-cloudflare`. Pendiente menor: mover los 2 secretos a
+  runtime si fallara el login de operario; limpiar registros viejos de Vercel;
+  landing en `www`.
+
+Siguiente: **D2** (backup visible), **D4/D5** (auto-update, multi-impresora) y
+luego **Bloque E** (nodo local). Probar en vivo el flujo de impresión con
+Desktop + impresora real.
 
 ## BLOQUE A — Remates de identidad y plataforma (~1 día) ← HECHO ✅
 

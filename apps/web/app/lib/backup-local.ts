@@ -2,6 +2,7 @@
 // del tenant a CSV y Gluuh Desktop las escribe en la carpeta/USB configurada.
 // Se dispara desde el evento "backup" del escritorio (volcado nocturno) o a mano.
 import { supabaseBrowser } from "./supabaseBrowser";
+import { setSetting } from "./settings";
 
 // ponytail: lista fija de tablas operativas; se amplía cuando haga falta.
 const TABLAS = [
@@ -74,6 +75,13 @@ export async function exportarBackupLocal(): Promise<{ ok: boolean; ruta?: strin
   const res = await gluuh.guardarBackup(`gluuh-backup-${hoy}`, ficheros);
   if (res.ok && incompletas.length) {
     return { ok: false, ruta: res.ruta, error: `Copia incompleta: ${incompletas.join(", ")}` };
+  }
+  // Registrar la última copia OK para mostrarla en el panel (D2). Best-effort:
+  // si falla el setting, la copia igualmente se hizo.
+  if (res.ok) {
+    try {
+      await setSetting("GLOBAL", "backup.ultima", { fecha: new Date().toISOString(), ruta: res.ruta ?? "" });
+    } catch { /* el estado se registra la próxima vez */ }
   }
   return res;
 }

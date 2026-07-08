@@ -4,7 +4,7 @@
 // escritorio Gluuh: aquí solo se configura (hora + destino, en `setting`) y se
 // puede lanzar una copia manual si estamos dentro de Gluuh Desktop.
 import { useEffect, useState } from "react";
-import { Archive, Clock, HardDriveDownload } from "lucide-react";
+import { Archive, Clock, HardDriveDownload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "@/app/lib/toast";
 import { getSetting, setSetting } from "../../lib/settings";
 import { exportarBackupLocal } from "../../lib/backup-local";
@@ -23,12 +23,14 @@ export default function CopiasDeSeguridad() {
   const [saving, setSaving] = useState(false);
   const [bkBusy, setBkBusy] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [ultima, setUltima] = useState<{ fecha: string; ruta: string } | null>(null);
   const enDesktop = mounted && typeof window !== "undefined" && !!window.gluuh;
 
   useEffect(() => {
     setMounted(true);
     getSetting<string>("backup.hora").then((h) => { if (h) setHora(h); }).catch(() => {});
     getSetting<string>("backup.destino").then((d) => { if (d) setDestino(d); }).catch(() => {});
+    getSetting<{ fecha: string; ruta: string }>("backup.ultima").then((v) => { if (v?.fecha) setUltima(v); }).catch(() => {});
   }, []);
 
   async function guardar() {
@@ -46,9 +48,19 @@ export default function CopiasDeSeguridad() {
     setBkBusy(true);
     const r = await exportarBackupLocal();
     setBkBusy(false);
-    if (r.ok) toast.success(`Copia guardada en ${r.ruta ?? "el destino configurado"}`);
-    else toast.error(r.error ?? "No se pudo hacer la copia");
+    if (r.ok) {
+      setUltima({ fecha: new Date().toISOString(), ruta: r.ruta ?? "" });
+      toast.success(`Copia guardada en ${r.ruta ?? "el destino configurado"}`);
+    } else toast.error(r.error ?? "No se pudo hacer la copia");
   }
+
+  // Estado de la última copia: verde si es reciente (<48 h), ámbar si hace más.
+  const estadoUltima = (() => {
+    if (!ultima?.fecha) return null;
+    const horas = (Date.now() - new Date(ultima.fecha).getTime()) / 3_600_000;
+    const cuando = new Date(ultima.fecha).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
+    return { vieja: horas > 48, cuando };
+  })();
 
   return (
     <ZonaTecnica>
@@ -57,6 +69,19 @@ export default function CopiasDeSeguridad() {
           title="Copias de seguridad"
           description="Copia local de los datos del negocio en el USB o carpeta del terminal."
         />
+
+        {estadoUltima && (
+          <div className={`flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-[13px] ${estadoUltima.vieja ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"}`}>
+            {estadoUltima.vieja ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
+            <div>
+              <div className="font-medium">Última copia: {estadoUltima.cuando}</div>
+              <div className="text-[12px] opacity-90">
+                {ultima?.ruta ? <>en <code>{ultima.ruta}</code>. </> : null}
+                {estadoUltima.vieja ? "Hace más de 48 h — conviene hacer una copia." : "Al día."}
+              </div>
+            </div>
+          </div>
+        )}
 
         <Card>
           <CardHeader>
