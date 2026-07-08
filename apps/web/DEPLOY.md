@@ -33,10 +33,21 @@ host, `/admin` y `/api/admin` devuelven 404.
 
 ## Desplegar
 
+### Desde tu PC
 ```bash
 pnpm --filter @gluuh/web deploy:cf     # build OpenNext + deploy al Worker
 pnpm --filter @gluuh/web preview:cf    # probar en local con el runtime de Workers
 ```
+
+### Cloudflare Workers Builds (conectado a GitHub) — monorepo
+En el Worker → Settings → Build:
+- **Root directory**: `/` (raíz del repo — así pnpm resuelve el workspace y el lockfile)
+- **Build command**: `pnpm run cf:build`
+  (compila `@gluuh/core` a dist y luego `opennextjs-cloudflare build` en `apps/web`)
+- **Deploy command**: `pnpm run cf:deploy`
+- Node 20+ (por defecto en Workers Builds).
+`@gluuh/ui` va desde fuente (transpilePackages); `@gluuh/core` se consume desde
+`dist/`, por eso hay que compilarlo antes (lo hace `cf:build`).
 
 ## Notas
 

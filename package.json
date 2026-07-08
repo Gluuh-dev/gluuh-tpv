@@ -14,7 +14,9 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "core:demo": "pnpm --filter @gluuh/core demo",
-    "core:test": "pnpm --filter @gluuh/core test"
+    "core:test": "pnpm --filter @gluuh/core test",
+    "cf:build": "pnpm --filter @gluuh/core build && pnpm --filter @gluuh/web exec opennextjs-cloudflare build",
+    "cf:deploy": "pnpm --filter @gluuh/web exec wrangler deploy"
   },
   "devDependencies": {
     "pg": "^8.21.0",
