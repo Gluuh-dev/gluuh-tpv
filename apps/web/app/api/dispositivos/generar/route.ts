@@ -50,6 +50,18 @@ export async function POST(req: Request) {
   if (!loc) return NextResponse.json({ error: "La empresa no tiene local" }, { status: 400 });
 
   const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+
+  // Límite de dispositivos de la empresa (licencia_limites.dispositivos, 0084):
+  // si se alcanza, no se crean más — el técnico de Gluuh lo amplía en la consola.
+  const { data: t } = await admin.from("tenant").select("licencia_limites").eq("id", tenantId).maybeSingle();
+  const maxDisp = (t?.licencia_limites as { dispositivos?: number } | null)?.dispositivos;
+  if (maxDisp && maxDisp > 0) {
+    const { count } = await admin.from("device").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId);
+    if ((count ?? 0) >= maxDisp) {
+      return NextResponse.json({ error: `Límite de dispositivos alcanzado (${maxDisp}). Contacta con Gluuh para ampliarlo.` }, { status: 403 });
+    }
+  }
+
   // Código aleatorio criptográfico (no Math.random, que es predecible).
   // NOTA DE SEGURIDAD: 6 dígitos = 900k combinaciones. El canje es de un solo uso,
   // caduca en 10 min y tanto este endpoint como el canje llevan rate-limit por IP

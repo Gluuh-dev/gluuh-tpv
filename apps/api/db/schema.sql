@@ -51,6 +51,7 @@ CREATE TABLE tenant (
   licencia_modulos text[] NOT NULL DEFAULT '{}',  -- módulos premium comprados (0052)
   codigo_instalacion text,         -- nº de serie de la empresa (0000-0000-00000-0000-0000), único; fija cada instalación a su tenant (0078)
   es_plantilla  boolean NOT NULL DEFAULT false,  -- tenant PLANTILLA BASE: fuente del clonado al crear empresas (0082); único parcial
+  licencia_limites jsonb,          -- { dispositivos, usuarios } límites por empresa; null = sin límite (0084)
   activo        boolean NOT NULL DEFAULT true,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()

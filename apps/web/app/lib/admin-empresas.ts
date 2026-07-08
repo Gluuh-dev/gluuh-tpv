@@ -10,6 +10,8 @@ export interface ResumenEmpresa {
   plan: string;
   codigo_instalacion: string | null;
   es_plantilla: boolean;
+  activo: boolean;
+  licencia_limites: { dispositivos?: number; usuarios?: number } | null;
   licencia_hasta: string | null;
   licencia_modulos: string[];
   created_at: string;

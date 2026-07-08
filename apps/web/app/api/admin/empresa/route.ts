@@ -60,6 +60,24 @@ async function regenerarCodigo(admin: SupabaseClient, tid: string) {
   return NextResponse.json({ error: "No se pudo generar un código único" }, { status: 500 });
 }
 
+// Suspender / reactivar (tenant.activo). Suspendida = no entran operarios ni se
+// activan instalaciones nuevas (RLS/login lo comprueban).
+async function suspender(admin: SupabaseClient, tid: string, activo: unknown) {
+  const { error } = await admin.from("tenant").update({ activo: !!activo }).eq("id", tid);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, activo: !!activo });
+}
+
+// Límites de la empresa (licencia_limites jsonb). 0/vacío = sin límite.
+async function limites(admin: SupabaseClient, tid: string, dispositivos: unknown, usuarios: unknown) {
+  const lim: { dispositivos?: number; usuarios?: number } = {};
+  if (Number.isInteger(dispositivos) && (dispositivos as number) > 0) lim.dispositivos = dispositivos as number;
+  if (Number.isInteger(usuarios) && (usuarios as number) > 0) lim.usuarios = usuarios as number;
+  const { error } = await admin.from("tenant").update({ licencia_limites: Object.keys(lim).length ? lim : null }).eq("id", tid);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: Request) {
   if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -74,7 +92,7 @@ export async function POST(req: Request) {
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
   if (!esAdmin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { accion, tenantId, meses, modulos } = await req.json().catch(() => ({}));
+  const { accion, tenantId, meses, modulos, activo, dispositivos, usuarios } = await req.json().catch(() => ({}));
   if (!tenantId) return NextResponse.json({ error: "Falta la empresa" }, { status: 400 });
 
   const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
@@ -82,6 +100,8 @@ export async function POST(req: Request) {
     case "reset-password": return resetPassword(admin, tenantId);
     case "renovar-licencia": return renovarLicencia(admin, tenantId, meses, modulos);
     case "regenerar-codigo": return regenerarCodigo(admin, tenantId);
+    case "suspender": return suspender(admin, tenantId, activo);
+    case "limites": return limites(admin, tenantId, dispositivos, usuarios);
     default: return NextResponse.json({ error: "Acción desconocida" }, { status: 400 });
   }
 }

@@ -15,7 +15,11 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 08-07-2026 la última es `0083`
+   numeradas secuencialmente (`0001`…; a 08-07-2026 la última es `0084`
+   —`tenant.licencia_limites` jsonb (dispositivos/usuarios; null=sin límite);
+   `admin_resumen_empresas()` devuelve `activo`+`licencia_limites`;
+   `verificar_clave_operario` exige `tenant.activo` (empresa suspendida = no
+   entra). `0083`
    —RPCs de la consola de plataforma `admin_resumen_empresas()` (suscripción,
    módulos, nº productos/usuarios/dispositivos por tenant) y
    `admin_dispositivos_empresa(p_tenant)`; ambas SECURITY DEFINER acotadas por

@@ -14,6 +14,7 @@ import { estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "@/app/lib/ad
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -40,6 +41,7 @@ export default function FichaEmpresa() {
   const [cargando, setCargando] = useState(true);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
   const [ren, setRen] = useState<{ meses: string; modulos: string[] }>({ meses: "12", modulos: [] });
+  const [lim, setLim] = useState<{ dispositivos: string; usuarios: string }>({ dispositivos: "", usuarios: "" });
 
   async function cargar() {
     const sb = supabaseBrowser();
@@ -49,7 +51,10 @@ export default function FichaEmpresa() {
     ]);
     const fila = ((r as ResumenEmpresa[] | null) ?? []).find((e) => e.id === id) ?? null;
     setEmp(fila);
-    if (fila) setRen({ meses: "12", modulos: fila.licencia_modulos ?? [] });
+    if (fila) {
+      setRen({ meses: "12", modulos: fila.licencia_modulos ?? [] });
+      setLim({ dispositivos: fila.licencia_limites?.dispositivos ? String(fila.licencia_limites.dispositivos) : "", usuarios: fila.licencia_limites?.usuarios ? String(fila.licencia_limites.usuarios) : "" });
+    }
     setDisp((d as Disp[] | null) ?? []);
     setCargando(false);
   }
@@ -91,7 +96,7 @@ export default function FichaEmpresa() {
       <div className="flex flex-wrap items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-surface-muted"><Building2 className="h-5 w-5 text-muted-foreground" aria-hidden /></span>
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">{emp.nombre} {emp.es_plantilla && <Badge variant="info">Plantilla</Badge>}</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold">{emp.nombre} {emp.es_plantilla && <Badge variant="info">Plantilla</Badge>} {!emp.activo && <Badge variant="destructive">Suspendida</Badge>}</h1>
           <p className="text-[13px] text-muted-foreground">{emp.cif ? `CIF ${emp.cif} · ` : ""}Alta {fechaCorta(emp.created_at)}</p>
         </div>
         <Badge variant={sub.variant}>{sub.texto}</Badge>
@@ -173,6 +178,22 @@ export default function FichaEmpresa() {
             </div>
           </div>
           {emp.email_admin && <p className="text-[12px] text-muted-foreground">Contacto: {emp.email_admin}</p>}
+
+          {/* Límites: 0/vacío = sin límite. El uso actual se ve arriba. */}
+          <div className="grid gap-3 border-t border-border-muted pt-3 sm:grid-cols-2">
+            <div className="space-y-1"><Label className="text-xs">Límite de dispositivos ({emp.n_dispositivos} usados)</Label>
+              <Input type="number" min={0} value={lim.dispositivos} onChange={(e) => setLim((s) => ({ ...s, dispositivos: e.target.value }))} placeholder="sin límite" /></div>
+            <div className="space-y-1"><Label className="text-xs">Límite de usuarios ({emp.n_usuarios} usados)</Label>
+              <Input type="number" min={0} value={lim.usuarios} onChange={(e) => setLim((s) => ({ ...s, usuarios: e.target.value }))} placeholder="sin límite" /></div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => accion("limites", { dispositivos: Number(lim.dispositivos) || 0, usuarios: Number(lim.usuarios) || 0 })}>Guardar límites</Button>
+            <Button size="sm" variant={emp.activo ? "outline" : "default"} className={emp.activo ? "text-destructive" : ""}
+              onClick={() => accion("suspender", { activo: !emp.activo })}>
+              {emp.activo ? "Suspender empresa" : "Reactivar empresa"}
+            </Button>
+          </div>
+          {!emp.activo && <p className="text-[12px] text-amber-500">Suspendida: los operarios no pueden entrar y no se activan equipos nuevos.</p>}
         </CardContent>
       </Card>
 
