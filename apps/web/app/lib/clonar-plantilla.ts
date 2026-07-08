@@ -81,6 +81,61 @@ export async function clonarCatalogo(
     .filter((m) => mapG.get(m.modifier_group_id as string))
     .map((m) => ({ ...sinMeta(m), tenant_id: destino, modifier_group_id: remap(mapG, m.modifier_group_id) }));
   if (filasM.length) await admin.from("modifier").insert(filasM);
+
+  // Asignaciones de la biblioteca (0064): grupo → familia/categoría/producto.
+  // Sin esto los grupos de biblioteca clonados quedan huérfanos (sin herencia).
+  const asigs = (await admin.from("modifier_group_asignacion").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasA = (asigs ?? [])
+    .filter((a) => mapG.get(a.modifier_group_id as string)
+      && (mapF.get(a.family_id as string) || mapC.get(a.category_id as string) || mapP.get(a.product_id as string)))
+    .map((a) => ({
+      ...sinMeta(a), tenant_id: destino, modifier_group_id: remap(mapG, a.modifier_group_id),
+      family_id: remap(mapF, a.family_id), category_id: remap(mapC, a.category_id), product_id: remap(mapP, a.product_id),
+    }));
+  if (filasA.length) await admin.from("modifier_group_asignacion").insert(filasA);
+
+  // Notas de preparación (globales del tenant, sin FKs).
+  await clonarTabla(admin, "nota_preparacion", origen, destino);
+
+  // Etiquetas de producto + su m2m.
+  const mapE = new Map<string, string>();
+  const etis = (await admin.from("etiqueta_producto").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasE = (etis ?? []).map((e) => {
+    const id = randomUUID();
+    mapE.set(e.id as string, id);
+    return { ...sinMeta(e), id, tenant_id: destino };
+  });
+  if (filasE.length) await admin.from("etiqueta_producto").insert(filasE);
+  const pes = (await admin.from("product_etiqueta").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasPE = (pes ?? [])
+    .filter((pe) => mapP.get(pe.product_id as string) && mapE.get(pe.etiqueta_id as string))
+    .map((pe) => ({ ...sinMeta(pe), tenant_id: destino, product_id: remap(mapP, pe.product_id), etiqueta_id: remap(mapE, pe.etiqueta_id) }));
+  if (filasPE.length) await admin.from("product_etiqueta").insert(filasPE);
+
+  // Menús/combos: menu → menu_group → menu_choice(product_id).
+  const mapM = new Map<string, string>();
+  const mapMG = new Map<string, string>();
+  const menus = (await admin.from("menu").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasMn = (menus ?? []).map((m) => {
+    const id = randomUUID();
+    mapM.set(m.id as string, id);
+    return { ...sinMeta(m), id, tenant_id: destino };
+  });
+  if (filasMn.length) await admin.from("menu").insert(filasMn);
+  const mgrupos = (await admin.from("menu_group").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasMGr = (mgrupos ?? [])
+    .filter((g) => mapM.get(g.menu_id as string))
+    .map((g) => {
+      const id = randomUUID();
+      mapMG.set(g.id as string, id);
+      return { ...sinMeta(g), id, tenant_id: destino, menu_id: remap(mapM, g.menu_id) };
+    });
+  if (filasMGr.length) await admin.from("menu_group").insert(filasMGr);
+  const choices = (await admin.from("menu_choice").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasCh = (choices ?? [])
+    .filter((c) => mapMG.get(c.group_id as string) && mapP.get(c.product_id as string))
+    .map((c) => ({ ...sinMeta(c), tenant_id: destino, group_id: remap(mapMG, c.group_id), product_id: remap(mapP, c.product_id) }));
+  if (filasCh.length) await admin.from("menu_choice").insert(filasCh);
 }
 
 // Clona filas sueltas de una tabla (sin FKs a remapear): impuestos, formas de
