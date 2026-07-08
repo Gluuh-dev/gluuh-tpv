@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
+import { hostPlataforma } from "@/app/lib/plataforma";
 
 // Gestión de una empresa ya creada. SOLO el técnico de Gluuh (es_admin_plataforma).
 // Acciones de soporte remoto (sin tocar la BD a mano): resetear la password del
@@ -60,6 +61,7 @@ async function regenerarCodigo(admin: SupabaseClient, tid: string) {
 }
 
 export async function POST(req: Request) {
+  if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 

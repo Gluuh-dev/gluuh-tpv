@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
 import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
+import { hostPlataforma } from "@/app/lib/plataforma";
 
 // Alta de empresa COMPLETA en un paso. SOLO el técnico de Gluuh (es_admin_plataforma).
 // Decisiones guía 15 §12: el cliente NO tiene email de login — se le genera un
@@ -76,6 +77,7 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
 }
 
 export async function POST(req: Request) {
+  if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 

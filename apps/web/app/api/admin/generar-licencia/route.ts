@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
+import { hostPlataforma } from "@/app/lib/plataforma";
 
 // Emite un código de licencia para una empresa. SOLO el administrador de
 // plataforma (Gluuh): se verifica al llamante con su token (es_admin_plataforma)
@@ -14,6 +15,7 @@ const grupo = () => Array.from({ length: 4 }, () => ALFABETO[randomInt(ALFABETO.
 const generarCodigo = () => `GLUH-${grupo()}-${grupo()}-${grupo()}`;
 
 export async function POST(req: Request) {
+  if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
