@@ -8,13 +8,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, CreditCard, LayoutTemplate, Tags, LogOut, ShieldAlert } from "lucide-react";
+import { Activity, Building2, CreditCard, LayoutTemplate, Tags, LogOut, ShieldAlert } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/admin", label: "Empresas", icon: Building2 },
   { href: "/admin/suscripciones", label: "Suscripciones", icon: CreditCard },
+  { href: "/admin/uso", label: "Uso", icon: Activity },
   { href: "/admin/tarifas", label: "Tarifas", icon: Tags },
   { href: "/admin/plantilla", label: "Plantilla base", icon: LayoutTemplate },
 ] as const;

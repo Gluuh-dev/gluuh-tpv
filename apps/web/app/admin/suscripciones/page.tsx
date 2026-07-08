@@ -67,7 +67,7 @@ export default function Suscripciones() {
                 const pagoDias = e.proximo_pago ? Math.floor((new Date(e.proximo_pago).getTime() - Date.now()) / 86_400_000) : null;
                 const pagoPronto = pagoDias !== null && pagoDias <= 15;
                 return (
-                  <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(urlEmpresa(e))}>
+                  <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(`${urlEmpresa(e)}/suscripcion`)}>
                     <TableCell className="font-medium">{e.nombre}</TableCell>
                     <TableCell><Badge variant={sub.variant}>{sub.texto}</Badge></TableCell>
                     <TableCell className="text-muted-foreground">{fechaCorta(e.licencia_hasta)}</TableCell>

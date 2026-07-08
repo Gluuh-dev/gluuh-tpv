@@ -48,3 +48,21 @@ export const urlEmpresa = (e: Pick<ResumenEmpresa, "id" | "slug">) => `/admin/em
 // Resuelve el parámetro de la URL (slug o UUID) contra el resumen ya cargado.
 export const buscarEmpresa = (lista: ResumenEmpresa[], param: string) =>
   lista.find((e) => e.slug === param || e.id === param) ?? null;
+
+// Acción de soporte sobre una empresa (POST /api/admin/empresa) con el mensaje
+// de resultado ya formateado. Compartida por la ficha y la pestaña Suscripción.
+export async function accionEmpresa(tenantId: string, accion: string, extra?: Record<string, unknown>): Promise<{ ok: boolean; msg: string }> {
+  const { supabaseBrowser } = await import("./supabaseBrowser");
+  const { data: { session } } = await supabaseBrowser().auth.getSession();
+  const res = await fetch("/api/admin/empresa", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+    body: JSON.stringify({ accion, tenantId, ...extra }),
+  });
+  const out = await res.json();
+  if (!res.ok) return { ok: false, msg: out.error ?? "Error" };
+  if (out.passwordInicial) return { ok: true, msg: `Nueva password (apúntala): ${out.passwordInicial}` };
+  if (out.codigoInstalacion) return { ok: true, msg: `Nuevo código de instalación: ${out.codigoInstalacion}` };
+  if (out.licenciaHasta) return { ok: true, msg: `Licencia renovada hasta ${fechaCorta(out.licenciaHasta)}` };
+  return { ok: true, msg: "Hecho." };
+}
