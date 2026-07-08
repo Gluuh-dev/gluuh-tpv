@@ -23,7 +23,7 @@ export default function Admin() {
   const sb = supabaseBrowser();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [f, setF] = useState({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[] });
+  const [f, setF] = useState({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[], importar: ["catalogo", "impuestos", "formas_pago", "tickets"] as string[] });
   // El usuario se autogenera del nombre ("Bar Pepe" → barpepe) hasta que se toque a mano.
   const [usrManual, setUsrManual] = useState(false);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
@@ -69,7 +69,7 @@ export default function Admin() {
     if (!res.ok) { setMsg({ t: "err", x: out.error ?? "Error" }); return; }
     setMsg({ t: "ok", x: `Empresa "${f.empresa}" creada. Operarios sembrados: tecnico/1212 · admin/1111 · camarero/2222.` });
     setAlta({ codigo: out.codigoInstalacion ?? null, clave: out.claveTecnica ?? null, usuario: out.usuario ?? "", password: out.passwordInicial ?? "" });
-    setF({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] });
+    setF({ empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [], importar: ["catalogo", "impuestos", "formas_pago", "tickets"] });
     setUsrManual(false);
     cargar();
   }
@@ -82,6 +82,18 @@ export default function Admin() {
   const toggleModAlta = (k: string) => setF((s) => ({
     ...s,
     modulos: s.modulos.includes(k) ? s.modulos.filter((m) => m !== k) : [...s.modulos, k],
+  }));
+
+  // Qué se importa de la plantilla base al crear la empresa.
+  const IMPORTABLES = [
+    { k: "catalogo", nombre: "Familias y productos" },
+    { k: "impuestos", nombre: "Impuestos" },
+    { k: "formas_pago", nombre: "Formas de pago" },
+    { k: "tickets", nombre: "Plantillas de ticket" },
+  ];
+  const toggleImportar = (k: string) => setF((s) => ({
+    ...s,
+    importar: s.importar.includes(k) ? s.importar.filter((m) => m !== k) : [...s.importar, k],
   }));
 
   async function generarLicencia() {
@@ -167,6 +179,18 @@ export default function Admin() {
                       </label>
                     ))}
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Importar de la plantilla base</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {IMPORTABLES.map(({ k, nombre }) => (
+                      <label key={k} className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
+                        <input type="checkbox" checked={f.importar.includes(k)} onChange={() => toggleImportar(k)} className="accent-primary" />
+                        {nombre}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Se clona de «Plantilla base». Los usuarios (admin/camarero/técnico) y perfiles se crean siempre.</p>
                 </div>
                 <Button className="w-full" disabled={busy}>{busy ? "Creando…" : "Crear empresa"}</Button>
                 {msg && <p className={`text-sm ${msg.t === "ok" ? "text-emerald-600" : "text-destructive"}`}>{msg.x}</p>}

@@ -3,6 +3,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
 import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
 import { hostPlataforma } from "@/app/lib/plataforma";
+import { clonarCatalogo, clonarTabla } from "@/app/lib/clonar-plantilla";
+
+// Grupos que se pueden importar de la plantilla al alta, y su tabla/acción.
+const TABLA_GRUPO: Record<string, string> = { impuestos: "tax_rate", formas_pago: "payment_method", tickets: "plantilla_ticket" };
 
 // Alta de empresa COMPLETA en un paso. SOLO el técnico de Gluuh (es_admin_plataforma).
 // Decisiones guía 15 §12: el cliente NO tiene email de login — se le genera un
@@ -42,6 +46,7 @@ type Admin = SupabaseClient;
 async function aprovisionar(admin: Admin, tid: string, datos: {
   cif?: string; direccion?: string; poblacion?: string; provincia?: string;
   codigoPostal?: string; telefono?: string; emailContacto?: string; meses?: unknown; modulos?: unknown;
+  importar?: unknown;
 }): Promise<{ codigoInstalacion: string | null; claveTecnica: string | null }> {
   // Código de instalación único (reintento ante la remotísima colisión).
   let codigoInstalacion: string | null = null;
@@ -66,14 +71,35 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   const { error: eClave } = await admin.rpc("admin_establecer_clave_tecnica", { p_tenant: tid, p_clave: claveTecnica });
   if (eClave) claveTecnica = null; // la clave se podrá fijar después
 
-  // Perfiles recomendados + usuarios y catálogo de ejemplo.
+  // Siempre: perfiles recomendados + usuarios base (tecnico/1212, admin/1111,
+  // camarero/2222, camarera/3333).
   await admin.from("perfil").insert(
     PERFILES_RECOMENDADOS.map((r) => ({ tenant_id: tid, nombre: r.nombre, descripcion: r.descripcion, permisos: r.permisos })),
   );
-  await admin.rpc("admin_sembrar_operarios_defecto", { p_tenant: tid }); // tecnico/1212 + PIN dueño
-  await admin.rpc("admin_sembrar_ejemplo", { p_tenant: tid });           // admin/camareros + familias/productos
+  await admin.rpc("admin_sembrar_operarios_defecto", { p_tenant: tid });
+  await admin.rpc("admin_sembrar_ejemplo", { p_tenant: tid });
+
+  // Clonado desde la PLANTILLA BASE de lo marcado en el alta.
+  const grupos = Array.isArray(datos.importar) ? datos.importar.filter((g): g is string => typeof g === "string") : [];
+  await clonarDesdePlantilla(admin, tid, grupos);
 
   return { codigoInstalacion, claveTecnica };
+}
+
+// Clona de la plantilla base (tenant es_plantilla) los grupos marcados: carta,
+// impuestos, formas de pago, tickets. Best-effort por grupo: un fallo no aborta
+// el alta (la empresa queda creada aunque falte un grupo).
+async function clonarDesdePlantilla(admin: Admin, tid: string, grupos: string[]): Promise<void> {
+  if (!grupos.length) return;
+  const { data: pl } = await admin.from("tenant").select("id").eq("es_plantilla", true).maybeSingle();
+  const origen = (pl as { id: string } | null)?.id;
+  if (!origen || origen === tid) return;
+  for (const g of grupos) {
+    try {
+      if (g === "catalogo") await clonarCatalogo(admin, origen, tid);
+      else if (TABLA_GRUPO[g]) await clonarTabla(admin, TABLA_GRUPO[g], origen, tid);
+    } catch { /* grupo omitido; la empresa queda igualmente creada */ }
+  }
 }
 
 export async function POST(req: Request) {
@@ -90,7 +116,7 @@ export async function POST(req: Request) {
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
   if (!esAdmin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { empresa, usuario, emailContacto, cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos } = await req.json();
+  const { empresa, usuario, emailContacto, cif, direccion, poblacion, provincia, codigoPostal, telefono, meses, modulos, importar } = await req.json();
   if (!empresa) return NextResponse.json({ error: "Falta el nombre de la empresa" }, { status: 400 });
   const usr = normalizarUsuario(String(usuario || empresa));
   if (usr.length < 3) return NextResponse.json({ error: "El usuario debe tener al menos 3 letras o números" }, { status: 400 });
@@ -123,7 +149,7 @@ export async function POST(req: Request) {
   }
 
   const { codigoInstalacion, claveTecnica } = await aprovisionar(admin, au.tenant_id as string, {
-    cif, direccion, poblacion, provincia, codigoPostal, telefono, emailContacto, meses, modulos,
+    cif, direccion, poblacion, provincia, codigoPostal, telefono, emailContacto, meses, modulos, importar,
   });
   return NextResponse.json({ ok: true, usuario: usr, passwordInicial, claveTecnica, codigoInstalacion });
 }
