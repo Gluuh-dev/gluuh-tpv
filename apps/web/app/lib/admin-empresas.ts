@@ -15,6 +15,10 @@ export interface ResumenEmpresa {
   licencia_hasta: string | null;
   licencia_modulos: string[];
   created_at: string;
+  ciclo_pago: string | null;
+  forma_pago: string | null;
+  precio_periodo: number | null;
+  proximo_pago: string | null;
   n_productos: number;
   n_usuarios: number;
   n_dispositivos: number;

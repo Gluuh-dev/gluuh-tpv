@@ -15,7 +15,12 @@ description: >-
 ## Reglas del repo (no negociables)
 
 1. **Lo que se aplica son las migraciones** de `supabase/migrations/*.sql`,
-   numeradas secuencialmente (`0001`…; a 08-07-2026 la última es `0084`
+   numeradas secuencialmente (`0001`…; a 08-07-2026 la última es `0086`
+   —`admin_empresa_datos(p_tenant)` (datos editables tenant+location). `0085`
+   **facturación empresa→Gluuh**: `tenant.ciclo_pago/forma_pago/precio_periodo/
+   proximo_pago/stripe_customer_id` + tabla `pago_gluuh` (historial, RLS
+   `es_admin_plataforma`); `admin_resumen_empresas` amplía con esos campos.
+   `0084`
    —`tenant.licencia_limites` jsonb (dispositivos/usuarios; null=sin límite);
    `admin_resumen_empresas()` devuelve `activo`+`licencia_limites`;
    `verificar_clave_operario` exige `tenant.activo` (empresa suspendida = no

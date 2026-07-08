@@ -58,18 +58,22 @@ export default function Suscripciones() {
         <CardHeader><CardTitle className="text-base">Todas las empresas ({empresas.length})</CardTitle></CardHeader>
         <CardContent className="px-0">
           <Table>
-            <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Estado</TableHead><TableHead>Caduca</TableHead><TableHead>Módulos</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Estado</TableHead><TableHead>Caduca</TableHead><TableHead>Próximo pago</TableHead><TableHead>Ciclo</TableHead><TableHead className="text-right">Precio</TableHead></TableRow></TableHeader>
             <TableBody>
-              {cargando && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>}
-              {!cargando && empresas.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Sin empresas.</TableCell></TableRow>}
+              {cargando && <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>}
+              {!cargando && empresas.length === 0 && <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Sin empresas.</TableCell></TableRow>}
               {empresas.map((e) => {
                 const sub = estadoSuscripcion(e.licencia_hasta);
+                const pagoDias = e.proximo_pago ? Math.floor((new Date(e.proximo_pago).getTime() - Date.now()) / 86_400_000) : null;
+                const pagoPronto = pagoDias !== null && pagoDias <= 15;
                 return (
                   <TableRow key={e.id} className="cursor-pointer" onClick={() => router.push(`/admin/empresas/${e.id}`)}>
                     <TableCell className="font-medium">{e.nombre}</TableCell>
                     <TableCell><Badge variant={sub.variant}>{sub.texto}</Badge></TableCell>
                     <TableCell className="text-muted-foreground">{fechaCorta(e.licencia_hasta)}</TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">{e.licencia_modulos.length}</TableCell>
+                    <TableCell className={pagoPronto ? "font-medium text-amber-500" : "text-muted-foreground"}>{fechaCorta(e.proximo_pago)}</TableCell>
+                    <TableCell className="text-muted-foreground">{e.ciclo_pago ? e.ciclo_pago.toLowerCase() : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{e.precio_periodo != null ? `${Number(e.precio_periodo).toFixed(2).replace(".", ",")} €` : "—"}</TableCell>
                   </TableRow>
                 );
               })}

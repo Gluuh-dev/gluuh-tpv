@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, KeyRound, Package, Users, MonitorSmartphone, Puzzle, CreditCard, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, KeyRound, Package, Users, MonitorSmartphone, Puzzle, CreditCard, RefreshCw, Pencil } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { MODULOS, type DefModulo } from "@/app/lib/modulos";
 import { estadoSuscripcion, fechaCorta, type ResumenEmpresa } from "@/app/lib/admin-empresas";
@@ -33,6 +33,9 @@ function haceCuanto(iso: string | null): string {
   const h = Math.floor(min / 60);
   return h < 24 ? `hace ${h} h` : `hace ${Math.floor(h / 24)} d`;
 }
+const eur = (n: number) => Number(n).toFixed(2).replace(".", ",") + " €";
+const CICLOS = [{ v: "MENSUAL", t: "Mensual" }, { v: "TRIMESTRAL", t: "Trimestral" }, { v: "ANUAL", t: "Anual" }];
+const FORMAS = [{ v: "TRANSFERENCIA", t: "Transferencia" }, { v: "EFECTIVO", t: "Efectivo" }, { v: "DOMICILIADO", t: "Domiciliado" }, { v: "STRIPE", t: "Stripe (próximamente)" }];
 
 export default function FichaEmpresa() {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +45,9 @@ export default function FichaEmpresa() {
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
   const [ren, setRen] = useState<{ meses: string; modulos: string[] }>({ meses: "12", modulos: [] });
   const [lim, setLim] = useState<{ dispositivos: string; usuarios: string }>({ dispositivos: "", usuarios: "" });
+  const [fac, setFac] = useState<{ ciclo: string; forma: string; precio: string; proximo: string }>({ ciclo: "", forma: "", precio: "", proximo: "" });
+  const [pago, setPago] = useState<{ importe: string; concepto: string }>({ importe: "", concepto: "" });
+  const [historial, setHistorial] = useState<{ id: string; fecha: string; importe: number; concepto: string | null; metodo: string | null }[]>([]);
 
   async function cargar() {
     const sb = supabaseBrowser();
@@ -54,8 +60,12 @@ export default function FichaEmpresa() {
     if (fila) {
       setRen({ meses: "12", modulos: fila.licencia_modulos ?? [] });
       setLim({ dispositivos: fila.licencia_limites?.dispositivos ? String(fila.licencia_limites.dispositivos) : "", usuarios: fila.licencia_limites?.usuarios ? String(fila.licencia_limites.usuarios) : "" });
+      setFac({ ciclo: fila.ciclo_pago ?? "", forma: fila.forma_pago ?? "", precio: fila.precio_periodo != null ? String(fila.precio_periodo) : "", proximo: fila.proximo_pago ?? "" });
     }
     setDisp((d as Disp[] | null) ?? []);
+    // Historial de pagos (RLS: es_admin_plataforma permite leer pago_gluuh).
+    const { data: h } = await sb.from("pago_gluuh").select("id,fecha,importe,concepto,metodo").eq("tenant_id", id).order("fecha", { ascending: false });
+    setHistorial((h as typeof historial | null) ?? []);
     setCargando(false);
   }
   useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, [id]);
@@ -99,7 +109,10 @@ export default function FichaEmpresa() {
           <h1 className="flex items-center gap-2 text-xl font-semibold">{emp.nombre} {emp.es_plantilla && <Badge variant="info">Plantilla</Badge>} {!emp.activo && <Badge variant="destructive">Suspendida</Badge>}</h1>
           <p className="text-[13px] text-muted-foreground">{emp.cif ? `CIF ${emp.cif} · ` : ""}Alta {fechaCorta(emp.created_at)}</p>
         </div>
-        <Badge variant={sub.variant}>{sub.texto}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={sub.variant}>{sub.texto}</Badge>
+          <Link href={`/admin/empresas/${id}/editar`}><Button size="sm" variant="outline"><Pencil className="h-3.5 w-3.5" /> Editar datos</Button></Link>
+        </div>
       </div>
 
       {msg && <p className={`rounded-md px-3 py-2 text-sm ${msg.t === "ok" ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{msg.x}</p>}
@@ -194,6 +207,58 @@ export default function FichaEmpresa() {
             </Button>
           </div>
           {!emp.activo && <p className="text-[12px] text-amber-500">Suspendida: los operarios no pueden entrar y no se activan equipos nuevos.</p>}
+        </CardContent>
+      </Card>
+
+      {/* Facturación / Pago a Gluuh */}
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" aria-hidden /> Facturación · pago a Gluuh</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="space-y-1"><Label className="text-xs">Ciclo</Label>
+              <Select value={fac.ciclo || undefined} onValueChange={(v) => setFac((s) => ({ ...s, ciclo: v }))}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>{CICLOS.map((c) => <SelectItem key={c.v} value={c.v}>{c.t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">Forma de pago</Label>
+              <Select value={fac.forma || undefined} onValueChange={(v) => setFac((s) => ({ ...s, forma: v }))}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>{FORMAS.map((c) => <SelectItem key={c.v} value={c.v}>{c.t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">Precio / periodo (€)</Label>
+              <Input type="number" min={0} step="0.01" value={fac.precio} onChange={(e) => setFac((s) => ({ ...s, precio: e.target.value }))} /></div>
+            <div className="space-y-1"><Label className="text-xs">Próximo pago</Label>
+              <Input type="date" value={fac.proximo} onChange={(e) => setFac((s) => ({ ...s, proximo: e.target.value }))} /></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => accion("config-pago", { ciclo: fac.ciclo, forma: fac.forma, precio: Number(fac.precio) || 0, proximo: fac.proximo })}>Guardar facturación</Button>
+          </div>
+
+          <div className="space-y-2 border-t border-border-muted pt-3">
+            <Label className="text-xs">Registrar pago recibido</Label>
+            <div className="flex flex-wrap items-end gap-2">
+              <Input type="number" min={0} step="0.01" className="w-32" placeholder="Importe €" value={pago.importe} onChange={(e) => setPago((s) => ({ ...s, importe: e.target.value }))} />
+              <Input className="w-48" placeholder="Concepto (opcional)" value={pago.concepto} onChange={(e) => setPago((s) => ({ ...s, concepto: e.target.value }))} />
+              <Button size="sm" variant="outline" disabled={Number(pago.importe) <= 0} onClick={() => { void accion("registrar-pago", { importe: Number(pago.importe), concepto: pago.concepto, metodo: fac.forma }); setPago({ importe: "", concepto: "" }); }}>Registrar pago</Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Al registrar, el próximo pago avanza según el ciclo.</p>
+          </div>
+
+          {historial.length > 0 && (
+            <div className="border-t border-border-muted pt-3">
+              <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Historial de pagos</div>
+              <div className="divide-y divide-border-muted">
+                {historial.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-2 py-1.5 text-[13px]">
+                    <span>{new Date(p.fecha).toLocaleDateString("es-ES")} <span className="text-muted-foreground">{p.concepto ?? p.metodo ?? ""}</span></span>
+                    <span className="font-medium tabular-nums">{eur(p.importe)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

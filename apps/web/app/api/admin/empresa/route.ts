@@ -15,6 +15,10 @@ const legible = (n: number) => Array.from({ length: n }, () => ALFABETO[randomIn
 const dig = (n: number) => Array.from({ length: n }, () => randomInt(10)).join("");
 const generarCodigoInstalacion = () => `${dig(4)}-${dig(4)}-${dig(5)}-${dig(4)}-${dig(4)}`;
 
+const conValor = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== ""));
+const MESES_CICLO: Record<string, number> = { MENSUAL: 1, TRIMESTRAL: 3, ANUAL: 12 };
+const sumarMeses = (desde: Date, n: number) => { const d = new Date(desde); d.setMonth(d.getMonth() + n); return d.toISOString().slice(0, 10); };
+
 // La cuenta de EMPRESA de un tenant: el app_user con email (sintético
 // @cuentas.gluuh.local) y auth_user_id — los operarios tienen email null.
 async function cuentaEmpresa(admin: SupabaseClient, tid: string): Promise<string | null> {
@@ -78,6 +82,47 @@ async function limites(admin: SupabaseClient, tid: string, dispositivos: unknown
   return NextResponse.json({ ok: true });
 }
 
+// Editar datos de la empresa (tenant + su local).
+async function editar(admin: SupabaseClient, tid: string, d: Record<string, unknown>) {
+  const t = conValor({ nombre: d.nombre, cif: d.cif, email_admin: d.emailContacto });
+  if (Object.keys(t).length) await admin.from("tenant").update(t).eq("id", tid);
+  const l = conValor({ direccion: d.direccion, poblacion: d.poblacion, provincia: d.provincia, codigo_postal: d.codigoPostal, telefono: d.telefono, cif: d.cif });
+  if (Object.keys(l).length) await admin.from("location").update(l).eq("tenant_id", tid);
+  return NextResponse.json({ ok: true });
+}
+
+// Configuración de pago (ciclo, forma, precio, próximo pago).
+async function configPago(admin: SupabaseClient, tid: string, d: Record<string, unknown>) {
+  const precio = Number(d.precio);
+  const { error } = await admin.from("tenant").update({
+    ciclo_pago: (d.ciclo as string) || null,
+    forma_pago: (d.forma as string) || null,
+    precio_periodo: Number.isFinite(precio) && precio > 0 ? precio : null,
+    proximo_pago: (d.proximo as string) || null,
+  }).eq("id", tid);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+// Registrar un pago recibido de la empresa y avanzar el próximo pago según el ciclo.
+async function registrarPago(admin: SupabaseClient, tid: string, d: Record<string, unknown>) {
+  const importe = Number(d.importe);
+  if (!Number.isFinite(importe) || importe <= 0) return NextResponse.json({ error: "Importe no válido" }, { status: 400 });
+  const { data: t } = await admin.from("tenant").select("ciclo_pago, proximo_pago").eq("id", tid).maybeSingle();
+  const ciclo = (t as { ciclo_pago?: string } | null)?.ciclo_pago ?? null;
+  const desde = (t as { proximo_pago?: string } | null)?.proximo_pago ?? new Date().toISOString().slice(0, 10);
+  const n = ciclo ? (MESES_CICLO[ciclo] ?? 1) : 1;
+  const hasta = sumarMeses(new Date(desde), n);
+  const { error } = await admin.from("pago_gluuh").insert({
+    tenant_id: tid, importe, concepto: (d.concepto as string) || null, metodo: (d.metodo as string) || null,
+    periodo_desde: desde, periodo_hasta: hasta,
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Avanza el próximo pago al fin del periodo cubierto.
+  await admin.from("tenant").update({ proximo_pago: hasta }).eq("id", tid);
+  return NextResponse.json({ ok: true, proximoPago: hasta });
+}
+
 export async function POST(req: Request) {
   if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -92,7 +137,8 @@ export async function POST(req: Request) {
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
   if (!esAdmin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { accion, tenantId, meses, modulos, activo, dispositivos, usuarios } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { accion, tenantId, meses, modulos, activo, dispositivos, usuarios } = body;
   if (!tenantId) return NextResponse.json({ error: "Falta la empresa" }, { status: 400 });
 
   const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
@@ -102,6 +148,9 @@ export async function POST(req: Request) {
     case "regenerar-codigo": return regenerarCodigo(admin, tenantId);
     case "suspender": return suspender(admin, tenantId, activo);
     case "limites": return limites(admin, tenantId, dispositivos, usuarios);
+    case "editar": return editar(admin, tenantId, body);
+    case "config-pago": return configPago(admin, tenantId, body);
+    case "registrar-pago": return registrarPago(admin, tenantId, body);
     default: return NextResponse.json({ error: "Acción desconocida" }, { status: 400 });
   }
 }
