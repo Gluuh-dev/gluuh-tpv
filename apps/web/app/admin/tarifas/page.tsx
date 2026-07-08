@@ -59,7 +59,7 @@ export default function Tarifas() {
         <span className="grid h-9 w-9 place-items-center rounded-md bg-surface-muted"><Tags className="h-4.5 w-4.5 text-muted-foreground" aria-hidden /></span>
         <div>
           <h1 className="text-lg font-semibold">Tarifas</h1>
-          <p className="text-[13px] text-muted-foreground">Precio mensual = base + dispositivos conectados × tarifa + módulos contratados × precio.</p>
+          <p className="text-[13px] text-muted-foreground">Precio mensual = base (Básica, incluye 1 TPV y 1 impresora) + dispositivos extra × tarifa + módulos contratados × precio.</p>
         </div>
       </div>
 
