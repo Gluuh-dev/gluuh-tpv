@@ -73,7 +73,7 @@ export default function Suscripciones() {
                     <TableCell className="text-muted-foreground">{fechaCorta(e.licencia_hasta)}</TableCell>
                     <TableCell className={pagoPronto ? "font-medium text-amber-500" : "text-muted-foreground"}>{fechaCorta(e.proximo_pago)}</TableCell>
                     <TableCell className="text-muted-foreground">{e.ciclo_pago ? e.ciclo_pago.toLowerCase() : "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{e.precio_periodo != null ? `${Number(e.precio_periodo).toFixed(2).replace(".", ",")} €` : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{`${Number(e.precio_calculado).toFixed(2).replace(".", ",")} €`}<span className="text-[11px] text-muted-foreground">/mes</span></TableCell>
                   </TableRow>
                 );
               })}

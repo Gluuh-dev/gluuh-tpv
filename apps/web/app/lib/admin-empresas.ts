@@ -19,6 +19,7 @@ export interface ResumenEmpresa {
   forma_pago: string | null;
   precio_periodo: number | null;
   proximo_pago: string | null;
+  precio_calculado: number;
   n_productos: number;
   n_usuarios: number;
   n_dispositivos: number;

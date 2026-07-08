@@ -48,6 +48,7 @@ export default function FichaEmpresa() {
   const [fac, setFac] = useState<{ ciclo: string; forma: string; precio: string; proximo: string }>({ ciclo: "", forma: "", precio: "", proximo: "" });
   const [pago, setPago] = useState<{ importe: string; concepto: string }>({ importe: "", concepto: "" });
   const [historial, setHistorial] = useState<{ id: string; fecha: string; importe: number; concepto: string | null; metodo: string | null }[]>([]);
+  const [tarifas, setTarifas] = useState<Record<string, { etiqueta: string; precio: number }>>({});
 
   async function cargar() {
     const sb = supabaseBrowser();
@@ -66,6 +67,9 @@ export default function FichaEmpresa() {
     // Historial de pagos (RLS: es_admin_plataforma permite leer pago_gluuh).
     const { data: h } = await sb.from("pago_gluuh").select("id,fecha,importe,concepto,metodo").eq("tenant_id", id).order("fecha", { ascending: false });
     setHistorial((h as typeof historial | null) ?? []);
+    // Tarifas para el desglose del mensual.
+    const { data: tf } = await sb.from("tarifa_plataforma").select("clave,etiqueta,precio");
+    setTarifas(Object.fromEntries(((tf as { clave: string; etiqueta: string; precio: number }[] | null) ?? []).map((t) => [t.clave, { etiqueta: t.etiqueta, precio: t.precio }])));
     setCargando(false);
   }
   useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, [id]);
@@ -98,6 +102,13 @@ export default function FichaEmpresa() {
   );
 
   const sub = estadoSuscripcion(emp.licencia_hasta);
+
+  // Desglose del mensual calculado: base + dispositivos vinculados por tipo + módulos.
+  const tp = (clave: string) => tarifas[clave]?.precio ?? 0;
+  const porTipo = new Map<string, number>();
+  for (const dv of disp.filter((x) => x.vinculado_at)) porTipo.set(dv.tipo, (porTipo.get(dv.tipo) ?? 0) + 1);
+  const lineasDisp = [...porTipo.entries()].map(([tipo, n]) => ({ etiqueta: tarifas[`DISPOSITIVO_${tipo}`]?.etiqueta ?? tipo, n, precio: tp(`DISPOSITIVO_${tipo}`) }));
+  const lineasMod = emp.licencia_modulos.map((m) => ({ etiqueta: tarifas[`MODULO_${m}`]?.etiqueta ?? m, precio: tp(`MODULO_${m}`) })).filter((x) => x.precio > 0);
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -214,6 +225,20 @@ export default function FichaEmpresa() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" aria-hidden /> Facturación · pago a Gluuh</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          {/* Mensual calculado (base + dispositivos + módulos) con desglose. */}
+          <div className="rounded-lg border border-border bg-surface-muted/40 p-3.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[13px] text-muted-foreground">Mensual calculado</span>
+              <span className="text-xl font-semibold tabular-nums">{eur(emp.precio_calculado)}<span className="text-[13px] font-normal text-muted-foreground">/mes</span></span>
+            </div>
+            <div className="mt-2 space-y-0.5 text-[12px] text-muted-foreground">
+              {tp("BASE") > 0 && <div className="flex justify-between"><span>Cuota base</span><span className="tabular-nums">{eur(tp("BASE"))}</span></div>}
+              {lineasDisp.map((l) => <div key={l.etiqueta} className="flex justify-between"><span>{l.n} × {l.etiqueta}</span><span className="tabular-nums">{eur(l.n * l.precio)}</span></div>)}
+              {lineasMod.map((l) => <div key={l.etiqueta} className="flex justify-between"><span>{l.etiqueta}</span><span className="tabular-nums">{eur(l.precio)}</span></div>)}
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">Trimestral {eur(emp.precio_calculado * 3)} · Anual {eur(emp.precio_calculado * 12)}. Tarifas en <a href="/admin/tarifas" className="underline">Tarifas</a>.</p>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-4">
             <div className="space-y-1"><Label className="text-xs">Ciclo</Label>
               <Select value={fac.ciclo || undefined} onValueChange={(v) => setFac((s) => ({ ...s, ciclo: v }))}>
