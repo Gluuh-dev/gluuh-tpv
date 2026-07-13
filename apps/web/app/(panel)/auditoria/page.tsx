@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gift, GraduationCap, ShieldAlert, Trash2, UtensilsCrossed, XCircle, type LucideIcon } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawEvento {
   id: string;
@@ -37,7 +38,6 @@ const TIPO_EVENTO: Record<string, { label: string; icon: LucideIcon; badge: stri
   FORMACION: { label: "Formación", icon: GraduationCap, badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
 };
 
-const eur = (n: number) => n.toFixed(2) + " €";
 const aFechaInput = (d: Date) => d.toISOString().slice(0, 10);
 
 function formatFecha(iso: string): string {

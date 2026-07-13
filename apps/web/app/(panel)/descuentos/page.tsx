@@ -27,7 +27,7 @@ export default function Descuentos() {
     const { data } = await sb.from("discount").select("id,nombre,tipo,valor,activo").order("orden");
     setList((data as Desc[]) ?? []);
   }
-  useEffect(() => { (async () => { await cargar(); setLoading(false); })(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { (async () => { await cargar(); setLoading(false); })();   }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();

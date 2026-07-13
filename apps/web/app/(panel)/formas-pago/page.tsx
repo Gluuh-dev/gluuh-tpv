@@ -43,7 +43,7 @@ export default function FormasPago() {
       setList((conFlags.data as Forma[]) ?? []);
     }
   }
-  useEffect(() => { (async () => { await cargar(); setLoading(false); })(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { (async () => { await cargar(); setLoading(false); })();   }, []);
 
   // Solo escribe columnas que existan (evita error si 0055 no está aplicada).
   function conDefaults(base: { nombre: string; tipo: string; orden: number }) {

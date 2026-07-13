@@ -52,7 +52,7 @@ export default function Series() {
       setList((conTipo.data as Serie[]) ?? []);
     }
   }
-  useEffect(() => { (async () => { await cargar(); setLoading(false); })(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { (async () => { await cargar(); setLoading(false); })();   }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();

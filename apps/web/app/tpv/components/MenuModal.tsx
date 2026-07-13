@@ -7,6 +7,7 @@
 // (táctil ≥44px, un acento = bg-brand; la acción de dinero = naranja).
 import { useMemo, useState } from "react";
 import { Check } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 export interface MenuGrupo {
   id: string;
@@ -22,8 +23,6 @@ export interface MenuModalProps {
   onCancelar(): void;
 }
 
-const eur = (n: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
 export function MenuModal({ menu, onAceptar, onCancelar }: MenuModalProps) {
   // Estado interno: una opción elegida por grupo.

@@ -5,6 +5,9 @@
 // en cian y un badge de contador; abajo, candado (bloquear) y engranaje (config)
 // con sus divisores. Presentacional puro: la lista de zonas (con sus contadores y
 // onClick) se construye en page.tsx y se pasa por `tabs`. Extraído de app/tpv/page.tsx.
+// Memoizado (plan 011): con `tabs` estable (useMemo en el padre), teclear o tocar
+// líneas no re-renderiza el rail.
+import { memo } from "react";
 import { Settings, type LucideIcon } from "lucide-react";
 
 export interface RailTab {
@@ -24,7 +27,7 @@ export interface RailSalasProps {
   onConfig: () => void;
 }
 
-export function RailSalas({ tabs, activo, busy, onConfig }: RailSalasProps) {
+export const RailSalas = memo(function RailSalas({ tabs, activo, busy, onConfig }: RailSalasProps) {
   return (
     <aside className="flex w-[140px] flex-none flex-col overflow-y-auto border-l border-border bg-surface">
       {tabs.map((t) => {
@@ -36,9 +39,15 @@ export function RailSalas({ tabs, activo, busy, onConfig }: RailSalasProps) {
               act ? "bg-accent-soft text-brand" : "text-muted-foreground hover:bg-accent hover:text-foreground"
             }`}
           >
-            <Icono size={22} strokeWidth={1.75} />
+            <div className="relative">
+              <Icono size={22} strokeWidth={1.75} />
+              {t.badge ? (
+                <span className="absolute -right-2.5 -top-2.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#c46a2a] px-1 text-[9px] font-extrabold text-white border border-card shadow-sm">
+                  {t.badge}
+                </span>
+              ) : null}
+            </div>
             <span className="w-full truncate text-center">{t.label}</span>
-            {t.badge ? <span className="absolute right-1 top-1 grid h-5 min-w-5 flex-none place-items-center rounded-full bg-[#c46a2a] px-1 text-[10px] font-bold text-white">{t.badge}</span> : null}
           </button>
         );
       })}
@@ -48,4 +57,4 @@ export function RailSalas({ tabs, activo, busy, onConfig }: RailSalasProps) {
       </button>
     </aside>
   );
-}
+});

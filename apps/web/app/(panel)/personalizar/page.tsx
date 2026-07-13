@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 interface Offer {
   id: string; titulo: string; descripcion: string | null; precio: string | null;
@@ -42,7 +43,7 @@ export default function Personalizar() {
     setOfertas((o as Offer[]) ?? []);
   }
 
-  useEffect(() => { (async () => { await cargar(); setLoading(false); })(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { (async () => { await cargar(); setLoading(false); })();   }, []);
 
   function aviso(t: string) { setMsg(t); setTimeout(() => setMsg(""), 2500); }
 
@@ -126,7 +127,7 @@ export default function Personalizar() {
                 <Label>Logo original (color)</Label>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => logoInput.current?.click()}><Upload className="h-4 w-4" /> Subir</Button>
-                  {marca.logo_url && <img src={marca.logo_url} alt="" className="h-9 w-9 rounded object-contain" />}
+                  {marca.logo_url && <img src={urlFoto(marca.logo_url)} alt="" className="h-9 w-9 rounded object-contain" />}
                   {marca.logo_url && <button type="button" onClick={() => setMarca({ ...marca, logo_url: null })} className="text-xs text-destructive">Quitar</button>}
                   <input ref={logoInput} type="file" accept="image/*" className="hidden" onChange={onLogo} />
                 </div>
@@ -136,7 +137,7 @@ export default function Personalizar() {
                 <Label>Logo para tickets (blanco y negro)</Label>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => logoTicketInput.current?.click()}><Upload className="h-4 w-4" /> Subir</Button>
-                  {marca.logo_ticket_url && <img src={marca.logo_ticket_url} alt="" className="h-9 w-9 rounded border border-border bg-white object-contain p-0.5" />}
+                  {marca.logo_ticket_url && <img src={urlFoto(marca.logo_ticket_url)} alt="" className="h-9 w-9 rounded border border-border bg-white object-contain p-0.5" />}
                   {marca.logo_ticket_url && <button type="button" onClick={() => setMarca({ ...marca, logo_ticket_url: null })} className="text-xs text-destructive">Quitar</button>}
                   <input ref={logoTicketInput} type="file" accept="image/*" className="hidden" onChange={onLogoTicket} />
                 </div>
@@ -158,7 +159,7 @@ export default function Personalizar() {
           <Label className="mb-1 block">Vista previa del kiosko</Label>
           <div className="grid h-[320px] place-items-center rounded-2xl p-6 text-center ring-1 ring-black/10" style={{ background: marca.color_primario, color: fg }}>
             <div>
-              {marca.logo_url ? <img src={marca.logo_url} alt="" className="mx-auto h-16 w-auto object-contain" /> : <div className="text-5xl">🍔</div>}
+              {marca.logo_url ? <img src={urlFoto(marca.logo_url)} alt="" className="mx-auto h-16 w-auto object-contain" /> : <div className="text-5xl">🍔</div>}
               <div className="mt-3 text-2xl font-bold">{marca.kiosko_titulo || marca.nombre_comercial || "Bienvenido"}</div>
               <div className="text-sm opacity-90">{marca.kiosko_subtitulo || "Haz tu pedido aquí"}</div>
               <div className="mt-4 flex justify-center gap-2">
@@ -188,8 +189,8 @@ export default function Personalizar() {
             <div key={o.id} className="grid gap-4 rounded-xl border border-border p-4 lg:grid-cols-[110px_1fr_auto]">
               {/* Preview */}
               <div className="grid h-28 w-full place-items-center overflow-hidden rounded-lg" style={{ background: o.color }}>
-                {o.media_tipo === "IMAGEN" && o.media_url ? <img src={o.media_url} alt="" className="h-full w-full object-cover" />
-                  : o.media_tipo === "VIDEO" && o.media_url ? <video src={o.media_url} muted className="h-full w-full object-cover" />
+                {o.media_tipo === "IMAGEN" && o.media_url ? <img src={urlFoto(o.media_url)} alt="" className="h-full w-full object-cover" />
+                  : o.media_tipo === "VIDEO" && o.media_url ? <video src={urlFoto(o.media_url)} muted className="h-full w-full object-cover" />
                   : <span className="text-5xl">{o.emoji || "🍔"}</span>}
               </div>
 

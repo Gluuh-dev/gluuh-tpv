@@ -1,5 +1,12 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Post } from "@nestjs/common";
 import { FiscalService, type PreviewTicketDto } from "./fiscal.service";
+import { validarPreviewDto } from "./validacion";
+
+/** Valida el cuerpo antes de tocar el motor fiscal (o de remitir a la AEAT). */
+function exigirDtoValido(dto: PreviewTicketDto): void {
+  const error = validarPreviewDto(dto);
+  if (error) throw new BadRequestException(error);
+}
 
 /**
  * Endpoints del motor fiscal.
@@ -25,16 +32,19 @@ export class FiscalController {
 
   @Post("preview")
   preview(@Body() dto: PreviewTicketDto) {
+    exigirDtoValido(dto);
     return this.fiscal.previewTicket(dto);
   }
 
   @Post("xml")
   xml(@Body() dto: PreviewTicketDto) {
+    exigirDtoValido(dto);
     return this.fiscal.construirEnvio(dto);
   }
 
   @Post("enviar")
   enviar(@Body() dto: PreviewTicketDto) {
+    exigirDtoValido(dto);   // remite a la AEAT: no pasa nada sin validar
     return this.fiscal.enviar(dto);
   }
 }

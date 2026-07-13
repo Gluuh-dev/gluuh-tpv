@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Users, TrendingUp } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawOrder {
   user_id: string | null;
@@ -27,7 +28,6 @@ interface FilaUsuario {
   total: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function agruparPorUsuario(orders: RawOrder[], userMap: Record<string, string>): FilaUsuario[] {
   const acc: Record<string, { tickets: number; total: number }> = {};

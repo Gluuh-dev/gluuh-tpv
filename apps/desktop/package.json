@@ -10,7 +10,6 @@
     "dev": "tsc && electron .",
     "start": "tsc && electron .",
     "dist": "tsc && electron-builder",
-    "lint": "echo \"(lint pendiente)\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

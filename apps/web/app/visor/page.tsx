@@ -4,6 +4,7 @@
 // Recibe el ticket en curso por IPC (window.gluuh.onEvento tipo "visor");
 // no necesita red ni sesión propia.
 import { useEffect, useState } from "react";
+import { eur } from "@/app/lib/money";
 
 interface TicketVisor {
   lineas: { nombre: string; cantidad: number; importe: number }[];
@@ -16,7 +17,6 @@ const MENSAJE_REPOSO = "¡Bienvenido!";
 const MENSAJE_ESPERA = "Enseguida le atendemos";
 const MENSAJE_GRACIAS = "GRACIAS POR SU VISITA";
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function Visor() {
   const [ticket, setTicket] = useState<TicketVisor | null>(null);

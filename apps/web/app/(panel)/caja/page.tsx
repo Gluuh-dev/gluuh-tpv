@@ -13,10 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { eur } from "@/app/lib/money";
 
 interface Sesion { id: string; fondo_inicial: number; abierta_en: string; cerrada_en: string | null; total_efectivo: number | null; descuadre: number | null }
 interface Mov { id: string; tipo: "ENTRADA" | "SALIDA"; importe: number; motivo: string | null; created_at: string }
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function Caja() {
   const sb = supabaseBrowser();
@@ -63,7 +63,7 @@ export default function Caja() {
     setArqueoCiego(ciego ?? false);
     setUmbral(u);
     setLoading(false);
-  })(); /* eslint-disable-next-line */ }, []);
+  })();   }, []);
 
   async function abrir(e: React.FormEvent) {
     e.preventDefault();

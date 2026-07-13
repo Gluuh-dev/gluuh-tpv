@@ -8,7 +8,6 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "lint": "echo \"(lint pendiente)\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

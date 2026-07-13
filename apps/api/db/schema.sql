@@ -1,16 +1,39 @@
 -- =============================================================================
---  Gluuh TPV — Esquema de base de datos (PostgreSQL)
+--  ⚠️  ESTO **NO** ES EL ESQUEMA. NO LO APLIQUES. NO LO USES COMO REFERENCIA
+--      COMPLETA.
+--
+--  CANÓNICO = supabase/migrations/*.sql  (decisión del 12-07-2026)
+--
+--  Este fichero nació como "espejo" mantenido a mano de las migraciones. Como
+--  todos los espejos a mano, se quedó atrás: a 12-07-2026 declara 52 tablas
+--  cuando la BD real tiene 80. Le FALTAN 28, entre ellas cosas nada menores:
+--
+--    menu · menu_group · menu_choice · discount · tax_rate (¡fiscal!) ·
+--    plano_elemento · tenant_branding · nota_preparacion · platform_admin ·
+--    plantilla_ticket · punto_venta · sales_center · offer · supplier ·
+--    warehouse · client · customer_type · cancel_reason · alergeno ·
+--    etiqueta_producto · pago_gluuh · tarifa_plataforma · … (lista completa:
+--    comparar con `list_tables` del MCP de Supabase)
+--
+--  Un espejo que miente es PEOR que no tener espejo: cualquiera (persona o
+--  agente) que lea esto para entender la BD se lleva una foto incompleta.
+--
+--  Se conserva SOLO como documentación del NÚCLEO del diseño (el patrón
+--  multi-tenant + RLS, las convenciones y las tablas fundacionales). Para saber
+--  qué hay de verdad en la base de datos: `supabase/migrations/` o la BD viva.
+--
+--  Ya NO hay que mantenerlo sincronizado al tocar el esquema (ver CLAUDE.md).
+-- =============================================================================
+--  Gluuh TPV — Núcleo del diseño de base de datos (PostgreSQL) — REFERENCIA
 --  Multi-tenant: shared schema + tenant_id + Row-Level Security (RLS)
 --  Ver docs/dossier/06-base-de-datos-y-sincronizacion.md y docs/dossier/07 (fiscalidad)
 --
---  Convenciones:
+--  Convenciones (estas SÍ siguen vigentes y las respetan las migraciones):
 --   - PK uuid (gen_random_uuid).
 --   - Toda tabla de negocio lleva tenant_id (aislamiento) y columnas de sync.
 --   - tenant_id es la PRIMERA columna de los índices compuestos (rendimiento RLS).
 --   - Se evita usar palabras reservadas (sales_order, restaurant_table).
 --   - Importes en numeric(12,2); impuestos en numeric(5,2).
---
---  Aplicar:  psql "$DATABASE_URL" -f apps/api/db/schema.sql
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- gen_random_uuid()
@@ -928,3 +951,43 @@ CREATE POLICY tenant_self ON tenant
 -- En cada petición/transacción la aplicación ejecuta:
 --   SET LOCAL app.tenant_id = '<uuid-del-tenant-del-JWT>';
 -- =============================================================================
+
+-- =============================================================================
+--  9. FUNCIONES RPC DEL TPV (espejo; canónico en supabase/migrations)
+-- =============================================================================
+
+-- espejo de 0094: reemplazo atómico de las líneas de una orden (TPV crearOrden).
+-- SECURITY INVOKER: corre con la RLS del usuario; set_tenant_id rellena tenant_id.
+CREATE OR REPLACE FUNCTION reemplazar_lineas_orden(p_order_id uuid, p_lineas jsonb)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  DELETE FROM order_line WHERE order_id = p_order_id;
+  INSERT INTO order_line (order_id, product_id, nombre, cantidad, precio_unitario,
+                          tipo_impositivo, notas, estacion, user_id, modificadores, pase)
+  SELECT p_order_id,
+         (l->>'product_id')::uuid,
+         l->>'nombre',
+         COALESCE((l->>'cantidad')::numeric, 1),
+         (l->>'precio_unitario')::numeric,
+         (l->>'tipo_impositivo')::numeric,
+         l->>'notas',
+         l->>'estacion',
+         (l->>'user_id')::uuid,
+         COALESCE(l->'modificadores', '[]'::jsonb),
+         (l->>'pase')::int
+  FROM jsonb_array_elements(COALESCE(p_lineas, '[]'::jsonb)) AS l;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION reemplazar_lineas_orden(uuid, jsonb) TO authenticated;
+
+-- espejo de 0095: traspaso entre mesas y división de cuenta ATÓMICOS.
+-- El traspaso clavea por la CLAVE de la comanda (order_line.modificadores->>'key'),
+-- no por product_id: un producto puede estar en varias líneas (formato/extras/dto).
+-- Cuerpo completo en supabase/migrations/0095_traspaso_y_division_atomicos.sql
+--   traspasar_lineas(p_origen uuid, p_destino_mesa uuid, p_location uuid,
+--                    p_user uuid, p_movimientos jsonb) RETURNS uuid
+--   dividir_cuenta(p_origen uuid, p_location uuid, p_mesa uuid, p_user uuid,
+--                  p_etiqueta_base text, p_campos jsonb, p_docs jsonb) RETURNS void

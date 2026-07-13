@@ -10,6 +10,7 @@
 // contra doble impresión sin tocar el esquema.
 import { useEffect } from "react";
 import { supabaseBrowser } from "./supabaseBrowser";
+import { escucharCambios } from "./cambios";
 
 interface Printer { id: string; transporte: string; destino: string | null; ancho: number; tipo: string; activa: boolean; device_id: string | null }
 interface Job { id: string; printer_id: string; payload: { lineas?: string[]; cortar?: boolean; abrirCajon?: boolean; qr?: string } | null }
@@ -68,15 +69,19 @@ export function PrintDispatcher() {
     latir();
     const heartbeat = setInterval(latir, 60_000);
 
-    // Nuevos trabajos en tiempo real.
-    const canal = sb.channel("print_job_dispatch")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "print_job" }, (payload) => {
-        const j = payload.new as { id: string; printer_id: string; estado: string };
-        if (j.estado === "ENCOLADO") void procesar(j.id, j.printer_id);
-      })
-      .subscribe();
+    // Nuevos trabajos en tiempo real. SIN debounce a propósito: aquí sí importa CADA
+    // fila (hay que despachar todos los trabajos, no solo el último de la ráfaga).
+    const dejarDeEscuchar = escucharCambios(sb, {
+      nombre: "print_job_dispatch",
+      tablas: ["print_job"],
+      evento: "INSERT",
+      onCambio: (c) => {
+        const j = c.fila as { id: string; printer_id: string; estado: string } | null;
+        if (j?.estado === "ENCOLADO") void procesar(j.id, j.printer_id);
+      },
+    });
 
-    return () => { vivo = false; clearInterval(heartbeat); void sb.removeChannel(canal); };
+    return () => { vivo = false; clearInterval(heartbeat); dejarDeEscuchar(); };
   }, []);
 
   return null;

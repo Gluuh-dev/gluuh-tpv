@@ -18,7 +18,7 @@ pensada para ejecutarla tal cual (por una persona o por un agente).
 | [03-app-escritorio-electron.md](03-app-escritorio-electron.md) | App PC: impresión, cajón, kiosk, updater, backup USB | P0 | 2-3 sem |
 | [04-modulos-y-emparejado.md](04-modulos-y-emparejado.md) | Módulos activables + pantallas por código | P0 | 1-1,5 sem |
 | [05-paridad-glop.md](05-paridad-glop.md) | Aparcar, pasar a mesa, cliente, barra de estado, F10-F12… | P1 | 1,5-2 sem |
-| [06-offline-powersync.md](06-offline-powersync.md) | Trabajar sin internet y volcar al volver | P1 | 2-3 sem |
+| [06-offline-powersync.md](06-offline-powersync.md) | Trabajar sin internet (PowerSync por dispositivo). **Re-encuadrada por la guía 16**: es el camino del caso futuro F4 (móvil offline), no el principal | P1→futuro | 2-3 sem |
 | [07-creacion-rapida-desde-tpv.md](07-creacion-rapida-desde-tpv.md) | Crear/editar productos desde cualquier pantalla del TPV en segundos | P1 | 4-6 d |
 | [08-analisis-glop.md](08-analisis-glop.md) | Glop a fondo: anatomía botón a botón, manuales y decisiones de imitación | — | consulta |
 | [09-referencias-ux-competencia.md](09-referencias-ux-competencia.md) | Lecciones UX de Ágora, Revo, Square, Toast, SumUp, Lightspeed |
@@ -28,6 +28,7 @@ pensada para ejecutarla tal cual (por una persona o por un agente).
 | [13-rediseno-config-y-estilos.md](13-rediseno-config-y-estilos.md) | ★ Backlog por sesiones: footer fijo + buscador global, Empresa y Local, Seguridad, Marca, orden de botones TPV, arreglar navegación | pendiente | por sesiones |
 | [14-identidad-acceso-y-seguridad.md](14-identidad-acceso-y-seguridad.md) | ★ Análisis + plan: activación por licencia, operarios con código+clave y perfiles, superficies por puerta, zona técnica→Seguridad, cerrar día, audit_log | análisis | por sesiones |
 | [15-instalacion-despliegue-y-licencia.md](15-instalacion-despliegue-y-licencia.md) | ★ Qué se instala en cada sitio (PC/móviles/cocina), caso 3 barras, impresión compartida (print_job), backups con horario, acceso remoto, "Acerca de/Licencia" estilo Ágora, ¿servicio central? + GAP priorizado | análisis + GAP | por sesiones |
+| [16-nodo-local-y-sincronizacion.md](16-nodo-local-y-sincronizacion.md) | ★★ Nodo local = fuente de verdad operativa (sin internet) + sync a nube (outbox operativo + LWW catálogo) + mDNS/fallback + numeración fiscal offline + backup nube + multi-local + servicio Windows. **Ejecuta el doc plan/10 y el Bloque E del plan/09.** Sustituye el camino de la guía 06 | P1 (nodo antes del 1er cliente) | 3-6 sem |
 
 Las guías 01–04 son independientes entre sí salvo lo indicado en cada una (03 y 04
 comparten la identidad de dispositivo). La 05 y la 07 requieren la 02 (el refactor)

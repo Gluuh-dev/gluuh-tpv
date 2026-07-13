@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { eur } from "@/app/lib/money";
 
 type Tipo = "EXTRA" | "COMENTARIO";
 
@@ -31,7 +32,6 @@ interface Grupo {
   asignaciones: { familias: number; categorias: number; productos: number };
 }
 
-const eur = (n: number) => Number(n).toFixed(2).replace(".", ",") + " €";
 
 export default function ModificadoresPage() {
   const [cargando, setCargando] = useState(true);

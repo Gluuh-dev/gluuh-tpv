@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { escucharCambios } from "../lib/cambios";
 import { BRANDING_DEFAULT, leerBranding, type Branding } from "../lib/branding";
 import type { EstadoPrep } from "../lib/estados";
 import { estacionDe } from "../lib/estaciones";
 import { CONFIG_PANTALLA_DEF, configCon, leerConfigModulo, type ConfigPantalla } from "../lib/modulos";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 interface Pedido { id: string; numero_pedido: number | null; estado_preparacion: EstadoPrep; order_line: { estacion: string | null }[] }
 
@@ -34,16 +36,8 @@ export default function PantallaCliente() {
     setPedidos((data as unknown as Pedido[]) ?? []);
   }, [sb]);
 
-  // Debounce (trailing, un solo timer) sobre `cargar`: una venta genera varios
-  // eventos realtime seguidos y sin esto se relanzaba la recarga por cada uno.
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cargarDebounced = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { void cargar(); }, 500);
-  }, [cargar]);
-
   useEffect(() => {
-    let ch: ReturnType<typeof sb.channel> | undefined;
+    let dejarDeEscuchar: (() => void) | undefined;
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { setEstado("sin-sesion"); return; }
@@ -57,15 +51,17 @@ export default function PantallaCliente() {
       setCfg(configCon(CONFIG_PANTALLA_DEF, rawCfg));
       await cargar();
       setEstado("ok");
-      // Canal SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"`
-      // los UPDATE que sacan un pedido de ese estado (COBRADA/ANULADA) no llegarían
-      // y el número quedaría "zombi" en el display. El debounce colapsa la tormenta.
-      ch = sb.channel("pantalla").on("postgres_changes", { event: "*", schema: "public", table: "sales_order" }, cargarDebounced).subscribe();
+      // SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"` los
+      // UPDATE que sacan un pedido de ese estado (COBRADA/ANULADA) no llegarían y el
+      // número quedaría "zombi" en el display. El debounce colapsa la tormenta.
+      dejarDeEscuchar = escucharCambios(sb, {
+        nombre: "pantalla",
+        tablas: ["sales_order"],
+        debounceMs: 500,
+        onCambio: () => { void cargar(); },
+      });
     })();
-    return () => {
-      if (ch) sb.removeChannel(ch);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { dejarDeEscuchar?.(); };
     /* eslint-disable-next-line */
   }, []);
 
@@ -100,7 +96,7 @@ export default function PantallaCliente() {
       <main className="flex min-h-screen flex-col bg-background text-foreground">
         {/* Cabecera con color de marca del tenant (dato del tenant, no paleta Tailwind) */}
         <header className="flex items-center justify-center gap-3 py-6 text-center" style={{ background: brand.color_secundario }}>
-          {brand.logo_url && <img src={brand.logo_url} alt="" className="h-10 w-auto object-contain" />}
+          {brand.logo_url && <img src={urlFoto(brand.logo_url)} alt="" className="h-10 w-auto object-contain" />}
           <span className="text-3xl font-extrabold tracking-tight">{empresa || "Estado de tu pedido"}</span>
         </header>
         <div className="grid flex-1 grid-cols-2">

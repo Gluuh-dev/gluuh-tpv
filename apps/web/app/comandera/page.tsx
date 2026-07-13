@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { estacionDe } from "../lib/estaciones";
+import { eur } from "@/app/lib/money";
 
 interface Empleado { id: string; nombre: string; rol: string }
 interface Mesa { id: string; nombre: string; estado: string }
 interface Cat { id: string; nombre: string; orden: number }
 interface Prod { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; disponible: boolean; estacion: string | null }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function Comandera() {
   const sb = supabaseBrowser();

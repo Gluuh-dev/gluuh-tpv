@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Pencil, ArrowLeft, Brush, LayoutGrid } from "lucide-react";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
-import { ASSETS, SUELOS, assetPorId, mesaPorCapacidad, dim, type PlanoAsset } from "../../lib/plano-assets";
+import { ASSETS, SUELOS, assetPorId, mesaPorCapacidad, dim, type PlanoAsset, PLANO_VER } from "../../lib/plano-assets";
 import { leerBranding, BRANDING_DEFAULT, type Branding } from "../../lib/branding";
 import { PlanoSvg } from "@/components/plano-svg";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ interface Mesa { id: string; nombre: string; room_id: string; pos_x: number | nu
 interface Elem { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
 type Sel = { kind: "mesa" | "elem"; id: string } | null;
 
-const snap = (v: number) => Math.round(v / 20) * 20;   // rejilla fina (más cuadrados)
+const snap = (v: number) => Math.round(v / 5) * 5;   // rejilla fina (más cuadrados)
 const MESAS_CAT = [
   { label: "Taburete", cap: 1 }, { label: "Mesa 2", cap: 2 }, { label: "Mesa 4", cap: 4 },
   { label: "Mesa 6", cap: 6 }, { label: "Mesa 8", cap: 8 },
@@ -58,7 +58,7 @@ export default function PlanosDeMesas() {
     setElems((e as Elem[]) ?? []);
     setMarca(await leerBranding(sb));
   }
-  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { cargar();   }, []);
   // Centrar el lienzo al abrir un plano
   useEffect(() => {
     if (!edit) return;
@@ -268,7 +268,7 @@ export default function PlanosDeMesas() {
   const mesaSel = sel?.kind === "mesa" ? mesas.find((m) => m.id === sel.id) : null;
   const elemSel = sel?.kind === "elem" ? elems.find((e) => e.id === sel.id) : null;
   const bg = room?.suelo
-    ? { backgroundImage: `url(/plano/${room.suelo}.svg)`, backgroundRepeat: "repeat" as const }
+    ? { backgroundImage: `url(/plano/${room.suelo}.svg?v=${PLANO_VER})`, backgroundRepeat: "repeat" as const, backgroundSize: "60px auto" }
     : { backgroundImage: "radial-gradient(rgba(120,120,120,0.12) 1px, transparent 1px)", backgroundSize: "20px 20px" };
   const canvasStyle = { minWidth: 1800, minHeight: 1100, ...bg, "--mesa-fill": marca.mesa_color, "--silla-fill": marca.silla_color } as unknown as React.CSSProperties;
 
@@ -332,9 +332,9 @@ export default function PlanosDeMesas() {
               className={`absolute cursor-move ${isSel ? "rounded ring-2 ring-primary" : ""}`}
             >
               {esSuelo
-                ? <div className="h-full w-full rounded-md border border-foreground/10" style={{ backgroundImage: `url(/plano/${el.icono!.slice(6)}.svg)`, backgroundRepeat: "repeat" }} />
-                /* eslint-disable-next-line @next/next/no-img-element */
-                : a ? <img src={`/plano/${a.file}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
+                ? <div className="h-full w-full rounded-md border border-foreground/10" style={{ backgroundImage: `url(/plano/${el.icono!.slice(6)}.svg?v=${PLANO_VER})`, backgroundRepeat: "repeat", backgroundSize: "60px auto" }} />
+                 
+                : a ? <img src={`/plano/${a.file}?v=${PLANO_VER}`} alt="" draggable={false} className="pointer-events-none h-full w-full" />
                 : <div className="grid h-full w-full place-items-center rounded bg-foreground/20 text-xs">{el.etiqueta}</div>}
               {isSel && <span onPointerDown={(e) => onResizeDown(e, el)} className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-se-resize rounded-sm border border-primary bg-background" />}
             </div>
@@ -386,7 +386,7 @@ export default function PlanosDeMesas() {
             <div className="grid grid-cols-3 gap-2">
               {SUELOS.map((s) => (
                 <button key={s.id || "liso"} onClick={() => { if (edit) setSuelo(edit, s.id); setDialogo(null); }} className="overflow-hidden rounded-md border border-border hover:ring-2 hover:ring-primary">
-                  <div className="h-16 w-full" style={s.id ? { backgroundImage: `url(/plano/${s.id}.svg)`, backgroundRepeat: "repeat" } : { background: "var(--muted)" }} />
+                  <div className="h-16 w-full" style={s.id ? { backgroundImage: `url(/plano/${s.id}.svg?v=${PLANO_VER})`, backgroundRepeat: "repeat" } : { background: "var(--muted)" }} />
                   <div className="px-1 py-1 text-center text-xs">{s.nombre}</div>
                 </button>
               ))}
@@ -405,8 +405,7 @@ export default function PlanosDeMesas() {
             <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
               {MESAS_CAT.map((mc) => (
                 <button key={mc.cap} onClick={() => addMesaCap(mc.cap)} className="flex flex-col items-center gap-1 rounded-md border border-border p-2 hover:ring-2 hover:ring-primary">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/plano/${mesaPorCapacidad(mc.cap).file}`} alt="" className="h-14 w-14 object-contain" />
+                  <img src={`/plano/${mesaPorCapacidad(mc.cap).file}?v=${PLANO_VER}`} alt="" className="h-14 w-14 object-contain" />
                   <span className="text-xs">{mc.label}</span>
                 </button>
               ))}
@@ -416,8 +415,7 @@ export default function PlanosDeMesas() {
             <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
               {ASSETS.filter((a) => a.tipo === "barra" || a.tipo === "planta" || a.tipo === "separador").map((a) => (
                 <button key={a.id} onClick={() => addElem(a)} title={a.nombre} className="flex flex-col items-center gap-1 rounded-md border border-border p-2 hover:ring-2 hover:ring-primary">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/plano/${a.file}`} alt="" className="h-14 w-14 object-contain" />
+                  <img src={`/plano/${a.file}?v=${PLANO_VER}`} alt="" className="h-14 w-14 object-contain" />
                   <span className="text-center text-[11px] leading-tight">{a.nombre}</span>
                 </button>
               ))}
@@ -427,8 +425,7 @@ export default function PlanosDeMesas() {
             <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
               {ASSETS.filter((a) => a.tipo === "abertura").map((a) => (
                 <button key={a.id} onClick={() => addElem(a)} title={a.nombre} className="flex flex-col items-center gap-1 rounded-md border border-border p-2 hover:ring-2 hover:ring-primary">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/plano/${a.file}`} alt="" className="h-14 w-14 object-contain" />
+                  <img src={`/plano/${a.file}?v=${PLANO_VER}`} alt="" className="h-14 w-14 object-contain" />
                   <span className="text-center text-[11px] leading-tight">{a.nombre}</span>
                 </button>
               ))}
@@ -438,7 +435,7 @@ export default function PlanosDeMesas() {
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {SUELOS.filter((s) => s.id).map((s) => (
                 <button key={s.id} onClick={() => addSueloZona(s.id)} className="overflow-hidden rounded-md border border-border hover:ring-2 hover:ring-primary">
-                  <div className="h-14 w-full" style={{ backgroundImage: `url(/plano/${s.id}.svg)`, backgroundRepeat: "repeat" }} />
+                  <div className="h-14 w-full" style={{ backgroundImage: `url(/plano/${s.id}.svg?v=${PLANO_VER})`, backgroundRepeat: "repeat" }} />
                   <div className="py-1 text-center text-[11px]">{s.nombre}</div>
                 </button>
               ))}

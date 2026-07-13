@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 interface Categoria { id: string; nombre: string; estacion: string | null }
 type Grupo = { id: string; nombre: string; min_sel: number; max_sel: number; opciones: { id: string; nombre: string; precio_extra: number }[] };
@@ -525,8 +526,7 @@ export default function ProductoEditar() {
                 <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
                   <Upload className="h-4 w-4" /> Subir<input type="file" accept="image/*" className="hidden" onChange={onFoto} />
                 </label>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {fotoUrl && <img src={fotoUrl} alt="" className="h-12 w-12 rounded object-cover" />}
+                {fotoUrl && <img src={urlFoto(fotoUrl)} alt="" className="h-12 w-12 rounded object-cover" />}
                 {fotoUrl && (
                   <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setFotoUrl("")}>
                     <X className="h-4 w-4" /> Quitar

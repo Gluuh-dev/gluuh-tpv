@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="100" cy="100" r="96" fill="var(--mesa-fill,#8a5a2b)"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Legs of the stool -->
+  <line x1="100" y1="100" x2="55" y2="55" stroke="var(--silla-dark,#4b4d52)" stroke-width="12" stroke-linecap="round" />
+  <line x1="100" y1="100" x2="145" y2="55" stroke="var(--silla-dark,#4b4d52)" stroke-width="12" stroke-linecap="round" />
+  <line x1="100" y1="100" x2="55" y2="145" stroke="var(--silla-dark,#4b4d52)" stroke-width="12" stroke-linecap="round" />
+  <line x1="100" y1="100" x2="145" y2="145" stroke="var(--silla-dark,#4b4d52)" stroke-width="12" stroke-linecap="round" />
+  
+  <!-- Metallic footrest ring -->
+  <circle cx="100" cy="100" r="62" fill="none" stroke="#a1a1aa" stroke-width="5" />
+  
+  <!-- Main seat cushion (follows mesa-fill so it behaves like a table and can be customized) -->
+  <circle cx="100" cy="100" r="50" fill="var(--mesa-fill,#774f19)" stroke="var(--silla-dark,#4b4d52)" stroke-width="3" />
+  
+  <!-- Stitched seam detail on the seat -->
+  <circle cx="100" cy="100" r="38" fill="none" stroke="var(--silla-dark,#4b4d52)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6" />
+  
+  <!-- Curved modern low backrest hugging the left edge -->
+  <path d="M 62,62 C 34,70 34,130 62,138 L 66,134 C 42,126 42,74 66,66 Z" fill="var(--silla-dark,#010101)" />
+</svg>

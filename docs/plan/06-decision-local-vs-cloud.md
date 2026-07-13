@@ -1,5 +1,12 @@
 # 06 — Decisión: ¿base de datos local, en la nube, o las dos?
 
+> ⚠️ **ACTUALIZADO por [10-arquitectura-nodo-local-y-nube.md](10-arquitectura-nodo-local-y-nube.md) (12-07-2026).**
+> El modelo evolucionó: **hay nodo local** y es la **fuente de verdad operativa** del
+> local; la nube pasa de "fuente de verdad" a **espejo + módulo de gestión remota**.
+> Lo que sigue vigente de este doc: NO dos productos (una sola base de código), NO
+> modo dual de pago, la copia local incluida. Lo superado: "la nube es la fuente de
+> verdad y no hay servidor local". Leer el doc 10 para la arquitectura actual.
+
 **Fecha:** 02-07-2026. **Pregunta que responde:** Glop instala la base de datos en el
 PC del bar (el PC es el servidor: los móviles se conectan por IP local, la copia de
 seguridad va a un USB/disco, y la nube es un plugin de pago). ¿Copiamos ese modelo?

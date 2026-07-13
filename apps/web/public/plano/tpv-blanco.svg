@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <!-- Base / Cajón portamonedas (Blanco Premium) -->
+  <rect x="60" y="60" width="280" height="280" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="8" />
+  <rect x="80" y="80" width="240" height="20" rx="4" fill="#cbd5e1" opacity="0.4" />
+  <!-- Impresora de Tickets integrada (Derecha) -->
+  <rect x="230" y="110" width="80" height="90" rx="8" fill="#e2e8f0" />
+  <rect x="240" y="170" width="60" height="6" fill="#334155" rx="2" />
+  <!-- Pantalla Táctil TPV (Izquierda) -->
+  <rect x="90" y="120" width="120" height="80" rx="6" fill="#e2e8f0" />
+  <rect x="70" y="200" width="160" height="70" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2" />
+  <rect x="76" y="206" width="148" height="48" rx="4" fill="#7D419E" opacity="0.9" />
+  <!-- Reflejo en la pantalla táctil -->
+  <path d="M 76,206 L 140,206 L 100,254 L 76,254 Z" fill="#ffffff" opacity="0.25" />
+  <!-- Teclado numérico / Botonera lateral -->
+  <rect x="90" y="280" width="220" height="40" rx="6" fill="#e2e8f0" />
+  <circle cx="115" cy="300" r="8" fill="#10b981" />
+  <circle cx="145" cy="300" r="8" fill="#ef4444" />
+  <circle cx="175" cy="300" r="8" fill="#f59e0b" />
+  <rect x="205" y="292" width="90" height="16" rx="4" fill="#cbd5e1" />
+</svg>

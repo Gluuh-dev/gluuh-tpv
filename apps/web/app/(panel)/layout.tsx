@@ -36,10 +36,13 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       if (!session) { router.replace("/login"); return; }
       // Cuenta recién entregada (alta de Gluuh): obliga a crear su contraseña.
       if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
-      const { data: t } = await sb.from("tenant").select("nombre,licencia_hasta").limit(1).maybeSingle();
+      // tenant y app_user en paralelo: un round-trip menos en CADA carga del panel.
       // En vivo: el usuario hereda los permisos de su perfil (perfil_id); sin
       // perfil = acceso completo. Editar el perfil se refleja al recargar.
-      const { data: u } = await sb.from("app_user").select("nombre,rol,perfil(permisos)").eq("auth_user_id", session.user.id).maybeSingle();
+      const [{ data: t }, { data: u }] = await Promise.all([
+        sb.from("tenant").select("nombre,licencia_hasta").limit(1).maybeSingle(),
+        sb.from("app_user").select("nombre,rol,perfil(permisos)").eq("auth_user_id", session.user.id).maybeSingle(),
+      ]);
       const perfilRel = (u as { perfil?: { permisos?: MapaPermisos } | null } | null)?.perfil;
       setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: perfilRel?.permisos ?? {}, licenciaHasta: (t as { licencia_hasta?: string | null } | null)?.licencia_hasta ?? null });
       setLoading(false);

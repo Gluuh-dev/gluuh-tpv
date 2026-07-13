@@ -10,6 +10,7 @@ import {
   type LineaFiscal,
   type Territorio,
 } from "@gluuh/core";
+import { resolverDestinatario, type ClienteFactura } from "@/app/lib/destinatario";
 
 // El motor VERIFACTU usa node:crypto → este handler debe ejecutarse en Node.
 export const runtime = "nodejs";
@@ -80,6 +81,18 @@ export async function POST(req: Request) {
     if (!tenantId) {
       return NextResponse.json({ ok: false, error: "Tenant no encontrado" }, { status: 500 });
     }
+
+    // ── 3b. Destinatario → ¿factura COMPLETA (F1) o SIMPLIFICADA (F2)? ───────
+    // Se deriva del pedido REAL, nunca del body (misma regla A2 que las líneas): si el
+    // pedido tiene cliente y ese cliente tiene NIF, la AEAT exige F1 con los datos del
+    // destinatario. Sin NIF no cabe factura completa → F2 (ticket/simplificada).
+    const { data: ord } = await supa
+      .from("sales_order")
+      .select("customer:customer_id(nif,nombre,direccion,codigo_postal,poblacion,provincia)")
+      .eq("id", body.orderId)
+      .maybeSingle();
+
+    const dest = resolverDestinatario((ord as { customer: ClienteFactura | null } | null)?.customer);
 
     // ── 4. Número correlativo + huella anterior (con un único reintento) ─────
     async function obtenerSiguienteNumero(): Promise<{ numero: number; huellaAnterior: string }> {
@@ -174,7 +187,11 @@ export async function POST(req: Request) {
           fecha_expedicion: fecha,
           nif_emisor: nif,
           nombre_emisor: nombre ?? null,
-          tipo_factura: "F2",
+          // F1 = completa (destinatario identificado) · F2 = simplificada (ticket).
+          tipo_factura: dest.tipoFactura,
+          dest_nif: dest.destNif,
+          dest_nombre: dest.destNombre,
+          dest_domicilio: dest.destDomicilio,
           base_total: impuestos.baseTotal,
           cuota_total: impuestos.cuotaTotal,
           importe_total: impuestos.importeTotal,
@@ -215,8 +232,12 @@ export async function POST(req: Request) {
     const invoiceId = result.data.id;
 
     // ── 7. Líneas de impuesto ────────────────────────────────────────────────
+    // El error SE COMPROBA: iba sin comprobar y la tabla `invoice_tax_line` ni
+    // siquiera existía en la BD (la declara 0022, que nunca se aplicó; la crea
+    // 0096). Resultado: cada factura se habría guardado SIN su desglose fiscal y
+    // en silencio en cuanto se activara VERIFACTU. Que no vuelva a pasar callando.
     if (impuestos.desglose.length > 0) {
-      await supa.from("invoice_tax_line").insert(
+      const { error: errTax } = await supa.from("invoice_tax_line").insert(
         impuestos.desglose.map((d) => ({
           tenant_id: tenantId,
           invoice_id: invoiceId,
@@ -225,6 +246,12 @@ export async function POST(req: Request) {
           cuota: d.cuota,
         })),
       );
+      if (errTax) {
+        console.error(
+          `[/api/factura] La factura ${result.numSerieFactura} se emitió SIN su desglose ` +
+            `de impuestos (invoice_tax_line): ${errTax.message}. ¿Está aplicada la migración 0096?`,
+        );
+      }
     }
 
     // ── 8. Respuesta (valores REALMENTE insertados, coherentes también tras reintento) ──

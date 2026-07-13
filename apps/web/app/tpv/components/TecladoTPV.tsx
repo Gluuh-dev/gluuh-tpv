@@ -5,15 +5,13 @@
 // El teclado numérico está DESHABILITADO hasta que se pulsa un modo (`editando`):
 // entonces se habilita y el botón de ese modo se pinta en verde.
 // (Utilidades · Abrir cajón · Imprimir viven ahora en el rail.)
-// Presentacional puro: el estado y la lógica (buffer, handleKey, cobro…) viven en
-// page.tsx; aquí solo se emiten callbacks. Extraído de app/tpv/page.tsx.
+// Desde el plan 011 lee modo/editando DIRECTAMENTE de useTpvStore (no por props)
+// y va memoizado: teclear no re-renderiza la página. La lógica (handleKey, cobro)
+// sigue en page.tsx; aquí solo se emiten callbacks.
+import { memo } from "react";
+import { useTpvStore } from "../hooks/useTpvStore";
 
 export interface TecladoTPVProps {
-  /** Modo activo del teclado, para resaltar Und./Precio/DTO%/DTO€. */
-  modo: "UND" | "PREC" | "DTO%" | "DTO€";
-  /** Hay un modo activo (Und/Precio/Descuento pulsado): habilita el teclado y
-   *  pinta el modo en verde. Sin él, las teclas numéricas van deshabilitadas. */
-  editando: boolean;
   /** Dígitos, coma, C (CLR) y ← (borrar): rutan a handleKey en page.tsx. */
   onKey: (k: string) => void;
   /** Teclas de modo (Und./Precio/DTO%/DTO€): rutan a handleKey en page.tsx. */
@@ -25,7 +23,9 @@ export interface TecladoTPVProps {
 
 const OFF = "disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none";
 
-export function TecladoTPV({ modo, editando, onKey, onModo, onCobrar, cobrarDisabled }: TecladoTPVProps) {
+export const TecladoTPV = memo(function TecladoTPV({ onKey, onModo, onCobrar, cobrarDisabled }: TecladoTPVProps) {
+  const modo = useTpvStore((s) => s.modo);
+  const editando = useTpvStore((s) => s.editando);
   // Verde solo cuando hay edición activa Y es el modo pulsado; si no, tecla neutra (bg elev #232a34).
   const modoCls = (m: "UND" | "PREC" | "DTO%" | "DTO€") =>
     editando && modo === m
@@ -58,4 +58,4 @@ export function TecladoTPV({ modo, editando, onKey, onModo, onCobrar, cobrarDisa
       </div>
     </div>
   );
-}
+});

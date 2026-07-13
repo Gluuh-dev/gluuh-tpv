@@ -1,12 +1,14 @@
 "use client";
 
 // Modal COBRAR (estilo Ágora): reparto de pagos (mixto), propina, descuento,
-// "A devolver" en grande y atajos F10/F11/F12. PRESENTACIONAL y FISCALMENTE
-// NEUTRO: recibe total, base imponible e impuesto ya calculados por props (el
-// TPV los saca de @gluuh/core); aquí solo se reparte el dinero. Nunca recalcula
-// impuestos. Skill: gluuh-ux-operativa (un solo acento = Cobrar).
+// "A devolver" en grande y atajos F10/F11/F12.
 import { useEffect, useMemo, useState } from "react";
-import { Delete, Pencil, Mail, Printer, X } from "lucide-react";
+import { Delete, Pencil, Mail, Printer, X, Banknote } from "lucide-react";
+import { sugerenciasEfectivo, desglosarCambio } from "../efectivo";
+import { eur } from "@/app/lib/money";
+
+// Formatea una denominación EUR para el desglose del cambio: 5 → "5", 0,5 → "0,50".
+const fmtDenom = (v: number) => (v % 1 === 0 ? String(v) : v.toFixed(2).replace(".", ","));
 
 export interface FormaPago {
   id: string;
@@ -33,6 +35,8 @@ export interface CobrarModalProps {
   baseImponible: number;
   impuesto: number;
   cliente?: string;
+  /** NIF del cliente asignado. Sin él no cabe factura completa (AEAT F1). */
+  clienteNif?: string | null;
   empleado?: string;
   terminal?: string;
   formasPago: FormaPago[];
@@ -43,17 +47,19 @@ export interface CobrarModalProps {
   onCancelar(): void;
 }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 const TIPOS_DOC_DEF = ["Factura simplificada", "Factura completa"];
 
-// Objetivo del teclado numérico: una línea de pago, el descuento o la propina.
-type Objetivo = { tipo: "pago"; idx: number } | { tipo: "descuento" } | { tipo: "propina" };
+/** Factura COMPLETA (AEAT F1): exige destinatario con NIF. La simplificada (F2) no. */
+const esCompleta = (t: string) => t.toLowerCase().includes("completa");
+
+type Objetivo = { tipo: "pago" } | { tipo: "descuento" } | { tipo: "propina" };
 
 export function CobrarModal({
   total,
   baseImponible,
   impuesto,
   cliente,
+  clienteNif,
   empleado,
   terminal,
   formasPago,
@@ -63,18 +69,16 @@ export function CobrarModal({
   onEmail,
   onCancelar,
 }: CobrarModalProps) {
-  const primeraForma = formasPago[0]?.id ?? "";
-  const [pagos, setPagos] = useState<LineaPago[]>(() => [{ formaPagoId: primeraForma, importe: total }]);
-  const [objetivo, setObjetivo] = useState<Objetivo>({ tipo: "pago", idx: 0 });
-  const [display, setDisplay] = useState<string>(() => total.toFixed(2));
-  const [reemplazar, setReemplazar] = useState(true); // primera tecla sobrescribe el valor
+  const [pagos, setPagos] = useState<LineaPago[]>([]);
+  const [objetivo, setObjetivo] = useState<Objetivo>({ tipo: "pago" });
   const [descuento, setDescuento] = useState(0);
   const [propina, setPropina] = useState(0);
+  const [display, setDisplay] = useState<string>(() => (total + propina - descuento).toFixed(2));
+  const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
   const [tipoDoc, setTipoDoc] = useState<string>(tiposDoc[0] ?? TIPOS_DOC_DEF[0]!);
   const [zonasImpresion, setZonasImpresion] = useState(true);
   const [editandoNotas, setEditandoNotas] = useState(false);
-
   const [ahora] = useState(() => new Date());
 
   const importeACobrar = Math.max(0, Math.round((total + propina - descuento) * 100) / 100);
@@ -89,25 +93,20 @@ export function CobrarModal({
     return m;
   }, [formasPago]);
 
-  function valorObjetivo(o: Objetivo): number {
-    if (o.tipo === "descuento") return descuento;
-    if (o.tipo === "propina") return propina;
-    return pagos[o.idx]?.importe ?? 0;
-  }
-
-  function escribirObjetivo(o: Objetivo, n: number) {
-    if (o.tipo === "descuento") setDescuento(n);
-    else if (o.tipo === "propina") setPropina(n);
-    else setPagos((prev) => prev.map((p, i) => (i === o.idx ? { ...p, importe: n } : p)));
-  }
+  const formaEfectivo = useMemo(() => {
+    return formasPago.find((f) => f.tipo === "CONTADO") || formasPago[0];
+  }, [formasPago]);
 
   function seleccionar(o: Objetivo) {
     setObjetivo(o);
-    setDisplay(valorObjetivo(o).toFixed(2));
+    if (o.tipo === "descuento") setDisplay(descuento > 0 ? descuento.toFixed(2) : "");
+    else if (o.tipo === "propina") setDisplay(propina > 0 ? propina.toFixed(2) : "");
+    else {
+      setDisplay(falta > 0 ? falta.toFixed(2) : "");
+    }
     setReemplazar(true);
   }
 
-  // ── Teclado numérico ──────────────────────────────────────────────────────
   function pulsar(tecla: string) {
     setDisplay((prev) => {
       let base = reemplazar ? "" : prev;
@@ -116,40 +115,45 @@ export function CobrarModal({
       else base = (base === "0" ? "" : base) + tecla;
       if (base.length > 10) base = prev;
       const n = Number(base) || 0;
-      escribirObjetivo(objetivo, Math.round(n * 100) / 100);
+      
+      if (objetivo.tipo === "descuento") setDescuento(n);
+      else if (objetivo.tipo === "propina") setPropina(n);
+      
       return base;
     });
     setReemplazar(false);
   }
 
-  // ── Formas de pago ────────────────────────────────────────────────────────
-  function elegirForma(id: string) {
-    // Aplica la forma a la línea de pago activa (o a la última si el foco está en desc./propina).
-    const idx = objetivo.tipo === "pago" ? objetivo.idx : pagos.length - 1;
-    setPagos((prev) => prev.map((p, i) => (i === idx ? { ...p, formaPagoId: id } : p)));
-    seleccionar({ tipo: "pago", idx: Math.max(0, idx) });
-  }
+  function registrarPago(formaPagoId: string) {
+    const val = Number(display) || 0;
+    if (val <= 0) return;
 
-  function anadirLinea() {
-    const restante = Math.max(0, Math.round((importeACobrar - pagado) * 100) / 100);
-    setPagos((prev) => [...prev, { formaPagoId: primeraForma, importe: restante }]);
-    const idx = pagos.length;
-    setObjetivo({ tipo: "pago", idx });
-    setDisplay(restante.toFixed(2));
+    const forma = formasPago.find((f) => f.id === formaPagoId);
+    const esTarjeta = forma?.tipo === "TARJETA";
+    const importeReal = esTarjeta ? Math.min(val, falta) : val;
+
+    setPagos((prev) => [...prev, { formaPagoId, importe: importeReal }]);
+
+    const nuevoPagado = pagado + importeReal;
+    const nuevoFalta = Math.max(0, Math.round((importeACobrar - nuevoPagado) * 100) / 100);
+
+    setDisplay(nuevoFalta > 0 ? nuevoFalta.toFixed(2) : "0.00");
     setReemplazar(true);
+    setObjetivo({ tipo: "pago" });
   }
 
-  function quitarLinea(idx: number) {
-    setPagos((prev) => {
-      if (prev.length <= 1) return [{ formaPagoId: primeraForma, importe: 0 }];
-      return prev.filter((_, i) => i !== idx);
-    });
-    seleccionar({ tipo: "pago", idx: 0 });
+  function registrarEfectivoRapido(importe: number) {
+    if (!formaEfectivo) return;
+    setPagos((prev) => [...prev, { formaPagoId: formaEfectivo.id, importe }]);
+    
+    const nuevoPagado = pagado + importe;
+    const nuevoFalta = Math.max(0, Math.round((importeACobrar - nuevoPagado) * 100) / 100);
+
+    setDisplay(nuevoFalta > 0 ? nuevoFalta.toFixed(2) : "0.00");
+    setReemplazar(true);
+    setObjetivo({ tipo: "pago" });
   }
 
-  const formaActiva = objetivo.tipo === "pago" ? pagos[objetivo.idx]?.formaPagoId : undefined;
-
-  // ── Cobro ─────────────────────────────────────────────────────────────────
   function cobrar(imprimir: boolean) {
     if (!puedeCobrar) return;
     onCobrar(
@@ -158,8 +162,6 @@ export function CobrarModal({
     );
   }
 
-  // Atajos F10 (imprimir cuenta) / F11 (cobrar+imprimir) / F12 (cobrar) + Esc.
-  // Además, teclado numérico físico alimenta el display si el foco no está en un campo de texto.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
@@ -168,6 +170,7 @@ export function CobrarModal({
       if (e.key === "F11") { e.preventDefault(); cobrar(true); return; }
       if (e.key === "F12") { e.preventDefault(); cobrar(zonasImpresion); return; }
       if (e.key === "Escape") { e.preventDefault(); onCancelar(); return; }
+      if (e.key === "Enter" && puedeCobrar && !enCampo) { e.preventDefault(); cobrar(zonasImpresion); return; }
       if (enCampo) return;
       if (/^[0-9]$/.test(e.key)) { e.preventDefault(); pulsar(e.key); }
       else if (e.key === "." || e.key === ",") { e.preventDefault(); pulsar("."); }
@@ -193,7 +196,7 @@ export function CobrarModal({
           <span aria-hidden className="h-5 w-1 rounded-full bg-brand" />
           Cobrar
         </h2>
-        <Dato label="Cliente" valor={cliente ?? "General"} />
+        <Dato label="Cliente" valor={clienteNif ? `${cliente} · ${clienteNif}` : (cliente ?? "General")} />
         <Dato label="Empleado" valor={empleado ?? "—"} />
         <Dato label="Terminal" valor={terminal ?? "—"} />
         <label className="flex items-center gap-1.5">
@@ -204,7 +207,12 @@ export function CobrarModal({
             className="rounded-md border border-border bg-background px-2 py-1 text-sm outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             {tiposDoc.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              // La AEAT solo admite factura COMPLETA (F1) con destinatario identificado.
+              // Sin cliente con NIF no se puede emitir: se deshabilita en vez de ofrecer
+              // algo que luego saldría como simplificada igualmente.
+              <option key={t} value={t} disabled={esCompleta(t) && !clienteNif}>
+                {esCompleta(t) && !clienteNif ? `${t} (asigna un cliente con NIF)` : t}
+              </option>
             ))}
           </select>
         </label>
@@ -219,12 +227,13 @@ export function CobrarModal({
         </button>
       </header>
 
-      {/* Fila de importes fiscales (recibidos por props, no se recalculan) */}
+      {/* Fila de importes fiscales */}
       <div className="flex flex-none flex-wrap items-stretch gap-2 border-b border-border bg-surface/40 px-4 py-2.5">
-        <Cifra label="Importe" valor={eur(importeACobrar)} destacado />
+        <Cifra label="Total a Cobrar" valor={eur(importeACobrar)} destacado />
         <Cifra label="B. Imp." valor={eur(baseImponible)} />
         <Cifra label="Impuesto" valor={eur(impuesto)} />
-        <Cifra label="Descuento" valor={eur(descuento)} activo={objetivo.tipo === "descuento"} />
+        <Cifra label="Descuento" valor={eur(descuento)} activo={objetivo.tipo === "descuento"} onClick={() => seleccionar({ tipo: "descuento" })} />
+        <Cifra label="Propina" valor={eur(propina)} activo={objetivo.tipo === "propina"} onClick={() => seleccionar({ tipo: "propina" })} />
         <button
           type="button"
           onClick={() => setEditandoNotas((v) => !v)}
@@ -253,47 +262,60 @@ export function CobrarModal({
 
       {/* Cuerpo: 3 columnas */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* Izquierda: líneas de pago + descuento/propina */}
+        
+        {/* Izquierda: listado de pagos registrados */}
         <section className="flex min-h-0 flex-col rounded-xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Formas de pago</span>
-            <button type="button" onClick={anadirLinea} className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-semibold transition-all hover:bg-accent active:scale-95">
-              + Añadir
-            </button>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Desglose de Pago</span>
+            {falta > 0 ? (
+              <span className="rounded bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500">
+                Falta {eur(falta)}
+              </span>
+            ) : (
+              <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-bold text-emerald-500">
+                Cubierto
+              </span>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {pagos.map((p, i) => {
-              const activo = objetivo.tipo === "pago" && objetivo.idx === i;
-              return (
-                <div
-                  key={i}
-                  className={`mb-1.5 flex items-center gap-2 rounded-lg border px-2 py-2 transition-colors ${
-                    activo ? "border-brand bg-brand/10" : "border-border bg-background"
-                  }`}
-                >
+            {pagos.map((p, i) => (
+              <div
+                key={i}
+                className="mb-1.5 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-foreground">
+                    {nombreForma[p.formaPagoId] ?? "Forma de pago"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Pago {i + 1}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-base font-bold tabular-nums text-foreground">{eur(p.importe)}</span>
                   <button
                     type="button"
-                    onClick={() => seleccionar({ tipo: "pago", idx: i })}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {nombreForma[p.formaPagoId] ?? "—"}
-                    </span>
-                    <span className="text-base font-bold tabular-nums">{eur(p.importe)}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => quitarLinea(i)}
-                    aria-label="Quitar forma de pago"
-                    className="grid h-8 w-8 flex-none place-items-center rounded-md transition-colors hover:bg-danger/10 hover:text-danger"
+                    onClick={() => {
+                      setPagos((prev) => prev.filter((_, idx) => idx !== i));
+                      setTimeout(() => {
+                        seleccionar({ tipo: "pago" });
+                      }, 0);
+                    }}
+                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
                   >
                     <X size={16} />
                   </button>
                 </div>
-              );
-            })}
+              </div>
+            ))}
+            {pagos.length === 0 && (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground gap-2 h-full">
+                <Banknote size={28} className="opacity-55" />
+                <p className="text-xs max-w-xs leading-normal">
+                  Escribe un importe y pulsa un tipo de cobro a la derecha. O usa los accesos directos de abajo.
+                </p>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-2 border-t border-border p-2">
+          <div className="grid grid-cols-2 gap-2 border-t border-border p-2 bg-surface/30">
             <button
               type="button"
               onClick={() => seleccionar({ tipo: "descuento" })}
@@ -317,92 +339,127 @@ export function CobrarModal({
           </div>
         </section>
 
-        {/* Centro: teclado numérico */}
+        {/* Centro: teclado numérico + atajos de efectivo */}
         <section className="flex w-full min-w-0 select-none flex-col rounded-xl border border-border bg-card p-2 lg:w-72">
-          <div className="mb-2 rounded-lg border border-border bg-background px-3 py-3.5 text-right">
+          <div 
+            onClick={() => seleccionar({ tipo: "pago" })}
+            className={`mb-2 rounded-lg border px-3 py-3 text-right cursor-pointer transition-colors ${
+              objetivo.tipo === "pago" ? "border-brand bg-brand/5" : "border-border bg-background"
+            }`}
+          >
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               {objetivo.tipo === "pago"
-                ? `Importe · ${nombreForma[formaActiva ?? ""] ?? ""}`
+                ? "Importe a Registrar"
                 : objetivo.tipo === "descuento"
-                  ? "Descuento"
-                  : "Propina"}
+                  ? "Editar Descuento"
+                  : "Editar Propina"}
             </div>
-            <div className="text-4xl font-bold leading-tight tabular-nums">{display || "0"}</div>
+            <div className="text-4xl font-bold leading-tight tabular-nums">{display || "0.00"}</div>
           </div>
-          <div className="grid flex-1 grid-cols-3 gap-2">
+          
+          <div className="grid grid-cols-3 gap-1.5 flex-1">
             {teclas.map((k) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => pulsar(k)}
-                className="grid min-h-16 place-items-center rounded-lg border border-border bg-background text-2xl font-semibold transition-all hover:border-border-strong hover:bg-accent active:scale-[.96] active:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="grid min-h-12 place-items-center rounded-lg border border-border bg-background text-xl font-semibold transition-all hover:border-border-strong hover:bg-accent active:scale-[.96] active:bg-brand/10 focus-visible:outline-none"
               >
-                {k === "borrar" ? <Delete size={24} /> : k}
+                {k === "borrar" ? <Delete size={20} /> : k}
               </button>
             ))}
           </div>
+
+          {/* Atajos de efectivo rápido */}
+          {formaEfectivo && (
+            <div className="mt-2.5 border-t border-border pt-2 flex flex-col gap-1.5">
+              <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider pl-1">Efectivo Rápido</div>
+              {/* Exacto + billetes inteligentes: sugerencias por ENCIMA del pendiente
+                  (no importes fijos), como con lo que suele pagar el cliente. */}
+              <div className="grid grid-cols-5 gap-1">
+                <button
+                  type="button"
+                  onClick={() => registrarEfectivoRapido(falta)}
+                  disabled={falta <= 0}
+                  className="rounded border border-brand/45 bg-brand/5 py-2 text-xs font-black text-brand transition-all hover:bg-brand/10 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
+                >
+                  Exacto
+                </button>
+                {sugerenciasEfectivo(falta).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => registrarEfectivoRapido(v)}
+                    disabled={falta <= 0}
+                    className="rounded border border-border bg-background py-2 text-xs font-bold transition-all hover:bg-accent active:scale-95 disabled:opacity-30 disabled:active:scale-100"
+                  >
+                    {v} €
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* Derecha: formas de pago (botones grandes) + impresión + a devolver */}
+        {/* Derecha: formas de pago (botones de un toque) */}
         <section className="flex min-h-0 flex-col gap-2">
-          <div className="grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto">
-            {formasPago.map((f) => {
-              const activo = f.id === formaActiva;
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => elegirForma(f.id)}
-                  className={`grid min-h-16 place-items-center rounded-xl border-2 px-2 text-center text-sm font-bold uppercase transition-all active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                    activo
-                      ? "border-brand bg-brand text-white shadow-lg shadow-brand/30"
-                      : "border-border bg-card hover:border-border-strong hover:bg-accent"
-                  }`}
-                >
-                  {f.nombre}
-                </button>
-              );
-            })}
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Registrar pago con:</div>
+          <div className="grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto pr-0.5">
+            {formasPago.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => registrarPago(f.id)}
+                className="grid min-h-[56px] place-items-center rounded-xl border border-border bg-card px-2 text-center text-xs font-bold uppercase transition-all hover:border-brand/40 hover:bg-accent hover:text-brand active:scale-[.97] focus-visible:outline-none"
+              >
+                {f.nombre}
+              </button>
+            ))}
           </div>
 
           <button
             type="button"
             onClick={() => setZonasImpresion((v) => !v)}
             aria-pressed={zonasImpresion}
-            className="flex flex-none items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-semibold transition-all hover:bg-accent active:scale-[.99]"
+            className="flex flex-none items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold transition-all hover:bg-accent active:scale-[.99]"
           >
-            <span className="flex items-center gap-2"><Printer size={16} /> Zonas de impresión</span>
+            <span className="flex items-center gap-1.5"><Printer size={14} /> Zonas de impresión</span>
             <span className={zonasImpresion ? "font-bold text-brand" : "text-muted-foreground"}>
               {zonasImpresion ? "Activadas" : "Desactivadas"}
             </span>
           </button>
 
-          {/* A devolver — GIGANTE, legible a 1 m */}
-          <div className={`flex-none rounded-xl border-2 px-4 py-4 text-right transition-colors ${aDevolver > 0 ? "border-brand bg-brand/10 ring-1 ring-brand/30" : "border-border bg-card"}`}>
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {falta > 0 ? `Falta ${eur(falta)}` : "A devolver"}
+          {/* Devuelve / Falta + desglose del cambio (cómo darlo en billetes/monedas) */}
+          <div className={`flex-none rounded-xl border px-3 py-2 text-right transition-colors ${aDevolver > 0 ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card"}`}>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {falta > 0 ? `Falta` : "Cambio a devolver"}
             </div>
-            <div className={`text-5xl font-black leading-none tabular-nums lg:text-6xl ${aDevolver > 0 ? "text-brand" : "text-foreground"}`}>
-              {eur(aDevolver)}
+            <div className={`text-4xl font-black leading-none tabular-nums ${aDevolver > 0 ? "text-emerald-600 dark:text-emerald-400" : falta > 0 ? "text-amber-500" : "text-foreground"}`}>
+              {falta > 0 ? eur(falta) : eur(aDevolver)}
             </div>
+            {aDevolver > 0 && (
+              <div className="mt-1 text-[11px] font-semibold tabular-nums text-emerald-700/85 dark:text-emerald-400/85">
+                {desglosarCambio(aDevolver).map((d) => `${d.n}×${fmtDenom(d.valor)}`).join("  ·  ")}
+              </div>
+            )}
           </div>
         </section>
       </div>
 
-      {/* Pie: acciones con atajos impresos */}
+      {/* Pie: acciones */}
       <footer className="flex flex-none flex-wrap items-center gap-2 border-t border-border bg-surface px-3 py-3">
-        <button type="button" onClick={onCancelar} className="min-h-14 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+        <button type="button" onClick={onCancelar} className="min-h-12 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98]">
           Cancelar
         </button>
         {onEmail && (
-          <button type="button" onClick={onEmail} className="flex min-h-14 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98]">
+          <button type="button" onClick={onEmail} className="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98]">
             <Mail size={16} /> Enviar por Email
           </button>
         )}
         <button
           type="button"
           onClick={onImprimirCuenta}
-          className="ml-auto flex min-h-14 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98]"
+          className="ml-auto flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98]"
         >
           <Printer size={16} /> Imprimir cuenta <Atajo>F10</Atajo>
         </button>
@@ -410,7 +467,7 @@ export function CobrarModal({
           type="button"
           onClick={() => cobrar(true)}
           disabled={!puedeCobrar}
-          className="flex min-h-14 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98] disabled:opacity-40 disabled:active:scale-100"
+          className="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98] disabled:opacity-45 disabled:active:scale-100"
         >
           Cobrar Imprimir <Atajo>F11</Atajo>
         </button>
@@ -418,7 +475,7 @@ export function CobrarModal({
           type="button"
           onClick={() => cobrar(zonasImpresion)}
           disabled={!puedeCobrar}
-          className="flex min-h-14 items-center gap-2 rounded-md bg-brand px-7 text-lg font-bold text-white shadow-lg shadow-brand/30 transition-all hover:bg-brand-hover active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:opacity-40 disabled:shadow-none disabled:hover:bg-brand disabled:active:scale-100"
+          className="flex min-h-12 items-center gap-2 rounded-md bg-brand px-7 text-base font-bold text-white shadow-md shadow-brand/20 transition-all hover:bg-brand-hover active:scale-[.98] disabled:opacity-45 disabled:hover:bg-brand disabled:active:scale-100"
         >
           Cobrar <Atajo tono="brand">F12</Atajo>
         </button>
@@ -429,30 +486,33 @@ export function CobrarModal({
 
 function Dato({ label, valor }: { label: string; valor: string }) {
   return (
-    <span className="flex items-baseline gap-1.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className="font-medium">{valor}</span>
+    <span className="flex items-baseline gap-1">
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="font-semibold">{valor}</span>
     </span>
   );
 }
 
-function Cifra({ label, valor, activo, destacado }: { label: string; valor: string; activo?: boolean; destacado?: boolean }) {
+function Cifra({ label, valor, activo, destacado, onClick }: { label: string; valor: string; activo?: boolean; destacado?: boolean; onClick?: () => void }) {
   const estilo = activo
-    ? "border-brand bg-brand/5"
+    ? "border-brand bg-brand/5 ring-1 ring-brand/20"
     : destacado
       ? "border-brand/40 bg-brand/5"
-      : "border-border bg-card";
+      : "border-border bg-card hover:border-border-strong";
   return (
-    <div className={`min-w-28 flex-1 rounded-lg border px-3 py-2 ${estilo}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`text-base font-bold tabular-nums ${destacado ? "text-brand" : ""}`}>{valor}</div>
+    <div 
+      onClick={onClick}
+      className={`min-w-28 flex-1 rounded-lg border px-3 py-1.5 transition-colors ${estilo} ${onClick ? "cursor-pointer" : ""}`}
+    >
+      <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`text-sm font-bold tabular-nums ${destacado ? "text-brand" : ""}`}>{valor}</div>
     </div>
   );
 }
 
 function Atajo({ children, tono }: { children: React.ReactNode; tono?: "brand" }) {
   return (
-    <kbd className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${tono === "brand" ? "border-white/30 bg-white/20 text-white" : "border-border-strong/50 bg-surface-overlay text-muted-foreground"}`}>
+    <kbd className={`rounded border px-1 text-[9px] font-bold ${tono === "brand" ? "border-white/30 bg-white/20 text-white" : "border-border-strong/50 bg-surface-overlay text-muted-foreground"}`}>
       {children}
     </kbd>
   );

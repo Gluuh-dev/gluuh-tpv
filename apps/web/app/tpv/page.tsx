@@ -1,23 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { estacionDe, ESTACION_LABEL } from "../lib/estaciones";
-import { ASSETS, ASSETS_LEGACY, FORMAS_MESA, assetPorId, mesaPorCapacidad, dim, type PlanoAsset } from "../lib/plano-assets";
 import { leerBranding, BRANDING_DEFAULT, subirMedia, type Branding } from "../lib/branding";
 import { imprimirTicket, imprimirComanda, resolverImpresora, formatearTicket, guardarTicketComoFichero, type TicketImpresion, type ConfigImpresion } from "../lib/impresion";
 import { encolarComandas } from "../lib/print-routing";
 import { claveBase, claveDeLinea, claveParaAnadir } from "./clave-linea";
+import { precioEfectivo as precioEfectivoPuro } from "./precio";
 import { toast } from "@/app/lib/toast";
+import { escucharCambios } from "../lib/cambios";
 import { getSetting } from "../lib/settings";
 import { exportarBackupLocal } from "../lib/backup-local";
+import { useTpvStore } from "./hooks/useTpvStore";
+import { useTPVKeyboard } from "./hooks/useTPVKeyboard";
+import { PlanoSalas } from "./components/PlanoSalas";
 import { BarraEstado } from "./components/BarraEstado";
 import { ColumnaFunciones } from "./components/ColumnaFunciones";
-import { ModificadoresModal, type SeleccionModificadores } from "./components/ModificadoresModal";
-import { MenuModal } from "./components/MenuModal";
-import { DividirCuentaModal } from "./components/DividirCuentaModal";
-import { CobrarModal, type CobrarOpciones, type LineaPago } from "./components/CobrarModal";
+import dynamic from "next/dynamic";
+import type { SeleccionModificadores } from "./components/ModificadoresModal";
+import type { CobrarOpciones, LineaPago } from "./components/CobrarModal";
 import { CabeceraCuenta } from "./components/CabeceraCuenta";
 import { BarraTotales } from "./components/BarraTotales";
 import { FilaAccionesLinea } from "./components/FilaAccionesLinea";
@@ -25,21 +28,22 @@ import { TileProducto } from "./components/TileProducto";
 import { TileCategoria } from "./components/TileCategoria";
 import { TecladoTPV } from "./components/TecladoTPV";
 import { RailSalas, type RailTab } from "./components/RailSalas";
-import { useCatalogo, gruposDeProducto, categoriaDisponible, type Family, type Cat, type Prod, type Formato, type ModGrupo, type ModOpcion } from "../lib/catalogo-store";
+import { useCatalogo, gruposDeProducto, categoriaDisponible, type Prod } from "../lib/catalogo-store";
 import { CLASES_FISCALES, ivaAuto } from "@/lib/fiscal-clases";
-import { PlanoSvg } from "@/components/plano-svg";
-import { Plus, Trash2, ChevronUp, ChevronDown, Search,
+import { Plus, ChevronUp, ChevronDown, Search,
   Receipt, Store, Armchair, Sun, ShoppingBag, CalendarCheck,
   Beer, Coffee, CupSoda, Wine, Beef, Sandwich, Pizza, UtensilsCrossed, Croissant, CakeSlice, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSurfaceTheme } from "@/app/lib/surface-theme";
 import { IconGift } from "@tabler/icons-react";
+import { eur } from "@/app/lib/money";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 /* ─── Tipos ─── */
-interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number; sprite?: string | null }
+interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number; sprite?: string | null; color?: string | null }
 interface Room   { id: string; nombre: string; orden: number; suelo: string | null }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
-interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number }
+interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number; color?: string | null }
 interface Ticket {
   impuestos: { impuesto: string; desglose: { tipo: number; base: number; cuota: number }[]; importeTotal: number };
   verifactu: { huella: string; qrDataUrl: string; leyenda: string; qrUrl?: string };
@@ -52,7 +56,6 @@ interface MenuTPV {
 }
 
 /* ─── Helpers ─── */
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 // Iniciales del camarero para la marca sutil de atribución por línea.
 const iniciales = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("");
 const TERR: Record<string, string> = {
@@ -82,8 +85,6 @@ function metodoPago(tipo?: string): "EFECTIVO" | "TARJETA" | "BIZUM" | "WALLET" 
   }
 }
 
-/* ─── Modo de pago extra ─── */
-type ModoDescuento = { tipo: "PCT" | "EUR"; valor: number };
 
 /* ─── Config de la botonera de productos (setting GLOBAL tpv.botones) ─── */
 type BotonesConfig = {
@@ -102,15 +103,38 @@ const ICONOS_CAT: Record<string, LucideIcon> = {
   croissant: Croissant, "cake-slice": CakeSlice,
 };
 
-/* ─── Teclado keys ─── */
-const KEYPAD_ROWS = [
-  ["7", "8", "9"],
-  ["4", "5", "6"],
-  ["1", "2", "3"],
-  ["0", ",", "CLR"],
-  ["DTO%", "DTO€", "PREC"],
-  ["CAN", "", ""],
-] as const;
+/* ─── Modales PESADOS fuera del chunk inicial (~1.400 líneas entre los cuatro).
+   Así el TPV hidrata antes al arrancar. NO se trocea PlanoSalas: es la pantalla
+   de ENTRADA (navSala arranca en true) y diferirla retrasaría el primer pintado.
+   Se precargan en segundo plano tras arrancar (ver el efecto de precarga), para
+   que el primer "Cobrar" no tenga que esperar a la red. ─── */
+const ModificadoresModal = dynamic(() => import("./components/ModificadoresModal").then((m) => m.ModificadoresModal), { ssr: false });
+const MenuModal = dynamic(() => import("./components/MenuModal").then((m) => m.MenuModal), { ssr: false });
+const DividirCuentaModal = dynamic(() => import("./components/DividirCuentaModal").then((m) => m.DividirCuentaModal), { ssr: false });
+const CobrarModal = dynamic(() => import("./components/CobrarModal").then((m) => m.CobrarModal), { ssr: false });
+
+/* ─── Recuadro verde con lo tecleado, dentro de la línea seleccionada ───
+   Se suscribe ÉL SOLO al buffer/modo/editando: teclear re-renderiza este span,
+   no la página entera (plan 011). tipo UND = columna de unidades; PRECIO = la
+   de precio (activo cuando el modo NO es UND). */
+function BufferEnLinea({ tipo, fallback }: { tipo: "UND" | "PRECIO"; fallback: React.ReactNode }) {
+  const buffer = useTpvStore((s) => s.buffer);
+  const modo = useTpvStore((s) => s.modo);
+  const editando = useTpvStore((s) => s.editando);
+  const activo = editando && (tipo === "UND" ? modo === "UND" : modo !== "UND");
+  if (!activo) return <>{fallback}</>;
+  return <span className="inline-block rounded-md bg-brand px-1.5 text-brand-foreground">{buffer || (tipo === "UND" ? fallback : "0")}</span>;
+}
+
+/* ─── Callback de identidad ESTABLE que siempre invoca la última versión (patrón
+   useEvent): permite memoizar hijos (ColumnaFunciones, RailSalas) sin closures
+   obsoletos en sus handlers. ─── */
+function useEventCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const ref = useRef(fn);
+  ref.current = fn;
+  return useCallback((...args: A) => ref.current(...args), []);
+}
+
 
 export default function TPV() {
   const sb = supabaseBrowser();
@@ -133,43 +157,21 @@ export default function TPV() {
   const [vistaSala, setVistaSala] = useState<string>("");  // room id, "BARRA", "RESERVAS" o "LLEVAR"
   // Navegación estilo Glop: false = pantalla Ticket (venta directa, por defecto al entrar);
   // true = navegando por el rail (plano de sala, barra o para llevar).
-  const [navSala, setNavSala] = useState(false);
+  const [navSala, setNavSala] = useState(true);
+  const [lineasGuardadas, setLineasGuardadas] = useState<Set<string>>(new Set());
   // Mesa preseleccionada en el plano: 1er toque = ver cuenta; 2º toque = abrir en TPV.
   const [mesaSel, setMesaSel] = useState<Mesa | null>(null);
   const [mesaSelInfo, setMesaSelInfo] = useState<{ apertura: string; importe: number; comensales: number | null; nota?: string; lineas: { nombre: string; cantidad: number; precio: number }[] } | null>(null);
-  // Edición del plano DENTRO del TPV: arrastrar mesas para recolocarlas.
-  const [editandoPlano, setEditandoPlano] = useState(false);
-  const [posOverride, setPosOverride] = useState<Record<string, { x: number; y: number }>>({});
-  const [mesaEdit, setMesaEdit] = useState<Mesa | null>(null);   // mesa abierta en el editor
-  const [numMesa, setNumMesa] = useState("");
-  const [capMesa, setCapMesa] = useState(4);
-  const [elemEdit, setElemEdit] = useState<Elemento | null>(null);   // objeto (barra/planta/…) en edición
-  const [paletaAbierta, setPaletaAbierta] = useState(true);          // menú lateral de "añadir"
-  const [paletaTab, setPaletaTab] = useState<"MESAS" | "OBJETOS">("MESAS");
-  const [arrastrando, setArrastrando] = useState(false);   // arrastrando en edición → muestra papelera
-  const [sobrePapel, setSobrePapel] = useState(false);     // el puntero está encima de la papelera
-  const papeleraRef = useRef<HTMLDivElement | null>(null);
   const catScrollRef = useRef<HTMLDivElement | null>(null);   // scroll de categorías
   const prodScrollRef = useRef<HTMLDivElement | null>(null);  // scroll de productos
   // Traspaso entre mesas (estilo Glop): elige origen → botón → toca destino.
   const [modoTraspaso, setModoTraspaso] = useState<null | "MESA" | "LINEAS">(null);
   const [traspLineas, setTraspLineas] = useState<Record<string, number>>({});
-  // Nota por mesa/pedido (alergias, avisos…).
-  const [modalNota, setModalNota] = useState(false);
-  const [notaTexto, setNotaTexto] = useState("");
-  const [notaOrderId, setNotaOrderId] = useState<string | null>(null);
   const [notaMesa, setNotaMesa] = useState("");   // nota de la cuenta abierta en el TPV
   /* Para llevar (cuenta sin mesa, con nombre + teléfono) */
-  const [llevar, setLlevar] = useState<{ nombre: string; telefono: string } | null>(null);
+  const llevar = useTpvStore((s) => s.llevar);
+  const setLlevar = useTpvStore((s) => s.setLlevar);
   const [llevarList, setLlevarList] = useState<{ id: string; cliente_nombre: string; cliente_telefono: string | null; total: number }[]>([]);
-  const [nuevoLlevar, setNuevoLlevar] = useState({ nombre: "", telefono: "" });
-  const [reservaPop, setReservaPop] = useState<Mesa | null>(null);  // popover de reservas de mesa
-  const [resForm, setResForm] = useState<{ id: string | null; nombre: string; personas: string; hora: string }>({ id: null, nombre: "", personas: "", hora: "" });
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressed = useRef(false);
-  const dragRef = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
-  const planoBoxRef = useRef<HTMLDivElement | null>(null);
-  const [planoScale, setPlanoScale] = useState(1);   // escala del plano para ajustarse a pantalla
   // Catálogo desde el store Zustand (compartido, no re-fetch al cambiar de pantalla).
   const families = useCatalogo((s) => s.families);
   const cats     = useCatalogo((s) => s.cats);
@@ -177,6 +179,8 @@ export default function TPV() {
   const prodCats = useCatalogo((s) => s.prodCats);   // categorías por producto (m2m Fase 1)
   const setProds = useCatalogo((s) => s.setProds);
   const [menus, setMenus] = useState<MenuTPV[]>([]);   // menús/combos del tenant (Carta → Menús); [] si no hay o falla la carga
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
 
   /* ── Operario activo (quién opera; persiste hasta "Salir") ── */
   const [operario, setOperario] = useState<{ id: string; nombre: string } | null>(null);
@@ -186,35 +190,36 @@ export default function TPV() {
   const [pinError, setPinError] = useState("");
 
   /* ── Selección de contexto ── */
-  const [mesa, setMesa]   = useState<Mesa | null>(null);
+  const mesa = useTpvStore((s) => s.mesa);
+  const setMesa = useTpvStore((s) => s.setMesa);
   const [barra, setBarra] = useState(false);
   /* Cuenta abierta de la mesa (un pedido reutilizable por mesa) + importes por mesa */
-  const [ordenAbiertaId, setOrdenAbiertaId] = useState<string | null>(null);
+  const ordenAbiertaId = useTpvStore((s) => s.ordenAbiertaId);
+  const setOrdenAbiertaId = useTpvStore((s) => s.setOrdenAbiertaId);
   const [totalesMesa, setTotalesMesa] = useState<Record<string, number>>({});
 
   /* ── Funciones de cuenta (columna estilo Glop) ── */
-  const [cliente, setCliente] = useState<{ id: string | null; nombre: string } | null>(null);
-  const [comensales, setComensales] = useState(1);
-  const [alias, setAlias] = useState("");   // etiqueta libre de la cuenta (estilo Glop)
-  const [tipoOperacion, setTipoOperacion] = useState<"VENTA" | "INVITACION" | "AUTOCONSUMO">("VENTA");
+  const cliente = useTpvStore((s) => s.cliente);
+  const setCliente = useTpvStore((s) => s.setCliente);
+  const comensales = useTpvStore((s) => s.comensales);
+  const setComensales = useTpvStore((s) => s.setComensales);
+  const alias = useTpvStore((s) => s.alias);
+  const setAlias = useTpvStore((s) => s.setAlias);
+  const tipoOperacion = useTpvStore((s) => s.tipoOperacion);
+  const setTipoOperacion = useTpvStore((s) => s.setTipoOperacion);
   const [aparcados, setAparcados] = useState<{ id: string; aparcado_como: string | null; total: number; created_at: string }[]>([]);
   // Desglose de líneas por cuenta abierta, para las tarjetas de la vista Barra.
   const [aparcadosLineas, setAparcadosLineas] = useState<Record<string, { nombre: string; cantidad: number; total: number }[]>>({});
   const [ultimoDoc, setUltimoDoc] = useState<TicketImpresion | null>(null);
-  const [modalCliente, setModalCliente] = useState(false);
-  const [modalPasarMesa, setModalPasarMesa] = useState(false);
-  const [modalUtilidades, setModalUtilidades] = useState(false);
+  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | null>(null);
   const { resolvedTheme } = useTheme();
   const { setSurfaceTheme } = useSurfaceTheme("tpv");   // tema propio del TPV (independiente del panel)
-  const [modalAparcados, setModalAparcados] = useState(false);
-  const [modalDividir, setModalDividir] = useState(false);
-  const [modalInvitar, setModalInvitar] = useState(false);
-  const [invitadas, setInvitadas] = useState<Record<string, boolean>>({});   // líneas invitadas (precio 0)
+  const invitadas = useTpvStore((s) => s.invitadas);
+  const setInvitadas = useTpvStore((s) => s.setInvitadas);
   const [busqCliente, setBusqCliente] = useState("");
-  const [clientesEnc, setClientesEnc] = useState<{ id: string; nombre: string; telefono: string | null }[]>([]);
-  const [nuevoCli, setNuevoCli] = useState({ nombre: "", telefono: "" });
+  const [clientesEnc, setClientesEnc] = useState<{ id: string; nombre: string; telefono: string | null; nif: string | null }[]>([]);
+  const [nuevoCli, setNuevoCli] = useState({ nombre: "", telefono: "", nif: "" });
   const [pedirBorrar, setPedirBorrar] = useState(false);
-  const [modalNuevoProd, setModalNuevoProd] = useState(false);
   const [nuevoProd, setNuevoProd] = useState({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "" });
   const [agotarPop, setAgotarPop] = useState<Prod | null>(null);
   const formatos  = useCatalogo((s) => s.formatos);
@@ -224,12 +229,14 @@ export default function TPV() {
   const biblioteca   = useCatalogo((s) => s.biblioteca);     // grupos de biblioteca (0064, Fase 2)
   const asignaciones = useCatalogo((s) => s.asignaciones);   // herencia familia→categoría→producto
   const horariosCat  = useCatalogo((s) => s.horariosCat);    // franjas por categoría (0067)
-  // Re-evalúa la disponibilidad por horario cada minuto (sin refetch).
+  // Re-evalúa la disponibilidad por horario cada minuto (sin refetch). Sin
+  // franjas configuradas no se arma el intervalo (evita un re-render/minuto).
   const [tickHorario, setTickHorario] = useState(0);
   useEffect(() => {
+    if (!Object.keys(horariosCat).length) return;
     const t = setInterval(() => setTickHorario((x) => x + 1), 60_000);
     return () => clearInterval(t);
-  }, []);
+  }, [horariosCat]);
   // Grupos EFECTIVOS de un producto: los suyos + los heredados de la biblioteca.
   const gruposDe = (pid: string) =>
     gruposDeProducto({ gruposMod, biblioteca, asignaciones, prods, cats, prodCats }, pid);
@@ -245,6 +252,8 @@ export default function TPV() {
   // Rail vertical de acciones de CUENTA: corre a altura completa (hermano de la columna
   // de contenido) y sus botones se estiran con flex-1 → sin altura fija ni hueco.
   const [permisos, setPermisos] = useState<Record<string, boolean>>({});
+  // Ref "viva" de permisos: handleKey es estable (useCallback []) y necesita el valor actual.
+  const permisosRef = useRef(permisos); permisosRef.current = permisos;
   const puede = (k: string) => permisos[k] !== false;   // ausente = permitido
   // Igual que puede() pero avisa si está bloqueado; para gatear acciones con feedback.
   const exige = (k: string) => { if (permisos[k] === false) { toast.warning("Tu perfil no permite esta acción."); return false; } return true; };
@@ -263,40 +272,55 @@ export default function TPV() {
   const [vistaProds, setVistaProds] = useState(false);
 
   /* ── Comanda y ticket ── */
-  const [comanda, setComanda] = useState<Record<string, number>>({});
-  const [descuentos, setDescuentos] = useState<Record<string, ModoDescuento>>({});
-  const [preciosManuales, setPreciosManuales] = useState<Record<string, number>>({});
-  const [notas, setNotas] = useState<Record<string, string>>({});
+  const modoZurdo = useTpvStore((s) => s.modoZurdo);
+  const setModoZurdo = useTpvStore((s) => s.setModoZurdo);
+  const pases = useTpvStore((s) => s.pases);
+  const setPases = useTpvStore((s) => s.setPases);
+  const comanda = useTpvStore((s) => s.comanda);
+  const setComanda = useTpvStore((s) => s.setComanda);
+  const descuentos = useTpvStore((s) => s.descuentos);
+  const setDescuentos = useTpvStore((s) => s.setDescuentos);
+  const preciosManuales = useTpvStore((s) => s.preciosManuales);
+  const setPreciosManuales = useTpvStore((s) => s.setPreciosManuales);
+  const notas = useTpvStore((s) => s.notas);
+  const setNotas = useTpvStore((s) => s.setNotas);
   // Atribución por línea: quién (operario activo) añadió cada clave de comanda.
-  const [anadidoPor, setAnadidoPor] = useState<Record<string, { id: string; nombre: string }>>({});
+  const anadidoPor = useTpvStore((s) => s.anadidoPor);
+  const setAnadidoPor = useTpvStore((s) => s.setAnadidoPor);
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [busy, setBusy]     = useState(false);
+  // Guard SÍNCRONO de reentrada del cobro: `busy` (estado) tarda un render en
+  // reflejarse y un doble toque rápido colaría dos cobros (dos filas payment).
+  const cobrandoRef = useRef(false);
 
-  /* ── Teclado ── */
-  const [buffer, setBuffer]   = useState("");
-  const [modo, setModo] = useState<"UND" | "PREC" | "DTO%" | "DTO€">("UND");   // modo del teclado (lo refleja la barra)
-  const [editando, setEditando] = useState(false);   // edición inline de la línea sel. (Glop): pulsar modo → teclear → volver a pulsar para confirmar
-  // Refs con el valor "vivo" de buffer/modo: permiten memoizar el grid de productos
-  // (handlers estables) sin que el buffer quede obsoleto al añadir con unidades.
-  const bufferRef = useRef(buffer); bufferRef.current = buffer;
-  const modoRef = useRef(modo); modoRef.current = modo;
+  /* ── Teclado ── La raíz NO se suscribe a buffer/modo/editando (plan 011):
+     teclear solo re-renderiza BarraTotales, TecladoTPV y BufferEnLinea (se
+     suscriben ellos); los handlers leen el valor vivo con getState(). Los
+     setters sí se toman aquí (identidad estable, nunca re-renderizan). ── */
+  const setBuffer = useTpvStore((s) => s.setBuffer);
+  const setModo = useTpvStore((s) => s.setModo);
+  const setEditando = useTpvStore((s) => s.setEditando);
   // Refs "vivas" para que addProd (capturado en el grid memoizado) decida la
   // clave con el estado ACTUAL de comanda/descuentos/precios, sin closures obsoletos.
   const comandaRef = useRef(comanda); comandaRef.current = comanda;
   const descuentosRef = useRef(descuentos); descuentosRef.current = descuentos;
   const preciosManualesRef = useRef(preciosManuales); preciosManualesRef.current = preciosManuales;
+  const lineasGuardadasRef = useRef(lineasGuardadas); lineasGuardadasRef.current = lineasGuardadas;
   // Operario "vivo": addProd va capturado en el grid memoizado; el ref permite sellar
   // la atribución con el camarero ACTIVO tras un cambio de operario bajo el velo.
   const operarioRef = useRef(operario); operarioRef.current = operario;
-  const [lineaSel, setLineaSel] = useState<string | null>(null);
+  const lineaSel = useTpvStore((s) => s.lineaSel);
+  const setLineaSel = useTpvStore((s) => s.setLineaSel);
 
   /* ── Modal cobrar (unifica efectivo + mixto) + formas de pago ── */
-  const [modalCobrar, setModalCobrar] = useState(false);
   const [formasPago, setFormasPago] = useState<FormaPagoTPV[]>(FORMAS_PAGO_FALLBACK);
   const [notasPrep, setNotasPrep] = useState<{ id: string; nombre: string; descripcion?: string | null }[]>([]);   // chips de anotación rápida (nota_preparacion); descripcion = grupo
   const [busqProd, setBusqProd] = useState("");   // buscador de producto (filtra el grid; cross-categoría)
 
-  /* ── Carga inicial ── */
+  /* ── Carga inicial ── El gate de sesión va primero; TODO lo demás es
+     independiente y sale en UNA ronda paralela (antes ~11 peticiones en
+     escalera = varios segundos de "Cargando…"). Pase lo que pase, el velo de
+     carga se quita (finally): el TPV no puede quedarse parado en "Cargando…". ── */
   useEffect(() => {
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
@@ -305,32 +329,37 @@ export default function TPV() {
       if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
       // Operario activo desde localStorage (persiste hasta "Salir") + lista de operarios
       try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
-      const { data: ops } = await sb.rpc("listar_operarios");
-      setOperarios((ops as { id: string; nombre: string; rol: string; codigo: string | null }[]) ?? []);
-      setMarca(await leerBranding(sb));
-      const { data: loc } = await sb.from("location").select("id,territorio_fiscal,nombre,razon_social,cif,direccion").limit(1).maybeSingle();
-      const { data: u }   = await sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle();
-      setLocationId(loc?.id ?? null);
-      const { data: tn } = await sb.from("tenant").select("id").limit(1).maybeSingle();
-      setTenantId((tn as { id: string } | null)?.id ?? null);
-      setTerritorio(loc?.territorio_fiscal ?? "PENINSULA_BALEARES");
-      setLocInfo({ nombre: loc?.razon_social ?? loc?.nombre ?? "", cif: loc?.cif ?? "", direccion: loc?.direccion ?? "" });
-      setUserId(u?.id ?? null);
-      // Catálogo: del store (solo fetchea la 1ª vez; navegación posterior = instantánea).
-      await useCatalogo.getState().cargar(sb);
-      setCatSel(useCatalogo.getState().cats[0]?.id ?? null);
-      await recargarMesas();
-      const [{ data: rms }, { data: rsv }, { data: els }] = await Promise.all([
-        sb.from("room").select("id,nombre,orden,suelo").order("orden"),
-        sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora"),
-        sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto,rotacion"),
-      ]);
-      setRooms((rms as Room[]) ?? []);
-      setReservas((rsv as Reserva[]) ?? []);
-      setElementos((els as Elemento[]) ?? []);
-      setVistaSala((rms as Room[])?.[0]?.id ?? "");
-      await recargarLlevar();
-      setLoading(false);
+      try {
+        const [ops, marcaV, loc, u, tn, , rms, rsv] = await Promise.all([
+          sb.rpc("listar_operarios").then((r) => r.data),
+          leerBranding(sb),
+          sb.from("location").select("id,territorio_fiscal,nombre,razon_social,cif,direccion").limit(1).maybeSingle().then((r) => r.data),
+          sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle().then((r) => r.data),
+          sb.from("tenant").select("id").limit(1).maybeSingle().then((r) => r.data),
+          useCatalogo.getState().cargar(sb),   // catálogo del store (cache + revalidación)
+          sb.from("room").select("id,nombre,orden,suelo").order("orden").then((r) => r.data),
+          sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora").then((r) => r.data),
+        ]);
+        setOperarios((ops as { id: string; nombre: string; rol: string; codigo: string | null }[]) ?? []);
+        setMarca(marcaV);
+        setLocationId(loc?.id ?? null);
+        setTenantId((tn as { id: string } | null)?.id ?? null);
+        setTerritorio(loc?.territorio_fiscal ?? "PENINSULA_BALEARES");
+        setLocInfo({ nombre: loc?.razon_social ?? loc?.nombre ?? "", cif: loc?.cif ?? "", direccion: loc?.direccion ?? "" });
+        setUserId(u?.id ?? null);
+        setCatSel(useCatalogo.getState().cats[0]?.id ?? null);
+        setRooms((rms as Room[]) ?? []);
+        setReservas((rsv as Reserva[]) ?? []);
+        setVistaSala((rms as Room[])?.[0]?.id ?? "");
+        // Mesas + elementos pintan el plano (primera pantalla): en paralelo entre sí.
+        await Promise.all([recargarMesas(), recargarElementos()]);
+      } catch (e) {
+        console.error("Carga inicial del TPV incompleta", e);
+        toast.error("No se pudo cargar todo el TPV. Comprueba la conexión.");
+      } finally {
+        setLoading(false);
+      }
+      void recargarLlevar();   // pestaña secundaria: no bloquea el primer pintado
     })();
     /* eslint-disable-next-line */
   }, []);
@@ -339,16 +368,45 @@ export default function TPV() {
        casa cambian productos/categorías/familias (p. ej. marcar un agotado), el
        TPV se actualiza solo en segundos, sin recargar. Debounce 800 ms para
        agrupar ráfagas. Si realtime no está en la publicación, no dispara (ok). */
-  useEffect(() => {
-    let t: ReturnType<typeof setTimeout> | null = null;
-    const recargar = () => { if (t) clearTimeout(t); t = setTimeout(() => { void useCatalogo.getState().cargar(sb, { force: true }); }, 800); };
-    const canal = sb.channel("tpv_catalogo")
-      .on("postgres_changes", { event: "*", schema: "public", table: "product" }, recargar)
-      .on("postgres_changes", { event: "*", schema: "public", table: "category" }, recargar)
-      .on("postgres_changes", { event: "*", schema: "public", table: "family" }, recargar)
-      .subscribe();
-    return () => { if (t) clearTimeout(t); void sb.removeChannel(canal); };
+  useEffect(() => escucharCambios(sb, {
+    nombre: "tpv_catalogo",
+    tablas: ["product", "category", "family"],
+    debounceMs: 800,
+    onCambio: () => { void useCatalogo.getState().cargar(sb, { force: true }); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  /* ── PLANO DE MESAS EN VIVO (0097) ── El comandero abre una mesa → aparece en
+       TODOS los TPV al instante. Antes NO pasaba: el TPV solo escuchaba el catálogo,
+       así que el plano solo se refrescaba tras una operación PROPIA o al recargar la
+       página → el camarero podía estar mirando un plano mentiroso.
+       (`restaurant_table` tampoco estaba publicada en realtime: lo arregla la 0097.)
+       Estable por useEventCallback: recargarAparcados lee prodPorId y con deps [] se
+       habría quedado con el catálogo VACÍO del primer render. ── */
+  const refrescarSalas = useEventCallback(() => {
+    void recargarMesas();
+    void recargarAparcados();
+    void recargarLlevar();
+  });
+  useEffect(() => escucharCambios(sb, {
+    nombre: "tpv_salas",
+    tablas: ["sales_order", "restaurant_table"],
+    debounceMs: 400,   // se siente instantáneo y agrupa la ráfaga de una comanda
+    onCambio: refrescarSalas,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  /* ── Precarga de los modales pesados (que van en chunks aparte, ver dynamic()
+       arriba). Se traen cuando el TPV ya arrancó: el primer "Cobrar" no puede
+       quedarse esperando a la red. ── */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void import("./components/CobrarModal");
+      void import("./components/DividirCuentaModal");
+      void import("./components/ModificadoresModal");
+      void import("./components/MenuModal");
+    }, 1500);
+    return () => clearTimeout(t);
   }, []);
 
   /* ── Formas de pago (cobro) + anotaciones rápidas (chips). Best-effort. ── */
@@ -422,15 +480,23 @@ export default function TPV() {
     [prods, menus, territorio],
   );
 
+  // Índice O(1) del catálogo: las derivadas de la comanda (prodDeKey, precioEfectivo,
+  // nombres) se llaman por línea y por render; con .find() eran O(catálogo) cada una.
+  const prodPorId = useMemo(() => {
+    const m = new Map<string, Prod>();
+    for (const p of catalogoConMenus) m.set(p.id, p);
+    return m;
+  }, [catalogoConMenus]);
+
   /* ── Formatos: la comanda se clavea por "productId" o "productId|formatId" ── */
   // clave: "productId" · "productId|formatId" · "productId|fid|mod1,mod2" (fid puede ir vacío),
   // con posible sufijo de unicidad "#n" que se ignora aquí (claveBase lo quita).
-  const prodDeKey = (key: string) => catalogoConMenus.find((x) => x.id === claveBase(key).split("|")[0]);
+  const prodDeKey = (key: string) => prodPorId.get(claveBase(key).split("|")[0]!);
   // campo: usa nombre_ticket / nombre_cocina (0051) como nombre base cuando existan;
   // si no, cae al nombre normal (los sufijos de formato/peso/modificadores se conservan).
   function nombreDeKey(key: string, campo?: "nombre_ticket" | "nombre_cocina"): string {
     const [pid, fid, mods] = claveBase(key).split("|");
-    const p = catalogoConMenus.find((x) => x.id === pid);
+    const p = pid ? prodPorId.get(pid) : undefined;
     if (!p) return "";
     const base = (campo && p[campo]) || p.nombre;
     let nombre: string;
@@ -446,24 +512,68 @@ export default function TPV() {
     return nombre;
   }
 
-  /* ── Precio efectivo (peso/formato + suplemento de modificadores + desc./precio manual) ── */
-  const precioEfectivo = useMemo(() => (id: string): number => {
-    const [pid, fid, mods] = claveBase(id).split("|");   // el "#n" no altera producto/precio base
-    const prod = catalogoConMenus.find((x) => x.id === pid);
-    if (!prod) return 0;
-    let calc: number;
-    if (fid?.startsWith("@")) calc = prod.precio * (parseFloat(fid.slice(1)) || 0);   // €/kg × peso
-    else {
-      const fmt = fid ? (formatos[pid!] ?? []).find((f) => f.id === fid) : undefined;
-      calc = fmt ? fmt.precio : prod.precio;
+  function nombreBaseDeKey(key: string, campo?: "nombre_ticket" | "nombre_cocina"): string {
+    const [pid, fid] = claveBase(key).split("|");
+    const p = pid ? prodPorId.get(pid) : undefined;
+    if (!p) return "";
+    const base = (campo && p[campo]) || p.nombre;
+    if (fid?.startsWith("@")) return `${base} (${fid.slice(1)} kg)`;
+    const fmt = fid ? (formatos[p.id] ?? []).find((f) => f.id === fid) : undefined;
+    return fmt ? `${base} (${fmt.nombre})` : base;
+  }
+
+  interface ExtraDetalle {
+    nombre: string;
+    precio: number;
+    uds: number;
+  }
+
+  function extraIngredientesDetallados(key: string): ExtraDetalle[] {
+    const [, , mods] = claveBase(key).split("|");
+    if (!mods) return [];
+    const counts: Record<string, number> = {};
+    for (const m of mods.split(",")) {
+      counts[m] = (counts[m] ?? 0) + 1;
     }
-    if (mods) for (const m of mods.split(",")) calc += modById[m]?.precio_extra ?? 0;
-    const base = preciosManuales[id] ?? calc;
-    const desc = descuentos[id];
-    if (!desc) return base;
-    if (desc.tipo === "PCT") return Math.max(0, base * (1 - desc.valor / 100));
-    return Math.max(0, base - desc.valor);
-  }, [catalogoConMenus, formatos, modById, preciosManuales, descuentos]);
+    return Object.entries(counts).map(([mId, uds]) => {
+      const mod = modById[mId];
+      return {
+        nombre: mod?.nombre ?? mId,
+        precio: mod?.precio_extra ?? 0,
+        uds,
+      };
+    });
+  }
+
+  function obtenerBaseManualSiDifiere(baseKey: string, precioUnitario: number): number | undefined {
+    const [pid, fid, mods] = baseKey.split("|");
+    // Solo products reales (las líneas de menú llegan con product_id NULL y no pasan por aquí).
+    const prod = pid ? prodPorId.get(pid) : undefined;
+    if (!prod) return undefined;
+    let calcBase = prod.precio;
+    if (fid && !fid.startsWith("@")) {
+      const fmt = (formatos[pid!] ?? []).find((f) => f.id === fid);
+      if (fmt) calcBase = fmt.precio;
+    }
+    let calcTotal = calcBase;
+    if (mods) {
+      for (const m of mods.split(",")) {
+        calcTotal += modById[m]?.precio_extra ?? 0;
+      }
+    }
+    if (Math.abs(precioUnitario - calcTotal) > 0.01) {
+      const extrasCost = calcTotal - calcBase;
+      return Math.max(0, precioUnitario - extrasCost);
+    }
+    return undefined;
+  }
+
+  /* ── Precio efectivo (peso/formato + suplemento de modificadores + desc./precio manual).
+     El cálculo vive en ./precio.ts (puro, con tests); aquí solo se le da el contexto. ── */
+  const precioEfectivo = useMemo(() => {
+    const ctx = { prodPorId, formatos, modById, preciosManuales, descuentos };
+    return (id: string): number => precioEfectivoPuro(ctx, id);
+  }, [prodPorId, formatos, modById, preciosManuales, descuentos]);
 
   /* ── Total (las líneas invitadas suman 0) ── */
   const total = useMemo(
@@ -487,35 +597,7 @@ export default function TPV() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comanda, invitadas, precioEfectivo, total]);
 
-  // Tamaño real del plano de la sala activa (para escalarlo y que quepa en pantalla).
-  const planoContent = useMemo(() => {
-    let w = 800, h = 520;
-    mesas.filter((m) => m.room_id === vistaSala).forEach((m, i) => {
-      const d = dim(mesaPorCapacidad(m.capacidad || 4));
-      const x = m.pos_x ?? (40 + (i % 4) * 220);
-      const y = m.pos_y ?? (40 + Math.floor(i / 4) * 230);
-      w = Math.max(w, x + d.w); h = Math.max(h, y + d.h);
-    });
-    elementos.filter((e) => e.room_id === vistaSala).forEach((e) => {
-      w = Math.max(w, e.pos_x + e.ancho); h = Math.max(h, e.pos_y + e.alto);
-    });
-    return { w: w + 48, h: h + 48 };
-  }, [mesas, elementos, vistaSala]);
 
-  useEffect(() => {
-    const el = planoBoxRef.current;
-    if (!el) return;
-    const calc = () => {
-      const r = el.getBoundingClientRect();
-      if (r.width < 10 || r.height < 10) return;
-      const s = Math.min(r.width / planoContent.w, r.height / planoContent.h);
-      setPlanoScale(Math.max(0.25, Math.min(2, s)));
-    };
-    calc();
-    const ro = new ResizeObserver(calc);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [planoContent, navSala, vistaSala]);
 
   /* ── Reserva próxima por mesa (para pintarla en el plano) ── */
   const reservasPorMesa = useMemo(() => {
@@ -533,14 +615,18 @@ export default function TPV() {
        productId = producto real (para order_line, que puede llevar formato).
        El nombre aquí es el normal (UI/BD); la IMPRESIÓN usa nombre_ticket /
        nombre_cocina (0051) vía nombreDeKey(l.id, campo). ── */
-  function lineasComanda() {
-    return Object.entries(comanda).map(([id, cantidad]) => {
+  const lineasComandaMemo = useMemo(
+    () => Object.entries(comanda).map(([id, cantidad]) => {
       const p = prodDeKey(id)!;
       // Los menús no son un product real: productId=null → order_line con product_id NULL (FK-safe).
       const productId: string | null = menuIds.has(p.id) ? null : p.id;
       return { id, productId, nombre: nombreDeKey(id), cantidad, precio: precioEfectivo(id), tipo: p.tipo_impositivo, estacion: estacionDe(p.estacion) };
-    });
-  }
+    }),
+    // prodDeKey/nombreDeKey leen de prodPorId/formatos/modById (funciones del render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [comanda, prodPorId, menuIds, precioEfectivo, formatos, modById],
+  );
+  const lineasComanda = () => lineasComandaMemo;
 
   /* ── Integración con Gluuh Desktop (visor de cliente y backup nocturno) ── */
   useEffect(() => {
@@ -558,33 +644,13 @@ export default function TPV() {
     });
   }, []);
 
-  /* ── Login por PULSERA: el lector RFID "teclea" el UID + Enter (keyboard wedge).
-       Activo solo en el gate (sin operario). Un burst rápido de teclas seguido de
-       Enter se valida como pulsera; el gap >300ms reinicia el buffer. ── */
-  // Activo en el gate (sin operario) Y con el VELO puesto: la pulsera re-identifica y
-  // quita el velo (loginOperario fija el operario sin resetear → sigue la misma cuenta).
-  useEffect(() => {
-    if (operario && !bloqueado) return;
-    let buffer = "";
-    let ultimo = 0;
-    const onKey = async (e: KeyboardEvent) => {
-      const ahora = Date.now();
-      if (ahora - ultimo > 300) buffer = "";
-      ultimo = ahora;
-      if (e.key === "Enter") {
-        const codigo = buffer; buffer = "";
-        if (codigo.length < 4) return;
-        const { data } = await sb.rpc("validar_pulsera", { p_codigo: codigo });
-        const u = (data as { id: string; nombre: string }[] | null)?.[0];
-        if (u) loginOperario(u);
-        return;
-      }
-      if (e.key.length === 1) buffer += e.key;
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operario, bloqueado]);
+  /* ── Hook de Teclado y Pulsera ── */
+  useTPVKeyboard({
+    sb,
+    operario,
+    bloqueado,
+    loginOperario,
+  });
 
   /* ── Configuración de impresión (diseño del ticket + impresoras + rutas) ── */
   useEffect(() => {
@@ -601,11 +667,25 @@ export default function TPV() {
      perfil; si no, los suyos propios (compat). Editar el perfil se refleja aquí. */
   useEffect(() => {
     if (!operario) { setPermisos({}); return; }
-    sb.from("app_user").select("perfil(permisos)").eq("id", operario.id).maybeSingle()
-      .then(({ data }) => {
-        const d = data as { perfil?: { permisos?: Record<string, boolean> } | null } | null;
-        setPermisos(d?.perfil?.permisos ?? {});
-      });
+    // Con REINTENTO y rama de error: antes un fallo de red dejaba `permisos = {}`
+    // en silencio y, como "ausente = permitido", el operario se quedaba con TODOS
+    // los permisos sin que nadie se enterara. Ahora el fallo es VISIBLE.
+    // ponytail: se mantiene el fail-open a propósito (denegar todo por un corte de
+    // red dejaría al bar sin poder vender). El cierre real son límites en
+    // SERVIDOR (RPC) — deuda anotada en plans/README.md; en cliente esto no se
+    // puede asegurar contra alguien que manipule el estado.
+    const cargarPermisos = async (reintento = false): Promise<void> => {
+      const { data, error } = await sb.from("app_user").select("perfil(permisos)").eq("id", operario.id).maybeSingle();
+      if (error) {
+        if (!reintento) return cargarPermisos(true);
+        console.error("No se pudieron cargar los permisos del operario:", error.message);
+        toast.warning("No se pudieron cargar los permisos. Avisa al responsable.");
+        return;   // conserva los permisos que hubiera; no los resetea a "todo permitido"
+      }
+      const d = data as { perfil?: { permisos?: Record<string, boolean> } | null } | null;
+      setPermisos(d?.perfil?.permisos ?? {});
+    };
+    void cargarPermisos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operario]);
 
@@ -648,7 +728,7 @@ export default function TPV() {
     window.addEventListener("pointerdown", reiniciar);
     window.addEventListener("keydown", reiniciar);
     return () => { clearTimeout(timer); window.removeEventListener("pointerdown", reiniciar); window.removeEventListener("keydown", reiniciar); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [operario, bloqueoInactividad, bloqueoSegundos, bloqueado]);
 
   /* ── Barra de estado: nombre del terminal (Desktop) y si hay caja abierta ── */
@@ -667,7 +747,16 @@ export default function TPV() {
       contexto: mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra",
       operario: operario?.nombre,
       numSerieFactura: VERIFACTU_ACTIVO ? t.numSerieFactura : undefined,
-      lineas: lineasComanda().map((l) => ({ cantidad: l.cantidad, nombre: nombreDeKey(l.id, "nombre_ticket"), importe: l.precio * l.cantidad })),
+      lineas: lineasComanda().map((l) => ({
+        cantidad: l.cantidad,
+        nombre: nombreBaseDeKey(l.id, "nombre_ticket"),
+        importe: l.precio * l.cantidad,
+        extras: extraIngredientesDetallados(l.id).map((ext) => ({
+          nombre: ext.nombre,
+          cantidad: ext.uds,
+          precioExtra: ext.precio,
+        })),
+      })),
       desglose: t.impuestos.desglose.map((d) => ({
         etiqueta: `${t.impuestos.impuesto} ${d.tipo}% (base ${eur(d.base)})`,
         cuota: d.cuota,
@@ -685,13 +774,35 @@ export default function TPV() {
     const diseno = cfgImpresion?.ticket ?? {};
     const destTicket = resolverImpresora(cfgImpresion, "TICKET_CLIENTE");
     if (!ticket && !unidades) return; // nada que imprimir
+
+    // Si se imprime la proforma (cuenta) de una mesa, actualizar estado a POR_COBRAR
+    if (!ticket && mesa && ordenAbiertaId) {
+      void (async () => {
+        try {
+          await sb.from("sales_order").update({ estado: "POR_COBRAR" }).eq("id", ordenAbiertaId);
+          await sb.from("restaurant_table").update({ estado: "POR_COBRAR" }).eq("id", mesa.id);
+          void recargarMesas();
+        } catch (e) {
+          console.warn("Fallo al actualizar mesa/pedido a POR_COBRAR", e);
+        }
+      })();
+    }
     const doc: TicketImpresion = ticket
       ? construirTicketImpresion(ticket)
       : {
           local: locInfo,
           contexto: mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra",
           operario: operario?.nombre,
-          lineas: lineasComanda().map((l) => ({ cantidad: l.cantidad, nombre: nombreDeKey(l.id, "nombre_ticket"), importe: l.precio * l.cantidad })),
+          lineas: lineasComanda().map((l) => ({
+            cantidad: l.cantidad,
+            nombre: nombreBaseDeKey(l.id, "nombre_ticket"),
+            importe: l.precio * l.cantidad,
+            extras: extraIngredientesDetallados(l.id).map((ext) => ({
+              nombre: ext.nombre,
+              cantidad: ext.uds,
+              precioExtra: ext.precio,
+            })),
+          })),
           desglose: [],
           total,
           proforma: true,
@@ -721,7 +832,12 @@ export default function TPV() {
       estacion,
       lineas: lineasComanda()
         .filter((l) => l.estacion === estacion)
-        .map((l) => ({ cantidad: l.cantidad, nombre: nombreDeKey(l.id, "nombre_cocina"), nota: notas[l.id]?.trim() || undefined })),
+        .map((l) => ({ 
+          cantidad: l.cantidad, 
+          nombre: nombreDeKey(l.id, "nombre_cocina"), 
+          nota: notas[l.id]?.trim() || undefined,
+          pase: pases[l.id] || null
+        })),
     }));
 
     if (window.gluuh) {
@@ -740,13 +856,17 @@ export default function TPV() {
   // Añade `id` a la comanda y devuelve la clave REAL usada (puede llevar "#n" si
   // hubo que separar la línea para no contagiar un descuento/precio manual).
   const addProd = (id: string): string => {
-    // Lee buffer/modo por ref (valor vivo) para que el grid memoizado no use closures obsoletos.
-    const m = modoRef.current;
-    const qty = m === "UND" ? (Number(bufferRef.current.replace(",", ".")) || 1) : 1;
+    // Lee buffer/modo con getState() (valor VIVO): el grid memoizado captura addProd
+    // y la raíz ya no está suscrita al teclado (plan 011).
+    const { buffer: buf, modo: m } = useTpvStore.getState();
+    const qty = m === "UND" ? (Number(buf.replace(",", ".")) || 1) : 1;
     // ponytail: comandaRef puede quedar 1 tick atrás si se dispara 2 veces en el
     // mismo render; en ese caso peor caso = fusiona en la misma #n (uds sumadas), no rompe.
     const clave = claveParaAnadir(id, comandaRef.current, (k) =>
-      descuentosRef.current[k] !== undefined || preciosManualesRef.current[k] !== undefined);
+      descuentosRef.current[k] !== undefined ||
+      preciosManualesRef.current[k] !== undefined ||
+      lineasGuardadasRef.current.has(k)
+    );
     setComanda((c) => ({ ...c, [clave]: (c[clave] ?? 0) + qty }));
     // Atribución: sella la línea con el operario ACTIVO (por ref: sobrevive al cambio de camarero).
     const op = operarioRef.current;
@@ -757,60 +877,71 @@ export default function TPV() {
   };
 
   /* ── Teclado (con MODO: Unidad/Precio/Descuento reflejado en la barra) ── */
-  // Aplica el valor tecleado a una línea según el modo. Devuelve true si aplicó.
-  function aplicarModo(id: string, m: "UND" | "PREC" | "DTO%" | "DTO€"): boolean {
-    const val = Number(buffer.replace(",", ".")) || 0;
-    if (!val) return false;
-    if (m === "DTO%") { if (!puede("descuento")) return false; setDescuentos((d) => ({ ...d, [id]: { tipo: "PCT", valor: val } })); }
-    else if (m === "DTO€") { if (!puede("descuento")) return false; setDescuentos((d) => ({ ...d, [id]: { tipo: "EUR", valor: val } })); }
-    else if (m === "PREC") { if (!puede("modificar")) return false; setPreciosManuales((mm) => ({ ...mm, [id]: val })); }
-    else { if (!puede("modificar")) return false; setComanda((c) => ({ ...c, [id]: Math.max(1, Math.round(val)) })); }
-    setBuffer(""); return true;
-  }
   // Tap en una línea del ticket: la marca (siempre hay una marcada); cancela edición.
   function onLineaTap(id: string) {
     setEditando(false); setModo("UND"); setBuffer("");
     setLineaSel(id);
   }
-  function handleKey(k: string) {
-    if (k === "CLR") { setBuffer(""); setLineaSel(null); setModo("UND"); setEditando(false); return; }
+  // ESTABLE (useCallback []): lee buffer/modo/editando/lineaSel con getState() y
+  // los permisos por ref → TecladoTPV (memo) no re-renderiza por identidad de props.
+  const handleKey = useCallback((k: string) => {
+    const st = useTpvStore.getState();
+    const permite = (p: string) => permisosRef.current[p] !== false;
+    // Aplica el valor tecleado a una línea según el modo. Devuelve true si aplicó.
+    const aplicarModo = (id: string, m: "UND" | "PREC" | "DTO%" | "DTO€"): boolean => {
+      const val = Number(st.buffer.replace(",", ".")) || 0;
+      if (!val) return false;
+      if (m === "DTO%") { if (!permite("descuento")) return false; st.setDescuentos((d) => ({ ...d, [id]: { tipo: "PCT", valor: val } })); }
+      else if (m === "DTO€") { if (!permite("descuento")) return false; st.setDescuentos((d) => ({ ...d, [id]: { tipo: "EUR", valor: val } })); }
+      else if (m === "PREC") { if (!permite("modificar")) return false; st.setPreciosManuales((mm) => ({ ...mm, [id]: val })); }
+      else { if (!permite("modificar")) return false; st.setComanda((c) => ({ ...c, [id]: Math.max(1, Math.round(val)) })); }
+      st.setBuffer(""); return true;
+    };
+    if (k === "CLR") { st.setBuffer(""); st.setLineaSel(null); st.setModo("UND"); st.setEditando(false); return; }
     if (k === "CAN") {
-      if (!lineaSel || !puede("modificar")) return;
-      setComanda((c) => { const { [lineaSel]: _, ...r } = c; return r; });
-      setDescuentos((d) => { const { [lineaSel]: _, ...r } = d; return r; });
-      setPreciosManuales((m) => { const { [lineaSel]: _, ...r } = m; return r; });
-      setNotas((n) => { const { [lineaSel]: _, ...r } = n; return r; });
-      setInvitadas((v) => { const { [lineaSel]: _, ...r } = v; return r; });
-      setLineaSel(null); setBuffer(""); setEditando(false); return;
+      const sel = st.lineaSel;
+      if (!sel || !permite("modificar")) return;
+      st.setComanda((c) => { const { [sel]: _, ...r } = c; return r; });
+      st.setDescuentos((d) => { const { [sel]: _, ...r } = d; return r; });
+      st.setPreciosManuales((m) => { const { [sel]: _, ...r } = m; return r; });
+      st.setNotas((n) => { const { [sel]: _, ...r } = n; return r; });
+      st.setInvitadas((v) => { const { [sel]: _, ...r } = v; return r; });
+      st.setLineaSel(null); st.setBuffer(""); st.setEditando(false); return;
     }
-    if (k === "<") { setBuffer((b) => b.slice(0, -1)); return; }   // borrar último dígito
+    if (k === "<") { st.setBuffer((b) => b.slice(0, -1)); return; }   // borrar último dígito
     // Teclas de MODO (Und/Precio/DTO): ARMAN el teclado (lo habilitan y pintan el
     // botón en verde). Con una línea seleccionada, editan su valor (recuadro + mensaje).
     // 2ª pulsación del MISMO modo → confirma lo tecleado (si hay línea) y desarma.
     if (k === "UND" || k === "PREC" || k === "DTO%" || k === "DTO€") {
-      if (editando && modo === k) {
-        if (lineaSel && buffer) aplicarModo(lineaSel, k);
-        setEditando(false); setModo("UND"); setBuffer("");
+      if (st.editando && st.modo === k) {
+        if (st.lineaSel && st.buffer) aplicarModo(st.lineaSel, k);
+        st.setEditando(false); st.setModo("UND"); st.setBuffer("");
         return;
       }
-      setModo(k); setEditando(true); setBuffer("");
+      st.setModo(k); st.setEditando(true); st.setBuffer("");
       return;
     }
     // Dígitos y coma
-    if (k === "," && buffer.includes(",")) return;
-    setBuffer((b) => b + k);
-  }
+    if (k === "," && st.buffer.includes(",")) return;
+    st.setBuffer((b) => b + k);
+  }, []);
 
   /* ── Backend ── */
   // Carga la lista de mesas + el importe de la cuenta abierta de cada una.
   async function recargarMesas() {
     const cols = "id,nombre,estado,room_id,pos_x,pos_y,capacidad,rotacion";
-    const conSprite = await sb.from("restaurant_table").select(`${cols},sprite`).order("nombre");
-    const sinSprite = conSprite.error ? await sb.from("restaurant_table").select(cols).order("nombre") : null;   // sprite aún sin migrar
-    const mData = (conSprite.error ? sinSprite?.data : conSprite.data) as Mesa[] | null;
-    const { data: ords } = await sb.from("sales_order").select("table_id,total,created_at")
-      .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
-      .not("table_id", "is", null);
+    // Promise.resolve fuerza el arranque del thenable de supabase YA: la query de
+    // pedidos abiertos viaja en paralelo con la cadena (con fallback) de mesas.
+    const pOrds = Promise.resolve(
+      sb.from("sales_order").select("table_id,total,created_at")
+        .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
+        .not("table_id", "is", null),
+    );
+    const conColor = await sb.from("restaurant_table").select(`${cols},sprite,color`).order("nombre");
+    const conSprite = conColor.error ? await sb.from("restaurant_table").select(`${cols},sprite`).order("nombre") : null;
+    const sinSprite = (conColor.error && conSprite?.error) ? await sb.from("restaurant_table").select(cols).order("nombre") : null;
+    const mData = (!conColor.error ? conColor.data : (!conSprite?.error ? conSprite?.data : sinSprite?.data)) as Mesa[] | null;
+    const { data: ords } = await pOrds;
     setMesas(mData ?? []);
     const ultima: Record<string, { total: number; created_at: string }> = {};
     for (const o of (ords ?? []) as { table_id: string; total: number; created_at: string }[]) {
@@ -820,6 +951,14 @@ export default function TPV() {
     const tot: Record<string, number> = {};
     for (const k of Object.keys(ultima)) tot[k] = ultima[k]!.total;
     setTotalesMesa(tot);
+  }
+
+  async function recargarElementos() {
+    const cols = "id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto,rotacion";
+    const conColor = await sb.from("plano_elemento").select(`${cols},color`);
+    const sinColor = conColor.error ? await sb.from("plano_elemento").select(cols) : null;
+    const eData = (!conColor.error ? conColor.data : sinColor?.data) as Elemento[] | null;
+    setElementos(eData ?? []);
   }
 
   async function recargarReservas() {
@@ -836,96 +975,48 @@ export default function TPV() {
     setLlevarList((data as { id: string; cliente_nombre: string; cliente_telefono: string | null; total: number; created_at: string }[]) ?? []);
   }
 
-  function nuevoParaLlevar() {
-    if (!nuevoLlevar.nombre.trim()) return;
+  function nuevoParaLlevar(nombre: string, telefono: string) {
+    if (!nombre.trim()) return;
     setNavSala(false);
     setMesa(null); setBarra(false); setTicket(null); setOrdenAbiertaId(null);
     setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({});
     setBuffer(""); setLineaSel(null); setVistaProds(false);
-    setLlevar({ nombre: nuevoLlevar.nombre.trim(), telefono: nuevoLlevar.telefono.trim() });
-    setNuevoLlevar({ nombre: "", telefono: "" });
+    setLlevar({ nombre: nombre.trim(), telefono: telefono.trim() });
   }
 
   async function abrirLlevar(o: { id: string; cliente_nombre: string; cliente_telefono: string | null }) {
     setNavSala(false);
     setMesa(null); setBarra(false); setTicket(null);
-    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({}); setAnadidoPor({});
+    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({}); setAnadidoPor({}); setPases({});
     setBuffer(""); setLineaSel(null); setVistaProds(false);
     setLlevar({ nombre: o.cliente_nombre, telefono: o.cliente_telefono ?? "" });
     setOrdenAbiertaId(o.id);
-    const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas").eq("order_id", o.id);
+    const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,modificadores,pase").eq("order_id", o.id);
     const cmd: Record<string, number> = {}, pr: Record<string, number> = {}, nt: Record<string, string> = {};
-    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null }[]) {
-      if (!l.product_id || !prods.some((p) => p.id === l.product_id)) continue;
-      cmd[l.product_id] = (cmd[l.product_id] ?? 0) + Number(l.cantidad);
-      pr[l.product_id] = Number(l.precio_unitario);
-      if (l.notas) nt[l.product_id] = l.notas;
+    const pasesCargados: Record<string, number> = {};
+    const guardadas = new Set<string>();
+    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null; modificadores?: any; pase?: number | null }[]) {
+      if (!l.product_id || !prodPorId.has(l.product_id)) continue;
+      let baseKey = l.product_id;
+      if (l.modificadores && typeof l.modificadores === "object" && l.modificadores.key) {
+        baseKey = l.modificadores.key;
+      }
+      const clave = claveParaAnadir(baseKey, cmd, () => true);
+      cmd[clave] = (cmd[clave] ?? 0) + Number(l.cantidad);
+      guardadas.add(clave);
+      const manualBase = obtenerBaseManualSiDifiere(baseKey, Number(l.precio_unitario));
+      if (manualBase !== undefined) {
+        pr[clave] = manualBase;
+      }
+      if (l.notas) nt[clave] = l.notas;
+      if (l.pase) pasesCargados[clave] = l.pase;
     }
     setComanda(cmd); setPreciosManuales(pr); setNotas(nt);
+    setPases(pasesCargados);
+    setLineasGuardadas(guardadas);
   }
 
-  /* ── Reserva de mesa por pulsación larga ── */
-  function onPressStart(m: Mesa) {
-    if (modoTraspaso) return;   // en traspaso, un toque selecciona destino (sin reservas)
-    longPressed.current = false;
-    pressTimer.current = setTimeout(() => {
-      longPressed.current = true;
-      setResForm({ id: null, nombre: "", personas: String(m.capacidad || 2), hora: "" });
-      setReservaPop(m);
-    }, 450);
-  }
-  function onPressEnd() { if (pressTimer.current) clearTimeout(pressTimer.current); }
-  function onMesaClick(m: Mesa) {
-    if (longPressed.current) { longPressed.current = false; return; }  // fue pulsación larga
-    if (modoTraspaso) { void ejecutarTraspaso(m); return; }   // traspaso: esta es la mesa destino
-    if (mesaSel?.id === m.id) { abrirMesa(m); return; }   // 2º toque → abre la mesa en el TPV
-    setMesaSel(m); void cargarPreviewMesa(m);             // 1er toque → muestra su cuenta
-  }
 
-  // Carga la cuenta de una mesa para la vista previa del plano (sin entrar al TPV).
-  async function cargarPreviewMesa(m: Mesa) {
-    setMesaSelInfo(null);
-    const { data: ord } = await sb.from("sales_order")
-      .select("id,total,comensales,created_at")
-      .eq("table_id", m.id).in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (!ord) { setMesaSelInfo({ apertura: "", importe: 0, comensales: null, lineas: [] }); return; }
-    const o = ord as { id: string; total: number; comensales: number | null; created_at: string };
-    const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario").eq("order_id", o.id);
-    const nq = await sb.from("sales_order").select("notas").eq("id", o.id).maybeSingle();   // best-effort
-    setMesaSelInfo({
-      apertura: hhmm(o.created_at), importe: Number(o.total), comensales: o.comensales,
-      nota: (nq.data as { notas?: string } | null)?.notas ?? "",
-      lineas: ((lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number }[]).map((l) => ({
-        nombre: prods.find((p) => p.id === l.product_id)?.nombre ?? "Producto", cantidad: Number(l.cantidad), precio: Number(l.precio_unitario),
-      })),
-    });
-  }
-  function fechaHoy(hm: string): string {
-    const [h, mi] = hm.split(":").map(Number);
-    const d = new Date(); d.setHours(h ?? 0, mi ?? 0, 0, 0);
-    return d.toISOString();
-  }
-  function editarReserva(r: Reserva) {
-    setResForm({ id: r.id, nombre: r.nombre ?? "", personas: String(r.comensales), hora: hhmm(r.fecha_hora) });
-  }
-  async function guardarReserva(m: Mesa) {
-    if (!resForm.hora) return;
-    const datos = {
-      fecha_hora: fechaHoy(resForm.hora),
-      comensales: Number(resForm.personas) || (m.capacidad || 2),
-      nombre: resForm.nombre.trim() || null,
-    };
-    if (resForm.id) await sb.from("reservation").update(datos).eq("id", resForm.id);
-    else await sb.from("reservation").insert({ location_id: locationId, table_id: m.id, estado: "CONFIRMADA", ...datos });
-    setResForm({ id: null, nombre: "", personas: String(m.capacidad || 2), hora: "" });
-    await recargarReservas();
-  }
-  async function quitarReserva(r: Reserva) {
-    await sb.from("reservation").delete().eq("id", r.id);
-    setResForm({ id: null, nombre: "", personas: "", hora: "" });
-    await recargarReservas();
-  }
 
   // Crea o REUTILIZA la cuenta abierta de la mesa (un único pedido por mesa).
   async function crearOrden(estado: string, estadoPrep: string) {
@@ -937,6 +1028,8 @@ export default function TPV() {
       notas: [invitadas[l.id] ? "Invitación" : null, notas[l.id]?.trim() || null].filter(Boolean).join(" · ") || null,
       estacion: l.estacion,
       user_id: anadidoPor[l.id]?.id ?? operario?.id ?? userId,   // atribución por línea (col. user_id, mig. 0059)
+      modificadores: { key: l.id },
+      pase: pases[l.id] || null,
     }));
     const totalRedondeado = Math.round(total * 100) / 100;
 
@@ -951,9 +1044,27 @@ export default function TPV() {
     };
 
     let orderId = ordenAbiertaId;
+    // Inserta las líneas COMPROBANDO el resultado; degrada sin user_id (la col.
+    // de la mig. 0059 puede no existir). false = no se pudieron guardar.
+    const insertarLineas = async (oid: string): Promise<boolean> => {
+      if (!lineas.length) return true;
+      const filas = lineas.map((l) => ({ order_id: oid, ...l }));
+      const { error } = await sb.from("order_line").insert(filas);
+      if (!error) return true;
+      const { error: e2 } = await sb.from("order_line").insert(filas.map(({ user_id, ...r }) => r));
+      if (e2) { toast.error("No se pudieron guardar las líneas de la cuenta."); return false; }
+      return true;
+    };
     if (orderId) {
       await sb.from("sales_order").update({ estado, estado_preparacion: estadoPrep, total: totalRedondeado, ...camposCuenta }).eq("id", orderId);
-      await sb.from("order_line").delete().eq("order_id", orderId);
+      // Reemplazo ATÓMICO de líneas (RPC 0094): elimina la ventana DELETE→INSERT
+      // en la que un fallo dejaba la cuenta sin líneas. Si la migración aún no
+      // está aplicada en este entorno, degrada al camino antiguo comprobando.
+      const { error: rpcErr } = await sb.rpc("reemplazar_lineas_orden", { p_order_id: orderId, p_lineas: lineas });
+      if (rpcErr) {
+        await sb.from("order_line").delete().eq("order_id", orderId);
+        if (!(await insertarLineas(orderId))) return null;
+      }
     } else {
       const { data: order } = await sb.from("sales_order").insert({
         location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId,
@@ -963,13 +1074,7 @@ export default function TPV() {
       if (!order) return null;
       orderId = (order as { id: string }).id;
       setOrdenAbiertaId(orderId);
-    }
-    if (lineas.length) {
-      const filas = lineas.map((l) => ({ order_id: orderId, ...l }));
-      const { error } = await sb.from("order_line").insert(filas);
-      // Degradación: la columna user_id (mig. 0059) puede no existir aún. Si el insert
-      // falla por eso, reintenta SIN user_id para no romper el guardado de la comanda.
-      if (error) await sb.from("order_line").insert(filas.map(({ user_id, ...r }) => r));
+      if (!(await insertarLineas(orderId))) return null;
     }
     return orderId;
   }
@@ -978,7 +1083,7 @@ export default function TPV() {
   // Devuelve true si la mesa tenía cuenta abierta. NO cambia de pantalla.
   async function cargarCuentaMesa(m: Mesa): Promise<boolean> {
     setMesa(m); setBarra(false); setLlevar(null); setTicket(null);
-    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({}); setAnadidoPor({});
+    setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({}); setAnadidoPor({}); setPases({});
     setLineaSel(null); setVistaProds(false); setOrdenAbiertaId(null);
 
     const { data: ord } = await sb.from("sales_order")
@@ -988,32 +1093,46 @@ export default function TPV() {
     if (!ord) { setNotaMesa(""); return false; }
     const oid = (ord as { id: string }).id;
     setOrdenAbiertaId(oid);
-    const nq = await sb.from("sales_order").select("notas").eq("id", oid).maybeSingle();   // best-effort
-    setNotaMesa((nq.data as { notas?: string } | null)?.notas ?? "");
+    // La nota (best-effort, la columna puede no existir) viaja EN PARALELO con las líneas.
+    const pNotas = Promise.resolve(sb.from("sales_order").select("notas").eq("id", oid).maybeSingle());
 
     // Cada order_line = su propia línea de comanda (clave única base#n), preservando el
     // precio exacto (dto por línea), la nota y la atribución. user_id puede no existir (0059).
-    const conUser = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,user_id").eq("order_id", oid);
+    const conUser = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,user_id,modificadores,pase").eq("order_id", oid);
     const lns = conUser.error
-      ? (await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas").eq("order_id", oid)).data
+      ? (await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,modificadores,pase").eq("order_id", oid)).data
       : conUser.data;
+    const nq = await pNotas;
+    setNotaMesa((nq.data as { notas?: string } | null)?.notas ?? "");
     const comandaCargada: Record<string, number> = {};
     const precios: Record<string, number> = {};
     const notasCargadas: Record<string, string> = {};
     const autores: Record<string, { id: string; nombre: string }> = {};
-    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null; user_id?: string | null }[]) {
-      if (!l.product_id || !prods.some((p) => p.id === l.product_id)) continue;
+    const pasesCargados: Record<string, number> = {};
+    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null; user_id?: string | null; modificadores?: any; pase?: number | null }[]) {
+      if (!l.product_id || !prodPorId.has(l.product_id)) continue;
+      let baseKey = l.product_id;
+      if (l.modificadores && typeof l.modificadores === "object" && l.modificadores.key) {
+        baseKey = l.modificadores.key;
+      }
       // clave única por order_line: fuerza #n cuando el producto ya está (una línea por fila).
-      const clave = claveParaAnadir(l.product_id, comandaCargada, () => true);
+      const clave = claveParaAnadir(baseKey, comandaCargada, () => true);
       comandaCargada[clave] = Number(l.cantidad);
-      precios[clave] = Number(l.precio_unitario);   // preserva precio/dto exacto de la línea
+      const manualBase = obtenerBaseManualSiDifiere(baseKey, Number(l.precio_unitario));
+      if (manualBase !== undefined) {
+        precios[clave] = manualBase;
+      }
       if (l.notas) notasCargadas[clave] = l.notas;
       if (l.user_id) autores[clave] = { id: l.user_id, nombre: operarios.find((o) => o.id === l.user_id)?.nombre ?? "" };
+      if (l.pase) pasesCargados[clave] = l.pase;
     }
+    const guardadas = new Set(Object.keys(comandaCargada));
     setComanda(comandaCargada);
     setPreciosManuales(precios);
     setNotas(notasCargadas);
     setAnadidoPor(autores);
+    setPases(pasesCargados);
+    setLineasGuardadas(guardadas);
     return true;
   }
 
@@ -1032,7 +1151,7 @@ export default function TPV() {
     const o = ord as { id: string; total: number };
     const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario").eq("order_id", o.id);
     const lineas = ((lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number }[])
-      .map((l) => ({ cantidad: Number(l.cantidad), nombre: prods.find((p) => p.id === l.product_id)?.nombre ?? "Producto", importe: Number(l.cantidad) * Number(l.precio_unitario) }));
+      .map((l) => ({ cantidad: Number(l.cantidad), nombre: prodPorId.get(l.product_id ?? "")?.nombre ?? "Producto", importe: Number(l.cantidad) * Number(l.precio_unitario) }));
     void imprimirTicket({ local: locInfo, contexto: m.nombre, operario: operario?.nombre, lineas, desglose: [], total: Number(o.total), proforma: true }, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
   }
 
@@ -1050,21 +1169,18 @@ export default function TPV() {
     const filas = ((lns ?? []) as { product_id: string | null; cantidad: number; notas: string | null }[]);
     for (const [estacion, tipoDoc] of [["COCINA", "COMANDA_COCINA"], ["BARRA", "COMANDA_BARRA"]] as const) {
       const lineas = filas
-        .filter((l) => (prods.find((p) => p.id === l.product_id)?.estacion ?? "COCINA") === estacion)
-        .map((l) => ({ cantidad: Number(l.cantidad), nombre: prods.find((p) => p.id === l.product_id)?.nombre ?? "Producto", nota: l.notas?.trim() || undefined }));
+        .filter((l) => (prodPorId.get(l.product_id ?? "")?.estacion ?? "COCINA") === estacion)
+        .map((l) => ({ cantidad: Number(l.cantidad), nombre: prodPorId.get(l.product_id ?? "")?.nombre ?? "Producto", nota: l.notas?.trim() || undefined }));
       if (!lineas.length) continue;
       void imprimirComanda({ contexto: m.nombre, operario: operario?.nombre, nota: notaM, lineas }, estacion, resolverImpresora(cfgImpresion, tipoDoc));
     }
   }
 
-  // Dividir / traspasar la cuenta de una mesa directamente desde el plano:
-  // cargan la cuenta y abren el modal correspondiente (sin ir al TPV).
+  // Dividir cuenta de una mesa directamente desde el plano:
+  // carga la cuenta y abre el modal correspondiente (sin ir al TPV).
   async function dividirMesa(m: Mesa) {
     if (!puede("cobrar") || !(await cargarCuentaMesa(m))) return;
-    setModalDividir(true);
-  }
-  async function traspMesa(m: Mesa) {
-    if (await cargarCuentaMesa(m)) setModalPasarMesa(true);
+    setModalActivo('DIVIDIR');
   }
 
   /* ── Traspaso entre mesas (estilo Glop) ── */
@@ -1080,74 +1196,94 @@ export default function TPV() {
     setTraspLineas({}); setModoTraspaso(modo);
   }
   function cancelarTraspaso() { setModoTraspaso(null); setTraspLineas({}); reset(); }
+  // Camino antiguo del traspaso (degradación si la RPC 0095 no está aplicada).
+  // Ya corregido: clavea por CLAVE DE LÍNEA, no por product_id.
+  async function traspasarLineasLegacy(origenId: string, destino: Mesa, movimientos: { clave: string; uds: number }[], todo: boolean) {
+    const dq = await sb.from("sales_order").select("id").eq("table_id", destino.id).in("estado", ESTADOS_ABIERTOS).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    let destId = (dq.data as { id: string } | null)?.id;
+    if (!destId) {
+      const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: destino.id, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: 0, client_id: crypto.randomUUID() }).select("id").single();
+      destId = (data as { id: string } | null)?.id;
+    }
+    if (!destId) { toast.error("No se pudo abrir la cuenta de destino."); return false; }
+    const { data: srcLns } = await sb.from("order_line").select("id,product_id,nombre,cantidad,precio_unitario,tipo_impositivo,notas,estacion,modificadores,pase").eq("order_id", origenId);
+    const udsDe = (clave: string) => movimientos.find((m) => m.clave === clave)?.uds ?? 0;
+    for (const l of (srcLns ?? []) as { id: string; product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: string; notas: string | null; estacion: string; modificadores?: any; pase?: number | null }[]) {
+      // La clave de comanda viaja en modificadores.key (crearOrden la sella ahí).
+      const clave = (l.modificadores && typeof l.modificadores === "object" && l.modificadores.key) ? String(l.modificadores.key) : (l.product_id ?? "");
+      const mover = todo ? Number(l.cantidad) : Math.min(Number(l.cantidad), udsDe(clave));
+      if (mover <= 0) continue;
+      const { error } = await sb.from("order_line").insert({ order_id: destId, product_id: l.product_id, nombre: l.nombre, cantidad: mover, precio_unitario: l.precio_unitario, tipo_impositivo: l.tipo_impositivo, notas: l.notas, estacion: l.estacion, modificadores: l.modificadores, pase: l.pase ?? null });
+      if (error) { toast.error("El traspaso falló a medias. Revisa ambas mesas."); return false; }
+      if (mover >= Number(l.cantidad)) await sb.from("order_line").delete().eq("id", l.id);
+      else await sb.from("order_line").update({ cantidad: Number(l.cantidad) - mover }).eq("id", l.id);
+    }
+    await recomputarTotal(destId);
+    await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", destino.id);
+    const { data: resto } = await sb.from("order_line").select("id").eq("order_id", origenId).limit(1);
+    if (!resto?.length) {
+      await sb.from("sales_order").update({ estado: "ANULADA", total: 0 }).eq("id", origenId);
+      if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
+    } else {
+      await recomputarTotal(origenId);
+    }
+    return true;
+  }
+
   async function ejecutarTraspaso(destino: Mesa) {
     const origenId = ordenAbiertaId, modo = modoTraspaso;
-    if (!origenId || !modo || destino.id === mesa?.id) { cancelarTraspaso(); return; }
+    if (busy || !origenId || !modo || destino.id === mesa?.id) { cancelarTraspaso(); return; }
     setBusy(true);
     try {
-      // Pedido destino: reutiliza el abierto o crea uno nuevo.
-      const dq = await sb.from("sales_order").select("id").eq("table_id", destino.id).in("estado", ESTADOS_ABIERTOS).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      let destId = (dq.data as { id: string } | null)?.id;
-      if (!destId) {
-        const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: destino.id, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: 0, client_id: crypto.randomUUID() }).select("id").single();
-        destId = (data as { id: string } | null)?.id;
-      }
-      if (!destId) { cancelarTraspaso(); return; }
-      // Mueve líneas (enteras o las unidades elegidas).
-      const { data: srcLns } = await sb.from("order_line").select("id,product_id,nombre,cantidad,precio_unitario,tipo_impositivo,notas,estacion").eq("order_id", origenId);
-      for (const l of (srcLns ?? []) as { id: string; product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: string; notas: string | null; estacion: string }[]) {
-        const mover = modo === "LINEAS" ? Math.min(Number(l.cantidad), traspLineas[l.product_id ?? ""] ?? 0) : Number(l.cantidad);
-        if (mover <= 0) continue;
-        await sb.from("order_line").insert({ order_id: destId, product_id: l.product_id, nombre: l.nombre, cantidad: mover, precio_unitario: l.precio_unitario, tipo_impositivo: l.tipo_impositivo, notas: l.notas, estacion: l.estacion });
-        if (mover >= Number(l.cantidad)) await sb.from("order_line").delete().eq("id", l.id);
-        else await sb.from("order_line").update({ cantidad: Number(l.cantidad) - mover }).eq("id", l.id);
-      }
-      await recomputarTotal(destId);
-      await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", destino.id);
-      // Si el origen se queda vacío, se anula y se libera la mesa.
-      const { data: resto } = await sb.from("order_line").select("id").eq("order_id", origenId).limit(1);
-      if (!resto?.length) {
-        await sb.from("sales_order").update({ estado: "ANULADA", total: 0 }).eq("id", origenId);
-        if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
-      } else {
-        await recomputarTotal(origenId);
-      }
+      // Movimientos por CLAVE DE LÍNEA (traspLineas se rellena con la clave de la
+      // comanda). Antes se buscaba por product_id → con formato/extras movía 0 uds
+      // en silencio, o aplicaba las uds de una línea a otra del mismo producto.
+      const todo = modo === "MESA";
+      const movimientos = todo ? [] : Object.entries(traspLineas)
+        .filter(([, uds]) => uds > 0)
+        .map(([clave, uds]) => ({ clave, uds }));
+      if (!todo && movimientos.length === 0) { toast.warning("No has elegido unidades que traspasar."); cancelarTraspaso(); return; }
+
+      // Traspaso ATÓMICO (RPC 0095): un fallo a medias ya no duplica ni pierde líneas.
+      const { error: rpcErr } = await sb.rpc("traspasar_lineas", {
+        p_origen: origenId,
+        p_destino_mesa: destino.id,
+        p_location: locationId,
+        p_user: operario?.id ?? userId,
+        p_movimientos: movimientos,   // [] = mesa entera
+      });
+      if (rpcErr && !(await traspasarLineasLegacy(origenId, destino, movimientos, todo))) return;
+
       setModoTraspaso(null); setTraspLineas({});
       await recargarMesas();
       reset();
+      toast.success(`Traspasado a ${destino.nombre}`);
     } finally { setBusy(false); }
   }
   async function cobrarMesa(m: Mesa) {
     if (!puede("cobrar") || !(await cargarCuentaMesa(m))) return;
-    setModalCobrar(true);
-  }
-  // Nota de la mesa: sobre el pedido abierto (best-effort; la columna puede faltar).
-  async function abrirNotaMesa(m: Mesa) {
-    const { data: ord } = await sb.from("sales_order").select("id").eq("table_id", m.id)
-      .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const oid = (ord as { id: string } | null)?.id;
-    if (!oid) return;   // mesa libre: sin cuenta donde anotar
-    setNotaOrderId(oid);
-    const nq = await sb.from("sales_order").select("notas").eq("id", oid).maybeSingle();
-    setNotaTexto((nq.data as { notas?: string } | null)?.notas ?? "");
-    setModalNota(true);
-  }
-  async function guardarNota() {
-    if (notaOrderId) await sb.from("sales_order").update({ notas: notaTexto }).eq("id", notaOrderId);
-    setModalNota(false);
+    setModalActivo('COBRAR');
   }
 
   async function enviarCocina(estadoPrep: string) {
+    if (busy) return;
     if (!unidades) { toast.warning("No hay nada que enviar"); return; }
     setBusy(true);
     try {
-      await crearOrden("ENVIADA_COCINA", estadoPrep);
+      const orderId = await crearOrden("ENVIADA_COCINA", estadoPrep);
       if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
       const marchar = estadoPrep === "EN_PREPARACION";
       if (marchar) imprimirComandas();   // solo imprime en Gluuh Desktop; el pedido va al KDS igualmente
       await recargarMesas();
-      reset();
+      
+      if (mesa) {
+        await cargarCuentaMesa(mesa);
+      } else if (llevar && orderId) {
+        await abrirLlevar({ id: orderId, cliente_nombre: llevar.nombre, cliente_telefono: llevar.telefono || null });
+      } else {
+        reset();
+      }
+      
       // Feedback: aunque no haya impresora, el pedido ya está en la pantalla de cocina (KDS).
       if (!marchar) toast.success("Enviado a cocina");
       else if (typeof window !== "undefined" && window.gluuh) toast.success("Marchado a cocina/barra");
@@ -1158,6 +1294,7 @@ export default function TPV() {
   // Guarda la cuenta abierta y limpia la pantalla. Mesa/llevar se auto-marchan;
   // un Ticket directo con líneas se aparca como cuenta de barra para no perderlo.
   async function guardarActual() {
+    if (busy) return;
     if (unidades > 0) {
       setBusy(true);
       try {
@@ -1177,12 +1314,8 @@ export default function TPV() {
     reset();
   }
 
-  async function volver() { await guardarActual(); setNavSala(false); }
-
-  // Rail lateral estilo Glop. "ticket" = venta actual; el resto navega guardando
-  // la cuenta en curso y mostrando el plano/tarjetas de ese destino.
-  function irASala(destino: { tipo: "ticket" } | { tipo: "barra" } | { tipo: "llevar" } | { tipo: "room"; id: string }) {
-    setMesaSel(null); setMesaSelInfo(null); setEditandoPlano(false); setPosOverride({});
+  function irASala(destino: { tipo: "ticket" | "barra" | "room" | "llevar"; id?: string }) {
+    setMesaSel(null); setMesaSelInfo(null);
     if (destino.tipo === "ticket") {
       if (!mesa && !llevar) setBarra(true);   // Ticket vacío = venta directa
       setNavSala(false);
@@ -1192,7 +1325,7 @@ export default function TPV() {
     setNavSala(true);
     if (destino.tipo === "barra") setVistaSala("BARRA");
     else if (destino.tipo === "llevar") setVistaSala("LLEVAR");
-    else setVistaSala(destino.id);
+    else if (destino.id) setVistaSala(destino.id);
     void guardarActual();
   }
 
@@ -1203,18 +1336,38 @@ export default function TPV() {
     filas: { metodo: string; importe: number; propina: number }[],
     opts: { abrirCajon?: boolean; imprimir?: boolean } = {},
   ) {
-    if (!unidades) return;
+    if (busy || cobrandoRef.current || !unidades) return;
+    cobrandoRef.current = true;
     setBusy(true);
     try {
-      const res = await fetch("/api/ticket", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          territorio: TERR[territorio] ?? "PENINSULA_BALEARES",
-          lineas: lineasComanda().map((l) => ({ precio: l.precio, tipo: l.tipo, cantidad: l.cantidad })),
-        }),
-      });
-      const t = await res.json();
+      // Cálculo fiscal ANTES de tocar nada en BD: si falla o no responde en 15 s,
+      // el cobro aborta entero (nada de venta COBRADA sin ticket ni TPV colgado).
+      let t: Ticket;
+      try {
+        // Bearer de la sesión: /api/ticket ya NO es anónimo (era un endpoint de
+        // cómputo —QR/huella— abierto a cualquiera). Mismo patrón que /api/factura.
+        const tok = (await sb.auth.getSession()).data.session?.access_token;
+        const res = await fetch("/api/ticket", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+          },
+          signal: AbortSignal.timeout(15_000),
+          body: JSON.stringify({
+            territorio: TERR[territorio] ?? "PENINSULA_BALEARES",
+            lineas: lineasComanda().map((l) => ({ precio: l.precio, tipo: l.tipo, cantidad: l.cantidad })),
+          }),
+        });
+        if (!res.ok) { toast.error("No se pudo calcular el ticket. No se ha cobrado nada."); return; }
+        t = (await res.json()) as Ticket;
+      } catch {
+        toast.error("Sin conexión con el servidor. No se ha cobrado nada.");
+        return;
+      }
+      if (!t?.impuestos?.desglose) { toast.error("Respuesta fiscal inválida. No se ha cobrado nada."); return; }
       const orderId = await crearOrden("COBRADA", "ENTREGADO");
+      if (!orderId) { toast.error("No se pudo guardar la cuenta. No se ha cobrado nada."); return; }
       // Invitación y consumo propio se REGISTRAN (crearOrden aplica tipo_operacion)
       // pero no generan cobro ni factura: no se inserta payment ni se factura.
       if (orderId && tipoOperacion === "VENTA") {
@@ -1225,7 +1378,15 @@ export default function TPV() {
         const { error: payErr } = await sb.from("payment").insert(
           finales.map((p) => ({ order_id: orderId, ...p, client_id: crypto.randomUUID() })),
         );
-        if (payErr) console.error("No se registró el pago:", payErr.message);
+        if (payErr) {
+          // El pedido ya quedó COBRADA (crearOrden): lo devolvemos a POR_COBRAR
+          // para que el descuadre sea visible y recuperable, no silencioso.
+          await sb.from("sales_order").update({ estado: "POR_COBRAR" }).eq("id", orderId);
+          if (mesa) await sb.from("restaurant_table").update({ estado: "POR_COBRAR" }).eq("id", mesa.id);
+          toast.error("El pago NO quedó registrado. La cuenta sigue pendiente de cobro.");
+          await recargarMesas();
+          return;   // sin cajón, sin liberar mesa, sin ticket
+        }
         // Cajón: abre si alguna forma usada lo pide (abre_cajon); si no, por efectivo.
         if (opts.abrirCajon ?? finales.some((p) => p.metodo === "EFECTIVO")) void window.gluuh?.abrirCajon();
       }
@@ -1267,13 +1428,13 @@ export default function TPV() {
       setUltimoDoc(construirTicketImpresion(t));
       // F11 (Cobrar+Imprimir): imprime el recibo con el logo de tickets.
       if (opts.imprimir) void imprimirTicket(construirTicketImpresion(t), cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
-    } finally { setBusy(false); }
+    } finally { cobrandoRef.current = false; setBusy(false); }
   }
 
   // Cobro desde CobrarModal: mapea las líneas de pago (payment_method) al esquema
   // de `payment`, reparte propina/descuento y decide el cajón por abre_cajon.
   function cobrarDesdeModal(pagos: LineaPago[], opts: CobrarOpciones) {
-    setModalCobrar(false);
+    setModalActivo(null);
     const due = Math.max(0, Math.round((total + (opts.propina || 0) - (opts.descuento || 0)) * 100) / 100);
     const prop = Math.round((opts.propina || 0) * 100) / 100;
     // Reparte los importes hasta cubrir el debido (el exceso = cambio, no se registra).
@@ -1300,7 +1461,7 @@ export default function TPV() {
   // queda en el pedido/mesa original; el resto se abren como cuentas de barra
   // aparcadas ("Mesa X (2)"…), cobrables por separado desde «Barra» (guía 12 §6).
   async function dividirAceptar(docs: { lineas: { id: string; uds: number }[] }[]) {
-    setModalDividir(false);
+    setModalActivo(null);
     const clean = docs.filter((d) => d.lineas.length);
     if (clean.length <= 1) { reset(); return; }   // sin reparto real: no se divide
     setBusy(true);
@@ -1318,36 +1479,61 @@ export default function TPV() {
       const totalDe = (asign: { id: string; uds: number }[]) =>
         Math.round(asign.reduce((s, a) => s + (invitadas[a.id] ? 0 : (meta[a.id]?.precio ?? 0)) * a.uds, 0) * 100) / 100;
       const filasDe = (asign: { id: string; uds: number }[]) => {
-        const out: { product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: number; notas: string | null; estacion: string }[] = [];
+        const out: { product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: number; notas: string | null; estacion: string; modificadores: any }[] = [];
         for (const a of asign) {
           const m = meta[a.id]; if (!m) continue;
-          out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion });
+          out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion, modificadores: { key: a.id } });
         }
         return out;
       };
 
-      // Doc 1 → pedido original (reutiliza el abierto o crea uno con SOLO sus líneas).
-      const doc0 = clean[0]!;
-      let baseId = ordenAbiertaId;
-      if (baseId) {
-        await sb.from("sales_order").update({ estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), ...camposCuenta }).eq("id", baseId);
-        await sb.from("order_line").delete().eq("order_id", baseId);
-      } else {
-        const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), client_id: crypto.randomUUID(), ...camposCuenta }).select("id").single();
-        baseId = (data as { id: string } | null)?.id ?? null;
-      }
-      if (baseId) { const f0 = filasDe(doc0.lineas); if (f0.length) await sb.from("order_line").insert(f0.map((l) => ({ order_id: baseId, ...l }))); }
+      // División ATÓMICA (RPC 0095): antes los inserts de los documentos 2.. no se
+      // comprobaban → si uno fallaba, ESA parte de la cuenta desaparecía en silencio.
+      const etiquetaBase = mesa?.nombre ?? llevar?.nombre ?? "Ticket";
+      const docsRpc = clean.map((d) => ({ total: totalDe(d.lineas), lineas: filasDe(d.lineas) }));
+      const { error: rpcErr } = await sb.rpc("dividir_cuenta", {
+        p_origen: ordenAbiertaId,
+        p_location: locationId,
+        p_mesa: mesa?.id ?? null,
+        p_user: operario?.id ?? userId,
+        p_etiqueta_base: etiquetaBase,
+        p_campos: camposCuenta,
+        p_docs: docsRpc,
+      });
 
-      // Docs 2.. → nuevas cuentas de barra aparcadas (cobrables por separado).
-      for (let i = 1; i < clean.length; i++) {
-        const etiqueta = `${mesa?.nombre ?? llevar?.nombre ?? "Ticket"} (${i + 1})`;
-        const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(clean[i]!.lineas), client_id: crypto.randomUUID(), aparcado_como: etiqueta, ...camposCuenta }).select("id").single();
-        const nid = (data as { id: string } | null)?.id;
-        if (nid) { const fl = filasDe(clean[i]!.lineas); if (fl.length) await sb.from("order_line").insert(fl.map((l) => ({ order_id: nid, ...l }))); }
+      if (rpcErr) {
+        // Degradación (0095 sin aplicar): camino antiguo, ahora COMPROBANDO cada insert.
+        const doc0 = clean[0]!;
+        let baseId = ordenAbiertaId;
+        if (baseId) {
+          await sb.from("sales_order").update({ estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), ...camposCuenta }).eq("id", baseId);
+          await sb.from("order_line").delete().eq("order_id", baseId);
+        } else {
+          const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), client_id: crypto.randomUUID(), ...camposCuenta }).select("id").single();
+          baseId = (data as { id: string } | null)?.id ?? null;
+        }
+        if (!baseId) { toast.error("No se pudo dividir la cuenta. Nada se ha modificado."); return; }
+        const f0 = filasDe(doc0.lineas);
+        if (f0.length) {
+          const { error } = await sb.from("order_line").insert(f0.map((l) => ({ order_id: baseId, ...l })));
+          if (error) { toast.error("La división falló al guardar el primer documento."); return; }
+        }
+        for (let i = 1; i < clean.length; i++) {
+          const { data, error } = await sb.from("sales_order").insert({ location_id: locationId, table_id: null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(clean[i]!.lineas), client_id: crypto.randomUUID(), aparcado_como: `${etiquetaBase} (${i + 1})`, ...camposCuenta }).select("id").single();
+          const nid = (data as { id: string } | null)?.id;
+          if (error || !nid) { toast.error(`No se pudo crear el documento ${i + 1}. Revisa la cuenta.`); return; }
+          const fl = filasDe(clean[i]!.lineas);
+          if (fl.length) {
+            const { error: e2 } = await sb.from("order_line").insert(fl.map((l) => ({ order_id: nid, ...l })));
+            if (e2) { toast.error(`El documento ${i + 1} quedó sin líneas. Revísalo.`); return; }
+          }
+        }
+        if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
       }
-      if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
+
       await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
       reset();
+      toast.success(`Cuenta dividida en ${clean.length} documentos`);
     } finally { setBusy(false); }
   }
 
@@ -1355,15 +1541,29 @@ export default function TPV() {
 
   // Carga las líneas de un pedido existente en la comanda de pantalla.
   async function cargarLineas(orderId: string) {
-    const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas").eq("order_id", orderId);
+    const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,modificadores,pase").eq("order_id", orderId);
     const cmd: Record<string, number> = {}, pr: Record<string, number> = {}, nt: Record<string, string> = {};
-    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null }[]) {
-      if (!l.product_id || !prods.some((p) => p.id === l.product_id)) continue;
-      cmd[l.product_id] = (cmd[l.product_id] ?? 0) + Number(l.cantidad);
-      pr[l.product_id] = Number(l.precio_unitario);
-      if (l.notas) nt[l.product_id] = l.notas;
+    const pasesCargados: Record<string, number> = {};
+    const guardadas = new Set<string>();
+    for (const l of (lns ?? []) as { product_id: string | null; cantidad: number; precio_unitario: number; notas: string | null; modificadores?: any; pase?: number | null }[]) {
+      if (!l.product_id || !prodPorId.has(l.product_id)) continue;
+      let baseKey = l.product_id;
+      if (l.modificadores && typeof l.modificadores === "object" && l.modificadores.key) {
+        baseKey = l.modificadores.key;
+      }
+      const clave = claveParaAnadir(baseKey, cmd, () => true);
+      cmd[clave] = (cmd[clave] ?? 0) + Number(l.cantidad);
+      guardadas.add(clave);
+      const manualBase = obtenerBaseManualSiDifiere(baseKey, Number(l.precio_unitario));
+      if (manualBase !== undefined) {
+        pr[clave] = manualBase;
+      }
+      if (l.notas) nt[clave] = l.notas;
+      if (l.pase) pasesCargados[clave] = l.pase;
     }
     setComanda(cmd); setPreciosManuales(pr); setNotas(nt);
+    setPases(pasesCargados);
+    setLineasGuardadas(guardadas);
   }
 
   // Cuentas abiertas de barra: pedidos sin mesa y sin cliente (los de "para llevar"
@@ -1383,7 +1583,7 @@ export default function TPV() {
     const map: Record<string, { nombre: string; cantidad: number; total: number }[]> = {};
     for (const l of (lns ?? []) as { order_id: string; product_id: string | null; cantidad: number; precio_unitario: number }[]) {
       (map[l.order_id] ??= []).push({
-        nombre: prods.find((p) => p.id === l.product_id)?.nombre ?? "Producto",
+        nombre: prodPorId.get(l.product_id ?? "")?.nombre ?? "Producto",
         cantidad: Number(l.cantidad), total: Number(l.cantidad) * Number(l.precio_unitario),
       });
     }
@@ -1392,6 +1592,7 @@ export default function TPV() {
 
   // Aparcar: guarda la cuenta con una etiqueta y dispara la comanda (como Glop).
   async function aparcar() {
+    if (busy) return;
     if (!exige("aparcar")) return;
     if (!unidades) return;
     setBusy(true);
@@ -1409,6 +1610,7 @@ export default function TPV() {
   // cuenta de barra aparcada (aparcado_como + table_id:null), como guardarActual
   // hace con los tickets directos. Recuperable desde la pestaña «Barra».
   async function llevarABarra() {
+    if (busy) return;
     if (!unidades && !ordenAbiertaId) return;
     setBusy(true);
     try {
@@ -1423,7 +1625,7 @@ export default function TPV() {
   }
 
   async function recuperarAparcado(o: { id: string }) {
-    setModalAparcados(false);
+    setModalActivo(null);
     reset();
     setNavSala(false); setBarra(true);   // vuelve a la pantalla Ticket con la cuenta cargada
     await sb.from("sales_order").update({ aparcado_como: null }).eq("id", o.id);
@@ -1432,9 +1634,8 @@ export default function TPV() {
     await recargarAparcados();
   }
 
-  // Pasar la cuenta actual a una mesa (crea/mueve el pedido y ocupa la mesa).
   async function pasarAMesa(destino: Mesa) {
-    setModalPasarMesa(false);
+    setModalActivo(null);
     if (!unidades && !ordenAbiertaId) return;
     setBusy(true);
     try {
@@ -1444,8 +1645,12 @@ export default function TPV() {
         await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", destino.id);
       }
       if (mesa && mesa.id !== destino.id) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
-      await recargarMesas();
-      reset();
+      
+      setMesa(destino);
+      setBarra(false);
+      setTicket(null);
+      await Promise.all([recargarMesas(), recargarAparcados()]);
+      toast.success(`Cuenta pasada a la mesa ${destino.nombre.replace("Mesa ", "")}`);
     } finally { setBusy(false); }
   }
 
@@ -1454,25 +1659,30 @@ export default function TPV() {
     setBusqCliente(q);
     const limpio = q.replace(/[,()%]/g, "").trim();
     if (limpio.length < 2) { setClientesEnc([]); return; }
-    const { data } = await sb.from("customer").select("id,nombre,telefono")
-      .or(`nombre.ilike.%${limpio}%,telefono.ilike.%${limpio}%`).limit(8);
-    setClientesEnc((data as { id: string; nombre: string; telefono: string | null }[]) ?? []);
+    const { data } = await sb.from("customer").select("id,nombre,telefono,nif")
+      .or(`nombre.ilike.%${limpio}%,telefono.ilike.%${limpio}%,nif.ilike.%${limpio}%`).limit(8);
+    setClientesEnc((data as { id: string; nombre: string; telefono: string | null; nif: string | null }[]) ?? []);
   }
-  function asignarCliente(c: { id: string; nombre: string }) {
-    setCliente({ id: c.id, nombre: c.nombre });
-    setModalCliente(false); setBusqCliente(""); setClientesEnc([]);
+  function asignarCliente(c: { id: string; nombre: string; nif?: string | null }) {
+    setCliente({ id: c.id, nombre: c.nombre, nif: c.nif ?? null });
+    setModalActivo(null); setBusqCliente(""); setClientesEnc([]);
   }
   async function crearClienteRapido() {
     if (!nuevoCli.nombre.trim()) return;
+    // Con NIF, /api/factura emite factura COMPLETA (F1) en vez de simplificada (F2).
     const { data } = await sb.from("customer")
-      .insert({ nombre: nuevoCli.nombre.trim(), telefono: nuevoCli.telefono.trim() || null })
-      .select("id,nombre").single();
-    if (data) asignarCliente(data as { id: string; nombre: string });
-    setNuevoCli({ nombre: "", telefono: "" });
+      .insert({
+        nombre: nuevoCli.nombre.trim(),
+        telefono: nuevoCli.telefono.trim() || null,
+        nif: nuevoCli.nif.trim().toUpperCase() || null,
+      })
+      .select("id,nombre,nif").single();
+    if (data) asignarCliente(data as { id: string; nombre: string; nif: string | null });
+    setNuevoCli({ nombre: "", telefono: "", nif: "" });
   }
 
   function reprimirUltimo() {
-    setModalUtilidades(false);
+    setModalActivo(null);
     if (ultimoDoc) void imprimirTicket(ultimoDoc, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
   }
 
@@ -1493,7 +1703,7 @@ export default function TPV() {
 
   // Bloquear: pone el VELO. NO hace logout ni resetea: la cuenta en curso se conserva
   // debajo y se sigue con solo re-identificarse (pulsera o PIN).
-  function bloquear() { setModalUtilidades(false); setBloqueado(true); }
+  function bloquear() { setModalActivo(null); setBloqueado(true); }
 
   async function recargarProductos() {
     const { data: p } = await sb.from("product")
@@ -1508,6 +1718,9 @@ export default function TPV() {
     longPressed.current = false;
     pressTimer.current = setTimeout(() => { longPressed.current = true; setAgotarPop(p); }, 450);
   }
+  function onPressEnd() {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  }
   function onProdClick(p: Prod) {
     if (longPressed.current) { longPressed.current = false; return; }
     if (estaAgotado(p)) return;
@@ -1517,7 +1730,8 @@ export default function TPV() {
     addProd(p.id);
   }
   function abrirModificadores(p: Prod, fid?: string) {
-    setModProd({ p, fid });
+    const key = addProd(claveDeLinea(p.id, fid, []));
+    setModProd({ p, fid, reemplazar: key });
   }
   // Construye la clave compuesta de la línea, la añade a la comanda y devuelve la
   // clave REAL usada (addProd puede añadir "#n" para no fusionar con líneas con dto).
@@ -1549,9 +1763,6 @@ export default function TPV() {
       sel.comentarioManual.trim(),
     ].filter(Boolean).join(" · ");
 
-    // "Com. y extra": re-clava la línea seleccionada conservando su cantidad,
-    // descuento/precio/invitación. Al ser una línea NUEVA, la nota se ASIGNA
-    // (no se acumula: evita "sin cebolla · sin cebolla").
     const viejo = modProd.reemplazar;
     if (viejo) {
       const clave = claveDeLinea(modProd.p.id, modProd.fid, modIds);
@@ -1560,25 +1771,31 @@ export default function TPV() {
       const desc = descuentos[viejo];
       const pm = preciosManuales[viejo];
       const inv = !!invitadas[viejo];
-      setComanda((c) => { const { [viejo]: _, ...r } = c; return { ...r, [clave]: (r[clave] ?? 0) + qty }; });
-      setDescuentos((d) => { const { [viejo]: _, ...r } = d; return desc ? { ...r, [clave]: desc } : r; });
-      setPreciosManuales((m) => { const { [viejo]: _, ...r } = m; return pm !== undefined ? { ...r, [clave]: pm } : r; });
-      setInvitadas((v) => { const { [viejo]: _, ...r } = v; return inv ? { ...r, [clave]: true } : r; });
-      setNotas((n) => { const { [viejo]: _, ...r } = n; return { ...r, [clave]: texto }; });
-      setAnadidoPor((a) => { const { [viejo]: prev, ...r } = a; return prev ? { ...r, [clave]: prev } : r; });   // traslada la atribución
-      setLineaSel(clave);
-      setModProd(null);
-      return;
-    }
+      const autor = anadidoPor[viejo];
 
-    // Alta normal desde la carta: añade la línea y ASIGNA su nota.
-    const key = finalizarLinea(modProd.p, modProd.fid, modIds);
-    if (texto) setNotas((n) => ({ ...n, [key]: texto }));
-    // "unidades" del modal FIJA la cantidad de la línea (el stepper arranca en unidadesInicial
-    // = uds del teclado, así fijar el mismo valor no altera lo que ya sumó finalizarLinea).
-    // ponytail: SET, no acumula; re-configurar la misma línea desde el modal reemplaza sus uds.
-    if (sel.unidades && sel.unidades >= 1) setComanda((c) => ({ ...c, [key]: sel.unidades! }));
-    setModProd(null);
+      setComanda((c) => {
+        const next = { ...c };
+        if (viejo !== clave) {
+          delete next[viejo];
+          next[clave] = qty;
+        } else {
+          next[clave] = qty;
+        }
+        return next;
+      });
+
+      if (viejo !== clave) {
+        setDescuentos((d) => { const { [viejo]: _, ...r } = d; return desc ? { ...r, [clave]: desc } : r; });
+        setPreciosManuales((m) => { const { [viejo]: _, ...r } = m; return pm !== undefined ? { ...r, [clave]: pm } : r; });
+        setInvitadas((v) => { const { [viejo]: _, ...r } = v; return inv ? { ...r, [clave]: true } : r; });
+        setNotas((n) => { const { [viejo]: _, ...r } = n; return { ...r, [clave]: texto }; });
+        setAnadidoPor((a) => { const { [viejo]: _, ...r } = a; return autor ? { ...r, [clave]: autor } : r; });
+        setLineaSel(clave);
+        setModProd({ p: modProd.p, fid: modProd.fid, reemplazar: clave });
+      } else {
+        setNotas((n) => ({ ...n, [clave]: texto }));
+      }
+    }
   }
 
   /* ── "Comp. menú": abre el selector de menús, o el único directo, o avisa si no hay ── */
@@ -1601,9 +1818,12 @@ export default function TPV() {
     if (!exige("agotado")) return;
     let hasta: string | null = null;
     if (agotar) { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(6, 0, 0, 0); hasta = d.toISOString(); }
-    await sb.from("product").update({ agotado_hasta: hasta }).eq("id", p.id);
+    const { error } = await sb.from("product").update({ agotado_hasta: hasta }).eq("id", p.id);
     setAgotarPop(null);
-    await recargarProductos();
+    if (error) { toast.error("No se pudo cambiar el agotado."); return; }
+    // Parche en el store (instantáneo, sin refetch): antes recargaba TODOS los
+    // productos y además el realtime disparaba una recarga completa del catálogo.
+    setProds(prods.map((x) => (x.id === p.id ? { ...x, agotado_hasta: hasta } : x)));
   }
 
   // Alta rápida de producto desde el TPV: nombre + precio + clase fiscal; la
@@ -1628,13 +1848,14 @@ export default function TPV() {
       if (error) { console.error(error.message); return; }
       await recargarProductos();
       if (anadir && data) addProd((data as { id: string }).id);
-      setModalNuevoProd(false);
+      setModalActivo(null);
       setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "" });
     } finally { setBusy(false); }
   }
 
   function reset() {
     setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({}); setAnadidoPor({});
+    setLineasGuardadas(new Set());
     setMesa(null); setBarra(false); setTicket(null);
     setBuffer(""); setModo("UND"); setLineaSel(null); setVistaProds(false); setEditando(false);
     setOrdenAbiertaId(null); setLlevar(null);
@@ -1684,13 +1905,17 @@ export default function TPV() {
   );
   // Vista del grid: con búsqueda activa filtra TODOS los productos por nombre
   // (sin acentos), ignorando la categoría; sin búsqueda, los de la categoría.
+  // La búsqueda va DIFERIDA (useDeferredValue): el input responde tecla a tecla
+  // y el grid (con fotos) se refiltra sin bloquear la pulsación.
+  const busqDiferida = useDeferredValue(busqProd);
   const productosVista = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    const q = norm(busqProd.trim());
+    const q = norm(busqDiferida.trim());
     if (!q) return productosCat;
     return prods.filter((p) => norm(p.nombre).includes(q));
-  }, [busqProd, productosCat, prods]);
-  const buscando = busqProd.trim().length > 0;
+  }, [busqDiferida, productosCat, prods]);
+  const buscando = busqProd.trim().length > 0;                 // input/cabecera: inmediato
+  const buscandoDiferido = busqDiferida.trim().length > 0;     // grid: acompasado al filtro
   const catActual    = cats.find((c) => c.id === catSelEf);
   const colorActual  = catActual ? (colorCat[catActual.id] ?? "") : "";
   // Solo categorías marcadas "mostrar en venta" (Fase 1 Glop) y disponibles a
@@ -1713,7 +1938,14 @@ export default function TPV() {
     }
     if (ests.size === 0) return "—";
     return [...ests].map((e) => ESTACION_LABEL[e as keyof typeof ESTACION_LABEL]).join(" y ");
-  }, [comanda, prods]);
+  }, [comanda, prodPorId]);
+
+  // Handlers ESTABLES por id para los tiles. Sin esto, el React.memo de TileProducto
+  // no serviría de nada: cada render crearía closures nuevos y se re-renderizarían
+  // los 40 tiles (esa era la causa del parpadeo del grid al recargar el catálogo).
+  const onTileClick = useEventCallback((id: string) => { const p = prodPorId.get(id); if (p) onProdClick(p); });
+  const onTilePressStart = useEventCallback((id: string) => { const p = prodPorId.get(id); if (p) onProdPressStart(p); });
+  const onTilePressEnd = useEventCallback(() => { onPressEnd(); });
 
   // Grid de productos memoizado: NO se re-renderiza al teclear/seleccionar (los handlers
   // leen buffer/modo por ref). Solo recalcula si cambian productos, color o categoría.
@@ -1733,6 +1965,7 @@ export default function TPV() {
         return (
           <TileProducto
             key={p.id}
+            id={p.id}
             nombre={p.texto_boton || p.nombre}
             precio={p.precio}
             agotado={agotado}
@@ -1741,16 +1974,16 @@ export default function TPV() {
             mostrarPrecio={mostrarPrecio}
             txtClase={txtClase}
             eur={eur}
-            onClick={() => onProdClick(p)}
-            onPressStart={() => onProdPressStart(p)}
-            onPressEnd={onPressEnd}
+            onClick={onTileClick}
+            onPressStart={onTilePressStart}
+            onPressEnd={onTilePressEnd}
           />
         );
       })}
       {/* Alta rápida: crear un producto sin salir del TPV (oculta al buscar) */}
-      {!buscando && (
+      {!buscandoDiferido && (
         <button type="button"
-          onClick={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "" }); setModalNuevoProd(true); }}
+          onClick={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "" }); setModalActivo('NUEVO_PROD'); }}
           className="flex min-h-[78px] flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-border text-[9px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <Plus size={14} strokeWidth={1.5} />
           <span className="text-xs font-medium">Nuevo</span>
@@ -1758,13 +1991,13 @@ export default function TPV() {
       )}
       {productosVista.length === 0 && (
         <p className="col-span-full text-muted-foreground text-sm">
-          {buscando ? `Sin resultados para «${busqProd.trim()}».` : "Sin productos. Pulsa «Nuevo» para crear el primero."}
+          {buscandoDiferido ? `Sin resultados para «${busqDiferida.trim()}».` : "Sin productos. Pulsa «Nuevo» para crear el primero."}
         </p>
       )}
     </div>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productosVista, buscando, busqProd, colorCat, colorActual, catSelEf, botonesCfg]);
+  }, [productosVista, buscandoDiferido, busqDiferida, colorCat, colorActual, catSelEf, botonesCfg]);
 
   // Grid de categorías memoizado: solo las visibles (mostrar_venta), sin nivel de familia.
   const gridCategorias = useMemo(() => (
@@ -1779,12 +2012,13 @@ export default function TPV() {
         return (
           <TileCategoria
             key={c.id}
+            id={c.id}
             nombre={c.texto_boton || c.nombre}
             color={color}
             seleccionada={sel}
             Icono={IconoCat}
             foto={catFoto ?? undefined}
-            onClick={() => setCatSel(c.id)}
+            onClick={setCatSel}
           />
         );
       })}
@@ -1792,8 +2026,88 @@ export default function TPV() {
         <p className="col-span-full text-muted-foreground text-sm">Sin categorías. Añade carta en el panel.</p>
       )}
     </div>
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   ), [catsVisibles, catSelEf, colorCat, iconosCat]);
+
+  /* ── Identidades ESTABLES para los hijos memoizados (plan 011): los wrappers
+     useEventCallback invocan siempre la última versión del handler, así
+     ColumnaFunciones/RailSalas/TecladoTPV (memo) no re-renderizan por identidad. ── */
+  const abrirCobrar = useCallback(() => setModalActivo('COBRAR'), []);
+  const abrirUtilidades = useCallback(() => setModalActivo('UTILIDADES'), []);
+  const onAparcadosModal = useCallback(() => setModalActivo('APARCADOS'), []);
+  const onPasarMesaModal = useCallback(() => setModalActivo('PASAR_MESA'), []);
+  const onClienteModal = useCallback(() => setModalActivo('CLIENTE'), []);
+  const onDividirModal = useCallback(() => setModalActivo('DIVIDIR'), []);
+  const onAparcarEstable = useEventCallback(aparcar);
+  const onLlevarBarraEstable = useEventCallback(() => { void llevarABarra(); });
+  const onPrepararEstable = useEventCallback(() => enviarCocina("PENDIENTE"));
+  const onMarcharEstable = useEventCallback(() => enviarCocina("EN_PREPARACION"));
+  const onUltimoDocEstable = useEventCallback(reprimirUltimo);
+  const onImprimirEstable = useEventCallback(imprimirRecibo);
+  const onAbrirCajonEstable = useEventCallback(abrirCajonManual);
+  const onConsumoPropioEstable = useEventCallback(() => { if (puede("invitar")) setTipoOperacion((t) => (t === "AUTOCONSUMO" ? "VENTA" : "AUTOCONSUMO")); });
+  const onBorrarCuentaEstable = useEventCallback(() => { if (puede("borrar")) setPedirBorrar(true); });
+  const onBloquearEstable = useEventCallback(bloquear);
+  const irASalaEstable = useEventCallback(irASala);
+  const onReservasEstable = useEventCallback(async () => { await guardarActual(); setNavSala(true); setVistaSala("RESERVAS"); });
+
+  // Props del rail vertical de acciones de CUENTA (orden configurable), memoizadas:
+  // ColumnaFunciones (memo) solo re-renderiza cuando cambia su dato visible.
+  const accionesRapidasProps = useMemo(() => ({
+    hayLineas: unidades > 0,
+    hayCuenta: unidades > 0 || !!ordenAbiertaId,
+    tipoOperacion,
+    nAparcados: aparcados.length,
+    hayUltimoDoc: !!ultimoDoc,
+    orden: ordenFunciones,
+    favoritos: ["aparcar", "marchar"] as const,
+    onAparcar: onAparcarEstable,
+    onAparcados: onAparcadosModal,
+    onLlevarBarra: onLlevarBarraEstable,
+    onPasarMesa: onPasarMesaModal,
+    onConsumoPropio: onConsumoPropioEstable,
+    onDividir: onDividirModal,
+    onBorrarCuenta: onBorrarCuentaEstable,
+    onUltimoDoc: onUltimoDocEstable,
+    onCliente: onClienteModal,
+    // ponytail: pendiente de definir → abre Utilidades como casa temporal.
+    onCamarero: abrirUtilidades,
+    onPreparar: onPrepararEstable,
+    onMarchar: onMarcharEstable,
+    // Utilidades ancladas al fondo del rail (movidas desde el teclado).
+    onAbrirCajon: onAbrirCajonEstable,
+    onUtilidades: abrirUtilidades,
+    onImprimir: onImprimirEstable,
+    imprimirDisabled: !ticket && !unidades,
+    onBloquear: onBloquearEstable,
+    // Los *Estable son de identidad fija: no necesitan estar en deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [unidades, ordenAbiertaId, tipoOperacion, aparcados.length, ultimoDoc, ordenFunciones, ticket]);
+
+  // Tabs del rail de salas, memoizadas: RailSalas (memo) no re-renderiza al
+  // teclear ni al tocar líneas; los badges siguen vivos por las deps.
+  const railTabs = useMemo<RailTab[]>(() => {
+    // Icono por sala: por nombre (las salas son configurables) con reserva genérica.
+    const iconoSala = (nombre: string): LucideIcon => {
+      const n = nombre.toLowerCase();
+      if (n.includes("terraza")) return Sun;
+      if (n.includes("barra")) return Store;
+      if (n.includes("llevar")) return ShoppingBag;
+      return Armchair;   // salón y demás salas
+    };
+    return [
+      { id: "TICKET", label: "Ticket", icon: Receipt, onClick: () => irASalaEstable({ tipo: "ticket" }) },
+      { id: "BARRA", label: "Aparcado", icon: Store, badge: aparcados.length || undefined, onClick: () => irASalaEstable({ tipo: "barra" }) },
+      ...rooms.map((rm) => ({
+        id: rm.id, label: rm.nombre, icon: iconoSala(rm.nombre),
+        badge: mesas.filter((m) => m.room_id === rm.id && (totalesMesa[m.id] ?? 0) > 0).length || undefined,
+        onClick: () => irASalaEstable({ tipo: "room", id: rm.id }),
+      })),
+      { id: "LLEVAR", label: "Para llevar", icon: ShoppingBag, badge: llevarList.length || undefined, onClick: () => irASalaEstable({ tipo: "llevar" }) },
+      { id: "RESERVAS", label: "Reservas", icon: CalendarCheck, badge: reservas.length || undefined, onClick: () => { void onReservasEstable(); } },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rooms, mesas, totalesMesa, aparcados.length, llevarList.length, reservas.length]);
 
   if (loading) return (
     <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Cargando…</div>
@@ -1816,7 +2130,7 @@ export default function TPV() {
                 className="grid h-28 place-items-center rounded-lg border-2 border-border bg-card font-semibold hover:border-brand"
               >
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-brand/15 text-lg text-brand">{o.nombre.charAt(0).toUpperCase()}</span>
-                <span className="mt-1">{o.nombre}</span>
+                <span className="mt-1 w-full px-2 text-center text-sm font-semibold truncate block" title={o.nombre}>{o.nombre}</span>
                 <span className="font-mono text-xs font-normal text-muted-foreground">#{o.codigo}</span>
               </button>
             ))}
@@ -1861,7 +2175,7 @@ export default function TPV() {
     return (
       <div className="fixed inset-0 z-[60] grid place-items-center bg-background/80 p-6 text-foreground backdrop-blur">
         <div className="w-full max-w-md">
-          <p className="mb-4 text-center text-3xl font-bold">🔒 TPV bloqueado</p>
+          <p className="mb-4 text-center text-3xl font-bold">TPV bloqueado</p>
           {panelIdentificacion("Identifícate para continuar", "Acerca tu pulsera, o toca tu nombre y teclea el PIN.")}
         </div>
       </div>
@@ -1877,695 +2191,59 @@ export default function TPV() {
     );
   }
 
-  /* ── Dibuja un elemento del plano; en edición es arrastrable y editable ── */
-  function ElementoPlano(e: Elemento) {
-    const ov = posOverride[e.id];
-    const px = ov?.x ?? e.pos_x, py = ov?.y ?? e.pos_y;
-    const st = { left: px, top: py, width: e.ancho, height: e.alto, transform: e.rotacion ? `rotate(${e.rotacion}deg)` : undefined };
-    // Contenido visual (rellena el contenedor); el posicionado va en el wrapper.
-    let inner: React.ReactNode;
-    const a = e.icono?.startsWith("suelo:") ? null : assetPorId(e.icono);
-    if (e.icono?.startsWith("suelo:")) {
-      inner = <div className="h-full w-full rounded-md border border-foreground/10" style={{ backgroundImage: `url(/plano/${e.icono.slice(6)}.svg)`, backgroundRepeat: "repeat" }} />;
-    } else if (a) {
-      // eslint-disable-next-line @next/next/no-img-element
-      inner = <img src={`/plano/${a.file}`} alt="" draggable={false} className="h-full w-full select-none" />;
-    } else if (e.tipo === "BARRA") {
-      inner = <div className="flex h-full w-full items-center justify-center rounded-md bg-amber-800/85 text-xs font-semibold text-amber-50">{e.etiqueta}</div>;
-    } else if (e.tipo === "PARED") {
-      inner = <div className="h-full w-full rounded bg-foreground/25" />;
-    } else if (e.tipo === "PUERTA") {
-      inner = <div className="flex h-full w-full items-center justify-center rounded border-2 border-dashed border-foreground/30 text-[10px] text-muted-foreground">{e.etiqueta}</div>;
-    } else {
-      inner = <div className="flex h-full w-full items-center justify-center text-2xl">{e.icono ?? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{e.etiqueta}</span>}</div>;
-    }
-    if (!editandoPlano) return <div key={e.id} style={st} className="pointer-events-none absolute">{inner}</div>;
-    return (
-      <button type="button" key={e.id} style={st} className="absolute cursor-move touch-none ring-2 ring-blue-400/60"
-        onPointerDown={(ev) => { (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId); dragRef.current = { id: e.id, sx: ev.clientX, sy: ev.clientY, ox: px, oy: py, moved: false }; setArrastrando(true); }}
-        onPointerMove={(ev) => {
-          const dr = dragRef.current;
-          if (dr?.id !== e.id) return;
-          const dx = ev.clientX - dr.sx, dy = ev.clientY - dr.sy;
-          if (!dr.moved && Math.abs(dx) + Math.abs(dy) < 8) return;
-          dr.moved = true;
-          setSobrePapel(ptEnPapelera(ev.clientX, ev.clientY));
-          const snap = (v: number) => Math.max(0, Math.round(v / 20) * 20);
-          setPosOverride((p) => ({ ...p, [e.id]: { x: snap(dr.ox + dx), y: snap(dr.oy + dy) } }));
-        }}
-        onPointerUp={(ev) => {
-          const dr = dragRef.current; dragRef.current = null;
-          setArrastrando(false); setSobrePapel(false);
-          if (dr?.moved && ptEnPapelera(ev.clientX, ev.clientY)) { void borrarElemId(e.id); return; }
-          const p = posOverride[e.id];
-          if (dr?.moved && p) void guardarPosElem(e.id, p);
-          else if (dr && !dr.moved) setElemEdit(e);
-        }}
-      >{inner}</button>
-    );
-  }
-
-  // Guarda la posición de una mesa tras arrastrarla en modo edición.
-  async function guardarPosMesa(id: string, pos: { x: number; y: number }) {
-    await sb.from("restaurant_table").update({ pos_x: pos.x, pos_y: pos.y }).eq("id", id);
-  }
-  // ¿El puntero está sobre la papelera? (para borrar arrastrando)
-  function ptEnPapelera(x: number, y: number) {
-    const el = papeleraRef.current;
-    if (!el) return false;
-    const r = el.getBoundingClientRect();
-    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-  }
-  async function borrarMesaId(id: string) { await sb.from("restaurant_table").delete().eq("id", id); await recargarMesas(); }
-  async function borrarElemId(id: string) { await sb.from("plano_elemento").delete().eq("id", id); await recargarElementos(); }
-
-  // ── Editor de mesa (modo edición): número, comensales/forma, girar, borrar ──
-  function abrirEditorMesa(m: Mesa) {
-    setMesaEdit(m);
-    setNumMesa(m.nombre.match(/\d+/)?.[0] ?? "");
-    setCapMesa(m.capacidad || 4);
-  }
-  function siguienteNumMesa(): number {
-    const nums = mesas.filter((m) => m.room_id === vistaSala)
-      .map((m) => parseInt(m.nombre.replace(/\D/g, ""), 10)).filter((n) => !Number.isNaN(n));
-    let n = 1; while (nums.includes(n)) n++; return n;
-  }
-  async function anadirMesaConForma(seats: number, sprite: string | null) {
-    const n = siguienteNumMesa();
-    const c = mesas.filter((m) => m.room_id === vistaSala).length;
-    const base = { room_id: vistaSala, nombre: seats <= 1 ? `B${n}` : `Mesa ${n}`, estado: "LIBRE", pos_x: 80 + (c % 6) * 40, pos_y: 80 + Math.floor(c / 6) * 40, capacidad: seats };
-    const cols = "id,nombre,estado,room_id,pos_x,pos_y,capacidad,rotacion";
-    const r1 = await sb.from("restaurant_table").insert({ ...base, sprite }).select(`${cols},sprite`).single();
-    const r2 = r1.error ? await sb.from("restaurant_table").insert(base).select(cols).single() : null;   // sprite aún sin migrar
-    const created = (r1.error ? r2?.data : r1.data) as Mesa | null;
-    await recargarMesas();
-    if (created) abrirEditorMesa(created);
-  }
-  // Cambia la forma (sprite + comensales) de una mesa desde el editor.
-  async function setFormaMesa(f: { sprite: string | null; seats: number }) {
-    if (!mesaEdit) return;
-    setMesaEdit({ ...mesaEdit, sprite: f.sprite, capacidad: f.seats });
-    setCapMesa(f.seats);
-    setMesas((ms) => ms.map((z) => (z.id === mesaEdit.id ? { ...z, sprite: f.sprite, capacidad: f.seats } : z)));
-    const res = await sb.from("restaurant_table").update({ sprite: f.sprite, capacidad: f.seats }).eq("id", mesaEdit.id);
-    if (res.error) await sb.from("restaurant_table").update({ capacidad: f.seats }).eq("id", mesaEdit.id);
-  }
-
-  // ── Objetos del plano (barra, plantas, sombrilla, puertas…) ──
-  async function recargarElementos() {
-    const { data } = await sb.from("plano_elemento").select("id,room_id,tipo,etiqueta,icono,pos_x,pos_y,ancho,alto,rotacion");
-    setElementos((data as Elemento[]) ?? []);
-  }
-  async function guardarPosElem(id: string, pos: { x: number; y: number }) {
-    await sb.from("plano_elemento").update({ pos_x: pos.x, pos_y: pos.y }).eq("id", id);
-  }
-  async function anadirElemento(a: PlanoAsset) {
-    const d = dim(a);
-    const tipo = a.tipo === "barra" ? "BARRA" : a.tipo === "separador" ? "PARED" : a.tipo === "abertura" ? "PUERTA" : "PLANTA";
-    await sb.from("plano_elemento").insert({ room_id: vistaSala, tipo, etiqueta: a.nombre, icono: a.id, pos_x: 100, pos_y: 100, ancho: d.w, alto: d.h });
-    await recargarElementos();
-  }
-  async function rotarElemEdit() {
-    if (!elemEdit) return;
-    const rot = ((elemEdit.rotacion || 0) + 45) % 360;
-    setElemEdit({ ...elemEdit, rotacion: rot });
-    setElementos((es) => es.map((z) => (z.id === elemEdit.id ? { ...z, rotacion: rot } : z)));
-    await sb.from("plano_elemento").update({ rotacion: rot }).eq("id", elemEdit.id);
-  }
-  // Redimensiona el objeto (p. ej. estirar una línea divisoria sin duplicarla).
-  async function setTamElem(dw: number, dh: number) {
-    if (!elemEdit) return;
-    const ancho = Math.max(20, elemEdit.ancho + dw);
-    const alto = Math.max(8, elemEdit.alto + dh);
-    setElemEdit({ ...elemEdit, ancho, alto });
-    setElementos((es) => es.map((z) => (z.id === elemEdit.id ? { ...z, ancho, alto } : z)));
-    await sb.from("plano_elemento").update({ ancho, alto }).eq("id", elemEdit.id);
-  }
-  async function eliminarElemEdit() {
-    if (!elemEdit) return;
-    await sb.from("plano_elemento").delete().eq("id", elemEdit.id);
-    setElemEdit(null); await recargarElementos();
-  }
-  async function duplicarElem() {
-    if (!elemEdit) return;
-    const e = elemEdit;
-    await sb.from("plano_elemento").insert({ room_id: e.room_id, tipo: e.tipo, etiqueta: e.etiqueta, icono: e.icono, pos_x: e.pos_x + 24, pos_y: e.pos_y + 24, ancho: e.ancho, alto: e.alto, rotacion: e.rotacion });
-    setElemEdit(null); await recargarElementos();
-  }
-  async function rotarMesaEdit() {
-    if (!mesaEdit) return;
-    const rot = ((mesaEdit.rotacion || 0) + 45) % 360;
-    setMesaEdit({ ...mesaEdit, rotacion: rot });
-    setMesas((ms) => ms.map((z) => (z.id === mesaEdit.id ? { ...z, rotacion: rot } : z)));
-    await sb.from("restaurant_table").update({ rotacion: rot }).eq("id", mesaEdit.id);
-  }
-  // El número solo se cambia si la mesa está LIBRE (sin cuenta), para no romper
-  // ninguna cuenta abierta. Capacidad/forma/giro sí se pueden tocar siempre.
-  function mesaLibreEdit(m: Mesa) { return (totalesMesa[m.id] ?? 0) === 0 && m.estado === "LIBRE"; }
-  async function guardarMesaEdit() {
-    if (!mesaEdit) return;
-    const cap = Math.max(1, Math.min(12, capMesa));
-    const update: Record<string, unknown> = { capacidad: cap };
-    const n = parseInt(numMesa, 10);
-    if (mesaLibreEdit(mesaEdit) && n) {
-      const dupe = mesas.some((m) => m.room_id === vistaSala && m.id !== mesaEdit.id && parseInt(m.nombre.replace(/\D/g, ""), 10) === n);
-      if (dupe) return;
-      update.nombre = cap <= 1 ? `B${n}` : `Mesa ${n}`;
-    }
-    await sb.from("restaurant_table").update(update).eq("id", mesaEdit.id);
-    setMesaEdit(null); await recargarMesas();
-  }
-  async function eliminarMesaEdit() {
-    if (!mesaEdit || !mesaLibreEdit(mesaEdit)) return;
-    await sb.from("restaurant_table").delete().eq("id", mesaEdit.id);
-    setMesaEdit(null); await recargarMesas();
-  }
-
-  /* ── Dibuja una mesa; el color va en el propio SVG según su estado ── */
-  function MesaPlano(m: Mesa, i: number) {
-    const cuenta = totalesMesa[m.id] ?? 0;
-    const ocupada = cuenta > 0 || m.estado !== "LIBRE";
-    const resvs = reservasPorMesa[m.id] ?? [];
-    const reservada = resvs.length > 0;
-    const a = (m.sprite ? assetPorId(m.sprite) : null) ?? mesaPorCapacidad(m.capacidad || 4);
-    const d = dim(a);
-    const ov = posOverride[m.id];
-    const x = ov?.x ?? m.pos_x ?? (40 + (i % 4) * 220);
-    const y = ov?.y ?? m.pos_y ?? (40 + Math.floor(i / 4) * 230);
-    const seleccionada = mesaSel?.id === m.id;
-    // Color aplicado al relieve del SVG (var --mesa-fill), no una capa encima.
-    // En reposo (libre) la mesa se ve marrón.
-    const fill = editandoPlano ? "#93c5fd" : seleccionada ? "#22c55e" : ocupada ? "#f59e0b" : reservada ? "#38bdf8" : "#8a5a2b";
-    return (
-      <button type="button"
-        key={m.id}
-        onClick={() => { if (!editandoPlano) onMesaClick(m); }}
-        onPointerDown={(e) => {
-          if (!editandoPlano) { onPressStart(m); return; }
-          (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-          dragRef.current = { id: m.id, sx: e.clientX, sy: e.clientY, ox: x, oy: y, moved: false };
-          setArrastrando(true);
-        }}
-        onPointerMove={(e) => {
-          const dr = dragRef.current;
-          if (!editandoPlano || dr?.id !== m.id) return;
-          const dx = e.clientX - dr.sx, dy = e.clientY - dr.sy;
-          if (!dr.moved && Math.abs(dx) + Math.abs(dy) < 8) return;   // ignora micro-temblor del toque
-          dr.moved = true;
-          setSobrePapel(ptEnPapelera(e.clientX, e.clientY));
-          const snap = (v: number) => Math.max(0, Math.round(v / 20) * 20);   // rejilla de 20px para alinear
-          setPosOverride((p) => ({ ...p, [m.id]: { x: snap(dr.ox + dx), y: snap(dr.oy + dy) } }));
-        }}
-        onPointerUp={(e) => {
-          if (!editandoPlano) { onPressEnd(); return; }
-          const dr = dragRef.current; dragRef.current = null;
-          setArrastrando(false); setSobrePapel(false);
-          if (dr?.moved && ptEnPapelera(e.clientX, e.clientY)) {   // soltar en papelera → borrar
-            if (mesaLibreEdit(m)) { void borrarMesaId(m.id); return; }
-          }
-          const p = posOverride[m.id];
-          if (dr?.moved && p) void guardarPosMesa(m.id, p);
-          else if (dr && !dr.moved) abrirEditorMesa(m);   // toque sin arrastrar → editar
-        }}
-        onPointerLeave={() => { if (!editandoPlano) onPressEnd(); }}
-        onContextMenu={(e) => e.preventDefault()}
-        style={{ left: x, top: y, width: d.w, height: d.h }}
-        className={`absolute select-none ${editandoPlano ? "cursor-move touch-none" : "transition-transform hover:scale-[1.04]"} ${seleccionada && !editandoPlano ? "z-10" : ""}`}
-      >
-        <PlanoSvg file={a.file} style={{ transform: m.rotacion ? `rotate(${m.rotacion}deg)` : undefined, "--mesa-fill": fill } as React.CSSProperties} className="pointer-events-none block h-full w-full" />
-        <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5">
-          <span className="text-[11px] font-bold leading-none text-white">{m.nombre.replace("Mesa ", "")}</span>
-          {ocupada && cuenta > 0 && <span className="text-[9px] font-semibold leading-none text-white">{eur(cuenta)}</span>}
-        </span>
-        {reservada && !editandoPlano && (
-          <span className="absolute left-1/2 top-full z-10 mt-0.5 -translate-x-1/2 whitespace-nowrap rounded bg-sky-600 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white shadow">
-            🕑 {resvs[0]!.nombre || "Reserva"} · {hhmm(resvs[0]!.fecha_hora)}{resvs.length > 1 ? ` +${resvs.length - 1}` : ""}
-          </span>
-        )}
-      </button>
-    );
-  }
-
-  // Rail lateral fijo (estilo Glop): Ticket · Barra · [salas] · Para llevar · Reservas.
-  // Es el "layout" constante; cambia el área central. `activo` = pestaña resaltada.
-  function railSalas(activo: string) {
-    // Icono por sala: por nombre (las salas son configurables) con reserva genérica.
-    const iconoSala = (nombre: string): LucideIcon => {
-      const n = nombre.toLowerCase();
-      if (n.includes("terraza")) return Sun;
-      if (n.includes("barra")) return Store;
-      if (n.includes("llevar")) return ShoppingBag;
-      return Armchair;   // salón y demás salas
-    };
-    const tabs: RailTab[] = [
-      { id: "TICKET", label: "Ticket", icon: Receipt, onClick: () => irASala({ tipo: "ticket" }) },
-      { id: "BARRA", label: "Barra", icon: Store, badge: aparcados.length || undefined, onClick: () => irASala({ tipo: "barra" }) },
-      ...rooms.map((rm) => ({
-        id: rm.id, label: rm.nombre, icon: iconoSala(rm.nombre),
-        badge: mesas.filter((m) => m.room_id === rm.id && (totalesMesa[m.id] ?? 0) > 0).length || undefined,
-        onClick: () => irASala({ tipo: "room", id: rm.id }),
-      })),
-      { id: "LLEVAR", label: "Para llevar", icon: ShoppingBag, badge: llevarList.length || undefined, onClick: () => irASala({ tipo: "llevar" }) },
-      { id: "RESERVAS", label: "Reservas", icon: CalendarCheck, badge: reservas.length || undefined, onClick: async () => { await guardarActual(); setNavSala(true); setVistaSala("RESERVAS"); } },
-    ];
-    return (
-      <RailSalas tabs={tabs} activo={activo} busy={busy} onConfig={() => setModalUtilidades(true)} />
-    );
-  }
+  // (El rail lateral fijo se construye arriba como `railTabs` memoizadas — plan 011.)
 
 
 
   /* ── Navegación de salas (estilo Glop): plano / barra / llevar / reservas ── */
   if (navSala) {
-    const mesasSala = mesas.filter((m) => m.room_id === vistaSala);
-    const roomActiva = rooms.find((r) => r.id === vistaSala);
-    const planoBg = roomActiva?.suelo
-      ? { backgroundImage: `url(/plano/${roomActiva.suelo}.svg)`, backgroundRepeat: "repeat" as const }
-      : { backgroundImage: "radial-gradient(rgba(120,120,120,0.10) 1px, transparent 1px)", backgroundSize: "26px 26px" };
-    const lienzoStyle = {
-      width: planoContent.w, height: planoContent.h,
-      transform: `scale(${editandoPlano ? 1 : planoScale})`, transformOrigin: "center",
-      "--mesa-fill": marca.mesa_color, "--silla-fill": marca.silla_color,
-    } as unknown as React.CSSProperties;
-    const enPlano = !["BARRA", "LLEVAR", "RESERVAS"].includes(vistaSala);
     return (
-      <div className="flex h-screen flex-col bg-background text-foreground">
-        {renderVelo()}
-        <header className="flex flex-none items-center justify-between border-b border-border bg-card px-4 py-2.5">
-          <strong className="font-semibold">TPV · {operario.nombre}</strong>
-          {editandoPlano && <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400">Editando salón · arrastra las mesas</span>}
-        </header>
-        <div className="flex min-h-0 flex-1">
-          {/* Menú lateral "Añadir" (mesas / objetos), desplegable a la izquierda */}
-          {editandoPlano && (paletaAbierta ? (
-            <aside className="flex w-52 flex-none flex-col border-r border-border bg-card">
-              <div className="flex items-center border-b border-border">
-                {(["MESAS", "OBJETOS"] as const).map((t) => (
-                  <button type="button" key={t} onClick={() => setPaletaTab(t)}
-                    className={`flex-1 py-2 text-sm font-medium ${paletaTab === t ? "border-b-2 border-brand text-brand" : "text-muted-foreground hover:text-foreground"}`}>
-                    {t === "MESAS" ? "Mesas" : "Objetos"}
-                  </button>
-                ))}
-                <button type="button" onClick={() => setPaletaAbierta(false)} className="px-2 text-muted-foreground hover:text-foreground" title="Ocultar">‹</button>
-              </div>
-              <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto p-2">
-                {paletaTab === "MESAS"
-                  ? FORMAS_MESA.map((f) => (
-                      <button type="button" key={f.file} onClick={() => anadirMesaConForma(f.seats, f.sprite)}
-                        className="flex flex-col items-center gap-1 rounded-md border border-border bg-background p-2 text-center hover:bg-accent">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/plano/${f.file}`} alt="" className="h-12 w-12 object-contain" />
-                        <span className="text-[10px] font-medium leading-tight">{f.nombre}</span>
-                      </button>
-                    ))
-                  : ASSETS.filter((a) => (a.tipo === "barra" || a.tipo === "planta" || a.tipo === "separador" || a.tipo === "abertura") && !ASSETS_LEGACY.has(a.id)).map((a) => (
-                      <button type="button" key={a.id} onClick={() => anadirElemento(a)}
-                        className="flex flex-col items-center gap-1 rounded-md border border-border bg-background p-2 text-center hover:bg-accent">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/plano/${a.file}`} alt="" className="h-12 w-12 object-contain" />
-                        <span className="text-[10px] font-medium leading-tight">{a.nombre}</span>
-                      </button>
-                    ))}
-              </div>
-            </aside>
-          ) : (
-            <button type="button" onClick={() => setPaletaAbierta(true)} className="flex w-9 flex-none items-center justify-center border-r border-border bg-card text-muted-foreground hover:text-foreground" title="Añadir">›</button>
-          ))}
-
-          {/* Plano / contenido (el rail de salas va a la derecha, estilo Glop) */}
-          <main className="relative min-w-0 flex-1 overflow-auto bg-muted/20">
-            {vistaSala === "BARRA" ? (
-              <div className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="font-semibold">Cuentas abiertas en barra</h3>
-                  <button type="button" onClick={() => irASala({ tipo: "ticket" })} className="btn-primary text-sm">+ Nueva venta</button>
-                </div>
-                {aparcados.length === 0 ? (
-                  <div className="card text-center text-muted-foreground">No hay cuentas abiertas. Pulsa «Nueva venta» para empezar una.</div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {aparcados.map((o) => {
-                      const lineas = aparcadosLineas[o.id] ?? [];
-                      return (
-                        <button type="button" key={o.id} onClick={() => recuperarAparcado(o)}
-                          className="flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition-transform active:scale-95">
-                          <div className="truncate bg-brand px-2 py-1 text-center text-xs font-semibold text-brand-foreground">{o.aparcado_como || `Barra ${hhmm(o.created_at)}`}</div>
-                          <div className="flex-1 p-2">
-                            <div className="mb-1 flex gap-1 border-b border-border pb-1 text-[10px] font-semibold uppercase text-muted-foreground">
-                              <span className="flex-1">Artículo</span><span className="w-8 text-right">Uds</span><span className="w-12 text-right">Total</span>
-                            </div>
-                            <ul className="space-y-0.5 text-xs">
-                              {lineas.slice(0, 6).map((l, i) => (
-                                <li key={`${o.id}-${i}`} className="flex gap-1">
-                                  <span className="flex-1 truncate">{l.nombre}</span>
-                                  <span className="w-8 text-right tabular-nums">{l.cantidad}</span>
-                                  <span className="w-12 text-right tabular-nums">{eur(l.total)}</span>
-                                </li>
-                              ))}
-                              {lineas.length > 6 && <li className="text-[10px] text-muted-foreground">+{lineas.length - 6} más…</li>}
-                              {lineas.length === 0 && <li className="text-[10px] text-muted-foreground">Sin líneas</li>}
-                            </ul>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 border-t border-border p-2">
-                            <span className="rounded bg-[#c46a2a] px-2 py-1 text-[11px] font-semibold text-white">Abrir cuenta</span>
-                            <span className="text-base font-bold tabular-nums">{eur(Number(o.total))}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : vistaSala === "LLEVAR" ? (
-              <div className="mx-auto max-w-2xl space-y-4 p-4">
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <h3 className="mb-2 font-semibold">Nuevo pedido para llevar</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <input value={nuevoLlevar.nombre} onChange={(e) => setNuevoLlevar((s) => ({ ...s, nombre: e.target.value }))} placeholder="Nombre del cliente" className="min-w-40 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                    <input value={nuevoLlevar.telefono} onChange={(e) => setNuevoLlevar((s) => ({ ...s, telefono: e.target.value }))} placeholder="Teléfono" inputMode="tel" className="w-40 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                    <button type="button" onClick={nuevoParaLlevar} disabled={!nuevoLlevar.nombre.trim()} className="btn-primary disabled:opacity-50">Crear</button>
-                  </div>
-                </div>
-                {llevarList.length === 0 && <div className="card text-center text-muted-foreground">Sin pedidos para llevar abiertos.</div>}
-                {llevarList.map((o) => (
-                  <button type="button" key={o.id} onClick={() => abrirLlevar(o)} className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-left hover:bg-accent">
-                    <div className="min-w-0">
-                      <div className="font-medium">🛍 {o.cliente_nombre}</div>
-                      {o.cliente_telefono && <div className="text-xs text-muted-foreground">{o.cliente_telefono}</div>}
-                    </div>
-                    <span className="font-semibold tabular-nums">{eur(Number(o.total))}</span>
-                  </button>
-                ))}
-              </div>
-            ) : vistaSala === "RESERVAS" ? (
-              <div className="mx-auto max-w-2xl space-y-2 p-4">
-                {reservas.length === 0 && <div className="card text-center text-muted-foreground">Sin reservas.</div>}
-                {reservas.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-                    <div className="min-w-0">
-                      <div className="font-medium">
-                        {new Date(r.fecha_hora).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        {r.nombre && <span className="ml-2">· {r.nombre}</span>}
-                        <span className="ml-2 text-muted-foreground">· {r.comensales} pax</span>
-                        {r.table_id && <span className="ml-2 text-muted-foreground">· {mesas.find((mm) => mm.id === r.table_id)?.nombre ?? "mesa"}</span>}
-                      </div>
-                      {r.notas && <div className="truncate text-xs text-muted-foreground">{r.notas}</div>}
-                    </div>
-                    <span className="ml-3 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{r.estado}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div ref={planoBoxRef} style={planoBg as React.CSSProperties} className={`relative h-full w-full p-2 ${editandoPlano ? "overflow-auto" : "grid place-items-center overflow-hidden"}`}>
-                {/* Cabecera flotante: nombre de sala + ocupación + leyenda (sin escalar) */}
-                <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex flex-wrap items-center justify-between gap-2">
-                  <span className="rounded-full bg-background px-3 py-1 text-sm font-semibold">
-                    {roomActiva?.nombre ?? "Sala"}
-                    <span className="ml-2 font-normal text-muted-foreground">{mesasSala.filter((m) => (totalesMesa[m.id] ?? 0) > 0).length}/{mesasSala.length} ocupadas</span>
-                  </span>
-                  <span className="flex items-center gap-3 rounded-full bg-background px-3 py-1 text-[11px]">
-                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />Libre</span>
-                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Ocupada</span>
-                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" />Reservada</span>
-                  </span>
-                </div>
-                {/* Lienzo del plano, escalado para caber en la pantalla */}
-                <div className="relative flex-none rounded-2xl" style={lienzoStyle}>
-                  {/* Paredes (marco de la sala) */}
-                  <div className="pointer-events-none absolute inset-3 rounded-2xl border-2 border-foreground/15" />
-                  {/* Elementos detrás de las mesas; zonas de suelo primero (al fondo) */}
-                  {elementos.filter((e) => e.room_id === vistaSala)
-                    .sort((a, b) => (b.icono?.startsWith("suelo:") ? 1 : 0) - (a.icono?.startsWith("suelo:") ? 1 : 0))
-                    .map((e) => ElementoPlano(e))}
-                  {mesasSala.map((m, i) => MesaPlano(m, i))}
-                  {mesasSala.length === 0 && (
-                    <p className="absolute inset-0 grid place-items-center text-muted-foreground">Sin mesas en esta sala.</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </main>
-
-          {/* Panel de traspaso por líneas: elige unidades y luego toca el destino */}
-          {enPlano && modoTraspaso === "LINEAS" && (
-            <aside className="flex w-72 flex-none flex-col border-l border-border bg-card">
-              <div className="border-b border-border p-3 text-sm font-semibold">Pasar de {mesa?.nombre}: elige qué</div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {Object.entries(comanda).length === 0 && <p className="mt-6 text-center text-xs text-muted-foreground">Sin líneas.</p>}
-                {Object.entries(comanda).map(([pid, qty]) => {
-                  const nombre = prods.find((p) => p.id === pid)?.nombre ?? "Producto";
-                  const mv = traspLineas[pid] ?? 0;
-                  return (
-                    <div key={pid} className="flex items-center gap-1 py-1 text-sm">
-                      <span className="min-w-0 flex-1 truncate">{nombre}</span>
-                      <button type="button" onClick={() => setTraspLineas((t) => ({ ...t, [pid]: Math.max(0, (t[pid] ?? 0) - 1) }))} className="h-7 w-7 flex-none rounded border border-border">−</button>
-                      <span className="w-10 text-center text-xs tabular-nums">{mv}/{qty}</span>
-                      <button type="button" onClick={() => setTraspLineas((t) => ({ ...t, [pid]: Math.min(qty, (t[pid] ?? 0) + 1) }))} className="h-7 w-7 flex-none rounded border border-border">+</button>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="border-t border-border p-2 text-center text-xs text-muted-foreground">Ahora toca la mesa destino</div>
-            </aside>
-          )}
-
-          {/* Panel de cuenta de la mesa seleccionada (1er toque); estilo Glop */}
-          {enPlano && !editandoPlano && !modoTraspaso && (
-            <aside className="flex w-72 flex-none flex-col border-l border-border bg-card">
-              <div className="border-b border-border p-3 text-sm">
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                  <span className="text-muted-foreground">Mesa</span><span className="font-semibold">{mesaSel?.nombre ?? "—"}</span>
-                  <span className="text-muted-foreground">Apertura</span><span className="tabular-nums">{mesaSelInfo?.apertura || "—"}</span>
-                  <span className="text-muted-foreground">Comensales</span><span>{mesaSelInfo?.comensales ?? "—"}</span>
-                  <span className="text-muted-foreground">Importe</span><span className="font-semibold tabular-nums">{eur(mesaSelInfo?.importe ?? 0)}</span>
-                </div>
-                {mesaSelInfo?.nota && <div className="mt-2 rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">📝 {mesaSelInfo.nota}</div>}
-              </div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {!mesaSel ? (
-                  <p className="mt-8 px-2 text-center text-xs text-muted-foreground">Toca una mesa para ver su cuenta.<br />Toca de nuevo para abrirla.</p>
-                ) : (mesaSelInfo?.lineas.length ?? 0) === 0 ? (
-                  <p className="mt-8 px-2 text-center text-xs text-muted-foreground">Mesa libre · sin cuenta abierta.</p>
-                ) : (
-                  <>
-                    <div className="mb-1 flex gap-1 border-b border-border pb-1 text-[11px] font-semibold text-muted-foreground">
-                      <span className="flex-1">Descripción</span><span className="w-8 text-right">Und</span><span className="w-14 text-right">Precio</span>
-                    </div>
-                    <ul className="space-y-0.5 text-sm">
-                      {mesaSelInfo!.lineas.map((l, i) => (
-                        <li key={`${mesaSel.id}-${i}`} className="flex gap-1">
-                          <span className="flex-1 truncate">{l.nombre}</span>
-                          <span className="w-8 text-right tabular-nums">{l.cantidad}</span>
-                          <span className="w-14 text-right tabular-nums">{eur(l.precio)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-              {mesaSel && (
-                <div className="border-t border-border p-2">
-                  <button type="button" onClick={() => abrirMesa(mesaSel)} className="btn-primary w-full">Abrir {mesaSel.nombre} →</button>
-                </div>
-              )}
-            </aside>
-          )}
-          {railSalas(vistaSala)}
-        </div>
-
-        {/* Traspaso: aviso parpadeante mientras esperas que toques la mesa destino */}
-        {modoTraspaso && (
-          <div className="fixed left-1/2 top-16 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-amber-400 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900 shadow-lg dark:bg-amber-900/50 dark:text-amber-100">
-            <span className="animate-pulse">Traspaso de {mesa?.nombre ?? "mesa"}{modoTraspaso === "LINEAS" ? " (por líneas)" : ""} → toca la mesa destino</span>
-            <button type="button" onClick={cancelarTraspaso} className="rounded-full bg-amber-800 px-2 py-0.5 text-xs text-white">Cancelar</button>
-          </div>
-        )}
-
-        {/* Papelera: aparece al arrastrar; soltar encima borra el elemento */}
-        {editandoPlano && arrastrando && (
-          <div ref={papeleraRef}
-            className={`pointer-events-none fixed bottom-24 left-1/2 z-50 flex h-24 w-24 -translate-x-1/2 flex-col items-center justify-center gap-1 rounded-full border-2 border-dashed shadow-lg transition-all ${sobrePapel ? "scale-110 border-rose-600 bg-rose-600 text-white" : "border-rose-400 bg-card text-rose-500"}`}>
-            <Trash2 size={28} strokeWidth={1.5} />
-            <span className="text-[10px] font-semibold">Soltar para borrar</span>
-          </div>
-        )}
-
-        {/* Footer de salón (estilo Glop): acciones sobre la mesa seleccionada */}
-        {enPlano && (editandoPlano ? (
-          <footer className="flex-none border-t border-border bg-blue-500/10 px-2 py-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => setPaletaAbierta((v) => !v)} className="rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-accent">☰ Añadir</button>
-              <span className="text-sm text-muted-foreground">Arrastra para mover · toca una mesa u objeto para editar/girar.</span>
-              <button type="button" onClick={() => { setEditandoPlano(false); setPosOverride({}); void recargarMesas(); void recargarElementos(); }} className="ml-auto rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white">✓ Hecho</button>
-            </div>
-          </footer>
-        ) : (
-          <footer className="flex-none border-t border-border bg-surface px-2 py-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button type="button" onClick={() => { setMesaSel(null); setMesaSelInfo(null); setEditandoPlano(true); setPaletaAbierta(true); }} className="btn-ghost">Editar salón</button>
-              <button type="button" onClick={abrirCajonManual} className="btn-ghost">Abrir cajón</button>
-              <button type="button" onClick={() => mesaSel && abrirNotaMesa(mesaSel)} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Notas mesa</button>
-              <button type="button" onClick={() => mesaSel && dividirMesa(mesaSel)} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Dividir pagos</button>
-              <button type="button" onClick={() => mesaSel && iniciarTraspaso(mesaSel, "LINEAS")} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Trasp. líneas</button>
-              <button type="button" onClick={() => mesaSel && iniciarTraspaso(mesaSel, "MESA")} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Trasp. mesa</button>
-              <button type="button" onClick={() => mesaSel && reimprimirCocinaMesa(mesaSel)} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Re. cocina</button>
-              <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="btn-ghost disabled:opacity-40">Último doc.</button>
-              <button type="button" onClick={() => mesaSel && imprimirCuentaMesa(mesaSel)} disabled={!mesaSel} className="btn-ghost disabled:opacity-40">Imp. cuenta</button>
-              <button type="button" onClick={() => mesaSel && abrirMesa(mesaSel)} disabled={!mesaSel} className="btn-primary disabled:opacity-40">Abrir Mesa</button>
-              <button type="button" onClick={() => mesaSel && cobrarMesa(mesaSel)} disabled={!mesaSel || !puede("cobrar")} className="ml-auto rounded-md bg-[#c46a2a] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">Cobrar</button>
-            </div>
-            {/* ponytail: "Notas mesa" y "Trasp. líneas" abren la cuenta en el TPV (falta editor de nota por pedido y selector de líneas). */}
-          </footer>
-        ))}
-
-        {/* Editor de mesa (modo edición): número, comensales/forma, girar, borrar */}
-        {mesaEdit && (() => {
-          const libre = mesaLibreEdit(mesaEdit);
-          const n = parseInt(numMesa, 10);
-          const dupe = !!n && mesas.some((m) => m.room_id === vistaSala && m.id !== mesaEdit.id && parseInt(m.nombre.replace(/\D/g, ""), 10) === n);
-          return (
-            <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" onClick={() => setMesaEdit(null)}>
-              <div className="w-full max-w-xs rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-                <h3 className="mb-3 font-semibold">Editar {mesaEdit.nombre}</h3>
-
-                <label className="mb-1 block text-sm font-medium" htmlFor="num-mesa">Número de mesa</label>
-                <input id="num-mesa" value={numMesa} onChange={(e) => setNumMesa(e.target.value.replace(/\D/g, ""))} inputMode="numeric" disabled={!libre}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-brand disabled:opacity-50" />
-                {!libre && <p className="mt-1 text-xs text-amber-600">No se puede cambiar el número: la mesa tiene cuenta abierta.</p>}
-                {libre && dupe && <p className="mt-1 text-xs text-rose-600">Ya existe la mesa {n} en esta sala.</p>}
-
-                <div className="mb-1 mt-3 block text-sm font-medium">Forma / comensales</div>
-                <div className="grid grid-cols-4 gap-1">
-                  {FORMAS_MESA.map((f) => {
-                    const activa = (mesaEdit.sprite ?? null) === f.sprite && mesaEdit.capacidad === f.seats;
-                    return (
-                      <button type="button" key={f.file} onClick={() => setFormaMesa(f)}
-                        className={`flex flex-col items-center gap-0.5 rounded-md border p-1 ${activa ? "border-brand bg-brand/10" : "border-border hover:bg-accent"}`}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/plano/${f.file}`} alt="" className="h-8 w-8 object-contain" />
-                        <span className="text-[8px] leading-none">{f.nombre}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <button type="button" onClick={rotarMesaEdit} className="mt-2 w-full rounded-md border border-border py-2 text-sm hover:bg-accent">↻ Girar 45°</button>
-
-                <div className="mt-5 flex gap-2">
-                  <button type="button" onClick={eliminarMesaEdit} disabled={!libre} title={libre ? "" : "No se puede borrar con cuenta abierta"} className="rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 disabled:opacity-40 dark:border-rose-900 dark:hover:bg-rose-950">Eliminar</button>
-                  <button type="button" onClick={() => setMesaEdit(null)} className="flex-1 rounded-md border border-border py-2 text-sm hover:bg-accent">Cancelar</button>
-                  <button type="button" onClick={guardarMesaEdit} disabled={libre && dupe} className="flex-1 rounded-md bg-brand py-2 text-sm font-semibold text-brand-foreground disabled:opacity-40">Guardar</button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Editor de objeto (barra, planta, sombrilla, puerta…): tamaño/girar/duplicar/eliminar */}
-        {elemEdit && (
-          <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" onClick={() => setElemEdit(null)}>
-            <div className="w-full max-w-xs rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-              <h3 className="mb-3 font-semibold">{elemEdit.etiqueta || "Objeto"}</h3>
-              {/* Tamaño: estira sin duplicar (p. ej. una línea divisoria larga) */}
-              <div className="mb-3 space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="w-12 text-muted-foreground">Ancho</span>
-                  <button type="button" onClick={() => setTamElem(-40, 0)} className="h-8 w-8 rounded-md border border-border text-lg leading-none">−</button>
-                  <span className="w-12 text-center tabular-nums">{elemEdit.ancho}</span>
-                  <button type="button" onClick={() => setTamElem(40, 0)} className="h-8 w-8 rounded-md border border-border text-lg leading-none">+</button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-12 text-muted-foreground">Alto</span>
-                  <button type="button" onClick={() => setTamElem(0, -20)} className="h-8 w-8 rounded-md border border-border text-lg leading-none">−</button>
-                  <span className="w-12 text-center tabular-nums">{elemEdit.alto}</span>
-                  <button type="button" onClick={() => setTamElem(0, 20)} className="h-8 w-8 rounded-md border border-border text-lg leading-none">+</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={rotarElemEdit} className="rounded-md border border-border py-2 text-sm hover:bg-accent">↻ Girar</button>
-                <button type="button" onClick={duplicarElem} className="rounded-md border border-border py-2 text-sm hover:bg-accent">⧉ Duplicar</button>
-                <button type="button" onClick={eliminarElemEdit} className="rounded-md border border-rose-300 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950">Eliminar</button>
-              </div>
-              <button type="button" onClick={() => setElemEdit(null)} className="mt-3 w-full text-sm text-muted-foreground hover:underline">Cerrar</button>
-            </div>
-          </div>
-        )}
-
-        {/* Nota de la mesa (alergias, avisos…) */}
-        {modalNota && (
-          <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" onClick={() => setModalNota(false)}>
-            <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-              <h3 className="mb-3 font-semibold">Nota de la mesa</h3>
-              <textarea value={notaTexto} onChange={(e) => setNotaTexto(e.target.value)} rows={4}
-                placeholder="Ej.: alergia a frutos secos · cumpleaños · sin gluten…"
-                className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={() => setModalNota(false)} className="flex-1 rounded-md border border-border py-2 text-sm hover:bg-accent">Cancelar</button>
-                <button type="button" onClick={guardarNota} className="flex-1 rounded-md bg-brand py-2 text-sm font-semibold text-brand-foreground">Guardar</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Ajustes / Utilidades (gear del rail) */}
-        {modalUtilidades && (
-          <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" onClick={() => setModalUtilidades(false)}>
-            <div className="w-full max-w-xs rounded-lg border border-border bg-card p-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
-              <h3 className="mb-3 font-semibold">Ajustes</h3>
-              <div className="space-y-1.5">
-                {typeof window !== "undefined" && window.gluuh && (
-                  <button type="button" onClick={() => { setModalUtilidades(false); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
-                )}
-                <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
-                <button type="button" onClick={() => { setModalUtilidades(false); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
-              <button type="button" onClick={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
-                <button type="button" onClick={() => { setModalUtilidades(false); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
-              </div>
-              <button type="button" onClick={() => setModalUtilidades(false)} className="btn-ghost mt-3 w-full">Cerrar</button>
-            </div>
-          </div>
-        )}
-
-        {/* Popover de reservas de mesa (pulsación larga sobre la mesa) */}
-        {reservaPop && (() => {
-          const m = reservaPop;
-          const list = reservasPorMesa[m.id] ?? [];
-          return (
-            <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setReservaPop(null)}>
-              <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-                <h3 className="mb-3 font-semibold">{m.nombre} · Reservas</h3>
-
-                {list.length > 0 && (
-                  <div className="mb-4 space-y-1">
-                    {list.map((r) => (
-                      <div key={r.id} className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${resForm.id === r.id ? "border-brand bg-brand/10" : "border-border"}`}>
-                        <button type="button" onClick={() => editarReserva(r)} className="min-w-0 flex-1 truncate text-left">
-                          <b className="tabular-nums">{hhmm(r.fecha_hora)}</b> · {r.nombre || "Sin nombre"} <span className="text-muted-foreground">· {r.comensales} pax</span>
-                        </button>
-                        <button type="button" onClick={() => quitarReserva(r)} className="ml-2 flex-none text-rose-600 hover:underline">Quitar</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{resForm.id ? "Editar reserva" : "Nueva reserva"}</div>
-                  <input value={resForm.nombre} onChange={(e) => setResForm((f) => ({ ...f, nombre: e.target.value }))} placeholder="Nombre de la reserva" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                  <div className="flex gap-2">
-                    <input type="time" aria-label="Hora de la reserva" value={resForm.hora} onChange={(e) => setResForm((f) => ({ ...f, hora: e.target.value }))} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                    <input type="number" min={1} aria-label="Comensales de la reserva" value={resForm.personas} onChange={(e) => setResForm((f) => ({ ...f, personas: e.target.value }))} placeholder="pax" className="w-20 flex-none rounded-md border border-border bg-background px-3 py-2 text-right text-sm tabular-nums outline-none focus:border-brand" />
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => guardarReserva(m)} disabled={!resForm.hora} className="btn-primary flex-1 disabled:opacity-50">{resForm.id ? "Guardar" : "Añadir reserva"}</button>
-                    {resForm.id && <button type="button" onClick={() => setResForm({ id: null, nombre: "", personas: String(m.capacidad || 2), hora: "" })} className="btn-ghost">Nueva</button>}
-                  </div>
-                </div>
-
-                <button type="button" onClick={() => setReservaPop(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+      <PlanoSalas
+        sb={sb}
+        operario={operario!}
+        mesas={mesas}
+        setMesas={setMesas}
+        rooms={rooms}
+        elementos={elementos}
+        setElementos={setElementos}
+        reservas={reservas}
+        totalesMesa={totalesMesa}
+        aparcados={aparcados}
+        aparcadosLineas={aparcadosLineas}
+        llevarList={llevarList}
+        recuperarAparcado={recuperarAparcado}
+        nuevoParaLlevar={nuevoParaLlevar}
+        abrirLlevar={abrirLlevar}
+        irASala={irASala}
+        vistaSala={vistaSala}
+        recargarMesas={recargarMesas}
+        recargarElementos={recargarElementos}
+        recargarReservas={recargarReservas}
+        abrirMesa={abrirMesa}
+        cobrarMesa={cobrarMesa}
+        dividirMesa={dividirMesa}
+        iniciarTraspaso={iniciarTraspaso}
+        cancelarTraspaso={cancelarTraspaso}
+        ejecutarTraspaso={ejecutarTraspaso}
+        reimprimirCocinaMesa={reimprimirCocinaMesa}
+        imprimirCuentaMesa={imprimirCuentaMesa}
+        marca={marca}
+        ultimoDoc={ultimoDoc}
+        reprimirUltimo={reprimirUltimo}
+        abrirCajonManual={abrirCajonManual}
+        modoTraspaso={modoTraspaso}
+        comanda={comanda}
+        nombreLinea={nombreDeKey}
+        traspLineas={traspLineas}
+        setTraspLineas={setTraspLineas}
+        prods={prods}
+        busy={busy}
+        setModalUtilidades={(v) => setModalActivo(v ? 'UTILIDADES' : null)}
+        reservasPorMesa={reservasPorMesa}
+        locationId={locationId}
+        renderVelo={renderVelo}
+        puede={puede}
+      />
     );
   }
 
@@ -2573,36 +2251,9 @@ export default function TPV() {
   // Categoría efectiva: la elegida o la primera (así siempre se ven productos debajo).
 
 
-  // Props del rail vertical de acciones de CUENTA (el orden es configurable).
+  // (Las props del rail de acciones se construyen arriba como `accionesRapidasProps`
+  // memoizadas — plan 011.)
   const hayInvitadas = Object.values(invitadas).some(Boolean);
-  const accionesRapidasProps = {
-    hayLineas: unidades > 0,
-    hayCuenta: unidades > 0 || !!ordenAbiertaId,
-    tipoOperacion,
-    nAparcados: aparcados.length,
-    hayUltimoDoc: !!ultimoDoc,
-    orden: ordenFunciones,
-    favoritos: ["aparcar", "marchar"],
-    onAparcar: aparcar,
-    onAparcados: () => setModalAparcados(true),
-    onLlevarBarra: () => { void llevarABarra(); },
-    onPasarMesa: () => setModalPasarMesa(true),
-    onConsumoPropio: () => { if (puede("invitar")) setTipoOperacion((t) => (t === "AUTOCONSUMO" ? "VENTA" : "AUTOCONSUMO")); },
-    onDividir: () => setModalDividir(true),
-    onBorrarCuenta: () => { if (puede("borrar")) setPedirBorrar(true); },
-    onUltimoDoc: reprimirUltimo,
-    onCliente: () => setModalCliente(true),
-    // ponytail: pendiente de definir → abre Utilidades como casa temporal.
-    onCamarero: () => setModalUtilidades(true),
-    onPreparar: () => enviarCocina("PENDIENTE"),
-    onMarchar: () => enviarCocina("EN_PREPARACION"),
-    // Utilidades ancladas al fondo del rail (movidas desde el teclado).
-    onAbrirCajon: abrirCajonManual,
-    onUtilidades: () => setModalUtilidades(true),
-    onImprimir: imprimirRecibo,
-    imprimirDisabled: !ticket && !unidades,
-    onBloquear: bloquear,
-  } as const;
   // Anular la línea seleccionada (misma lógica que "Eliminar" del editor de línea).
   const anularLineaSel = () => {
     if (!lineaSel) return;
@@ -2631,14 +2282,14 @@ export default function TPV() {
 
       {/* ── Cuerpo: ticket+teclado | categorías+productos (sin cabecera de ancho
           completo: el título va dentro de la columna de cuenta, como el mockup) ── */}
-      <div className="flex min-h-0 flex-1">
+      <div className={`flex min-h-0 flex-1 ${modoZurdo ? "flex-row-reverse" : ""}`}>
 
         {/* ─── Columna izquierda: [ticket + teclado] · rail (a altura completa) ─── */}
-        <div className="flex w-[532px] flex-none border-r border-border bg-card">
+        <div className={`flex w-[532px] flex-none ${modoZurdo ? "border-l" : "border-r"} border-border bg-card`}>
 
           {/* Columna de contenido: ticket (crece) + teclado apilados. El border-r la separa
               del rail a lo alto (ticket + teclado), de arriba abajo. */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-border">
+          <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${modoZurdo ? "border-l" : "border-r"} border-border`}>
           {/* Parte superior: cabecera + líneas + totales (crece para empujar el teclado al fondo). */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
@@ -2690,42 +2341,96 @@ export default function TPV() {
               const pm   = preciosManuales[id];
               const inv  = !!invitadas[id];
               const autor = anadidoPor[id];
+              const marchado = lineasGuardadas.has(id);
               return (
-                <button type="button"
+                <div
                   key={id}
                   onClick={() => onLineaTap(id)}
-                  className={`flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                  className={`flex w-full flex-col rounded-md px-2 py-1.5 text-xs transition-colors cursor-pointer ${
                     sel ? "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_#0e8fa2]" : "hover:bg-accent"
-                  }`}
+                  } ${marchado ? "opacity-80" : ""}`}
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1">
-                      <span className="truncate">{nombreDeKey(id)}</span>
-                      {multiCamarero && autor && <span title={autor.nombre} className={`flex-none rounded px-1 text-[9px] font-semibold bg-muted text-muted-foreground`}>{iniciales(autor.nombre)}</span>}
-                      {inv && <span className="inline-flex flex-none items-center gap-0.5 rounded bg-emerald-500/15 px-1 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400"><IconGift size={11} /> INVITADO</span>}
-                      {(desc || pm) && (
-                        <span className={`flex-none rounded px-1 text-[10px] font-medium tabular-nums bg-muted text-muted-foreground`}>
-                          {pm ? `P:${eur(pm)}` : ""}
-                          {desc ? (desc.tipo === "PCT" ? ` -${desc.valor}%` : ` -${eur(desc.valor)}`) : ""}
+                  <div className="flex w-full items-start gap-1">
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1">
+                        <span className={`truncate ${marchado ? "text-muted-foreground/90 font-medium" : "font-bold text-foreground"}`}>
+                          {nombreBaseDeKey(id)}
                         </span>
+                        {marchado && (
+                          <span className="inline-flex flex-none items-center rounded bg-emerald-500/10 px-1 py-0.5 text-[8px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide">
+                            MARCHADO
+                          </span>
+                        )}
+                        {pases[id] && (
+                          <span className="inline-flex flex-none items-center rounded bg-yellow-500/15 px-1 text-[9px] font-bold text-yellow-600 dark:text-yellow-400">
+                            {pases[id] === 4 ? "POSTRE" : pases[id] === 5 ? "BEBIDA" : `${pases[id]}º`}
+                          </span>
+                        )}
+                        {multiCamarero && autor && <span title={autor.nombre} className={`flex-none rounded px-1 text-[9px] font-semibold bg-muted text-muted-foreground`}>{iniciales(autor.nombre)}</span>}
+                        {inv && <span className="inline-flex flex-none items-center gap-0.5 rounded bg-emerald-500/15 px-1 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400"><IconGift size={11} /> INVITADO</span>}
+                        {(desc || pm) && (
+                          <span className={`flex-none rounded px-1 text-[10px] font-medium tabular-nums bg-muted text-muted-foreground`}>
+                            {pm ? `P:${eur(pm)}` : ""}
+                            {desc ? (desc.tipo === "PCT" ? ` -${desc.valor}%` : ` -${eur(desc.valor)}`) : ""}
+                          </span>
+                        )}
+                      </span>
+                      {extraIngredientesDetallados(id).map((ext, idx) => (
+                        <span key={idx} className="mt-0.5 block pl-3 text-[10px] text-muted-foreground/75 font-medium leading-tight">
+                          ↳ {ext.nombre} {ext.uds > 1 ? `x${ext.uds}` : ""} {ext.precio > 0 ? `(+${eur(ext.precio * ext.uds)})` : ""}
+                        </span>
+                      ))}
+                      {notas[id] && (
+                        <span className="mt-0.5 block truncate text-[10px] text-amber-600 dark:text-amber-400">✎ {notas[id]}</span>
                       )}
                     </span>
-                    {notas[id] && (
-                      <span className="mt-0.5 block truncate text-[10px] text-amber-600 dark:text-amber-400">✎ {notas[id]}</span>
-                    )}
-                  </span>
-                  <span className="w-[2.4rem] text-right font-medium tabular-nums">
-                    {sel && editando && modo === "UND"
-                      ? <span className="inline-block rounded-md bg-brand px-1.5 text-brand-foreground">{buffer || q}</span>
-                      : q}
-                  </span>
-                  <span className="w-[4.2rem] text-right tabular-nums">
-                    {sel && editando && modo !== "UND"
-                      ? <span className="inline-block rounded-md bg-brand px-1.5 text-brand-foreground">{buffer || "0"}</span>
-                      : eur(pe)}
-                  </span>
-                  <span className={`w-[4.8rem] text-right font-semibold tabular-nums ${inv ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{inv ? "Inv." : eur(pe * q)}</span>
-                </button>
+                    <span className="w-[2.4rem] text-right font-medium tabular-nums pt-0.5">
+                      {sel ? <BufferEnLinea tipo="UND" fallback={q} /> : q}
+                    </span>
+                    <span className="w-[4.2rem] text-right tabular-nums pt-0.5">
+                      {sel ? <BufferEnLinea tipo="PRECIO" fallback={eur(pe)} /> : eur(pe)}
+                    </span>
+                    <span className={`w-[4.8rem] text-right font-semibold tabular-nums pt-0.5 ${inv ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{inv ? "Inv." : eur(pe * q)}</span>
+                  </div>
+
+                  {sel && (
+                    <div className="mt-2 flex items-center gap-1 border-t border-border/40 pt-1.5" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[9px] text-muted-foreground mr-1">Pase:</span>
+                      {[
+                        { val: 1, label: "1º" },
+                        { val: 2, label: "2º" },
+                        { val: 3, label: "3º" },
+                        { val: 4, label: "Postre" },
+                        { val: 5, label: "Bebida" },
+                      ].map((pOpt) => {
+                        const isCurrent = (pases[id] || 0) === pOpt.val;
+                        return (
+                          <button
+                            key={pOpt.val}
+                            type="button"
+                            onClick={() => setPases((prev) => ({ ...prev, [id]: pOpt.val }))}
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold border transition-all ${
+                              isCurrent
+                                ? "bg-brand text-brand-foreground border-brand"
+                                : "bg-background text-muted-foreground border-border hover:bg-accent"
+                            }`}
+                          >
+                            {pOpt.label}
+                          </button>
+                        );
+                      })}
+                      {(pases[id] || 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPases((prev) => { const { [id]: _, ...r } = prev; return r; })}
+                          className="rounded px-1.5 py-0.5 text-[9px] font-bold border border-rose-500/20 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                        >
+                          Limpiar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -2735,20 +2440,13 @@ export default function TPV() {
 
           {/* Banda de totales (UDS · PRECIO/DTO · ARTÍCULOS · TOTAL) + hint "toca la línea". */}
           <BarraTotales
-            modo={modo}
-            editando={editando}
-            buffer={buffer}
             hayLinea={!!lineaSel}
             udsLinea={lineaSel ? (comanda[lineaSel] ?? 0) : 0}
             precioLinea={lineaSel ? precioEfectivo(lineaSel) : 0}
             unidades={unidades}
             total={total}
             eur={eur}
-            edicion={editando && lineaSel ? {
-              tipo: modo === "UND" ? "unidades" : modo === "PREC" ? "precio" : modo === "DTO%" ? "descuento %" : "descuento €",
-              nombre: nombreDeKey(lineaSel),
-              label: modo === "UND" ? "Und." : modo === "PREC" ? "Precio" : modo === "DTO%" ? "DTO%" : "DTO€",
-            } : null}
+            nombreLineaSel={lineaSel ? nombreDeKey(lineaSel) : null}
           />
           {/* Fila de acciones de LÍNEA/extra (bajo los totales): Anular · Comp. menú · Com. y extra · Invitar. */}
           <FilaAccionesLinea
@@ -2758,18 +2456,16 @@ export default function TPV() {
             onAnular={anularLineaSel}
             onCompMenu={abrirCompMenu}
             onComExtra={comExtraSel}
-            onInvitar={() => { if (puede("invitar")) setModalInvitar(true); }}
+            onInvitar={() => { if (puede("invitar")) setModalActivo('INVITAR'); }}
           />
           </div>{/* fin parte superior */}
 
           {/* Teclado numérico bajo el ticket, dentro de la columna de contenido.
               El buffer (lo que se teclea) ya se ve en la barra de totales, en verde. */}
           <TecladoTPV
-            modo={modo}
-            editando={editando}
             onKey={handleKey}
             onModo={handleKey}
-            onCobrar={() => setModalCobrar(true)}
+            onCobrar={abrirCobrar}
             cobrarDisabled={!unidades || busy || !puede("cobrar")}
           />{/* fin teclado */}
           </div>{/* fin columna de contenido */}
@@ -2818,7 +2514,7 @@ export default function TPV() {
         </div>
 
         {/* ─── Rail de salas (layout fijo estilo Glop): Ticket es la pestaña activa en venta ─── */}
-        {railSalas("TICKET")}
+        <RailSalas tabs={railTabs} activo="TICKET" busy={busy} onConfig={abrirUtilidades} />
       </div>
 
       {/* ── Barra de estado inferior (estilo Glop) ── */}
@@ -2827,11 +2523,13 @@ export default function TPV() {
         terminal={terminal}
         contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Ticket"}
         cajaAbierta={cajaAbierta}
+        modoZurdo={modoZurdo}
+        onModoZurdoChange={setModoZurdo}
       />
 
       {/* ── Modal: Cliente y comensales ── */}
-      {modalCliente && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalCliente(false)}>
+      {modalActivo === 'CLIENTE' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
           <div className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 font-semibold">Cliente y comensales</h3>
             {cliente && (
@@ -2852,14 +2550,18 @@ export default function TPV() {
               aria-label="Buscar cliente"
               value={busqCliente}
               onChange={(e) => buscarClientes(e.target.value)}
-              placeholder="Buscar por nombre o teléfono…"
+              placeholder="Buscar por nombre, teléfono o NIF…"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand"
             />
             {clientesEnc.length > 0 && (
               <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
                 {clientesEnc.map((c) => (
                   <button type="button" key={c.id} onClick={() => asignarCliente(c)} className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-accent">
-                    <span>{c.nombre}</span>
+                    <span className="flex items-center gap-2">
+                      {c.nombre}
+                      {/* Con NIF se le puede emitir factura completa: se marca para que el camarero lo vea. */}
+                      {c.nif && <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{c.nif}</span>}
+                    </span>
                     <span className="text-xs text-muted-foreground">{c.telefono ?? ""}</span>
                   </button>
                 ))}
@@ -2872,34 +2574,49 @@ export default function TPV() {
                 <input aria-label="Teléfono del cliente" value={nuevoCli.telefono} onChange={(e) => setNuevoCli((c) => ({ ...c, telefono: e.target.value }))} placeholder="Teléfono" className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
                 <button type="button" onClick={crearClienteRapido} disabled={!nuevoCli.nombre.trim()} className="btn-primary disabled:opacity-50">Crear</button>
               </div>
+              <input
+                aria-label="NIF del cliente"
+                value={nuevoCli.nif}
+                onChange={(e) => setNuevoCli((c) => ({ ...c, nif: e.target.value }))}
+                placeholder="NIF / CIF — necesario para factura completa"
+                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm uppercase outline-none focus:border-brand"
+              />
             </div>
-            <button type="button" onClick={() => setModalCliente(false)} className="btn-ghost mt-3 w-full">Cerrar</button>
+            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
           </div>
         </div>
       )}
 
       {/* ── Modal: Pasar a mesa ── */}
-      {modalPasarMesa && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalPasarMesa(false)}>
+      {modalActivo === 'PASAR_MESA' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
           <div className="w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 font-semibold">Pasar la cuenta a…</h3>
             <div className="grid max-h-80 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-5">
               {mesas.filter((m) => !mesa || m.id !== mesa.id).map((m) => (
                 <button type="button" key={m.id} onClick={() => pasarAMesa(m)} disabled={busy}
-                  className={`flex h-16 flex-col items-center justify-center rounded-md border text-sm disabled:opacity-50 ${m.estado === "OCUPADA" ? "border-amber-500 bg-amber-500/10" : "border-border hover:bg-accent"}`}>
+                  className={`flex h-16 flex-col items-center justify-center rounded-md border text-sm disabled:opacity-50 ${
+                    m.estado === "POR_COBRAR"
+                      ? "border-yellow-500 bg-yellow-500/10"
+                      : m.estado === "OCUPADA"
+                        ? "border-amber-500 bg-amber-500/10"
+                        : "border-border hover:bg-accent"
+                  }`}>
                   <span className="font-semibold">{m.nombre}</span>
-                  <span className="text-[10px] text-muted-foreground">{m.estado === "OCUPADA" ? "Ocupada" : "Libre"}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {m.estado === "POR_COBRAR" ? "Por cobrar" : m.estado === "OCUPADA" ? "Ocupada" : "Libre"}
+                  </span>
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setModalPasarMesa(false)} className="btn-ghost mt-3 w-full">Cancelar</button>
+            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cancelar</button>
           </div>
         </div>
       )}
 
       {/* ── Modal: Cuentas aparcadas ── */}
-      {modalAparcados && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalAparcados(false)}>
+      {modalActivo === 'APARCADOS' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
           <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 font-semibold">Cuentas aparcadas</h3>
             <div className="space-y-1">
@@ -2911,20 +2628,20 @@ export default function TPV() {
               ))}
               {aparcados.length === 0 && <p className="text-sm text-muted-foreground">No hay cuentas aparcadas.</p>}
             </div>
-            <button type="button" onClick={() => setModalAparcados(false)} className="btn-ghost mt-3 w-full">Cerrar</button>
+            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
           </div>
         </div>
       )}
 
       {/* ── Dividir cuenta (DividirCuentaModal): reparte líneas en documentos ── */}
-      {modalDividir && (
+      {modalActivo === 'DIVIDIR' && (
         <DividirCuentaModal
           lineas={lineasComanda().map((l) => ({ id: l.id, nombre: l.nombre, uds: l.cantidad, precio: l.precio }))}
           total={total}
           comensales={comensales}
           onAceptar={dividirAceptar}
-          onCobrarTodos={() => { setModalDividir(false); setModalCobrar(true); }}
-          onCancelar={() => setModalDividir(false)}
+          onCobrarTodos={() => { setModalActivo('COBRAR'); }}
+          onCancelar={() => setModalActivo(null)}
           onAbrirCajon={abrirCajonManual}
         />
       )}
@@ -2965,8 +2682,8 @@ export default function TPV() {
       })()}
 
       {/* ── Modal: Invitaciones en ticket (marca qué líneas invitar) ── */}
-      {modalInvitar && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalInvitar(false)}>
+      {modalActivo === 'INVITAR' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
           <div className="w-full max-w-md rounded-lg border border-border bg-card shadow-sm" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h3 className="flex items-center gap-2 font-semibold"><IconGift size={18} className="text-emerald-600 dark:text-emerald-400" /> Invitaciones en ticket</h3>
@@ -2994,7 +2711,7 @@ export default function TPV() {
               </span>
               <button type="button" onClick={() => setInvitadas(Object.fromEntries(Object.keys(comanda).map((k) => [k, true])))} className="btn-ghost ml-auto text-xs">Invitar todo</button>
               <button type="button" onClick={() => setInvitadas({})} className="btn-ghost text-xs">Quitar</button>
-              <button type="button" onClick={() => setModalInvitar(false)} className="btn-primary text-sm">Hecho</button>
+              <button type="button" onClick={() => setModalActivo(null)} className="btn-primary text-sm">Hecho</button>
             </div>
           </div>
         </div>
@@ -3028,8 +2745,10 @@ export default function TPV() {
             .split("·").map((s) => s.trim()).filter((s) => s && !nombresComentario.has(s)).join(" · ");
           seleccionInicial = { comentarios, extras: Object.entries(extrasUds).map(([id, uds]) => ({ id, uds })), comentarioManual };
         }
-        // Unidades de partida del stepper: al re-editar, las de la línea; si no, las del teclado (Und).
-        const bufferUds = modo === "UND" ? (Number(buffer.replace(",", ".")) || 1) : 1;
+        // Unidades de partida del stepper: al re-editar, las de la línea; si no, las del
+        // teclado (Und). getState al abrir: el buffer no cambia con el modal abierto.
+        const tecl = useTpvStore.getState();
+        const bufferUds = tecl.modo === "UND" ? (Number(tecl.buffer.replace(",", ".")) || 1) : 1;
         const unidadesInicial = modProd.reemplazar ? (comanda[modProd.reemplazar] ?? 1) : bufferUds;
         // Anotaciones rápidas del tenant agrupadas por su `descripcion` (Punto de la
         // carne · Cuajado · Preparación · Alergias…). Orden = el de la consulta.
@@ -3050,6 +2769,18 @@ export default function TPV() {
             unidadesInicial={unidadesInicial}
             onGuardar={guardarModificadores}
             onCancelar={() => setModProd(null)}
+            onEliminar={() => {
+              if (modProd.reemplazar) {
+                const key = modProd.reemplazar;
+                setComanda((c) => { const { [key]: _, ...r } = c; return r; });
+                setDescuentos((d) => { const { [key]: _, ...r } = d; return r; });
+                setPreciosManuales((m) => { const { [key]: _, ...r } = m; return r; });
+                setNotas((n) => { const { [key]: _, ...r } = n; return r; });
+                setInvitadas((v) => { const { [key]: _, ...r } = v; return r; });
+                setLineaSel(null);
+              }
+              setModProd(null);
+            }}
           />
         );
       })()}
@@ -3127,8 +2858,8 @@ export default function TPV() {
       )}
 
       {/* ── Modal: Nuevo producto (alta rápida) ── */}
-      {modalNuevoProd && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalNuevoProd(false)}>
+      {modalActivo === 'NUEVO_PROD' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
           <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-1 font-semibold">Nuevo producto</h3>
             <p className="mb-3 text-sm text-muted-foreground">Rellena lo básico; el resto lo completas luego en la carta.</p>
@@ -3155,50 +2886,51 @@ export default function TPV() {
                 <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent">
                   📷 Foto<input type="file" accept="image/*" className="hidden" onChange={onFotoRapida} />
                 </label>
-                {nuevoProd.foto_url && <img src={nuevoProd.foto_url} alt="" className="h-9 w-9 rounded object-cover" />}
+                {nuevoProd.foto_url && <img src={urlFoto(nuevoProd.foto_url)} alt="" className="h-9 w-9 rounded object-cover" />}
               </div>
             </div>
             <div className="mt-4 flex gap-2">
               <button type="button" onClick={() => crearProductoRapido(false)} disabled={!nuevoProd.nombre.trim() || !nuevoProd.precio || busy} className="btn-ghost flex-1 disabled:opacity-50">Crear</button>
               <button type="button" onClick={() => crearProductoRapido(true)} disabled={!nuevoProd.nombre.trim() || !nuevoProd.precio || busy} className="btn-primary flex-1 disabled:opacity-50">Crear y añadir</button>
             </div>
-            <button type="button" onClick={() => setModalNuevoProd(false)} className="btn-ghost mt-2 w-full">Cancelar</button>
+            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-2 w-full">Cancelar</button>
           </div>
         </div>
       )}
 
       {/* ── Modal: Utilidades ── */}
-      {modalUtilidades && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalUtilidades(false)}>
+      {modalActivo === 'UTILIDADES' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
           <div className="w-full max-w-xs rounded-lg border border-border bg-card p-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 font-semibold">Utilidades</h3>
             <div className="space-y-1.5">
               {window.gluuh && (
-                <button type="button" onClick={() => { setModalUtilidades(false); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
+                <button type="button" onClick={() => { setModalActivo(null); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
               )}
               <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
-              <button type="button" onClick={() => { setModalUtilidades(false); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
+              <button type="button" onClick={() => { setModalActivo(null); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
               <button type="button" onClick={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
-              <button type="button" onClick={() => { setModalUtilidades(false); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
+              <button type="button" onClick={() => { setModalActivo(null); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
             </div>
-            <button type="button" onClick={() => setModalUtilidades(false)} className="btn-ghost mt-3 w-full">Cerrar</button>
+            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
           </div>
         </div>
       )}
 
       {/* ── Cobrar (CobrarModal): pago mixto, propina, descuento, F10/F11/F12 ── */}
-      {modalCobrar && (
+      {modalActivo === 'COBRAR' && (
         <CobrarModal
           total={total}
           baseImponible={desgloseCobro.base}
           impuesto={desgloseCobro.impuesto}
           cliente={cliente?.nombre}
+          clienteNif={cliente?.nif ?? null}
           empleado={operario?.nombre}
           terminal={terminal}
           formasPago={formasPago}
           onCobrar={cobrarDesdeModal}
           onImprimirCuenta={imprimirRecibo}
-          onCancelar={() => setModalCobrar(false)}
+          onCancelar={() => setModalActivo(null)}
         />
       )}
 
@@ -3221,7 +2953,6 @@ export default function TPV() {
             </div>
             {VERIFACTU_ACTIVO ? (
               <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={ticket.verifactu.qrDataUrl} alt="QR VERIFACTU" className="mx-auto my-2 h-32 w-32" />
                 <div className="font-semibold">{ticket.verifactu.leyenda}</div>
                 <div className="text-xs text-muted-foreground">{ticket.numSerieFactura}</div>

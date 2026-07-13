@@ -8,11 +8,11 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
+import { eur } from "@/app/lib/money";
 
 interface Categoria { id: string; nombre: string; orden: number }
 interface Producto { id: string; nombre: string; precio: number; category_id: string | null; orden: number }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function OrdenarProductos() {
   const sb = supabaseBrowser();

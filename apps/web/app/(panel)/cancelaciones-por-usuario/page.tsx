@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Users, XCircle } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawOrder {
   user_id: string | null;
@@ -27,7 +28,6 @@ interface FilaCancelacion {
   importe: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function agruparCancelaciones(orders: RawOrder[], userMap: Record<string, string>): FilaCancelacion[] {
   const acc: Record<string, { canceladas: number; importe: number }> = {};

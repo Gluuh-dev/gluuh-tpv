@@ -29,18 +29,55 @@ export function elegirImpresora(
   return impresoras.find((p) => p.activa && p.rol === rol)?.id ?? null;
 }
 
-export interface LineaComanda { cantidad: number; nombre: string; nota?: string }
+export interface LineaComanda { cantidad: number; nombre: string; nota?: string; pase?: number | null }
 export interface GrupoComanda { estacion: string; lineas: LineaComanda[] }
+
+const NOMBRES_PASES: Record<number, string> = {
+  1: "1º PRIMEROS",
+  2: "2º SEGUNDOS",
+  3: "3º TERCEROS",
+  4: "POSTRES",
+  5: "BEBIDAS",
+};
 
 // Texto ESC/POS-friendly de una comanda (sin precios).
 function formatearComanda(contexto: string, operario: string | undefined, lineas: LineaComanda[]): string[] {
   const out = [contexto.toUpperCase()];
   if (operario) out.push(operario);
   out.push("--------------------------------");
+
+  const pasesAgrupados: Record<number, LineaComanda[]> = {};
+  const sinPase: LineaComanda[] = [];
+
   for (const l of lineas) {
-    out.push(`${l.cantidad} x ${l.nombre}`);
-    if (l.nota) out.push(`   >> ${l.nota}`);
+    const p = l.pase;
+    if (typeof p === "number" && p > 0) {
+      if (!pasesAgrupados[p]) pasesAgrupados[p] = [];
+      pasesAgrupados[p].push(l);
+    } else {
+      sinPase.push(l);
+    }
   }
+
+  if (sinPase.length) {
+    for (const l of sinPase) {
+      out.push(`${l.cantidad} x ${l.nombre}`);
+      if (l.nota) out.push(`   >> ${l.nota}`);
+    }
+  }
+
+  const sortedPases = Object.keys(pasesAgrupados).map(Number).sort();
+  for (const p of sortedPases) {
+    const list = pasesAgrupados[p]!;
+    if (!list.length) continue;
+    const nombrePase = NOMBRES_PASES[p] || `${p}º TIEMPO`;
+    out.push("--------------------------------", `=== ${nombrePase} ===`, "--------------------------------");
+    for (const l of list) {
+      out.push(`${l.cantidad} x ${l.nombre}`);
+      if (l.nota) out.push(`   >> ${l.nota}`);
+    }
+  }
+
   return out;
 }
 

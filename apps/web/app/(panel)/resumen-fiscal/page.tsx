@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Receipt, Calculator, Coins } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawLine {
   cantidad: number;
@@ -24,7 +25,6 @@ interface FilaFiscal {
   total: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function agruparPorTipo(lines: RawLine[]): FilaFiscal[] {
   const acc: Record<number, { base: number; cuota: number; total: number }> = {};

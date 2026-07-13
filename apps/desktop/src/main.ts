@@ -80,7 +80,8 @@ function crearVentana(): void {
 function inicializarUpdater(): void {
   if (!app.isPackaged) return;
   // Carga diferida: electron-updater no hace falta en dev.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // (la regla se llamaba `no-var-requires`; ese disable ya no silenciaba nada)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true; // nunca reiniciar en mitad del servicio

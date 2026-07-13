@@ -33,6 +33,7 @@
 | [07-catalogo-modulos-y-roadmap.md](07-catalogo-modulos-y-roadmap.md) | Módulos e integraciones de todo el mercado (ES + internacional) cruzados con Gluuh, y roadmap priorizado P0/P1/P2 |
 | [08-checklist-maestro-100.md](08-checklist-maestro-100.md) | ★ Lista maestra de TODO (módulos, funciones, mejoras) con estado ✅/🟡/❌ — la "definición de completo al 100%" |
 | [09-orden-de-implementacion.md](09-orden-de-implementacion.md) | ★★ PLAN OPERATIVO (07-07): bloques A-F en orden — remates de identidad, publicar en Cloudflare, impresión multi-barra, acabados, NODO LOCAL y VERIFACTU al final. Abrir por la mañana y trabajar de arriba abajo |
+| [10-arquitectura-nodo-local-y-nube.md](10-arquitectura-nodo-local-y-nube.md) | ★ ARQUITECTURA DEFINITIVA (12-07): nodo local = fuente de verdad operativa (sin internet); nube = espejo + módulo de pago (ver/editar desde casa, backup remoto, multi-local). Sync partido por clase de dato. **Actualiza el doc 06.** Se ejecuta en la guía de implementación 16 |
 
 ## Documentos relacionados
 

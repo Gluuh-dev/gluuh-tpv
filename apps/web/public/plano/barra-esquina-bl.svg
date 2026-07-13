@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 676.41 668.4">
+  <g transform="rotate(90, 338.2, 334.2)">
+    <!-- Borde frontal (madera más clara) -->
+    <polygon points="676.41 0 647.42 0 647.42 639.41 0 639.41 0 668.4 676.41 668.4 676.41 0" fill="#9c6a38" />
+    <!-- Repisa trasera (acero/pizarra) -->
+    <path d="M526.2 457.57H512V0H465.6v457.57H0v46.4h526.2Z" fill="#cbd5e1" />
+    <!-- Barra principal (madera) -->
+    <polygon points="511.98 0 511.98 503.97 0 503.97 0 639.41 647.42 639.41 647.42 507.97 647.42 503.97 647.42 0 511.98 0" fill="#8a5a2b" />
+  </g>
+</svg>

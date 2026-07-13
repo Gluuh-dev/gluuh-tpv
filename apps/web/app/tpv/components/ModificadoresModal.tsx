@@ -1,13 +1,8 @@
 "use client";
 
-// Modal de MODIFICADORES de un producto (estilo mockup del cliente): dos paneles
-// —COMENTARIOS (de cocina, sin precio) y EXTRAS (con precio y unidades)— con una
-// COLUMNA DE ACCIONES al centro (comentario manual · guardar · cancelar).
-// PRESENTACIONAL: recibe datos por props, emite por callbacks; no hace fetch ni
-// toca fiscalidad (el precio llega ya calculado).
-// Skill: gluuh-ux-operativa (táctil ≥48px, feedback fuera del dedo).
 import { useMemo, useState } from "react";
-import { Minus, Plus, MessageSquarePlus, Check, AlertTriangle, X } from "lucide-react";
+import { Minus, Plus, Check, AlertTriangle, X } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 export interface GrupoComentario {
   nombre: string;
@@ -31,7 +26,7 @@ export interface SeleccionModificadores {
   extras: { id: string; uds: number }[];
   /** Texto libre escrito por el camarero. */
   comentarioManual: string;
-  /** Unidades del propio producto (≥ 1). Opcional: page.tsx no lo consume hoy. */
+  /** Unidades del propio producto (≥ 1). */
   unidades?: number;
 }
 
@@ -48,9 +43,9 @@ export interface ModificadoresModalProps {
   unidadesInicial?: number;
   onGuardar(seleccion: SeleccionModificadores): void;
   onCancelar(): void;
+  onEliminar?(): void;
 }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 const esUnicaGrupo = (g: GrupoComentario) => !!g.unica || (g.min ?? 0) >= 1;
 
 export function ModificadoresModal({
@@ -62,6 +57,7 @@ export function ModificadoresModal({
   unidadesInicial,
   onGuardar,
   onCancelar,
+  onEliminar,
 }: ModificadoresModalProps) {
   const [comentarios, setComentarios] = useState<Set<string>>(
     () => new Set(seleccionInicial?.comentarios ?? []),
@@ -72,7 +68,6 @@ export function ModificadoresModal({
     return r;
   });
   const [comentarioManual, setComentarioManual] = useState(seleccionInicial?.comentarioManual ?? "");
-  const [mostrarManual, setMostrarManual] = useState(!!seleccionInicial?.comentarioManual);
   const [unidades, setUnidades] = useState(
     () => Math.max(1, seleccionInicial?.unidades ?? unidadesInicial ?? 1),
   );
@@ -83,13 +78,29 @@ export function ModificadoresModal({
   );
   const total = producto.precio * unidades + totalExtras;
 
-  // Primer grupo obligatorio (min>0) sin cubrir: deshabilita Guardar y avisa.
+  // Primer grupo obligatorio (min>0) sin cubrir: deshabilita Aceptar y avisa.
   const grupoFaltante = useMemo(
     () => gruposComentario.find(
       (g) => (g.min ?? 0) > 0 && g.opciones.filter((o) => comentarios.has(o.id)).length < g.min!,
     ),
     [gruposComentario, comentarios],
   );
+
+  function triggerAutoSave(
+    currentComentarios: Set<string>,
+    currentExtrasUds: Record<string, number>,
+    currentManual: string,
+    currentUnidades: number
+  ) {
+    onGuardar({
+      comentarios: [...currentComentarios],
+      extras: extras
+        .filter((e) => (currentExtrasUds[e.id] ?? 0) > 0)
+        .map((e) => ({ id: e.id, uds: currentExtrasUds[e.id]! })),
+      comentarioManual: currentManual.trim(),
+      unidades: currentUnidades,
+    });
+  }
 
   function toggleComentario(grupo: GrupoComentario, id: string) {
     setComentarios((prev) => {
@@ -104,55 +115,32 @@ export function ModificadoresModal({
       } else {
         next.add(id);
       }
+      triggerAutoSave(next, extrasUds, comentarioManual, unidades);
       return next;
     });
   }
 
-  function cambiarUds(id: string, delta: number) {
-    setExtrasUds((prev) => {
-      const uds = Math.max(0, (prev[id] ?? 0) + delta);
-      const next = { ...prev };
-      if (uds === 0) delete next[id];
-      else next[id] = uds;
-      return next;
-    });
-  }
-
-  function guardar() {
-    if (grupoFaltante) return; // grupo obligatorio sin cubrir (además del disabled del botón)
-    onGuardar({
-      comentarios: [...comentarios],
-      extras: extras
-        .filter((e) => (extrasUds[e.id] ?? 0) > 0)
-        .map((e) => ({ id: e.id, uds: extrasUds[e.id]! })),
-      comentarioManual: comentarioManual.trim(),
-      unidades,
-    });
-  }
-
-  const manualTexto = comentarioManual.trim();
-
-  // Anotaciones rápidas: se pliegan en el comentario manual como segmentos "· ".
-  // Un chip está activo si su texto ya es un segmento de la nota.
   const segmentos = comentarioManual.split("·").map((s) => s.trim()).filter(Boolean);
   const anotActiva = (txt: string) => segmentos.includes(txt);
   function toggleAnotacion(txt: string) {
     const set = new Set(segmentos);
     if (set.has(txt)) set.delete(txt);
     else set.add(txt);
-    setComentarioManual([...set].join(" · "));
+    const newManual = [...set].join(" · ");
+    setComentarioManual(newManual);
+    triggerAutoSave(comentarios, extrasUds, newManual, unidades);
   }
 
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={onCancelar}
+      onClick={() => { if (!grupoFaltante) onCancelar(); }}
       role="dialog"
       aria-modal="true"
       aria-label={`Modificadores de ${producto.nombre}`}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera: nombre del producto (acento cian) + total + cerrar */}
@@ -168,44 +156,44 @@ export function ModificadoresModal({
             <button
               type="button"
               onClick={onCancelar}
+              disabled={!!grupoFaltante}
               aria-label="Cerrar"
-              className="grid h-11 w-11 flex-none place-items-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="grid h-11 w-11 flex-none place-items-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <X size={20} />
             </button>
           </div>
         </header>
 
-        {/* Cuerpo: panel Comentarios · acciones · panel Extras (apilado en móvil) */}
-        <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto bg-background/40 p-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-          {/* ── Panel izquierdo: Comentarios ── */}
-          <section className="order-1 flex flex-col rounded-lg border border-border bg-card p-3">
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Comentarios</h3>
-
-            {/* Fila de precio: recalcula con unidades y extras */}
-            <div className="mb-3 flex items-baseline gap-2 rounded-md bg-surface px-3 py-2 text-sm tabular-nums">
-              <span className="text-muted-foreground">Precio:</span>
-              <span className="font-semibold">{eur(producto.precio)}</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground">Total:</span>
-              <span className="font-bold text-brand">{eur(total)}</span>
+        {/* Cuerpo: Comentarios (izq) y Extras (der) */}
+        <div className="grid flex-1 grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto bg-background/40 p-4">
+          
+          {/* Panel izquierdo: Comentarios */}
+          <section className="flex flex-col rounded-lg border border-border bg-card p-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Comentarios</h3>
+              <div className="flex items-baseline gap-2 rounded-md bg-surface px-3 py-2 text-xs tabular-nums text-muted-foreground">
+                <span>Precio base: <strong>{eur(producto.precio)}</strong></span>
+                <span>·</span>
+                <span>Total línea: <strong className="text-brand">{eur(total)}</strong></span>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex-1 space-y-4 overflow-y-auto pr-1">
               {gruposComentario.map((grupo) => {
                 const unica = esUnicaGrupo(grupo);
                 return (
-                  <div key={grupo.nombre}>
-                    <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                  <div key={grupo.nombre} className="border-b border-border/40 pb-3 last:border-0 last:pb-0">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                       {grupo.nombre}
                       {unica && <span className="text-xs font-normal text-muted-foreground">· elige uno</span>}
                       {(grupo.min ?? 0) > 0 && (
-                        <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
+                        <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-warning">
                           Obligatorio
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {grupo.opciones.map((op) => {
                         const activo = comentarios.has(op.id);
                         return (
@@ -213,21 +201,13 @@ export function ModificadoresModal({
                             key={op.id}
                             type="button"
                             onClick={() => toggleComentario(grupo, op.id)}
-                            aria-pressed={activo}
-                            className={`flex min-h-12 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-medium transition-all active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                            className={`flex min-h-12 items-center justify-center text-center rounded-md border px-2 py-1.5 text-xs font-semibold transition-all active:scale-[.98] ${
                               activo
-                                ? "border-brand bg-brand/10 text-brand"
+                                ? "border-brand bg-brand/10 text-brand shadow-[0_0_0_1px_rgba(13,143,162,0.2)]"
                                 : "border-border bg-background hover:border-border-strong hover:bg-accent"
                             }`}
                           >
-                            <span
-                              className={`grid h-5 w-5 flex-none place-items-center border transition-colors ${
-                                unica ? "rounded-full" : "rounded"
-                              } ${activo ? "border-brand bg-brand text-white" : "border-border-strong"}`}
-                            >
-                              {activo ? <Check size={14} strokeWidth={3} /> : null}
-                            </span>
-                            <span className="truncate">{op.nombre}</span>
+                            {op.nombre}
                           </button>
                         );
                       })}
@@ -236,18 +216,10 @@ export function ModificadoresModal({
                 );
               })}
 
-              {gruposComentario.length === 0 && anotaciones.length === 0 && (
-                <p className="rounded-md border border-dashed border-border bg-background px-3 py-4 text-center text-sm text-muted-foreground">
-                  Este producto no tiene comentarios predefinidos. Usa «Comentario manual».
-                </p>
-              )}
-
-              {/* Anotaciones rápidas del tenant (nota_preparacion), agrupadas por
-                  descripcion: toggles que se pliegan en la nota de cocina. */}
               {anotaciones.map((grupo) => (
-                <div key={grupo.grupo}>
-                  <div className="mb-1.5 text-sm font-semibold">{grupo.grupo}</div>
-                  <div className="grid grid-cols-2 gap-2">
+                <div key={grupo.grupo} className="border-b border-border/40 pb-3 last:border-0 last:pb-0">
+                  <div className="mb-2 text-sm font-semibold">{grupo.grupo}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {grupo.opciones.map((txt) => {
                       const activo = anotActiva(txt);
                       return (
@@ -255,21 +227,13 @@ export function ModificadoresModal({
                           key={txt}
                           type="button"
                           onClick={() => toggleAnotacion(txt)}
-                          aria-pressed={activo}
-                          className={`flex min-h-12 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-medium transition-all active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                          className={`flex min-h-12 items-center justify-center text-center rounded-md border px-2 py-1.5 text-xs font-semibold transition-all active:scale-[.98] ${
                             activo
                               ? "border-brand bg-brand/10 text-brand"
-                              : "border-border bg-background hover:border-border-strong hover:bg-accent"
+                              : "border-border bg-background hover:border-strong hover:bg-accent"
                           }`}
                         >
-                          <span
-                            className={`grid h-5 w-5 flex-none place-items-center rounded border transition-colors ${
-                              activo ? "border-brand bg-brand text-white" : "border-border-strong"
-                            }`}
-                          >
-                            {activo ? <Check size={14} strokeWidth={3} /> : null}
-                          </span>
-                          <span className="truncate">{txt}</span>
+                          {txt}
                         </button>
                       );
                     })}
@@ -277,138 +241,127 @@ export function ModificadoresModal({
                 </div>
               ))}
 
-              {/* Comentario manual: edición inline o vista entre comillas */}
-              {mostrarManual ? (
-                <textarea
-                  autoFocus
-                  value={comentarioManual}
-                  onChange={(e) => setComentarioManual(e.target.value)}
-                  onBlur={() => setMostrarManual(!!manualTexto)}
-                  placeholder="Comentario manual a cocina…"
-                  rows={2}
-                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand"
-                />
-              ) : (
-                manualTexto && (
-                  <button
-                    type="button"
-                    onClick={() => setMostrarManual(true)}
-                    className="rounded-md border border-border bg-surface px-3 py-2 text-left text-sm italic text-foreground transition-colors hover:border-brand"
-                  >
-                    «{manualTexto}»
-                  </button>
-                )
+              {gruposComentario.length === 0 && anotaciones.length === 0 && (
+                <p className="rounded-md border border-dashed border-border bg-background px-3 py-4 text-center text-sm text-muted-foreground">
+                  Este producto no tiene comentarios predefinidos.
+                </p>
               )}
+
+              {/* Comentario manual */}
+              <div className="pt-2">
+                <div className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comentario manual</div>
+                <textarea
+                  value={comentarioManual}
+                  onChange={(e) => {
+                    setComentarioManual(e.target.value);
+                    triggerAutoSave(comentarios, extrasUds, e.target.value, unidades);
+                  }}
+                  placeholder="Escribe un comentario personalizado para cocina..."
+                  rows={2}
+                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-xs outline-none focus:border-brand"
+                />
+              </div>
             </div>
           </section>
 
-          {/* ── Columna central: acciones ── */}
-          <div className="order-3 flex flex-col justify-center gap-3 md:order-2 md:w-44">
-            <button
-              type="button"
-              onClick={() => setMostrarManual(true)}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-md border border-dashed border-border bg-card px-4 text-sm font-semibold text-muted-foreground transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              <MessageSquarePlus size={18} strokeWidth={1.5} /> Comentario manual
-            </button>
-            <button
-              type="button"
-              onClick={guardar}
-              disabled={!!grupoFaltante}
-              className="min-h-14 rounded-md bg-[#c46a2a] px-4 text-base font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-[#d47c34] active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:bg-[#c46a2a] disabled:active:scale-100"
-            >
-              Guardar
-            </button>
-            <button
-              type="button"
-              onClick={onCancelar}
-              className="min-h-14 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              Cancelar
-            </button>
-            {grupoFaltante && (
-              <div
-                className="flex items-center justify-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-2 py-2 text-center text-xs font-semibold text-warning"
-                role="alert"
-              >
-                <AlertTriangle size={14} strokeWidth={2.5} /> Elige {grupoFaltante.nombre}
+          {/* Panel derecho: Extras en un grid rápido (Estilo checkbox) */}
+          <section className="flex flex-col rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Extras y añadidos</h3>
+            
+            <div className="flex-1 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {extras.map((e) => {
+                  const activo = (extrasUds[e.id] ?? 0) > 0;
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => {
+                        setExtrasUds((prev) => {
+                          const next = { ...prev };
+                          if (prev[e.id] > 0) {
+                            delete next[e.id];
+                          } else {
+                            next[e.id] = 1;
+                          }
+                          triggerAutoSave(comentarios, next, comentarioManual, unidades);
+                          return next;
+                        });
+                      }}
+                      className={`flex flex-col items-center justify-center text-center min-h-[64px] rounded-md border px-2 py-1.5 transition-all active:scale-[.98] ${
+                        activo
+                          ? "border-brand bg-brand/10 text-brand shadow-[0_0_0_1px_rgba(13,143,162,0.2)]"
+                          : "border-border bg-background hover:border-strong hover:bg-accent"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold truncate w-full">{e.nombre}</span>
+                      <span className={`text-[10px] ${activo ? "text-brand" : "text-muted-foreground"} mt-0.5 tabular-nums`}>+{eur(e.precioExtra)}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
 
-          {/* ── Panel derecho: Extras (con unidades del producto) ── */}
-          <section className="order-2 flex flex-col rounded-lg border border-border bg-card p-3 md:order-3">
-            {/* Cabecera con stepper de unidades del producto */}
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Extras</h3>
-              <div className="flex items-center gap-1">
-                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Unidades</span>
-                <button
-                  type="button"
-                  onClick={() => setUnidades((u) => Math.max(1, u - 1))}
-                  disabled={unidades <= 1}
-                  aria-label="Quitar unidad"
-                  className="grid h-11 w-11 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95 disabled:opacity-30 disabled:active:scale-100"
-                >
-                  <Minus size={18} />
-                </button>
-                <span className="w-8 text-center text-lg font-bold tabular-nums">{unidades}</span>
-                <button
-                  type="button"
-                  onClick={() => setUnidades((u) => u + 1)}
-                  aria-label="Añadir unidad"
-                  className="grid h-11 w-11 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95"
-                >
-                  <Plus size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {extras.map((e) => {
-                const uds = extrasUds[e.id] ?? 0;
-                return (
-                  <div
-                    key={e.id}
-                    className={`flex items-center gap-3 rounded-md border px-3 py-2 transition-colors ${
-                      uds > 0 ? "border-brand bg-brand/5" : "border-border bg-background"
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{e.nombre}</div>
-                      <div className="text-xs tabular-nums text-muted-foreground">+{eur(e.precioExtra)}</div>
-                    </div>
-                    <div className="flex flex-none items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => cambiarUds(e.id, -1)}
-                        disabled={uds === 0}
-                        aria-label={`Quitar ${e.nombre}`}
-                        className="grid h-12 w-12 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95 disabled:opacity-30 disabled:active:scale-100"
-                      >
-                        <Minus size={18} />
-                      </button>
-                      <span className="w-9 text-center text-lg font-bold tabular-nums">{uds}</span>
-                      <button
-                        type="button"
-                        onClick={() => cambiarUds(e.id, +1)}
-                        aria-label={`Añadir ${e.nombre}`}
-                        className="grid h-12 w-12 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95"
-                      >
-                        <Plus size={18} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
               {extras.length === 0 && (
-                <p className="rounded-md border border-dashed border-border bg-background px-3 py-4 text-center text-sm text-muted-foreground">
+                <p className="rounded-md border border-dashed border-border bg-background px-3 py-6 text-center text-sm text-muted-foreground">
                   Este producto no admite extras.
                 </p>
               )}
             </div>
           </section>
         </div>
+
+        {/* Pie de página con unidades y acciones */}
+        <footer className="flex flex-none flex-wrap items-center justify-between gap-4 border-t border-border bg-surface px-5 py-4">
+          {/* Unidades del plato */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">Unidades del plato</span>
+            <button
+              type="button"
+              onClick={() => setUnidades((u) => {
+                const next = Math.max(1, u - 1);
+                triggerAutoSave(comentarios, extrasUds, comentarioManual, next);
+                return next;
+              })}
+              disabled={unidades <= 1}
+              className="grid h-11 w-11 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95 disabled:opacity-30"
+            >
+              <Minus size={18} />
+            </button>
+            <span className="w-8 text-center text-lg font-bold tabular-nums">{unidades}</span>
+            <button
+              type="button"
+              onClick={() => setUnidades((u) => {
+                const next = u + 1;
+                triggerAutoSave(comentarios, extrasUds, comentarioManual, next);
+                return next;
+              })}
+              className="grid h-11 w-11 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+
+          {/* Acciones principales */}
+          <div className="flex items-center gap-3">
+            {onEliminar && (
+              <button
+                type="button"
+                onClick={onEliminar}
+                className="min-h-12 rounded-md border border-rose-500/30 bg-rose-500/10 text-rose-600 px-6 text-sm font-bold transition-all hover:bg-rose-500/20 active:scale-[.98]"
+              >
+                Quitar plato
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onCancelar}
+              disabled={!!grupoFaltante}
+              className="min-h-12 rounded-md bg-brand px-8 text-base font-bold text-white shadow-md shadow-brand/25 transition-all hover:bg-brand/90 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Aceptar
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

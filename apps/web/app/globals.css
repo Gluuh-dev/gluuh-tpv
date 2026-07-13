@@ -28,8 +28,8 @@
     --text-secondary: var(--scale-11);
     --text-primary: var(--scale-12);
 
-    --brand:#eab308; --brand-hover:#d99e06; --brand-active:#b8850a; --brand-muted: rgba(234,179,8,.15);
-    --accent-soft:#fdf3d0;  /* fondo sólido para estados seleccionados (claro) */
+    --brand:#7D419E; --brand-hover:#652c84; --brand-active:#541F6E; --brand-muted: rgba(125,65,158,.15);
+    --accent-soft:#f5f0f9;  /* fondo sólido para estados seleccionados (claro) */
     --boton-bg:#ffffff; --boton-tono:#60646c;   /* botón de acción rail/fila: fondo + texto/filo (claro) */
     --success:#2ea06a; --warning:#d0a24a; --danger:#cf5346; --info:#2f7fd0;
 
@@ -50,8 +50,8 @@
     --border-muted:#2a313d; --border-default:#38414f; --border-strong:#4b5768;
 
     --text-muted:#98a2b0; --text-secondary:#c2ccd8; --text-primary:#eef1f6;
-    --brand:#eab308; --brand-hover:#f0bd2b; --brand-active:#c99a09; --brand-muted: rgba(234,179,8,.18);
-    --accent-soft:#352a0a;  /* amarillo tenue para seleccionado/activo (oscuro) */
+    --brand:#7D419E; --brand-hover:#9358b5; --brand-active:#652c84; --brand-muted: rgba(125,65,158,.18);
+    --accent-soft:#24152e;  /* violeta tenue para seleccionado/activo (oscuro) */
     --boton-bg:#212731; --boton-tono:#7f8b9a;    /* botón de acción rail/fila: fondo + texto/filo (oscuro) */
     --success:#34b476; --warning:#d0a24a; --danger:#cf5346; --info:#3ba7e0;
     color-scheme: dark;
@@ -82,7 +82,7 @@
   --color-accent-soft: var(--accent-soft);
   --color-boton-bg: var(--boton-bg);
   --color-boton-tono: var(--boton-tono);
-  --color-brand-foreground: #1f1803;  /* texto oscuro sobre el amarillo (alto contraste) */
+  --color-brand-foreground: #ffffff;  /* texto claro sobre el violeta de marca */
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -98,7 +98,7 @@
   --color-popover: var(--bg-overlay);
   --color-popover-foreground: var(--text-primary);
   --color-primary: var(--brand);
-  --color-primary-foreground: #1f1803;  /* texto oscuro sobre el amarillo de marca */
+  --color-primary-foreground: #ffffff;  /* texto claro sobre el violeta de marca */
   --color-secondary: var(--bg-muted);
   --color-secondary-foreground: var(--text-primary);
   --color-muted: var(--bg-muted);
@@ -121,4 +121,12 @@ html, body { height: 100%; }
   .input { @apply w-full rounded-md border border-input bg-surface px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring; }
   .card { @apply rounded-lg border border-border bg-surface p-5; }
   .label { @apply mb-1 block text-sm font-medium; }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

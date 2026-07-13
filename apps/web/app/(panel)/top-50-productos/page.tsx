@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Package, ShoppingCart } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawLine {
   nombre: string;
@@ -23,7 +24,6 @@ interface ProductoTop {
   importe: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function agruparPorProducto(lines: RawLine[]): ProductoTop[] {
   const acc: Record<string, { uds: number; importe: number }> = {};

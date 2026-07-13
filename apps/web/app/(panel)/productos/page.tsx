@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CLASES_FISCALES } from "@/lib/fiscal-clases";
 import { ESTACION_LABEL, estacionDe } from "@/app/lib/estaciones";
+import { eur } from "@/app/lib/money";
 
 interface Prod {
   id: string; nombre: string; precio: number; tipo_impositivo: number; clase_fiscal: string | null;
@@ -24,7 +25,6 @@ interface Prod {
   disponible: boolean; agotado_hasta: string | null;
 }
 
-const eur = (n: number) => Number(n).toFixed(2).replace(".", ",") + " €";
 const TODAS = "__todas__";
 const SIN_CAT = "__sincat__";
 const siNo = (v: boolean) => (v ? "Sí" : "No");

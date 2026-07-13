@@ -16,12 +16,12 @@ import { SearchInput } from "@/components/ui/search-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { eur } from "@/app/lib/money";
 
 interface Tarifa { id: string; nombre: string }
 interface Categoria { id: string; nombre: string; orden: number }
 interface Producto { id: string; nombre: string; precio: number; category_id: string | null }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function Tarifas() {
   const sb = supabaseBrowser();

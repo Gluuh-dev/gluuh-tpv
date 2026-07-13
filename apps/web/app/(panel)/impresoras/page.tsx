@@ -74,7 +74,7 @@ export default function Impresoras() {
     setDispositivos((d as Dispositivo[]) ?? []);
     setZonas((z as Zona[]) ?? []);
   }
-  useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { void cargar();   }, []);
 
   const emp = editor?.modo === "editar" ? lista.find((e) => e.id === editor.id) ?? null : null;
   const nombreImp = (id: string) => lista.find((p) => p.id === id)?.nombre ?? "—";

@@ -163,7 +163,11 @@ export function TablaDatos<T>({
     };
     const cabecera = columnas.map((c) => esc(c.titulo)).join(";");
     const cuerpo = filasExp.map((f) => columnas.map((c) => esc(c.valor(f))).join(";")).join("\n");
-    const csv = `﻿${cabecera}\n${cuerpo}`; // BOM + ; → Excel es-ES
+    // OJO: la cadena empieza con un BOM (U+FEFF) CRUDO e invisible. Es a propósito:
+    // con BOM + ";" como separador, Excel es-ES abre el CSV en columnas y con los
+    // acentos bien. No lo borres al editar la línea (parece un espacio de más).
+    // eslint-disable-next-line no-irregular-whitespace
+    const csv = `﻿${cabecera}\n${cuerpo}`;
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;

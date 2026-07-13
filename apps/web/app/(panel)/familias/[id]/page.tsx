@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 const COLOR_DEFECTO = "#64748b";
 const NINGUNO = "__ninguno__"; // Radix Select no admite value=""
@@ -272,8 +273,8 @@ export default function FamiliaEditarPage() {
                 <Label>Imagen</Label>
                 <div className="flex items-center gap-3">
                   {fotoUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={fotoUrl} alt="Imagen de la familia" className="h-14 w-14 rounded-md border border-border object-cover" />
+                     
+                    <img src={urlFoto(fotoUrl)} alt="Imagen de la familia" className="h-14 w-14 rounded-md border border-border object-cover" />
                   )}
                   <Button type="button" variant="outline" size="sm" asChild disabled={subiendo}>
                     <label className="cursor-pointer">

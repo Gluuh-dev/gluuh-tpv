@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Coins, TrendingUp } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawPayment {
   metodo: string;
@@ -16,7 +17,6 @@ interface RawPayment {
   created_at: string;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 export default function MovimientosDeCajaPage() {
   const [loading, setLoading] = useState(true);

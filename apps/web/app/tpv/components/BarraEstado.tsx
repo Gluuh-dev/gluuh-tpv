@@ -4,7 +4,8 @@
 // terminal en una franja fina, siempre visible. Reloj y estado de red en vivo;
 // el resto llega por props desde la pantalla de venta.
 // Diseño: docs/auditoria_02_07_26/04-tpv-estilo-glop.md §4.1 + skill gluuh-ux-operativa.
-import { useEffect, useState } from "react";
+// Memoizada (plan 011): sus props son primitivas; solo re-renderiza si cambian.
+import { memo, useEffect, useState } from "react";
 import { Monitor, MapPin, Wifi, WifiOff } from "lucide-react";
 
 interface Props {
@@ -16,6 +17,8 @@ interface Props {
   cajaAbierta: boolean;
   /** Tarifa activa; hoy fija hasta implementar tarifas (P1-3). */
   tarifa?: string;
+  modoZurdo?: boolean;
+  onModoZurdoChange?: (val: boolean) => void;
 }
 
 function Segmento({ icon, children, tono = "normal" }: { icon: React.ReactNode; children: React.ReactNode; tono?: "normal" | "ok" | "alerta" }) {
@@ -35,7 +38,7 @@ function Sep() {
   return <span aria-hidden className="h-3.5 w-px flex-none bg-border" />;
 }
 
-export function BarraEstado({ operario, terminal, contexto, cajaAbierta, tarifa = "General" }: Props) {
+export const BarraEstado = memo(function BarraEstado({ operario, terminal, contexto, cajaAbierta, tarifa = "General", modoZurdo = false, onModoZurdoChange }: Props) {
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
@@ -69,6 +72,20 @@ export function BarraEstado({ operario, terminal, contexto, cajaAbierta, tarifa 
           Tarifa <span className="font-medium text-foreground">{tarifa}</span>
         </span>
         <div className="ml-auto flex items-center gap-3 pl-3">
+          {onModoZurdoChange && (
+            <>
+              <label className="flex items-center gap-1.5 cursor-pointer text-muted-foreground select-none hover:text-foreground">
+                <input 
+                  type="checkbox" 
+                  checked={modoZurdo} 
+                  onChange={(e) => onModoZurdoChange(e.target.checked)} 
+                  className="rounded border-border bg-card text-brand focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" 
+                />
+                <span>Modo Zurdo</span>
+              </label>
+              <Sep />
+            </>
+          )}
           <Segmento icon={online ? <Wifi size={14} strokeWidth={1.75} /> : <WifiOff size={14} strokeWidth={1.75} />} tono={online ? "ok" : "alerta"}>
             {online ? "En línea" : "Sin conexión"}
           </Segmento>
@@ -76,4 +93,4 @@ export function BarraEstado({ operario, terminal, contexto, cajaAbierta, tarifa 
       </div>
     </footer>
   );
-}
+});

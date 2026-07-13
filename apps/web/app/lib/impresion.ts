@@ -8,7 +8,12 @@ export interface TicketImpresion {
   contexto: string; // "Mesa 12" · "Para llevar · Ana" · "Barra"
   operario?: string;
   numSerieFactura?: string;
-  lineas: { cantidad: number; nombre: string; importe: number }[];
+  lineas: {
+    cantidad: number;
+    nombre: string;
+    importe: number;
+    extras?: { nombre: string; cantidad: number; precioExtra: number }[];
+  }[];
   desglose: { etiqueta: string; cuota: number }[];
   total: number;
   /** URL de cotejo VERIFACTU (QR en la térmica) y leyenda. */
@@ -104,14 +109,34 @@ function envolver(texto: string, ancho: number): string[] {
   return out;
 }
 
-/** Línea de artículo: "  2 Bocadillo calamares      8,50 EUR", envolviendo nombres largos. */
-function lineasArticulo(li: { cantidad: number; nombre: string; importe: number }, ancho: number): string[] {
+/** Línea de artículo: "  2 Bocadillo calamares      8,50 EUR", envolviendo nombres largos y sus extras. */
+function lineasArticulo(
+  li: {
+    cantidad: number;
+    nombre: string;
+    importe: number;
+    extras?: { nombre: string; cantidad: number; precioExtra: number }[];
+  },
+  ancho: number
+): string[] {
   const uds = String(li.cantidad).padStart(3);
   const imp = eurTxt(li.importe);
   const anchoNombre = Math.max(8, ancho - 4 - imp.length - 1);
   const partes = envolver(li.nombre, anchoNombre);
   const out = [fila(`${uds} ${partes[0] ?? ""}`, imp, ancho)];
   for (const p of partes.slice(1)) out.push(`    ${p}`);
+
+  if (li.extras && li.extras.length > 0) {
+    for (const ext of li.extras) {
+      const extUds = ext.cantidad > 1 ? ` x${ext.cantidad}` : "";
+      const extPrecio = ext.precioExtra > 0 ? ` (+${eurTxt(ext.precioExtra * ext.cantidad)})` : "";
+      const label = `+ ${ext.nombre}${extUds}${extPrecio}`;
+      const partesExt = envolver(label, anchoNombre - 4);
+      for (const pe of partesExt) {
+        out.push(`      ${pe}`);
+      }
+    }
+  }
   return out;
 }
 
@@ -180,9 +205,136 @@ export function formatearTicket(t: TicketImpresion, d: DisenoTicket = {}): strin
 }
 
 /**
+ * Carga una imagen de forma asíncrona retornando un elemento HTMLImageElement
+ * o null si hay algún fallo (ej: CORS o ruta inválida).
+ */
+async function cargarImagenLogo(url: string): Promise<HTMLImageElement | null> {
+  if (typeof window === "undefined") return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = url;
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+  });
+}
+
+/**
+ * Convierte una imagen a blanco y negro puro (monocromo de alto contraste)
+ * mediante un canvas para imitar la impresión térmica física de tickets.
+ */
+function imageToBlackAndWhite(img: HTMLImageElement): HTMLCanvasElement | HTMLImageElement {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return img;
+    
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      // Si el píxel es muy transparente, mantenerlo transparente
+      if (a < 10) continue;
+      
+      // Fórmula estándar de luminancia (escala de grises)
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      
+      // Umbral para blanco y negro puro (estilo ticket impreso)
+      const val = gray < 185 ? 0 : 255;
+      data[i] = val;
+      data[i + 1] = val;
+      data[i + 2] = val;
+      if (val === 255) {
+        data[i + 3] = 0; // Hacer que el fondo blanco del logo sea 100% transparente
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  } catch (e) {
+    console.warn("Fallo al convertir logo a blanco y negro (posible error de CORS), usando original", e);
+    return img;
+  }
+}
+
+/**
+ * Guarda las líneas de un documento como fichero PDF y lo descarga en el navegador.
+ * Monospace Courier font is used to preserve columns alignment perfectly.
+ * Si no hay logo de la empresa, carga el de Gluuh (/logo.png).
+ */
+export async function guardarTicketComoPdf(lineas: string[], nombre: string, logoUrl?: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const { jsPDF } = await import("jspdf");
+    const cols = lineas[0]?.length || 42;
+    const mm = cols === 32 ? 58 : 80;
+    const ptWidth = Math.round(mm * 2.83465); // 1mm = 2.83465pt
+    
+    // Escala del tamaño de letra para evitar desbordamiento horizontal:
+    const fontSize = mm === 58 ? 7.5 : 8.0;
+    const lineSpacing = mm === 58 ? 11 : 12;
+
+    // Carga de logotipo
+    let logoImg: HTMLImageElement | null = null;
+    let logoHeight = 0;
+    const targetLogoUrl = logoUrl || "/logo.png";
+    const logoWidth = mm === 58 ? 32 : 42; // Logotipo más pequeño y elegante para estilo ticket
+    
+    try {
+      logoImg = await cargarImagenLogo(targetLogoUrl);
+      if (logoImg) {
+        logoHeight = (logoImg.naturalHeight / logoImg.naturalWidth) * logoWidth;
+      }
+    } catch (e) {
+      console.warn("No se pudo cargar la imagen del logo", e);
+    }
+
+    const topPadding = 15;
+    const bottomMargin = 15;
+    const topMargin = topPadding + (logoHeight > 0 ? logoHeight + 10 : 0);
+    const ptHeight = topMargin + (lineas.length * lineSpacing) + bottomMargin;
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: [ptWidth, ptHeight]
+    });
+
+    // Dibujar logo centrado y procesado en blanco y negro puro
+    if (logoImg && logoHeight > 0) {
+      const processedLogo = imageToBlackAndWhite(logoImg);
+      const logoX = (ptWidth - logoWidth) / 2;
+      doc.addImage(processedLogo, "PNG", logoX, topPadding, logoWidth, logoHeight);
+    }
+
+    doc.setFont("courier", "normal");
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+
+    const leftMargin = mm === 58 ? 6 : 8;
+    let y = topMargin + fontSize;
+    for (const line of lineas) {
+      doc.text(line, leftMargin, y);
+      y += lineSpacing;
+    }
+
+    doc.save(nombre.endsWith(".pdf") ? nombre : `${nombre}.pdf`);
+  } catch (e) {
+    console.error("Error generating PDF, falling back to TXT", e);
+    guardarTicketComoFichero(lineas, nombre.replace(/\.pdf$/i, "") + ".txt");
+  }
+}
+
+/**
  * Guarda las líneas de un documento como fichero `.txt` descargado (Blob +
- * <a download>). Último recurso para que un ticket/comanda nunca se pierda
- * cuando la impresión nativa falla o no hay impresora.
+ * <a download>). Último recurso si falla jsPDF.
  */
 export function guardarTicketComoFichero(lineas: string[], nombre: string): void {
   const blob = new Blob([lineas.join("\r\n")], { type: "text/plain;charset=utf-8" });
@@ -226,12 +378,7 @@ function imprimirLineasEnNavegador(lineas: string[], anchoMm: number, opts?: { l
 
 /**
  * Imprime un ticket: nativo (ESC/POS a la IP de `dest`) en Gluuh Desktop, o en
- * ventana aislada en navegador. `dest` = impresora destino (ticket/factura).
- *
- * `extra.logoUrl` es el logo de la cabecera del ticket. Como aquí no se lee la
- * BD, el llamador (vista previa de configuración y, en el futuro, el TPV) debe
- * pasar `branding.logo_ticket_url || branding.logo_url`: el logo de tickets
- * (b/n) si existe, y si no el logo de marca. Solo se dibuja si `d.logo` está on.
+ * ventana aislada en navegador. Si no hay impresora configurada, guarda un PDF.
  */
 export async function imprimirTicket(
   t: TicketImpresion, d: DisenoTicket = {}, dest?: ImpresoraCfg | null, extra?: { logoUrl?: string },
@@ -239,13 +386,14 @@ export async function imprimirTicket(
   const anchoMm = dest?.anchoMm ?? d.anchoMm ?? 80;
   const lineas = formatearTicket(t, { ...d, anchoMm });
   const gluuh = typeof window !== "undefined" ? window.gluuh : undefined;
+
+  // Si no hay impresora configurada (dest es null/undefined), guardamos en PDF directamente
+  if (!dest) {
+    void guardarTicketComoPdf(lineas, `ticket-${fechaFichero()}.pdf`);
+    return { ok: true };
+  }
+
   if (gluuh) {
-    // ponytail: logo en ESC/POS pendiente — PrintJob no soporta imagen; ampliar
-    // packages/hardware (printImage) en una pasada del escritorio.
-    // La cola local de Gluuh Desktop ya reintenta el envío ESC/POS; guardar el
-    // documento como fichero es el cinturón extra para que nunca se pierda.
-    // El cajón solo se abre si el TPV lo pide (cobro en efectivo) Y esta
-    // impresora lo tiene conectado; y solo en la primera copia.
     const copias = copiasDe(dest);
     let r: { ok: boolean; pendientes?: number; error?: string } = { ok: false };
     try {
@@ -260,10 +408,10 @@ export async function imprimirTicket(
         if (!r.ok) break;
       }
     } catch (e) {
-      guardarTicketComoFichero(lineas, `ticket-${fechaFichero()}.txt`);
+      void guardarTicketComoPdf(lineas, `ticket-${fechaFichero()}.pdf`);
       throw e;
     }
-    if (!r.ok) guardarTicketComoFichero(lineas, `ticket-${fechaFichero()}.txt`);
+    if (!r.ok) void guardarTicketComoPdf(lineas, `ticket-${fechaFichero()}.pdf`);
     return r;
   }
   imprimirLineasEnNavegador(lineas, anchoMm, d.logo && extra?.logoUrl ? { logoUrl: extra.logoUrl } : undefined);
@@ -271,11 +419,19 @@ export async function imprimirTicket(
 
 /** Comanda de cocina/barra: solo artículos de una partida, sin precios. */
 export interface ComandaImpresion {
-  contexto: string;   // "Mesa 5" · "Para llevar · Ana" · "Barra"
+  contexto: string;
   operario?: string;
-  nota?: string;      // aviso de la mesa (alergias, cumpleaños…)
-  lineas: { cantidad: number; nombre: string; nota?: string }[];
+  nota?: string;
+  lineas: { cantidad: number; nombre: string; nota?: string; pase?: number | null }[];
 }
+
+const NOMBRES_PASES: Record<number, string> = {
+  1: "1º PRIMEROS",
+  2: "2º SEGUNDOS",
+  3: "3º TERCEROS",
+  4: "POSTRES",
+  5: "BEBIDAS",
+};
 
 export function formatearComanda(c: ComandaImpresion, titulo: string, ancho = 42): string[] {
   const raya = "-".repeat(ancho);
@@ -284,23 +440,59 @@ export function formatearComanda(c: ComandaImpresion, titulo: string, ancho = 42
   if (c.operario) l.push(`Camarero: ${c.operario}`);
   if (c.nota?.trim()) l.push(raya, `** AVISO: ${c.nota.trim()} **`);
   l.push(raya);
+
+  const pasesAgrupados: Record<number, typeof c.lineas> = {};
+  const sinPase: typeof c.lineas = [];
+
   for (const li of c.lineas) {
-    l.push(`${li.cantidad} x ${li.nombre}`);
-    if (li.nota) l.push(`   > ${li.nota}`);
+    const p = li.pase;
+    if (typeof p === "number" && p > 0) {
+      if (!pasesAgrupados[p]) pasesAgrupados[p] = [];
+      pasesAgrupados[p].push(li);
+    } else {
+      sinPase.push(li);
+    }
   }
+
+  if (sinPase.length) {
+    for (const li of sinPase) {
+      l.push(`${li.cantidad} x ${li.nombre}`);
+      if (li.nota) l.push(`   > ${li.nota}`);
+    }
+  }
+
+  const sortedPases = Object.keys(pasesAgrupados).map(Number).sort();
+  for (const p of sortedPases) {
+    const list = pasesAgrupados[p]!;
+    if (!list.length) continue;
+    const nombrePase = NOMBRES_PASES[p] || `${p}º TIEMPO`;
+    l.push(raya, centrar(`=== ${nombrePase} ===`, ancho), raya);
+    for (const li of list) {
+      l.push(`${li.cantidad} x ${li.nombre}`);
+      if (li.nota) l.push(`   > ${li.nota}`);
+    }
+  }
+
   l.push(raya);
   return l;
 }
 
-/** Imprime una comanda en su impresora (cocina/barra) por IP, o en navegador. */
+/** Imprime una comanda en su impresora (cocina/barra) por IP, o en navegador. Si no hay impresora, guarda un PDF. */
 export async function imprimirComanda(
   c: ComandaImpresion, titulo: string, dest?: ImpresoraCfg | null,
 ): Promise<{ ok: boolean; pendientes?: number; error?: string } | void> {
   const anchoMm = dest?.anchoMm ?? 80;
   const lineas = formatearComanda(c, titulo, columnas(anchoMm));
   const gluuh = typeof window !== "undefined" ? window.gluuh : undefined;
+
+  // Si no hay impresora configurada para esta partida, guardamos en PDF directamente
+  if (!dest) {
+    const estacion = titulo.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "comanda";
+    void guardarTicketComoPdf(lineas, `comanda-${estacion}-${fechaFichero()}.pdf`);
+    return { ok: true };
+  }
+
   if (gluuh) {
-    // Cinturón extra (la cola del escritorio ya reintenta): si falla, a fichero.
     const estacion = titulo.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "comanda";
     const copias = copiasDe(dest);
     let r: { ok: boolean; pendientes?: number; error?: string } = { ok: false };
@@ -310,10 +502,10 @@ export async function imprimirComanda(
         if (!r.ok) break;
       }
     } catch (e) {
-      guardarTicketComoFichero(lineas, `comanda-${estacion}-${fechaFichero()}.txt`);
+      void guardarTicketComoPdf(lineas, `comanda-${estacion}-${fechaFichero()}.pdf`);
       throw e;
     }
-    if (!r.ok) guardarTicketComoFichero(lineas, `comanda-${estacion}-${fechaFichero()}.txt`);
+    if (!r.ok) void guardarTicketComoPdf(lineas, `comanda-${estacion}-${fechaFichero()}.pdf`);
     return r;
   }
   imprimirLineasEnNavegador(lineas, anchoMm);

@@ -8,12 +8,13 @@ import {
   CONFIG_KIOSKO_DEF, DISENOS_KIOSKO, configCon,
   type ConfigKiosko, type DisenoKiosko,
 } from "../lib/modulos";
+import { eur } from "@/app/lib/money";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 interface Cat { id: string; nombre: string; family_id: string | null; foto_url?: string | null }
 interface Prod { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; foto_url: string | null }
 type Paso = "inicio" | "carta" | "nombre" | "pago" | "ok";
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 const FILAS_TECLADO = ["QWERTYUIOP", "ASDFGHJKLÑ", "ZXCVBNM"];
 
 /* ── Plantillas de diseño ──────────────────────────────────────────────
@@ -146,7 +147,7 @@ export default function Kiosko() {
     if (paso !== "ok") return;
     const t = setTimeout(reiniciar, 15000);
     return () => clearTimeout(t);
-    /* eslint-disable-next-line */
+     
   }, [paso]);
 
   // c / fg: colores de marca del tenant (vienen de datos, no son paleta Tailwind)
@@ -181,7 +182,7 @@ export default function Kiosko() {
   function reiniciar() { setCarrito({}); setNombre(""); setNumero(null); setTipoConsumo("LOCAL"); setHojaAbierta(false); setPaso("inicio"); }
 
   const Logo = () => brand.logo_url
-    ? <img src={brand.logo_url} alt="" className="mx-auto h-24 w-auto object-contain" />
+    ? <img src={urlFoto(brand.logo_url)} alt="" className="mx-auto h-24 w-auto object-contain" />
     : <div className="text-6xl">🍔</div>;
 
   if (estado === "cargando") return (
@@ -390,7 +391,7 @@ export default function Kiosko() {
         }}
       >
         <strong className="flex items-center gap-2 text-lg">
-          {brand.logo_url ? <img src={brand.logo_url} alt="" className="h-7 w-auto object-contain" /> : "🍔"}
+          {brand.logo_url ? <img src={urlFoto(brand.logo_url)} alt="" className="h-7 w-auto object-contain" /> : "🍔"}
           {empresa}
         </strong>
         <span className="text-sm font-semibold">{tipoConsumo === "LOCAL" ? `🍽️ ${cfg.textoAqui}` : `🛍️ ${cfg.textoLlevar}`}</span>
@@ -413,7 +414,7 @@ export default function Kiosko() {
                 style={{ background: sel ? t.boton : undefined, boxShadow: sel ? `inset 0 0 0 2px ${c}` : undefined }}
               >
                 <span className="relative block h-12 w-12 overflow-hidden rounded-lg" style={{ background: color }}>
-                  {cat.foto_url && <img src={cat.foto_url} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                  {cat.foto_url && <img loading="lazy" decoding="async" src={urlFoto(cat.foto_url)} alt="" className="absolute inset-0 h-full w-full object-cover" />}
                 </span>
                 <span className="w-full text-center text-xs font-bold leading-tight">{cat.nombre}</span>
               </button>
@@ -425,7 +426,7 @@ export default function Kiosko() {
                 style={{ background: color, boxShadow: sel ? `inset 0 0 0 4px ${c}, 0 0 0 2px ${c}` : undefined }}
               >
                 {cat.foto_url ? (<>
-                  <img src={cat.foto_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={urlFoto(cat.foto_url)} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   <span className="absolute inset-x-0 bottom-0 bg-background/95 px-1 py-1 text-center text-sm font-bold leading-tight text-foreground" style={{ background: t.tarjeta, color: t.texto }}>{cat.nombre}</span>
                 </>) : (
                   <span className="grid h-full w-full place-items-center px-1 text-center text-base font-bold leading-tight text-white">{cat.nombre}</span>
@@ -451,7 +452,7 @@ export default function Kiosko() {
                 style={{ background: t.tarjeta, borderColor: t.borde, boxShadow: t.sombra }}
               >
                 {p.foto_url ? (<>
-                  <img src={p.foto_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={urlFoto(p.foto_url)} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   <div className="absolute inset-x-0 bottom-0 bg-background/95 px-2 py-1.5 text-center leading-tight" style={{ background: t.tarjeta, color: t.texto }}>
                     <div className="line-clamp-2 font-semibold">{p.nombre}</div>
                     {cfg.mostrarPrecios && <div className="font-bold tabular-nums" style={{ color: t.precio }}>{eur(p.precio)}</div>}

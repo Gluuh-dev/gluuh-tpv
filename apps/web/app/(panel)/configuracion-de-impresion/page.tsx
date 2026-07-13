@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 type Ancho = 58 | 80;
 // Misma forma que ConfigImpresion (lib/impresion.ts, la única fuente de verdad),
@@ -351,7 +352,7 @@ export default function ConfiguracionImpresion() {
           <div className="flex justify-center overflow-x-auto rounded-lg border border-border bg-muted/60 px-4 pt-6 pb-8">
             <div className="drop-shadow-md" style={{ width: cfg.ticket.anchoMm === 58 ? 236 : 306 }}>
               <div className="overflow-x-auto bg-white px-3 pt-4 pb-2 text-black">
-                {cfg.ticket.logo && logoUrl && <img src={logoUrl} alt="" className="mx-auto mb-2 max-w-[60%]" />}
+                {cfg.ticket.logo && logoUrl && <img src={urlFoto(logoUrl)} alt="" className="mx-auto mb-2 max-w-[60%]" />}
                 <pre className="whitespace-pre font-mono text-[10.5px] leading-[1.45]">{preview.join("\n")}</pre>
               </div>
               {/* Borde dentado del corte: triángulos blancos sobre el fondo neutro. */}

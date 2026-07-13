@@ -18,11 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { eur } from "@/app/lib/money";
 
 interface Disp { id: string; tipo: string; vinculado_at: string | null }
 const MODULOS_PREMIUM = (Object.entries(MODULOS) as [string, DefModulo][]).filter(([, d]) => d.requiereLicencia).map(([k, d]) => ({ k, nombre: d.nombre }));
 const nombreModulo = (k: string) => (MODULOS as Record<string, DefModulo>)[k]?.nombre ?? k;
-const eur = (n: number) => Number(n).toFixed(2).replace(".", ",") + " €";
 const CICLOS = [{ v: "MENSUAL", t: "Mensual" }, { v: "TRIMESTRAL", t: "Trimestral" }, { v: "ANUAL", t: "Anual" }];
 const FORMAS = [{ v: "TRANSFERENCIA", t: "Transferencia" }, { v: "EFECTIVO", t: "Efectivo" }, { v: "DOMICILIADO", t: "Domiciliado" }, { v: "STRIPE", t: "Stripe (próximamente)" }];
 
@@ -57,7 +57,7 @@ export default function SuscripcionEmpresa() {
     setTarifas(Object.fromEntries(((tf as { clave: string; etiqueta: string; precio: number }[] | null) ?? []).map((t) => [t.clave, { etiqueta: t.etiqueta, precio: t.precio }])));
     setCargando(false);
   }
-  useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { void cargar();   }, [id]);
 
   async function accion(a: string, extra?: Record<string, unknown>) {
     setMsg(null);

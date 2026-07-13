@@ -1,10 +1,174 @@
 # Planes de implementación
 
-Generados por la skill `improve` el 2026-06-15, contra el commit `09857da`.
-Cada ejecutor: lee el plan completo antes de empezar, respeta sus "STOP conditions" y
-actualiza tu fila al terminar.
+Índice generado por la skill `improve`. Dos tandas:
 
-## Orden de ejecución y estado
+- **001–009** — auditoría del 2026-06-15 (commit `09857da`). Todas DONE; notas abajo.
+- **010–015** — auditoría del 2026-07-11 (commit `9c959d1` + árbol de trabajo),
+  motivada por: *"el TPV no va todo lo fluido que debería"*. Foco: fluidez de
+  `apps/web/app/tpv` + bugs del camino del dinero encontrados por el camino.
+  Selección hecha en modo autónomo: los 6 hallazgos con más palanca
+  (impacto ÷ esfuerzo, ponderado por confianza); el resto queda documentado en
+  las secciones de abajo para no re-auditar.
+
+Cada ejecutor: lee el plan completo antes de empezar, respeta sus "Condiciones
+de STOP" y actualiza tu fila al terminar.
+
+## Orden de ejecución y estado — tanda 2026-07-11
+
+| Plan | Título | Prioridad | Esfuerzo | Depende de | Estado |
+|------|--------|-----------|----------|------------|--------|
+| 013 | Blindar el camino del dinero (cobro sin crash, sin doble pago, líneas atómicas) | P1 | M | — | DONE (11-07, aplicado en working tree sin commit; **migración 0094 pendiente de aplicar en Supabase**) |
+| 010 | Índice O(1) del catálogo + memoizar derivadas de la comanda | P1 | S | — | DONE (11-07, working tree; 0 escaneos lineales) |
+| 011 | Cortar los re-renders por pulsación (buffer fuera de la raíz + memo) | P1 | M | 010 | DONE (11-07, working tree; typecheck+tests verdes) |
+| 012 | Arranque del TPV y carga de mesas en paralelo | P1 | S-M | — | DONE (11-07, working tree; 1 Promise.all de 8 + mesas/elementos en paralelo + finally anti-cuelgue) |
+| 015 | Tests del camino del dinero (precio.ts puro + vitest en web) | P2 | M | 010 | DONE (11-07, working tree; 17 tests, `pnpm test` cubre web) |
+| 014 | Miniaturas de fotos de producto + carga perezosa | P2 | M | — | DONE (11-07, working tree; resize al subir + lazy en tiles/kiosko/ofertas; fotos antiguas sin backfill) |
+
+**Ejecutados el 2026-07-11 en el árbol de trabajo (sin commits) a petición del usuario
+("haz todos los cambios"). Verificación: `pnpm typecheck` 12/12, `pnpm test` core 44 +
+web 17 en verde. Pendiente del operador: aplicar `supabase/migrations/0094_reemplazar_lineas_orden.sql`
+al proyecto Supabase (el TPV degrada al camino antiguo mientras tanto) y el humo manual
+en el TPV real (teclear/cobrar/dividir/traspasar).**
+
+### Notas de dependencia (tanda 2)
+
+- **013 primero**: es el único que arregla bugs (un fallo de `/api/ticket` hoy
+  deja la venta COBRADA y rompe la pantalla). Además toca `cobrar`/`crearOrden`
+  en `page.tsx`, igual que 010/011 — ejecutar 013, 010 y 011 **en serie** (mismo
+  fichero), nunca en paralelo.
+- **011 requiere 010**: la memoización asume lookups O(1) (`prodPorId`).
+- **015 requiere 010**: el módulo extraído `precio.ts` recibe `prodPorId`.
+- 012 y 014 son independientes y pueden intercalarse en cualquier momento.
+- La suma esperada de 010+011+012 es la respuesta directa al "no va fluido":
+  teclear deja de re-renderizar la página entera, cada render deja de escanear
+  el catálogo por línea, y el arranque pasa de ~11 round-trips en escalera a 2-3 olas.
+
+## Quick wins sin plan (una línea cada uno; hacer cuando convenga)
+
+- `pnpm --filter @gluuh/web remove @radix-ui/react-dialog @radix-ui/react-label @radix-ui/react-select @radix-ui/react-slot shadcn`
+  — verificado: cero imports de `@radix-ui/*` (el código usa el paquete `radix-ui`
+  monolítico) y `shadcn` es una CLI, no runtime.
+- `.env.example`: renombrar `SUPABASE_SERVICE_ROLE_KEY` → `SUPABASE_SECRET_KEY`
+  (es la variable que lee el código, 7 rutas API) y documentar `DEVICE_JWT_SECRET`,
+  `PLATAFORMA_HOSTS`, `GLUUH_URL`, `AEAT_CERT_PFX`.
+- Verificar la procedencia de `lucide-react@1.18.0` (el paquete oficial versionaba
+  0.x): `npm view lucide-react versions`. Si es legítima, nada; si no, fijar la oficial.
+- `apps/web/app/(panel)/layout.tsx:39-42`: `tenant` y `app_user` en un
+  `Promise.all` (hoy en serie) — quita un round-trip a TODO el backoffice.
+- Sustituir los 2 usos de `@tabler/icons-react` en `components/ui/{select,dialog}.tsx`
+  por equivalentes lucide y evaluar quitar la dependencia (quedan `IconGift` en
+  `tpv/page.tsx` y `TileCategoria` — 4 ficheros en total).
+
+## Hallazgos documentados SIN plan (decisión del responsable / siguiente tanda)
+
+**Seguridad — bloqueantes ANTES de producción/exponer la API** (hoy VERIFACTU
+está desactivado por decisión 06-07-2026 y `apps/api` no está desplegada):
+
+- `apps/api` `/fiscal/*` sin guard de auth ni `ValidationPipe`, y `enableCors()`
+  abierto (`apps/api/src/fiscal/fiscal.controller.ts:26-39`, `main.ts:6-7`).
+  `/fiscal/enviar` remite a la AEAT con el certificado mTLS de la empresa.
+  **No exponer esa API sin cerrar esto.**
+- Permisos de operario solo en cliente y fail-open (`tpv/page.tsx:232-234`,
+  fetch sin rama de error en 609-617): descuentos/precio manual/borrados se
+  autorizan en el navegador. Cierre real = límites en servidor (RPC), junto con:
+- Precios/total escritos por el navegador (techo CONOCIDO y documentado en
+  `apps/web/app/api/factura/route.ts:117-124`): el cierre es la RPC de pedido
+  con precios de servidor, ligada a activar VERIFACTU.
+- `/api/ticket` en modo PERMISIVO (documentado en `route.ts:19-25`): enviar el
+  Bearer desde `cobrar()` y poner `PERMISIVO=false` cuando se toque ese flujo.
+
+**Corrección — deferidos con el mismo patrón que el plan 013**:
+
+- `dividirAceptar` (page.tsx:1312-1362): inserts sin comprobar; una porción de la
+  cuenta puede perderse en silencio al dividir.
+- `ejecutarTraspaso` (page.tsx:1101-1137): mueve unidades claveadas por
+  `product_id` cuando la UI selecciona por clave de línea (formatos/modificadores
+  traspasan mal), y sin transacción.
+
+**Rendimiento — siguiente tanda si el TPV sigue sin ir fino tras 010-014**:
+
+- Realtime recarga el catálogo COMPLETO (9 queries) ante cualquier cambio de
+  product/category/family (page.tsx:338-348 + catalogo-store.cargar), y un
+  "agotado" local dispara refetch local + realtime (doble). Fix: aplicar el
+  payload por fila al store. (Tras 010/011 el re-render derivado ya es barato.)
+- Sin code-splitting (`next/dynamic`): modales + `PlanoSalas` hidratan de golpe.
+  Medir con bundle-analyzer antes de trocear.
+- `PlanoSvg` inyecta un SVG inline (fetch + innerHTML) por CADA mesa; el resize
+  del editor hace `setState` por pointermove (`PlanoSalas.tsx:800-812`). Modo
+  edición, no ruta caliente del camarero.
+- Backoffice: `(panel)/layout.tsx` 100 % cliente con cascada de auth (3 RTT en
+  serie) + ~51 páginas con fetch en `useEffect`. El fix de fondo (sesión en
+  cookies con `@supabase/ssr` + Server Components) es L y toca el modelo de
+  sesión entero — planificar como migración propia cuando el panel duela.
+- React Compiler (`reactCompiler`) no activado: probarlo DESPUÉS de 011 para no
+  enmascarar la causa raíz; requiere QA de las 56 páginas cliente.
+
+**Deuda/DX — documentados, valen su plan cuando toquen esa zona**:
+
+- `eur()` re-implementado en ~36 ficheros con TRES formatos distintos
+  (`1234.50 €` vs `1234,50 €` vs `1.234,50 €` — solo dashboard usa es-ES bien).
+  Unificar en `app/lib/money.ts` con `Intl.NumberFormat("es-ES")`; es cambio
+  visual masivo → decisión del responsable.
+- `apps/api/db/schema.sql` desfasado como espejo (faltan `menu*`, `discount`,
+  `tax_rate`, `plano_elemento`…). CLAUDE.md pide "decide cuál es canónico":
+  recomendación = declarar `supabase/migrations` canónico y regenerar el espejo
+  con `pg_dump --schema-only` o borrarlo.
+- Lint inexistente de facto: `next lint` se eliminó en Next 16 y no hay config
+  ESLint en el repo; 8 paquetes tienen `"lint": "echo (lint pendiente)"`. Montar
+  flat-config + typescript-eslint + paso de CI.
+- Carga de catálogo re-implementada en kiosko/comandera (con filtro `agotado_hasta`
+  en query; el TPV lo filtra en cliente con el badge 86 — intencional). Unificar
+  sobre `catalogo-store` cuando se toque el kiosko.
+- Plano implementado dos veces (PlanoSalas TPV 1817 líneas vs editor del panel
+  451): extraer un lienzo común es L y con riesgo visual; para después de la
+  tanda de fluidez.
+- `packages/ui` y `packages/api-client` son placeholders sin importadores
+  (`@gluuh/ui` figura como dependencia de web sin usarse); decidir rellenar o borrar.
+- Sin pre-commit hooks; `packages/ui` con typecheck stub.
+- `page.tsx` (2755 líneas) god component: los planes 010/011/015 ya extraen
+  índice+precio y reducen la superficie; seguir extrayendo módulos puros ANTES
+  de plantear trocear el componente.
+
+## Hallazgos considerados y RECHAZADOS en la tanda 2026-07-11 (no re-auditar)
+
+- **"El TPV muestra agotados y kiosko no — divergencia"**: intencional. El TPV
+  enseña el producto agotado con badge "86" y bloquea el click (`estaAgotado`,
+  page.tsx:1535); el kiosko lo oculta en query. Comportamiento correcto de cada canal.
+- **"`setSobrePapel` re-renderiza el plano en cada pointermove"**: matizado.
+  React descarta el set con valor idéntico; solo re-renderiza al cruzar el umbral
+  de la papelera. El `setDimOverride` del RESIZE sí re-renderiza por movimiento
+  (queda anotado arriba, modo edición).
+- **"jspdf infla el bundle"**: falso — ya se importa dinámicamente (`impresion.ts:275`).
+- **"Providers en el layout raíz fuerzan client-render global"**: falso —
+  reciben `children` de un layout servidor.
+- **"globals.css costoso"**: 132 líneas; el selector universal es el patrón shadcn. Nada.
+- **"PIN comparado en cliente"**: desmentido — `validar_pin` es SECURITY DEFINER
+  con bcrypt en servidor (`0007_validar_pin.sql`), tenant-scoped.
+- **"RLS floja"**: al contrario — aislamiento por tenant aplicado en bucle a
+  todas las tablas (0001) + `set_tenant_id` (0004); los únicos `USING(true)` son
+  formulario de contacto y tarifas públicas, por diseño.
+- **"typescript 6 / vitest 4 sospechosos"**: sin evidencia de problema (ya
+  rechazado en la tanda 1); solo queda el quick-win de verificar `lucide-react@1.18.0`.
+- **"turbo.json mal cacheado"**: outputs correctos; no hallazgo.
+
+## Hallazgos de dirección (sin cambios desde la tanda 1)
+
+- Write-path de sync (`/sync/upload`) sigue siendo stub — bloqueante nº 1 del
+  modo offline-first (decisión "nodo local estándar", 07-07).
+- TicketBAI (País Vasco) prometido sin código.
+- Impresión ESC/POS real y pagos (Stripe/Redsys/Bizum) son esqueletos.
+
+## Qué NO se auditó a fondo en la tanda 2026-07-11
+
+`apps/desktop` y `apps/mobile` (esqueletos), `packages/{sync,hardware,api-client,ui}`
+(solo inventariados), el algoritmo VERIFACTU de `packages/core` (tiene el vector
+oficial AEAT como red), el contenido de `docs/`, y no se midió el bundle real
+(los hallazgos de tamaño son estáticos, no de analyzer). El backoffice `(panel)`
+se auditó a profundidad media (no página a página).
+
+---
+
+## Tanda 2026-06-15 (histórico) — orden y estado
 
 | Plan | Título | Prioridad | Esfuerzo | Depende de | Estado |
 |------|--------|-----------|----------|------------|--------|
@@ -12,107 +176,34 @@ actualiza tu fila al terminar.
 | 002 | Unificar tipos fiscales (clase × territorio) en core | P1 | M | 001 | DONE (revisado; en rama de consolidación) |
 | 003 | Quick wins: puerto del README + encoding del QR | P3 | S | — | DONE (puerto sí; QR no aplicado — ver nota) |
 | 004 | CLAUDE.md + CI (build/typecheck/test) | P2 | M | — | DONE (revisado; en rama de consolidación) |
-| 005 | Sistema de diseño: token de acento intercambiable + primitivos + DESIGN.md | P1 | M | — | DONE (revisado; en rama de consolidación) |
-| 006 | Rediseño pantallas operativas + públicas (estilo Supabase) | P1 | L | 005 | DONE (revisado; en rama de consolidación) |
+| 005 | Sistema de diseño: token de acento + primitivos + DESIGN.md | P1 | M | — | DONE (revisado; en rama de consolidación) |
+| 006 | Rediseño pantallas operativas + públicas | P1 | L | 005 | DONE (revisado; en rama de consolidación) |
 | 007 | Pulido backoffice contra el sistema | P2 | M | 005 | DONE (revisado; en rama de consolidación) |
-| 008 | TPV estilo Ágora (layout + teclado DTO/CAN/PREC + barra de acciones) | P1 | L | 005 | DONE (mergeado en main `8b109f2`) |
+| 008 | TPV estilo Ágora (layout + teclado + acciones) | P1 | L | 005 | DONE (mergeado en main `8b109f2`) |
 | 009 | Navegación del panel con submenús expandibles | P1 | M | 005 | DONE (mergeado en main `79d60a2`) |
 
 Valores de estado: TODO | IN PROGRESS | DONE | BLOCKED (con motivo) | REJECTED (con motivo).
 
-## Notas de dependencia
+### Notas de ejecución de la tanda 1 (resumen; detalle en el historial git de este fichero)
 
-- **002 requiere 001**: los tests de `calcularImpuestosIncluidos` (Plan 001) son la red de
-  seguridad que demuestra que la unificación de tipos (Plan 002) es behavior-preserving. Sin
-  ellos, una regresión de céntimos pasaría inadvertida.
-- 003 y 004 son independientes y pueden ejecutarse en cualquier momento (no tocan el motor de
-  impuestos salvo, en 003, una posible mejora acotada del QR que NO debe romper el vector AEAT).
-- Recomendación de orden global: 001 → 002, y 003/004 en paralelo cuando convenga.
+- **001**: rama `advisor/001-tests-impuestos-y-estados` (commit `f5d8a36`), 18 tests
+  nuevos verdes; pendiente de merge por decisión del usuario.
+- **002/003/004**: worktrees revisados; 002 behavior-preserving; 003 dejó el QR
+  intacto a propósito (reproduce el vector AEAT); 004 añadió CLAUDE.md + CI.
+- **005/006/007**: sistema de diseño (`--brand`), 10 pantallas operativas y 7 del
+  panel migradas a tokens. Consolidación verificada en `advisor/all-001-004`
+  (HEAD `590b4a3`): core 38 tests + builds verdes. **Pendiente de merge a `main`.**
+- Hallazgo preexistente al verificar: `pnpm --filter @gluuh/web build` requiere
+  `NEXT_PUBLIC_SUPABASE_URL` en el entorno (el CI del plan 004 fallará sin ese
+  secret). Sigue vigente.
 
-## Notas de ejecución
+### Rechazados en la tanda 1 (siguen vigentes)
 
-- **001 (DONE, 2026-06-15)**: ejecutado en worktree aislado; commit `f5d8a36`, rama
-  `advisor/001-tests-impuestos-y-estados`. Añade `packages/core/src/fiscal/tax.test.ts`
-  (9 tests) y `packages/core/src/domain/order-state.test.ts` (9 tests). Revisado y aprobado:
-  32 tests pasan, typecheck OK, fuentes sin modificar, tests con aserciones reales.
-  **Anomalía**: el worktree se creó sobre un ancestro antiguo (`46412d2`) en vez de `09857da`,
-  pero `tax.ts`/`order-state.ts` son idénticos entre ambos, así que los tests son válidos. La
-  verificación corrió bajo vitest 2.1.9 (lockfile de la base antigua), no 4.1.9 — matchers
-  estándar, sin impacto. **Pendiente de merge** (decisión del usuario): aplicar los 2 ficheros
-  sobre `09857da` o mergear la rama (conjuntos disjuntos → merge limpio, no revierte nada).
-
-- **002/003/004 (DONE, 2026-06-15)**: ejecutados en worktrees aislados y revisados. Causa
-  raíz de la anomalía del 001: el harness crea los worktrees desde `origin/main` (`46412d2`),
-  16 commits por detrás del `main` local (`09857da`); se corrigió en cada ejecutor con
-  `git reset --hard 09857da` (Step 0).
-  - **002** (`refactor(core)`): `tax-rates.ts` + `tax-rates.test.ts` nuevos, `index.ts` exporta,
-    huérfano `tipoHosteleria`/`TIPOS_IVA`/`TIPOS_IGIC` eliminado de `tax.ts`, `fiscal-clases.ts`
-    convertido en reexport. Behavior-preserving (valores de runtime idénticos).
-  - **003** (`docs`): puerto del README 3000→3100. QR **no modificado**: `docs/07 §3.4` no
-    especifica reglas de percent-encoding y el código actual reproduce el vector oficial AEAT
-    → decisión conservadora correcta (cambiarlo es decisión de cumplimiento del responsable).
-  - **004** (`docs`+`ci`): `CLAUDE.md` + `.github/workflows/ci.yml`. El aviso del ejecutor sobre
-    `radix-ui` rompiendo el build fue un FALSO POSITIVO (artefacto de symlinks del worktree):
-    `pnpm --filter @gluuh/web build` pasa limpio en el repo real. Igual el fallo de vitest en
-    worktrees (Windows + symlinks profundos) — no reproduce en el repo principal ni en CI Linux.
-- **005 (DONE, 2026-06-15)** `feat(ui)`: en globals.css se añade el token de acento
-  `--brand`/`--brand-foreground` (hoy NEUTRO = primary; **punto único de cambio para el color
-  del logo** en `:root` y `.dark`), registrado en `@theme inline` como `--color-brand`; botón
-  `default` → `bg-brand`; primitivos `page-header`/`stat-card`/`empty-state`; `apps/web/DESIGN.md`
-  con las convenciones para 006/007. Escala índigo legada intacta. Sin cambio visual hoy.
-- **006 (DONE)** `style(web)` (commit eee7af3): 10 pantallas no-panel migradas a tokens del tema y
-  rediseñadas (cocina/pantalla/cocina forzadas en oscuro vía `.dark`, no slate literal; tpv/comandera
-  con primitivos; públicas alineadas). Excepción tolerada: 2 `text-white` en cocina sobre fondos hex
-  de dominio (`COLOR` de estados). Colores de marca del tenant conservados en `style={}` (datos, no paleta).
-- **007 (DONE)** `style(panel)` (commit 9a5c234): 7 pantallas del backoffice homogeneizadas con
-  `PageHeader`/`StatCard`/`EmptyState`; 0 literales de paleta gris en `(panel)/`. Solo presentación.
-- **Consolidación verificada**: rama `advisor/all-001-004` (worktree `.claude/worktrees/consolidation-001-004`,
-  HEAD `590b4a3`) reúne **001–007** (cherry-picks sin conflictos, ficheros disjuntos). Estado combinado
-  verde, verificado en worktree limpio de path superficial: **core 38 tests + build OK**, **web typecheck
-  OK**, **web build OK** (18 rutas). Revisión: typecheck/build pasan y los diffs de 006/007 son solo
-  markup/clases (handlers y queries intactos). **Pendiente de merge a `main`.**
-- **Hallazgo preexistente surgido al verificar (no de estos planes)**: `pnpm --filter @gluuh/web build`
-  falla si no existe `apps/web/.env.local` con `NEXT_PUBLIC_SUPABASE_URL` — las pantallas cliente
-  inicializan el cliente Supabase en build-time (`Error: supabaseUrl is required` al prerenderizar).
-  Esto significa que el **CI del plan 004 fallará el build** en runners sin esas env vars. Es el
-  mismo problema que CORRECTNESS-13 (env con `!` sin validación). Seguimiento recomendado: validar
-  env o inyectar las `NEXT_PUBLIC_*` en el CI (GitHub Secrets).
-
-## Hallazgos considerados y rechazados (para no re-auditar)
-
-- **"Secretos commiteados en .env" (sub-auditoría de seguridad): FALSO.** `apps/api/.env` y
-  `apps/web/.env.local` existen en disco con valores reales pero **no están en git** (`git ls-files`/
-  `git log` solo muestran `.env.example`); están correctamente en `.gitignore`. Es el
-  comportamiento esperado de `.env`. (No se reproduce ningún valor.)
-- **"IDOR en bucket storage `media`": sobredimensionado.** La lectura pública es por diseño
-  (logos/ofertas en pantallas de kiosko); escritura/borrado están acotados por carpeta
-  `<tenant_id>/` (patrón estándar de Supabase). Único matiz menor opcional: `media_update`
-  (`supabase/migrations/0010_personalizacion.sql:66-68`) tiene `USING` sin `WITH CHECK`.
-- **"Memory leak / stale closure en Realtime de cocina/pantalla": rechazado.** El cleanup
-  (`sb.removeChannel(ch)`) y las deps `[]` son correctos e intencionales
-  (`apps/web/app/cocina/page.tsx:37-51`).
-- **"Endpoint `/api/ticket` sin auth": atenuado, no se planifica ahora.** Es un endpoint DEMO
-  documentado (NIF/fecha/serie fijos, no persiste nada). La ruta admin `crear-empresa` sí
-  valida `es_admin_plataforma` antes de usar la service key. La validación de entrada (zod) en
-  los límites de API es deuda real para producción, ligada al write-path de sync (dirección).
-- **"TS 6 / Vitest 4 obsoletos": especulativo.** Versiones recientes y compilando; sin
-  evidencia de problema. Investigar si surge, no planificar.
-- **N+1 / refetch total tras cada mutación (PERF-01/02):** patrón real, pero a escala de TPV
-  (decenas de ítems) el coste es despreciable hoy; optimizar sería prematuro. Revisar cuando
-  se integre PowerSync.
-
-## Hallazgos de dirección (no planificados — decisión del responsable)
-
-No son bugs, sino bloqueantes de MVP/roadmap ya marcados como esqueleto. Si se priorizan,
-conviene un plan de diseño/spike, no de "construir todo":
-
-- **Write-path de sync (`/sync/upload`) es un stub** que no persiste (`apps/api/src/sync/sync.controller.ts:28-32`).
-  Bloqueante #1 del modo offline-first.
-- **TicketBAI (País Vasco)** prometido sin código (existe `FORAL_PV` en UI/tipos, cero lógica Batuz).
-- **Impresión ESC/POS y pagos (Stripe/Redsys/Bizum)** son esqueletos (`packages/hardware`, sin SDK de pago).
-
-## Qué no se auditó a fondo
-
-`apps/desktop` y `apps/mobile` (esqueletos), `packages/{sync,hardware,api-client,ui}`
-(esqueletos, solo inventariados), el contenido completo de `docs/`, y no se ejecutó la suite
-de tests ni el build durante la auditoría.
+- "Secretos commiteados en .env": FALSO — solo `.env.example` está en git.
+- "IDOR en bucket media": sobredimensionado (lectura pública por diseño; matiz
+  menor: `media_update` sin `WITH CHECK`).
+- "Memory leak en realtime de cocina": rechazado (cleanup correcto).
+- "N+1/refetch total tras cada mutación": rechazado ENTONCES por escala…
+  **reabierto en la tanda 2** con evidencia nueva (reporte del usuario + TPV de
+  2755 líneas): ahora está cubierto por los planes 010-012 y el hallazgo de
+  realtime de la sección "siguiente tanda".

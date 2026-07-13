@@ -13,12 +13,12 @@ import { CLASES_FISCALES } from "@/lib/fiscal-clases";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { eur } from "@/app/lib/money";
 
 interface Menu { id: string; nombre: string; precio: number; clase_fiscal: string; activo: boolean }
 interface Grupo { id: string; menu_id: string; nombre: string; orden: number }
 interface Choice { group_id: string; product_id: string }
 interface Prod { id: string; nombre: string }
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function Menus() {
   const sb = supabaseBrowser();
@@ -42,7 +42,7 @@ export default function Menus() {
     setMenus((m as Menu[]) ?? []); setGrupos((g as Grupo[]) ?? []);
     setChoices((c as Choice[]) ?? []); setProds((p as Prod[]) ?? []);
   }
-  useEffect(() => { (async () => { await cargar(); setLoading(false); })(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { (async () => { await cargar(); setLoading(false); })();   }, []);
 
   async function addMenu(e: React.FormEvent) {
     e.preventDefault();

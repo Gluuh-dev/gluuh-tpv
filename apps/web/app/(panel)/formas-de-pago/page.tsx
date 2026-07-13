@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { Landmark, CreditCard } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawPayment {
   metodo: string;
@@ -22,7 +23,6 @@ interface MetodoPago {
   total: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function agruparPorMetodo(payments: RawPayment[]): MetodoPago[] {
   const acc: Record<string, { nPagos: number; total: number }> = {};

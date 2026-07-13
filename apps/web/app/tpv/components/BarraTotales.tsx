@@ -4,14 +4,12 @@
 // Los números NO reflejan lo que se teclea: muestran el valor confirmado y solo
 // cambian cuando la edición se aplica. Al editar, SOLO el número del campo activo
 // se pinta en cian (marca); las etiquetas quedan neutras. Encima, el mensaje "Editando…".
-// Presentacional puro: recibe los valores YA calculados desde page.tsx.
+// Desde el plan 011 lee buffer/modo/editando DIRECTAMENTE de useTpvStore (no por
+// props): así teclear re-renderiza solo esta banda, no la página entera.
+import { memo } from "react";
+import { useTpvStore } from "../hooks/useTpvStore";
 
 export interface BarraTotalesProps {
-  modo: "UND" | "PREC" | "DTO%" | "DTO€";
-  /** Edición activa (un modo pulsado): pinta en cian el número del campo. */
-  editando: boolean;
-  /** Lo tecleado; solo se muestra en UDS al armar cantidad SIN línea (añadir producto). */
-  buffer: string;
   /** Hay una línea seleccionada (editando su valor) vs. armando cantidad para un producto. */
   hayLinea: boolean;
   /** Uds de la línea seleccionada (0 si no hay). */
@@ -22,11 +20,14 @@ export interface BarraTotalesProps {
   unidades: number;
   total: number;
   eur: (n: number) => string;
-  /** Edición inline en curso (Glop): "Editando <tipo> de «<nombre>» — teclea y pulsa <label>". */
-  edicion?: { tipo: string; nombre: string; label: string } | null;
+  /** Nombre de la línea seleccionada, para el mensaje "Editando…". */
+  nombreLineaSel?: string | null;
 }
 
-export function BarraTotales({ modo, editando, buffer, hayLinea, udsLinea, precioLinea, unidades, total, eur, edicion }: BarraTotalesProps) {
+export const BarraTotales = memo(function BarraTotales({ hayLinea, udsLinea, precioLinea, unidades, total, eur, nombreLineaSel }: BarraTotalesProps) {
+  const modo = useTpvStore((s) => s.modo);
+  const editando = useTpvStore((s) => s.editando);
+  const buffer = useTpvStore((s) => s.buffer);
   const enPrecio = modo === "PREC" || modo === "DTO%" || modo === "DTO€";
   const labelPrecio = modo === "DTO%" ? "Dto %" : modo === "DTO€" ? "Dto €" : "Precio";
   const udsActivo = editando && modo === "UND";
@@ -34,6 +35,14 @@ export function BarraTotales({ modo, editando, buffer, hayLinea, udsLinea, preci
   // Al armar cantidad SIN línea (para añadir producto), UDS muestra lo tecleado;
   // editando una línea, muestra el valor confirmado (no cambia hasta aplicar).
   const udsMostrar = editando && !hayLinea && modo === "UND" ? (buffer || "0") : udsLinea;
+  // Edición inline en curso (Glop): "Editando <tipo> de «<nombre>» — teclea y pulsa <label>".
+  const edicion = editando && hayLinea
+    ? {
+        tipo: modo === "UND" ? "unidades" : modo === "PREC" ? "precio" : modo === "DTO%" ? "descuento %" : "descuento €",
+        nombre: nombreLineaSel ?? "",
+        label: modo === "UND" ? "Und." : modo === "PREC" ? "Precio" : modo === "DTO%" ? "DTO%" : "DTO€",
+      }
+    : null;
   return (
     <>
       {/* Mensaje de edición: la palabra del modo en BLANCO y el resto en cian (marca). */}
@@ -63,4 +72,4 @@ export function BarraTotales({ modo, editando, buffer, hayLinea, udsLinea, preci
       </div>
     </>
   );
-}
+});

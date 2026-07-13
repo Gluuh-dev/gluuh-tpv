@@ -32,11 +32,14 @@ con foco en cumplimiento fiscal **VERIFACTU** e **IGIC** canario.
 
 ## Base de datos
 
-- Lo que se aplica son las migraciones de `supabase/migrations/*.sql` (Supabase, multi-tenant
-  con RLS por `tenant_id` vía `current_tenant_id()`).
-- `apps/api/db/schema.sql` es un DDL de **referencia** que debe mantenerse como espejo de las
-  migraciones (ver `supabase/README.md`). Si tocas el esquema, actualiza ambos o decide cuál
-  es canónico.
+- **Canónico: `supabase/migrations/*.sql`** (Supabase, multi-tenant con RLS por `tenant_id`
+  vía `current_tenant_id()`). Una migración nueva = siguiente número libre + nombre en
+  snake_case. Leer la skill **gluuh-base-datos** antes de tocar nada.
+- `apps/api/db/schema.sql` **NO es el esquema y NO hay que mantenerlo sincronizado**
+  (decisión 12-07-2026). Era un espejo a mano y se quedó 28 tablas atrás — un espejo que
+  miente es peor que ninguno. Se conserva solo como documentación del **núcleo del diseño**
+  (patrón multi-tenant + RLS y convenciones). Para saber qué hay de verdad: las migraciones
+  o la BD viva (`list_tables` del MCP de Supabase).
 
 ## Convenciones
 

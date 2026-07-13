@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShoppingCart } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawOrder {
   numero_pedido: number | null;
@@ -18,7 +19,6 @@ interface RawOrder {
   created_at: string;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 export default function DiarioDePedidosPage() {
   const [loading, setLoading] = useState(true);

@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" rx="36" fill="var(--mesa-fill,#8a5a2b)"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Capa_2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 329 243">
+  <g id="Capa_1-2">
+    <g style="isolation: isolate;">
+      <rect fill="var(--silla-fill,#5e4c34)" x="6.5" y="85.5" width="34" height="72" rx="9" ry="9" />
+      <rect fill="var(--silla-fill,#5e4c34)" x="288.5" y="85.5" width="34" height="72" rx="9" ry="9" />
+      <rect fill="var(--mesa-fill,#774f19)" stroke="#71727b" stroke-width="3px" x="44.5" y="1.5" width="240" height="240" rx="24" ry="24" />
+      <path fill="var(--silla-dark,#010101)" d="M16.5,79.5c-22,0-22,84,0,84v-6c-16,0-16-72,0-72v-6Z" />
+      <path fill="var(--silla-dark,#010101)" d="M312.5,79.5c22,0,22,84,0,84v-6c16,0,16-72,0-72v-6Z" />
+    </g>
+  </g>
+</svg>

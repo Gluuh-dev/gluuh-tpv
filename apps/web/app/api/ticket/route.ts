@@ -14,22 +14,30 @@ import {
 // El motor VERIFACTU usa node:crypto → este handler debe ejecutarse en Node.
 export const runtime = "nodejs";
 
-// Seguridad M4: este endpoint calcula el preview fiscal (QR/huella demo) y no
-// debe ser anónimo. Validamos el token de sesión del llamante con Supabase.
+// Seguridad M4: este endpoint calcula el preview fiscal (QR/huella) y NO es
+// anónimo. Era un endpoint de CÓMPUTO (hash + QR con node:crypto) abierto a
+// cualquiera: superficie de abuso de CPU gratis. Desde el 12-07 el TPV envía el
+// Bearer de la sesión en cobrar() y aquí se exige (PERMISIVO=false).
 //
-// ponytail: modo PERMISIVO. Hoy el TPV (apps/web/app/tpv/page.tsx → cobrar())
-// llama a /api/ticket SIN cabecera Authorization (sí la envía a /api/factura),
-// así que exigir sesión con 401 rompería el cobro. Se deja la puerta preparada
-// pero permisiva: sólo registra la petición sin token. Pendiente enviar el
-// Bearer desde el TPV; cuando lo haga, poner PERMISIVO=false para exigir sesión.
-const PERMISIVO = true;
+// Si esto empieza a devolver 401 en producción, lo más probable NO es la sesión:
+// es que el Worker de Cloudflare no tenga NEXT_PUBLIC_SUPABASE_URL /
+// PUBLISHABLE_KEY en el entorno de RUNTIME (se necesitan aquí, en servidor).
+// Por eso ese caso se registra con un mensaje distinto y explícito.
+const PERMISIVO = false;
 
 async function haySesionValida(req: Request): Promise<boolean> {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return false;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) return false;
+  if (!url || !key) {
+    console.error(
+      "[/api/ticket] FALTA CONFIGURACIÓN: NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY no están " +
+        "en el entorno del SERVIDOR. No se puede validar la sesión → el cobro fallará. " +
+        "Añádelas a los secretos de runtime del Worker.",
+    );
+    return false;
+  }
   const supa = createClient(url, key, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },

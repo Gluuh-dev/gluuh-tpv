@@ -24,8 +24,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo": "tsx examples/verifactu-demo.ts",
-    "lint": "echo \"(lint pendiente)\""
+    "demo": "tsx examples/verifactu-demo.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",

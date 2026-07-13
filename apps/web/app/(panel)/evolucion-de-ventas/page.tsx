@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AvisoTruncado, fechaDesde, LIMITE_INFORME, RANGO_DEFECTO, SelectorRango, type Rango } from "@/components/selector-rango";
 import { TrendingUp, CalendarDays, Coins } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawOrder {
   total: number;
@@ -22,7 +23,6 @@ interface VentaMes {
   total: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function agruparPorMes(orders: RawOrder[]): VentaMes[] {
   const acc: Record<string, { tickets: number; total: number }> = {};

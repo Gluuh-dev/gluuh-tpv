@@ -5,6 +5,7 @@
 // (preparar / marchar). Las acciones de LÍNEA (anular / com. y extra / comp. menú)
 // viven en la fila horizontal bajo los totales; imprimir vive en el teclado.
 // El orden es configurable (setting `tpv.funciones.orden`). docs/implementacion/05 §5.2.
+import { memo } from "react";
 import {
   ParkingSquare, ArrowRightLeft, Coffee, SplitSquareHorizontal, UserPlus,
   Printer, Trash2, UserCog, ChefHat, Send, Settings2, ArchiveRestore, Lock, type LucideIcon,
@@ -66,7 +67,9 @@ export function ordenarAcciones(orden?: string[]): string[] {
   return r;
 }
 
-export function ColumnaFunciones(p: Props) {
+// Memoizado (plan 011): el padre pasa `accionesRapidasProps` estable (useMemo +
+// callbacks vivos), así que teclear o tocar líneas no re-renderiza el rail.
+export const ColumnaFunciones = memo(function ColumnaFunciones(p: Props) {
   const defs: Record<string, { icon: LucideIcon; label: string; onClick(): void; disabled?: boolean; activo?: boolean; badge?: number }> = {
     cliente: { icon: UserPlus, label: "Cliente", onClick: p.onCliente },
     aparcar: { icon: ParkingSquare, label: "Aparcar", onClick: p.onAparcar, disabled: !p.hayLineas },
@@ -96,4 +99,4 @@ export function ColumnaFunciones(p: Props) {
       </div>
     </div>
   );
-}
+});

@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Gift, TrendingDown } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface RawInvitacion {
   total: number;
@@ -20,7 +21,6 @@ interface FilaInvitacion {
   importe: number;
 }
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);

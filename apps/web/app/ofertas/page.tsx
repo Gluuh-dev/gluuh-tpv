@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { textoSobre } from "../lib/branding";
 import { CONFIG_CARTELERIA_DEF, configCon, leerConfigModulo } from "../lib/modulos";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 interface Offer {
   id: string; titulo: string; descripcion: string | null; precio: string | null;
@@ -82,10 +83,10 @@ export default function Ofertas() {
       style={{ background: o.color, color: fg, transition: "background .6s" }}
     >
       {o.media_tipo === "VIDEO" && o.media_url && (
-        <video key={o.id} src={o.media_url} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
+        <video key={o.id} src={urlFoto(o.media_url)} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
       )}
       {o.media_tipo === "IMAGEN" && o.media_url && (
-        <img key={o.id} src={o.media_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img loading="lazy" decoding="async" key={o.id} src={urlFoto(o.media_url)} alt="" className="absolute inset-0 h-full w-full object-cover" />
       )}
       {o.media_tipo !== "EMOJI" && o.media_url && <div className="absolute inset-0 bg-foreground/35" />}
 

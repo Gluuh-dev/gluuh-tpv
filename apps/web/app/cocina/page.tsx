@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { escucharCambios } from "../lib/cambios";
 import { COLOR, LABEL, SIGUIENTE, type EstadoPrep } from "../lib/estados";
 import { estacionDe } from "../lib/estaciones";
 import { CONFIG_COCINA_DEF, configCon, leerConfigModulo, type ConfigCocina } from "../lib/modulos";
@@ -71,17 +72,8 @@ export default function Cocina() {
     idsRef.current = new Set(rows.map((r) => r.id));
   }, [sb]);
 
-  // Debounce (trailing, un solo timer) sobre `cargar`: una venta genera varios
-  // eventos realtime seguidos (pedido + líneas + pago) y sin esto se relanzaba
-  // la recarga completa por cada uno.
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cargarDebounced = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { void cargar(); }, 500);
-  }, [cargar]);
-
   useEffect(() => {
-    let ch: ReturnType<typeof sb.channel> | undefined;
+    let dejarDeEscuchar: (() => void) | undefined;
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.replace("/login"); return; }
@@ -101,18 +93,18 @@ export default function Cocina() {
       } catch { /* sin identidad o sin la 0068: se queda la estación global */ }
       await cargar();
       setLoading(false);
-      // Canal SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"`
-      // los UPDATE que sacan un pedido de ese estado (COBRADA/ANULADA) no llegarían
-      // y la comanda quedaría "zombi" en pantalla. El debounce ya colapsa la tormenta.
-      ch = sb
-        .channel("cocina")
-        .on("postgres_changes", { event: "*", schema: "public", table: "sales_order" }, cargarDebounced)
-        .subscribe();
+      // SIN filtro de estado a propósito: con `filter: "estado=eq.ENVIADA_COCINA"` los
+      // UPDATE que sacan un pedido de ese estado (COBRADA/ANULADA) no llegarían y la
+      // comanda quedaría "zombi" en pantalla. El debounce ya colapsa la tormenta
+      // (una venta dispara pedido + líneas + pago seguidos).
+      dejarDeEscuchar = escucharCambios(sb, {
+        nombre: "cocina",
+        tablas: ["sales_order"],
+        debounceMs: 500,
+        onCambio: () => { void cargar(); },
+      });
     })();
-    return () => {
-      if (ch) sb.removeChannel(ch);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { dejarDeEscuchar?.(); };
     /* eslint-disable-next-line */
   }, []);
 

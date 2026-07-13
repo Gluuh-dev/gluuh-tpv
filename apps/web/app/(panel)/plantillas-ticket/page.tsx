@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 type Ancho = 58 | 80;
 type CfgImpresion = Required<ConfigImpresion>;
@@ -112,7 +113,7 @@ export default function PlantillasTicket() {
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1"><Toggle label="Logo de tickets" on={!!cfg.ticket.logo} onClick={() => setTicket("logo", !cfg.ticket.logo)} /></div>
-                    {logoUrl && <img src={logoUrl} alt="Logo de tickets" className="h-9 w-9 shrink-0 rounded border border-border bg-white object-contain p-0.5" />}
+                    {logoUrl && <img src={urlFoto(logoUrl)} alt="Logo de tickets" className="h-9 w-9 shrink-0 rounded border border-border bg-white object-contain p-0.5" />}
                   </div>
                   {TOGGLES_CABECERA.map(([k, t]) => (
                     <Toggle key={k} label={t} on={cfg.ticket[k] !== false} onClick={() => setTicket(k, cfg.ticket[k] === false)} />
@@ -168,7 +169,7 @@ export default function PlantillasTicket() {
           <div className="flex justify-center overflow-x-auto rounded-lg border border-border bg-muted/60 px-4 pt-6 pb-8">
             <div className="drop-shadow-md" style={{ width: cfg.ticket.anchoMm === 58 ? 236 : 306 }}>
               <div className="overflow-x-auto bg-white px-3 pt-4 pb-2 text-black">
-                {cfg.ticket.logo && logoUrl && <img src={logoUrl} alt="" className="mx-auto mb-2 max-w-[60%]" />}
+                {cfg.ticket.logo && logoUrl && <img src={urlFoto(logoUrl)} alt="" className="mx-auto mb-2 max-w-[60%]" />}
                 <pre className="whitespace-pre font-mono text-[10.5px] leading-[1.45]">{preview.join("\n")}</pre>
               </div>
               <div

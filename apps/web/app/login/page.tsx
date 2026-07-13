@@ -135,7 +135,7 @@ export default function Login() {
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary font-bold text-primary-foreground">G</span>
+          <img src="/logo.png" alt="Gluuh Logo" className="h-9 w-9 object-contain" />
           Gluuh <span className="text-muted-foreground">TPV</span>
         </div>
         <Card>

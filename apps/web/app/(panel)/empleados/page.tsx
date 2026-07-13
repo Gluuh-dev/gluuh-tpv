@@ -86,7 +86,7 @@ export default function Empleados() {
     const perf = await sb.from("perfil").select("id,nombre").order("nombre");
     setPerfiles(perf.error ? [] : ((perf.data as Perfil[]) ?? []));
   }
-  useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { void cargar();   }, []);
 
   const emp = editor?.modo === "editar" ? lista.find((e) => e.id === editor.id) ?? null : null;
 
@@ -96,7 +96,7 @@ export default function Empleados() {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") cerrar(); };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
-    // eslint-disable-next-line
+     
   }, [editor]);
 
   function cerrar() { setEditor(null); }

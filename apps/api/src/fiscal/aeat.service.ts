@@ -20,12 +20,19 @@ export interface RespuestaAeat {
   body: string;
 }
 
+export interface EnviarSoapOptions {
+  pfx?: Buffer | string; // Buffer o string en Base64
+  passphrase?: string;
+  entorno?: "pruebas" | "produccion";
+}
+
 /**
  * Cliente de envío a la AEAT mediante SOAP sobre HTTPS con autenticación mutua
  * (mTLS) usando el CERTIFICADO ELECTRÓNICO del obligado/representante.
  *
  * El envío real requiere:
- *   - AEAT_CERT_PATH: ruta a un certificado .p12/.pfx
+ *   - AEAT_CERT_PFX: certificado en Base64 (en memoria / env)
+ *   - AEAT_CERT_PATH: ruta a un certificado .p12/.pfx (disco)
  *   - AEAT_CERT_PASSWORD: su contraseña
  *   - AEAT_ENTORNO: "pruebas" | "produccion"
  *
@@ -35,20 +42,27 @@ export interface RespuestaAeat {
 export class AeatService {
   private readonly logger = new Logger(AeatService.name);
 
-  async enviarSoap(soapXml: string): Promise<RespuestaAeat> {
-    const entorno = (process.env.AEAT_ENTORNO ?? "pruebas") as keyof typeof AEAT_ENDPOINTS;
+  async enviarSoap(soapXml: string, options?: EnviarSoapOptions): Promise<RespuestaAeat> {
+    const entorno = (options?.entorno ?? process.env.AEAT_ENTORNO ?? "pruebas") as keyof typeof AEAT_ENDPOINTS;
     const endpoint = AEAT_ENDPOINTS[entorno] ?? AEAT_ENDPOINTS.pruebas;
-    const certPath = process.env.AEAT_CERT_PATH;
-    const passphrase = process.env.AEAT_CERT_PASSWORD;
+    const passphrase = options?.passphrase ?? process.env.AEAT_CERT_PASSWORD;
 
-    if (!certPath) {
-      throw new ServiceUnavailableException(
-        "Falta AEAT_CERT_PATH. El envío VERIFACTU a la AEAT requiere certificado electrónico (mTLS). " +
-          "Configura AEAT_CERT_PATH y AEAT_CERT_PASSWORD. Ver docs/07 §3.4.",
-      );
+    let pfx: Buffer;
+    if (options?.pfx) {
+      pfx = typeof options.pfx === "string" ? Buffer.from(options.pfx, "base64") : options.pfx;
+    } else if (process.env.AEAT_CERT_PFX) {
+      pfx = Buffer.from(process.env.AEAT_CERT_PFX, "base64");
+    } else {
+      const certPath = process.env.AEAT_CERT_PATH;
+      if (!certPath) {
+        throw new ServiceUnavailableException(
+          "Falta configuración del certificado. El envío VERIFACTU a la AEAT requiere certificado electrónico (mTLS). " +
+            "Configura AEAT_CERT_PATH, AEAT_CERT_PFX o pasa un certificado en memoria. Ver docs/07 §3.4.",
+        );
+      }
+      pfx = readFileSync(certPath);
     }
 
-    const pfx = readFileSync(certPath);
     const url = new URL(endpoint);
     const agent = new https.Agent({ pfx, passphrase });
 

@@ -16,6 +16,9 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      # Lint REAL desde el 12-07 (antes `turbo run lint` solo ejecutaba `echo`s).
+      # Va primero: es lo más rápido y falla antes de gastar 5 min compilando.
+      - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm build

@@ -9,5 +9,5 @@ import "sileo/styles.css";
 
 export function AppToaster() {
   const { resolvedTheme } = useTheme();
-  return <Toaster theme={(resolvedTheme as "light" | "dark") ?? "dark"} position="bottom-center" />;
+  return <Toaster key={resolvedTheme} theme={(resolvedTheme as "light" | "dark") ?? "dark"} position="bottom-center" />;
 }

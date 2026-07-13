@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150">
+  <!-- Toldo divisor con franjas corporativas en degradados de morado -->
+  <path d="M 0 0 H 125 V 87.5 A 62.5 62.5 0 0 1 0 87.5 Z" fill="#541F6E" />
+  <path d="M 125 0 H 250 V 87.5 A 62.5 62.5 0 0 1 125 87.5 Z" fill="#7D419E" />
+  <path d="M 250 0 H 375 V 87.5 A 62.5 62.5 0 0 1 250 87.5 Z" fill="#541F6E" />
+  <path d="M 375 0 H 500 V 87.5 A 62.5 62.5 0 0 1 375 87.5 Z" fill="#7D419E" />
+  
+  <!-- Línea superior de anclaje -->
+  <rect x="0" y="0" width="500" height="12" fill="#3c1352" />
+</svg>

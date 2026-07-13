@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><circle cx="200" cy="200" r="196" fill="var(--mesa-fill,#8a5a2b)"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <g id="silla">
+      <path d="M -36,-10 C -36,-32 36,-32 36,-10 L 30,-10 C 30,-22 -30,-22 -30,-10 Z" fill="var(--silla-dark,#4B4D52)" />
+      <rect x="-36" y="-12" width="72" height="34" rx="9" fill="var(--silla-fill,#707378)" />
+    </g>
+  </defs>
+  <!-- Sillas -->
+  <use href="#silla" transform="translate(200, 200) rotate(0) translate(0, -132)" />
+  <use href="#silla" transform="translate(200, 200) rotate(90) translate(0, -132)" />
+  <use href="#silla" transform="translate(200, 200) rotate(180) translate(0, -132)" />
+  <use href="#silla" transform="translate(200, 200) rotate(270) translate(0, -132)" />
+  <!-- Mesa -->
+  <circle cx="200" cy="200" r="110" fill="var(--mesa-fill,#8a5a2b)" />
+</svg>

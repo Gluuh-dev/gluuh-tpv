@@ -7,6 +7,7 @@
 // Skill: gluuh-ux-operativa.
 import { useMemo, useState } from "react";
 import { Minus, Plus, ArrowRight, RotateCcw, Wand2, Hand } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 export interface LineaTicket {
   id: string;
@@ -26,7 +27,6 @@ export interface DividirCuentaModalProps {
   onAbrirCajon?(): void;
 }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 /** Reparto: para cada documento, unidades asignadas por id de línea. */
 type Reparto = Record<string, number>[];

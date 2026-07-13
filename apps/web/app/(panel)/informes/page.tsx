@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
+import { eur } from "@/app/lib/money";
 
 interface Venta {
   id: string;
@@ -17,7 +18,6 @@ interface Venta {
   restaurant_table: { nombre: string } | null;
 }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 export default function Informes() {
   const sb = supabaseBrowser();

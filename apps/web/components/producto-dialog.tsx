@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { urlFoto } from "@/app/lib/urlFoto";
 
 interface Props {
   producto: { id: string; nombre: string };
@@ -229,7 +230,7 @@ export function ProductoDialog({ producto, onSaved, open: openProp, onOpenChange
               <Label>Foto</Label>
               <div className="flex items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input px-3 py-2 text-sm hover:bg-accent"><Upload className="h-4 w-4" /> Subir<input type="file" accept="image/*" className="hidden" onChange={onFoto} /></label>
-                {f.foto_url && <img src={f.foto_url} alt="" className="h-9 w-9 rounded object-cover" />}
+                {f.foto_url && <img src={urlFoto(f.foto_url)} alt="" className="h-9 w-9 rounded object-cover" />}
               </div>
             </div>
           </div>

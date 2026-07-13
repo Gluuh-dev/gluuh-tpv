@@ -10,7 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "eslint .",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "core:demo": "pnpm --filter @gluuh/core demo",
@@ -19,8 +19,14 @@
     "cf:deploy": "pnpm --filter @gluuh/web exec wrangler deploy"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.2.10",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
     "pg": "^8.21.0",
     "turbo": "^2.9.18",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.63.0"
   }
 }

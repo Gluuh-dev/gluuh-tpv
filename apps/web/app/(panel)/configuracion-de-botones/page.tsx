@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { eur } from "@/app/lib/money";
 
 interface TpvBotones {
   columnas: "auto" | 6 | 8 | 10;
@@ -42,7 +43,6 @@ const TEXTO_CLASE: Record<TpvBotones["tamanoTexto"], string> = {
   L: "text-[15px]",
 };
 
-const eur = (n: number) => n.toFixed(2) + " €";
 
 export default function ConfiguracionDeBotones() {
   const [cfg, setCfg] = useState<TpvBotones>(DEFAULTS);

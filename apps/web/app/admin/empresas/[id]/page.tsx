@@ -49,7 +49,7 @@ export default function FichaEmpresa() {
     setDisp((d as Disp[] | null) ?? []);
     setCargando(false);
   }
-  useEffect(() => { void cargar(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { void cargar();   }, [id]);
 
   async function accion(a: string, extra?: Record<string, unknown>) {
     setMsg(null);

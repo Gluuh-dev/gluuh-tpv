@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileText, Coins, ShieldCheck } from "lucide-react";
+import { eur } from "@/app/lib/money";
 
 interface InvoiceRow {
   num_serie_factura: string;
@@ -19,7 +20,6 @@ interface InvoiceRow {
   created_at: string;
 }
 
-const eur = (n: number) => Number(n).toFixed(2) + " €";
 
 const BADGE: Record<string, string> = {
   NO_ENVIADA:   "bg-muted text-muted-foreground",

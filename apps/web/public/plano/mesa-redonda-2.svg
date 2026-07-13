@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Capa_2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 244.46 156">
+  <g id="Capa_1-2">
+    <!-- Barrel body / Outer rim -->
+    <circle fill="#704e17" stroke="#5d3e24" stroke-width="6px" cx="122.17" cy="78" r="75" />
+    
+    <!-- Table Surface (Customizable color) -->
+    <circle fill="var(--mesa-fill,#774f19)" stroke="#71727b" stroke-width="3px" style="isolation: isolate; opacity: 0.55;" cx="122.17" cy="78" r="60" />
+    
+    <!-- Inner barrel details -->
+    <circle fill="#77582b" stroke="#5d3e24" stroke-width="2px" style="isolation: isolate; opacity: 0.4;" cx="122.17" cy="78" r="40" />
+    <line style="isolation: isolate; opacity: 0.4;" stroke="#5d3e24" stroke-width="2px" x1="122.17" y1="3" x2="122.17" y2="153" />
+    <line style="isolation: isolate; opacity: 0.4;" stroke="#5d3e24" stroke-width="2px" x1="47.17" y1="78" x2="197.17" y2="78" />
+    
+    <!-- Right Chair (Customizable color) -->
+    <path fill="var(--silla-fill,#5e4c34)" d="M203.62,51.3c-.06-4.97,3.92-9.05,8.89-9.11l16-.2c4.97-.06,9.05,3.92,9.11,8.89l.67,54c.06,4.97-3.92,9.05-8.89,9.11l-16,.2c-4.97.06-9.05-3.92-9.11-8.89" />
+    <path fill="var(--silla-dark,#010101)" d="M228.48,120c22-.27,20.95-84.27-1.05-83.99l.07,6c16-.2,16.89,71.8.9,71.99l.07,6Z" />
+    
+    <!-- Left Chair (Customizable color) -->
+    <path fill="var(--silla-fill,#5e4c34)" d="M40.42,105.07c-.01,4.97-4.06,8.99-9.03,8.97l-16-.05c-4.97-.01-8.99-4.06-8.97-9.03l.16-54c.01-4.97,4.06-8.99,9.03-8.97l16,.05c4.97.01,8.99,4.06,8.97,9.03" />
+    <path fill="var(--silla-dark,#010101)" d="M16.63,36c-22-.07-22.25,83.93-.25,84l.02-6c-16-.05-15.78-72.05.22-72l.02-6Z" />
+  </g>
+</svg>

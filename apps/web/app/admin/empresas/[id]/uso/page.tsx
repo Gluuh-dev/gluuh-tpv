@@ -12,6 +12,7 @@ import { buscarEmpresa, type ResumenEmpresa } from "@/app/lib/admin-empresas";
 import { EncabezadoEmpresa } from "../encabezado";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { eur } from "@/app/lib/money";
 
 interface Uso {
   ventas_dia: { dia: string; pedidos: number; importe: number }[];
@@ -24,7 +25,6 @@ interface Uso {
 }
 interface Disp { id: string; nombre: string; tipo: string; modulo: string | null; vinculado_at: string | null; ultima_conexion: string | null; version: string | null }
 
-const eur = (n: number) => Number(n).toFixed(2).replace(".", ",") + " €";
 function haceCuanto(iso: string | null): string {
   if (!iso) return "nunca";
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
