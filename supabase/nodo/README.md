@@ -472,3 +472,56 @@ reinicia.
 el puerto bueno. Además, `arrancar-nodo.ps1` **espera a que Postgres conteste**
 (`pg_isready`), no a un `Start-Sleep`: en un mini-PC arrancando por la mañana, Postgres
 tarda más de tres segundos y los demás servicios morían con *connection refused*.
+
+---
+
+## Provisionar: bajarse el bar de la nube
+
+Es el **primer paso** de una instalación real y **el único que necesita internet**. Sin
+esto el nodo nace vacío: sin carta, sin mesas, sin empleados. Y lo que vendiera **no
+podría subir nunca**, porque en la nube ni siquiera existiría el `tenant`.
+
+```powershell
+node apps/nodo/provisionar.mjs --listar        # ¿qué bares hay?
+node apps/nodo/provisionar.mjs <tenant-id>     # bájate ese
+node apps/nodo/descargar-imagenes.mjs          # y sus fotos
+```
+
+Baja **catálogo y configuración** (carta, salas, mesas, empleados, tarifas, impuestos,
+plano…). **NO baja ventas, ni caja, ni facturas**: eso nace en el bar y el bar tiene la
+razón — bajarlas sería invitar a que la nube pisara una venta.
+
+El **orden** lo deduce del propio esquema (un orden topológico de las claves foráneas),
+no de una lista escrita a mano que se quedaría vieja en cuanto alguien añada una tabla.
+
+### Tres trampas que costaron encontrar
+
+**1. Los `auth_user_id` de la nube NO valen en el nodo — y esto tumbaba el login.**
+El nodo tiene su propio GoTrue. Al entrar un camarero, `/api/entrar-operario` ve que el
+operario ya tiene `auth_user_id`, hace `updateUserById(ese-id)` contra el GoTrue del
+nodo… y recibe *«user not found»*. **Nadie podría entrar al TPV.** Al provisionar se
+vacían: la primera vez que entre cada camarero, se le crea la cuenta aquí.
+
+**2. No todas las tablas tienen `id`.** `tenant_branding` va por `tenant_id` y las tablas
+de unión tienen clave compuesta. Exigiendo `id` se saltaban en silencio y el bar se
+quedaba **sin logo ni colores** y sin la mitad de las relaciones de la carta. Ahora se usa
+la clave primaria de verdad, la que diga el esquema.
+
+**3. `tenant` no tiene columna `tenant_id`** (ella *es* el bar), así que el filtro no le
+aplicaba y se bajaban **todos los bares de la nube** al nodo de uno solo.
+
+Y un detalle del driver: un `text[]` de Postgres (`product.alergenos`) y un JSON que
+casualmente es una lista **se ven idénticos desde JavaScript**. Hay que preguntarle al
+esquema de qué tipo es cada columna, o Postgres responde *«malformed array literal»*.
+
+### El TPV contra el nodo: la clave secreta también es la del NODO
+
+En `apps/web/.env.local`, `SUPABASE_SECRET_KEY` **no es la de Supabase** (`sb_secret_…`):
+es la `service_role` **del nodo** (la segunda que imprime `claves.mjs`).
+
+`/api/entrar-operario` la usa contra `NEXT_PUBLIC_SUPABASE_URL`, que en modo nodo **es el
+nodo**. Con la clave de la nube ahí, el nodo la rechaza y **ningún camarero entra**. Es el
+error fácil de cometer y el más caro de diagnosticar.
+
+Probado: crear la cuenta del operario en el GoTrue del nodo → iniciar sesión → pedir
+datos. Y la RLS sigue viva: un operario sin bar asignado **no ve nada**.
