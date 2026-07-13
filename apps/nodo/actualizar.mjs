@@ -28,21 +28,15 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import pg from "pg";
+import { cabeceras, credenciales } from "./nube.mjs";
 
 const RAIZ = path.resolve(".");
 const NODO = path.join(RAIZ, ".nodo");
 const VERSION_FICHERO = path.join(RAIZ, "apps/nodo/version.json");
 
-// Credenciales de la nube (el mismo fichero que usa el sincronizador).
-const ENV = path.join(NODO, "sync.env");
-if (fs.existsSync(ENV)) {
-  for (const l of fs.readFileSync(ENV, "utf8").split(/\r?\n/)) {
-    const m = /^([A-Z_]+)=(.*)$/.exec(l.trim());
-    if (m) process.env[m[1]] ??= m[2];
-  }
-}
-const NUBE = process.env.SUPABASE_URL;
-const CLAVE = process.env.SUPABASE_SECRET_KEY;
+// Se identifica como su bar, igual que el sincronizador — nunca con la clave maestra de
+// la plataforma. Ver nube.mjs.
+const NUBE = credenciales().url;
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
 
 const SOLO_REVISAR = process.argv.includes("--revisar");
@@ -72,8 +66,9 @@ function masNueva(a, b) {
 }
 
 // ── 1. ¿Hay algo nuevo? ──────────────────────────────────────────────────────
-if (!NUBE || !CLAVE) {
-  console.log("Sin credenciales de la nube: este nodo no se actualiza solo.");
+const cab = await cabeceras();
+if (!NUBE || !cab) {
+  console.log("Sin credenciales de la nube (o sin línea): este nodo no se actualiza ahora.");
   process.exit(0);
 }
 
@@ -81,7 +76,7 @@ let ultima;
 try {
   const r = await fetch(
     `${NUBE}/rest/v1/nodo_release?select=*&order=publicada_at.desc&limit=1`,
-    { headers: { apikey: CLAVE, authorization: `Bearer ${CLAVE}` } },
+    { headers: cab },
   );
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   [ultima] = await r.json();

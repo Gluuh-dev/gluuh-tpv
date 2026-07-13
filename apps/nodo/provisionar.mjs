@@ -16,31 +16,24 @@
 // tarifas, impresoras…). NO baja ventas ni caja ni facturas: eso nace en el bar y el bar
 // tiene la razón — bajarlas sería invitar a que la nube pisara una venta.
 
-import fs from "node:fs";
-import path from "node:path";
 import pg from "pg";
+import { cabeceras, credenciales } from "./nube.mjs";
 
 // Timestamps en texto: el Date de JS pierde los microsegundos de Postgres.
 pg.types.setTypeParser(1184, (v) => v);
 pg.types.setTypeParser(1114, (v) => v);
 
-const ENV = path.resolve(".nodo/sync.env");
-if (fs.existsSync(ENV)) {
-  for (const l of fs.readFileSync(ENV, "utf8").split(/\r?\n/)) {
-    const m = /^([A-Z_]+)=(.*)$/.exec(l.trim());
-    if (m) process.env[m[1]] ??= m[2];
-  }
-}
-const NUBE = process.env.SUPABASE_URL;
-const CLAVE = process.env.SUPABASE_SECRET_KEY;
+// El nodo se identifica como SU bar y la RLS lo acota a él. NUNCA lleva la clave maestra
+// de la plataforma: en el mini-PC de un cliente, esa clave sería la llave de los datos de
+// todos los demás clientes. Ver nube.mjs.
+const NUBE = credenciales().url;
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
 
-if (!NUBE || !CLAVE) {
-  console.error("Faltan SUPABASE_URL / SUPABASE_SECRET_KEY en .nodo/sync.env");
+const cab = await cabeceras();
+if (!NUBE || !cab) {
+  console.error("Sin credenciales de la nube (.nodo/sync.env) o sin conexión.");
   process.exit(1);
 }
-
-const cab = { apikey: CLAVE, authorization: `Bearer ${CLAVE}` };
 
 async function nube(ruta) {
   const r = await fetch(`${NUBE}/rest/v1/${ruta}`, { headers: cab });

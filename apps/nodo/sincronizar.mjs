@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
+import { cabeceras, credenciales } from "./nube.mjs";
 
 // Las marcas de tiempo, en TEXTO tal como las da Postgres — no como Date de JS.
 //
@@ -33,22 +34,17 @@ import pg from "pg";
 pg.types.setTypeParser(1184, (v) => v); // timestamptz
 pg.types.setTypeParser(1114, (v) => v); // timestamp
 
-// ── Credenciales: de .nodo/sync.env, JAMÁS del código ────────────────────────
-const ENV = path.resolve(".nodo/sync.env");
-if (fs.existsSync(ENV)) {
-  for (const l of fs.readFileSync(ENV, "utf8").split(/\r?\n/)) {
-    const m = /^([A-Z_]+)=(.*)$/.exec(l.trim());
-    if (m) process.env[m[1]] ??= m[2];
-  }
-}
-
-const NUBE = process.env.SUPABASE_URL;
-const CLAVE = process.env.SUPABASE_SECRET_KEY;
+// ── Identidad ante la nube ───────────────────────────────────────────────────
+//
+// El nodo NO lleva la clave maestra de la plataforma. Se identifica como SU bar y la RLS
+// lo acota a él. La diferencia es enorme: con la clave maestra, robar el mini-PC de un
+// bar sería robar los datos de TODOS los clientes. Ver nube.mjs.
+const NUBE = credenciales().url;
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
 const MEDIA = path.resolve(process.env.NODO_MEDIA_DIR ?? ".nodo/media");
 
-if (!NUBE || !CLAVE) {
-  console.error("Faltan SUPABASE_URL / SUPABASE_SECRET_KEY (en .nodo/sync.env).");
+if (!NUBE) {
+  console.error("Falta SUPABASE_URL en .nodo/sync.env: este nodo no sube nada a la nube.");
   process.exit(1);
 }
 
@@ -93,14 +89,13 @@ const LOTE = 200;
 
 const bd = new pg.Pool({ connectionString: BD });
 
-const cab = {
-  apikey: CLAVE,
-  authorization: `Bearer ${CLAVE}`,
-  "content-type": "application/json",
-};
+// Las cabeceras se piden en CADA pase: el token del bar caduca en una hora y hay que
+// renovarlo. Si vuelve null es que no hay línea (o no hay credenciales): no es un error.
+let cab = null;
 
-/** ¿Hay internet y la nube contesta? Si no, no es un error: es un martes. */
 async function hayNube() {
+  cab = await cabeceras();
+  if (!cab) return false;
   try {
     const c = new AbortController();
     const t = setTimeout(() => c.abort(), 5000);
@@ -134,7 +129,7 @@ async function subirImagenes() {
     try {
       const r = await fetch(`${NUBE}/storage/v1/object/media/${ruta}`, {
         method: "POST",
-        headers: { apikey: CLAVE, authorization: `Bearer ${CLAVE}`, "x-upsert": "true" },
+        headers: { ...cab, "x-upsert": "true", "content-type": "application/octet-stream" },
         body: fs.readFileSync(fichero),
       });
       if (!r.ok && r.status !== 409) throw new Error(`HTTP ${r.status} ${await r.text()}`);

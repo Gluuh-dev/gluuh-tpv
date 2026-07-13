@@ -1,0 +1,221 @@
+# 17 — Manual del nodo local
+
+Dos partes:
+
+- **A · Configurar para PROBAR** (en tu máquina, hoy).
+- **B · El INSTALADOR** para un cliente de verdad (qué pregunta y cómo se genera).
+
+---
+
+# A · Configurar para probar
+
+## A.0 · Antes de nada: la migración pendiente
+
+En Supabase, aplicar **`supabase/migrations/0099_cliente_unificado_datos_fiscales.sql`**.
+
+⚠️ **Elimina la tabla `client`** (traspasando antes sus filas a `customer`, lo hace la
+propia migración). Sin ella, la página de Clientes del backoffice **sigue rota** y la
+"Factura completa" del TPV **sigue siendo imposible de emitir**.
+
+La `0100` ya está aplicada.
+
+## A.1 · Levantar el nodo
+
+```powershell
+.\supabase\nodo\instalar-nodo.ps1 -Recrear   # sólo la primera vez (o para rehacerla)
+.\supabase\nodo\arrancar-nodo.ps1            # levanta los 7 servicios
+```
+
+Al terminar imprime la dirección. Compruébalo en el navegador:
+`http://127.0.0.1:54321/nodo/estado` → debe devolver un JSON.
+
+Para pararlo: `.\supabase\nodo\arrancar-nodo.ps1 -Parar`
+
+| servicio | puerto | qué es |
+|---|---|---|
+| Postgres | 55432 | la verdad |
+| PostgREST | 55433 | los datos por HTTP |
+| GoTrue | 55434 | quién eres |
+| Realtime | 55435 | "el comandero ha picado algo" |
+| Media | 55436 | las fotos de la carta |
+| **Gateway** | **54321** | ← **lo único que ve el TPV** |
+| Sync | — | sube a la nube cada 5 min |
+
+## A.2 · Bajarse un bar de la nube
+
+El nodo nace **vacío**. Sin este paso no tiene ni carta, ni mesas, ni empleados:
+
+```powershell
+node apps/nodo/provisionar.mjs --listar        # ¿qué bares hay?
+node apps/nodo/provisionar.mjs <tenant-id>     # bájate ese
+node apps/nodo/descargar-imagenes.mjs          # y sus fotos
+```
+
+**Ojo con cuál eliges**: *Bar Demo Gluuh* tiene la carta pero **no tiene mesas ni
+empleados**. El bar completo (1 local, 2 salas, **21 mesas**, 4 empleados, 75 productos)
+es **Plantilla base**.
+
+## A.3 · Apuntar el TPV al nodo
+
+```powershell
+node apps/nodo/claves.mjs "clave-jwt-de-desarrollo-del-nodo-gluuh-min-32-chars"
+```
+
+Imprime **dos** claves. La **primera** es `anon`, la **segunda** es `service_role`.
+En `apps/web/.env.local`:
+
+```env
+NEXT_PUBLIC_NODO_LOCAL=1
+NEXT_PUBLIC_SUPABASE_URL=http://<ip-del-nodo>:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<la 1ª>
+SUPABASE_SECRET_KEY=<la 2ª — la del NODO, NO la de Supabase>
+NEXT_PUBLIC_SUPABASE_URL_NUBE=https://<proyecto>.supabase.co
+```
+
+### ⚠️ El error que más cuesta diagnosticar
+
+**`SUPABASE_SECRET_KEY` tiene que ser la del NODO**, no la de Supabase (`sb_secret_…`).
+
+`/api/entrar-operario` usa esa clave **contra `NEXT_PUBLIC_SUPABASE_URL`**, que en modo
+nodo **es el nodo**. Con la clave de la nube ahí, el nodo la rechaza y **ningún camarero
+puede entrar**. No da un error claro: sólo "no puedo entrar".
+
+`NEXT_PUBLIC_SUPABASE_URL_NUBE` sí es la de Supabase de verdad: es la que se guarda en la
+base de datos al subir una foto (ver §B.4).
+
+Arrancar: `pnpm --filter @gluuh/web dev` → `http://localhost:3100`
+
+## A.4 · Qué probar (y en qué orden)
+
+1. **Con internet**: entrar, abrir una mesa, picar, cobrar. Que todo va.
+2. **APAGA EL WIFI** y repite. *Aquí es donde se ve si esto vale.* Si algo tira de
+   internet, se cae aquí.
+3. **Dos pestañas** del TPV: picar en una → tiene que aparecer sola en la otra.
+4. **`/servidor`**: los servicios en verde, qué hay creado, qué falta por subir.
+5. **Vuelve a encender el wifi** y `node apps/nodo/sincronizar.mjs`: la venta aparece en
+   Supabase. Lánzalo **dos veces**: sigue habiendo **una sola** venta.
+
+## A.5 · Si algo falla
+
+Los logs están en `.nodo\tmp\*.log` (uno por servicio).
+
+| síntoma | causa casi seguro |
+|---|---|
+| Ningún camarero entra | `SUPABASE_SECRET_KEY` es la de la nube, no la del nodo (§A.3) |
+| El TPV no ve nada, sin errores | la RLS no resuelve el tenant → `auth.uid()` |
+| PostgREST muere al arrancar | falta `libpq.dll` → `pgsql\bin` no está en el PATH |
+| El nodo arranca "vivo" pero mudo | Postgres levantó en el 5432 en vez del 55432 |
+| El TPV no ve las fotos | falta `NEXT_PUBLIC_NODO_LOCAL=1` (no reescribe las URLs) |
+
+---
+
+# B · El instalador para un cliente
+
+## B.1 · Qué pregunta (y por qué eso y no más)
+
+`supabase/nodo/Instalar-Gluuh.ps1` — cuatro preguntas, ni una de más:
+
+**1. Código de instalación** (21 dígitos, `0000-0000-00000-0000-0000`).
+Es el que Gluuh le da al cliente al darlo de alta, y **ya existía** en el sistema
+(`tenant.codigo_instalacion`, migración 0078). Lo valida contra la nube y **enseña el
+nombre de la empresa** para que el técnico confirme que no se ha equivocado de bar.
+
+**2. Email y contraseña del titular.**
+Para que el servidor pueda bajarse la carta y subir las ventas. **La contraseña no se
+guarda**: se usa una vez, se pide un permiso, y se guarda sólo ese permiso.
+Además **se comprueba que la cuenta es de esa empresa** — si el titular lleva dos bares,
+el servidor de éste no puede quedarse con un permiso que apunte al otro.
+
+**3. Datos fiscales** — CIF, razón social y territorio (IVA / IGIC / IPSI).
+**Sólo si faltan.** Sin ellos **no se pueden emitir facturas**: los exige la AEAT.
+(Al dar de alta una empresa, el CIF se queda en `PENDIENTE`.)
+
+**4. ¿Arrancar solo al encender?** Sí, salvo que digan que no.
+
+Y ya. Lo demás lo hace sin preguntar: base de datos, se baja el bar, las fotos, arranca
+los servicios, registra el arranque automático y escribe `INSTALACION.txt` con **la
+dirección que hay que poner en cada TPV**.
+
+## B.2 · 🔒 Lo que el instalador **NO** hace, y es lo más importante
+
+**No instala la clave secreta de Supabase en el ordenador del cliente.**
+
+Esa clave (`SUPABASE_SECRET_KEY`) **salta toda la RLS**: con ella se leen y se escriben
+los datos de **cualquier** bar de la plataforma. Repartirla con el instalador sería dejar
+en cada mini-PC —debajo de una barra, con la wifi del local y la puerta abierta— **la
+llave maestra de todos los demás clientes**. Un ordenador robado en un bar sería una fuga
+de datos en todos.
+
+En su lugar (`apps/nodo/nube.mjs`):
+
+- El nodo **inicia sesión como el bar**, con la cuenta del titular.
+- Guarda **sólo el `refresh_token`** — nunca la contraseña, nunca una clave maestra.
+- GoTrue **rota** ese token en cada uso, y el nodo guarda el nuevo.
+- **La RLS lo acota a su empresa.** No puede tocar nada de nadie más.
+
+Si le roban el ordenador a un bar, se llevan los datos **de ese bar**. De ninguno más.
+
+> En **nuestra** máquina de desarrollo `nube.mjs` sí acepta `SUPABASE_SECRET_KEY`, porque
+> es cómodo y la máquina es nuestra. Eso **no debe salir de aquí**.
+
+## B.3 · Cómo se genera el `.exe`
+
+Con **Inno Setup** (gratis, es el estándar en Windows). El guion está en
+`supabase/nodo/instalador/gluuh-servidor.iss`.
+
+**1. Preparar la carga** (`supabase/nodo/instalador/carga/`):
+
+```
+carga\pgsql\          Postgres portable          (~300 MB)
+carga\bin\            postgrest.exe, gotrue.exe  (~120 MB)
+carga\node\           Node.js portable           (~50 MB)
+carga\postgrest.conf
+carga\gotrue.env
+```
+
+⚠️ **`postgrest.exe` necesita `libpq.dll`, que viene con Postgres y NO en su propio zip.**
+Si empaquetas uno sin el otro, **PostgREST muere en silencio** nada más arrancar. Por eso
+van juntos, y por eso los scripts ponen `pgsql\bin` en el PATH.
+
+**2. Compilar:**
+
+```powershell
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" supabase\nodo\instalador\gluuh-servidor.iss
+```
+
+Sale `dist\GluuhServidor-1.0.0.exe`. Un solo fichero, ~500 MB. Parece mucho hasta que te
+acuerdas de que la alternativa es pedirle al cliente que instale Postgres y Node a mano
+por teléfono.
+
+**3. Fírmalo** si tienes certificado. Sin firma, Windows SmartScreen le enseña al cliente
+un aviso rojo de "aplicación no reconocida" — y ahí se acaba la instalación.
+
+## B.4 · Lo que el instalador hace por su cuenta
+
+1. `initdb` — crea el cluster de Postgres. **Es lo único que no se puede traer hecho**:
+   el directorio de datos lleva dentro rutas absolutas de la máquina donde se creó.
+2. Las 100 migraciones (bootstrap → GoTrue → reparar `auth.uid()` → migraciones).
+3. Se baja el bar entero de la nube y sus fotos.
+4. Arranca los 7 servicios y registra el arranque automático.
+5. Escribe `INSTALACION.txt` con la dirección para los TPV.
+
+Y al **desinstalar**: para los servicios y quita la tarea de arranque. Si no, quedan
+procesos huérfanos comiendo memoria y una tarea programada apuntando a la nada.
+
+## B.5 · Lo que hay que decirle al cliente (está en `INSTALACION.txt`)
+
+- **Este ordenador se queda ENCENDIDO.** Es donde están los datos. Si se apaga, **el bar
+  no puede cobrar**.
+- El bar **funciona sin internet**. Cuando vuelva la línea, sube solo.
+- **La IP no puede cambiar**: hay que fijarla en el router (reserva por MAC). Si el router
+  le da otra IP un día, los TPV dejan de encontrar el servidor.
+
+---
+
+## Pendiente
+
+- El instalador **no se ha probado de punta a punta** todavía (falta compilar el `.exe` y
+  ejecutarlo en una máquina limpia).
+- Falta el **segundo instalador**: el de los TPV (que sólo pregunta la dirección del
+  servidor). Hoy se configura a mano con `.env.local`.
+- Falta que el TPV **descubra el servidor solo** (mDNS), para no teclear la IP.
