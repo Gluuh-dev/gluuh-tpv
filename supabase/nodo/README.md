@@ -419,3 +419,56 @@ encerradas en el bar.
 
 El panel `/servidor` lo enseña: **lo que aún no está en la nube sólo existe en ese
 ordenador**. Si se muere ahora, se pierde.
+
+---
+
+## Actualizar los nodos desde la nube
+
+```powershell
+# Nosotros, al publicar una versión:
+node apps/nodo/publicar.mjs 1.1.0 "Arregla el redondeo del IGIC"
+
+# El nodo, solo, cada pocos minutos:
+node apps/nodo/actualizar.mjs            # mira y actualiza
+node apps/nodo/actualizar.mjs --revisar  # sólo mira; no toca nada
+```
+
+La nube tiene el tablón (`nodo_release`, migración 0100). Cada nodo mira si hay algo más
+nuevo que lo suyo, se lo baja, **comprueba que no viene manipulado**, lo aplica y se
+reinicia.
+
+### Cómo se hace sin romper el bar
+
+- **El `sha256` se comprueba SIEMPRE.** Si el zip descargado no cuadra con el hash
+  publicado, **no se instala**. Un TPV que acepta cualquier binario que le mandan es una
+  puerta abierta a la caja del bar. *(Probado: falseando el hash, el nodo se planta.)*
+- **No se actualiza con el bar trabajando.** Si hay cuentas abiertas o una caja sin
+  cerrar, lo dice y espera. Reiniciar los servicios en plena comanda es tirarle el TPV al
+  camarero. *(Probado: con 3 mesas abiertas, se niega.)*
+- **Copia de seguridad antes de tocar nada.** Si algo falla, vuelve atrás y levanta el
+  nodo. *(Durante el desarrollo saltó **tres veces** y el bar volvió entero cada una.)*
+- **Sin internet no pasa nada:** el bar sigue con la versión que tiene, que funciona.
+
+### Cuatro cosas que costaron encontrar (todas reventaban la actualización)
+
+1. **La base de datos NO se puede parar.** Parar "el nodo" paraba también Postgres, y las
+   migraciones se aplicaban contra una base apagada. Por eso existe `-MantenerBd`.
+2. **Las migraciones NO son idempotentes.** El comentario decía que sí; era mentira:
+   `0001_init.sql` hace `create table tenant` sin `if not exists`. Reaplicarlas todas
+   revienta con *«relation "tenant" already exists»* y **ningún bar se actualizaría
+   jamás**. Ahora se lleva la cuenta en `nodo_migracion` y sólo se pasan las nuevas.
+3. **psql supone WIN1252.** En un Windows español, y nuestras migraciones son UTF-8
+   llenas de tildes → *«character with byte sequence 0x8d … has no equivalent in UTF8»*.
+   Se arregla con `PGCLIENTENCODING=UTF8`.
+4. **`Compress-Archive -Path apps\nodo`** mete la carpeta como `nodo/` en la raíz del zip,
+   no como `apps/nodo/`. Al descomprimir habría aparecido un `<raiz>\nodo` suelto y el
+   nodo se habría quedado con el código viejo **sin un solo error**.
+
+### Y un bug de arranque que habría matado el nodo cada mañana
+
+`pg_ctl start` sin `-o "-p 55432"` levanta Postgres en el **5432** (el de
+`postgresql.conf`), mientras PostgREST y GoTrue le hablan al 55432 → el nodo arranca
+"vivo" pero mudo. Sólo parecía funcionar porque había una instancia levantada a mano con
+el puerto bueno. Además, `arrancar-nodo.ps1` **espera a que Postgres conteste**
+(`pg_isready`), no a un `Start-Sleep`: en un mini-PC arrancando por la mañana, Postgres
+tarda más de tres segundos y los demás servicios morían con *connection refused*.

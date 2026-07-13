@@ -40,9 +40,20 @@ fs.rmSync(zip, { force: true });
 
 // Sólo lo que el nodo necesita: su código y las migraciones. Ni binarios, ni datos, ni
 // —jamás— .nodo/ (que es donde viven las credenciales).
+//
+// OJO con el zip: `Compress-Archive -Path apps\nodo` mete la carpeta como `nodo/` en la
+// raíz del paquete, no como `apps/nodo/`. Al descomprimirlo en el bar aparecería un
+// `<raiz>\nodo` suelto y el nodo se quedaría con el código viejo, sin un solo error.
+// Por eso se prepara antes la estructura EXACTA que debe tener el zip y se comprime eso.
 console.log("Empaquetando apps/nodo + supabase…");
+const prep = path.join(RAIZ, ".nodo", "tmp", "paquete");
+fs.rmSync(prep, { recursive: true, force: true });
+fs.mkdirSync(path.join(prep, "apps"), { recursive: true });
+fs.cpSync(path.join(RAIZ, "apps/nodo"), path.join(prep, "apps/nodo"), { recursive: true });
+fs.cpSync(path.join(RAIZ, "supabase"), path.join(prep, "supabase"), { recursive: true });
+
 execSync(
-  `powershell -NoProfile -Command "Compress-Archive -Path '${RAIZ}\\apps\\nodo','${RAIZ}\\supabase' -DestinationPath '${zip}' -Force"`,
+  `powershell -NoProfile -Command "Compress-Archive -Path '${prep}\\*' -DestinationPath '${zip}' -Force"`,
   { stdio: "inherit" },
 );
 

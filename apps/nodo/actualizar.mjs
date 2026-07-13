@@ -10,8 +10,13 @@
 //   · Nada se toca hasta tener el paquete entero y verificado. Se descarga a un lado.
 //   · El sha256 se comprueba SIEMPRE. Si no cuadra, no se instala y no pasa nada más.
 //     Un TPV que instala cualquier cosa que le mandan es una puerta abierta a la caja.
-//   · Se guarda una COPIA de lo que había. Si algo sale mal, se vuelve atrás.
-//   · Las migraciones son idempotentes (`if not exists`): se pueden reaplicar sin miedo.
+//   · Se guarda una COPIA de lo que había. Si algo sale mal, se vuelve atrás. (Y funciona:
+//     durante el desarrollo saltó tres veces y el nodo volvió entero cada una.)
+//   · Sólo se aplican las migraciones QUE FALTAN. Reaplicarlas todas revienta —
+//     `0001_init.sql` hace `create table tenant` sin `if not exists`. La cuenta la lleva
+//     la tabla `nodo_migracion`.
+//   · La base de datos NO se para: si se parara, las migraciones se aplicarían contra
+//     una base apagada.
 //   · Y no se actualiza con la caja abierta. Un bar a las 21:30 un sábado no es momento
 //     de reiniciar nada.
 //
@@ -42,9 +47,19 @@ const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/glu
 
 const SOLO_REVISAR = process.argv.includes("--revisar");
 
-const versionLocal = fs.existsSync(VERSION_FICHERO)
-  ? JSON.parse(fs.readFileSync(VERSION_FICHERO, "utf8")).version
-  : "0.0.0";
+// Quitar el BOM: PowerShell escribe UTF-8 CON BOM y JSON.parse se atraganta.
+// Un nodo que no puede leer su propia versión no se actualiza nunca, y nadie entendería
+// por qué. Sale más barato tolerarlo que confiar en que nadie se equivoque de
+// codificación dentro de cinco años.
+function leerVersion() {
+  if (!fs.existsSync(VERSION_FICHERO)) return "0.0.0";
+  const crudo = fs.readFileSync(VERSION_FICHERO, "utf8");
+  // 0xFEFF es el BOM. Se compara por código en vez de escribirlo: el carácter en sí es
+  // invisible y cualquier editor o linter lo trata como basura.
+  const limpio = crudo.charCodeAt(0) === 0xfeff ? crudo.slice(1) : crudo;
+  return JSON.parse(limpio).version;
+}
+const versionLocal = leerVersion();
 
 /** Compara semver: ¿es `a` más nueva que `b`? */
 function masNueva(a, b) {
@@ -139,8 +154,11 @@ console.log("  copia de seguridad hecha");
 
 // ── 5. Aplicar ───────────────────────────────────────────────────────────────
 try {
-  console.log("\nParando el nodo…");
-  execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${RAIZ}\\supabase\\nodo\\arrancar-nodo.ps1" -Parar`,
+  console.log("\nParando los servicios (la base de datos sigue viva)…");
+  // -MantenerBd: hay que parar los servicios para cambiarles el código, pero Postgres
+  // TIENE que seguir en marcha — si no, las migraciones de abajo se aplicarían contra
+  // una base de datos apagada y la actualización se caería entera.
+  execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${RAIZ}\\supabase\\nodo\\arrancar-nodo.ps1" -Parar -MantenerBd`,
     { stdio: "ignore" });
 
   console.log("Aplicando la versión nueva…");
@@ -149,17 +167,50 @@ try {
     { stdio: "ignore" });
 
   console.log("Aplicando migraciones…");
-  // Las migraciones son idempotentes (`if not exists`): reaplicarlas todas es seguro y
-  // evita llevar la cuenta de cuáles faltan.
+  //
+  // SÓLO LAS QUE FALTAN. Las migraciones NO son idempotentes: `0001_init.sql` hace
+  // `create table tenant` a secas. Reaplicarlas todas revienta con «relation "tenant"
+  // already exists» y el bar no se actualizaría jamás. La cuenta la lleva
+  // `nodo_migracion` (creada en 00_bootstrap).
   const psql = path.join(NODO, "pgsql", "bin", "psql.exe");
   process.env.PGPASSWORD = "gluuh";
+
+  // Sin esto, psql se cree que el fichero viene en WIN1252 (la codificación del sistema
+  // en un Windows español) y revienta en la primera tilde:
+  //   «character with byte sequence 0x8d in encoding "WIN1252" has no equivalent in UTF8»
+  // Nuestras migraciones están en UTF-8 y llenas de acentos, porque el proyecto está en
+  // español. Se lo decimos y punto.
+  process.env.PGCLIENTENCODING = "UTF8";
+
+  const { rows: yaEstan } = await bd.query("select fichero from public.nodo_migracion");
+  const aplicadas = new Set(yaEstan.map((r) => r.fichero));
+
+  // Si una migración falla hay que VER POR QUÉ. Con `stdio: "ignore"` el fallo llegaba
+  // mudo —«Command failed»— y ni el soporte ni nosotros sabríamos qué pasó en el bar.
+  const migrar = (fichero) => {
+    try {
+      execSync(`"${psql}" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -q -v ON_ERROR_STOP=1 -f "${fichero}"`,
+        { stdio: ["ignore", "ignore", "pipe"] });
+    } catch (e) {
+      throw new Error(`${path.basename(fichero)}: ${String(e.stderr ?? "").trim() || e.message}`, { cause: e });
+    }
+  };
+
+  let nuevas = 0;
   for (const f of fs.readdirSync(path.join(RAIZ, "supabase/migrations")).sort()) {
-    execSync(`"${psql}" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -q -v ON_ERROR_STOP=1 -f "${path.join(RAIZ, "supabase/migrations", f)}"`,
-      { stdio: "ignore" });
+    if (aplicadas.has(f)) continue;
+    migrar(path.join(RAIZ, "supabase/migrations", f));
+    await bd.query("insert into public.nodo_migracion (fichero) values ($1) on conflict do nothing", [f]);
+    console.log(`  + ${f}`);
+    nuevas++;
   }
-  for (const f of ["02_realtime_nodo.sql", "03_media_nodo.sql", "04_sync_nodo.sql"]) {
-    execSync(`"${psql}" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -q -v ON_ERROR_STOP=1 -f "${path.join(RAIZ, "supabase/nodo", f)}"`,
-      { stdio: "ignore" });
+  console.log(`  ${nuevas} migración(es) nueva(s)`);
+
+  // Éstas SÍ se reaplican siempre: son las del propio nodo (triggers de realtime,
+  // permisos…) y están escritas para poder pasarse mil veces. Y hace falta: una
+  // migración nueva puede traer una tabla que necesite su trigger y sus permisos.
+  for (const f of ["02_realtime_nodo.sql", "03_media_nodo.sql", "04_sync_nodo.sql", "05_permisos_nodo.sql"]) {
+    migrar(path.join(RAIZ, "supabase/nodo", f));
   }
 
   fs.writeFileSync(VERSION_FICHERO, JSON.stringify({ version: ultima.version, instalada: new Date().toISOString() }, null, 2) + "\n");

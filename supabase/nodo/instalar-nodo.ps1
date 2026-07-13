@@ -23,6 +23,10 @@ $ErrorActionPreference = "Stop"
 $nodo = Join-Path $Raiz ".nodo"
 $env:PATH = "$nodo\pgsql\bin;$env:PATH"
 $env:PGPASSWORD = "gluuh"
+# Las migraciones están en UTF-8 y llenas de acentos (el proyecto es en español). Sin
+# esto, psql supone WIN1252 —la codificación de un Windows español— y muere en la
+# primera tilde.
+$env:PGCLIENTENCODING = "UTF8"
 
 function Paso($n, $txt) { Write-Host "`n[$n] $txt" -ForegroundColor Cyan }
 function Sql($file) {
@@ -72,8 +76,15 @@ Sql "$PSScriptRoot\01_despues_de_gotrue.sql"
 # ── 4. Las migraciones de la aplicación ──────────────────────────────────────
 Paso 4 "Aplicando las migraciones de supabase/migrations"
 $migs = Get-ChildItem "$Raiz\supabase\migrations\*.sql" | Sort-Object Name
-foreach ($m in $migs) { Sql $m.FullName }
-Write-Host "    $($migs.Count) migraciones aplicadas" -ForegroundColor Green
+foreach ($m in $migs) {
+  Sql $m.FullName
+  # Se ANOTA cada una: el actualizador sólo aplicará las que falten. Reaplicarlas todas
+  # no vale — 0001_init.sql hace `create table tenant` sin `if not exists`.
+  $ins = "insert into public.nodo_migracion (fichero) values ('$($m.Name)') on conflict do nothing;"
+  $ins | Out-File "$nodo\tmp\anotar.sql" -Encoding ascii
+  psql -h 127.0.0.1 -p $Puerto -U postgres -d $Bd -q -f "$nodo\tmp\anotar.sql"
+}
+Write-Host "    $($migs.Count) migraciones aplicadas y anotadas" -ForegroundColor Green
 
 # ── 5. Realtime del nodo: que Postgres avise de los cambios ──────────────────
 # Va DESPUÉS de las migraciones: pone un trigger a cada tabla de la publicación
@@ -81,6 +92,9 @@ Write-Host "    $($migs.Count) migraciones aplicadas" -ForegroundColor Green
 Paso 5 "Realtime del nodo (LISTEN/NOTIFY sobre las tablas publicadas)"
 Sql "$PSScriptRoot\02_realtime_nodo.sql"
 Sql "$PSScriptRoot\03_media_nodo.sql"
+Sql "$PSScriptRoot\04_sync_nodo.sql"
+# Los permisos, LOS ÚLTIMOS: tienen que cubrir todas las tablas que acaban de nacer.
+Sql "$PSScriptRoot\05_permisos_nodo.sql"
 
 # ── 6. ¿Ha quedado igual que la nube? ────────────────────────────────────────
 Paso 6 "Verificando"

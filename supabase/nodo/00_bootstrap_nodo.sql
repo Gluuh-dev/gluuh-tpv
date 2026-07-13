@@ -41,6 +41,18 @@ end $$;
 grant anon, authenticated, service_role to authenticator;
 grant usage on schema public to anon, authenticated, service_role;
 
+-- En Supabase, `service_role` puede con todo: ellos le dan permisos sobre cada tabla.
+-- En un Postgres pelado NO: cada tabla que cree una migración nace SIN permisos para él,
+-- y el sincronizador (que se conecta con esa clave) se come un
+-- «permission denied for table X» en cuanto añadimos una tabla.
+--
+-- Con ALTER DEFAULT PRIVILEGES, todo lo que cree `postgres` a partir de ahora —o sea,
+-- las 100 migraciones y las que vengan con cada actualización— ya nace con los permisos
+-- puestos. Sin esto habría que acordarse de un GRANT por cada tabla nueva, para siempre.
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+alter default privileges in schema public grant all on functions to service_role;
+
 -- ── 2. Esquema `auth` ────────────────────────────────────────────────────────
 create schema if not exists auth;
 grant usage on schema auth to anon, authenticated, service_role;
@@ -108,6 +120,23 @@ begin
     execute format('alter function auth.%I(%s) owner to supabase_auth_admin', r.proname, r.args);
   end loop;
 end $$;
+
+-- ── 2-bis. La cuenta de qué migraciones se han aplicado ya ───────────────────
+--
+-- Hace falta porque **las migraciones NO son idempotentes**: `0001_init.sql` hace
+-- `create table tenant` a secas, sin `if not exists`. Sobre una base vacía va bien —por
+-- eso el instalador puede lanzarlas todas—, pero una ACTUALIZACIÓN que las reaplicara
+-- todas se estrellaría con «relation "tenant" already exists» y volvería atrás sin
+-- instalar nada. Nunca se actualizaría un bar.
+--
+-- Así que se anota cuál se ha aplicado, y el actualizador sólo pasa las nuevas.
+create table if not exists public.nodo_migracion (
+  fichero    text primary key,
+  aplicada_at timestamptz not null default now()
+);
+
+comment on table public.nodo_migracion is
+  'Migraciones ya aplicadas en este nodo. El actualizador sólo pasa las que faltan.';
 
 -- ── 3. `pgcrypto`: bcrypt de los PIN/claves de operario (validar_pin, 0007) ───
 create extension if not exists pgcrypto with schema public;

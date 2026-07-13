@@ -14,7 +14,12 @@
 
 param(
   [string]$Raiz = (Resolve-Path "$PSScriptRoot\..\.."),
-  [switch]$Parar
+  [int]$Puerto = 55432,
+  [switch]$Parar,
+  # Para todo MENOS la base de datos. Lo usa el actualizador: hay que parar los servicios
+  # para cambiarles el código, pero Postgres tiene que seguir vivo — si no, las
+  # migraciones se aplican contra una base de datos apagada y la actualización falla.
+  [switch]$MantenerBd
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,8 +34,12 @@ function Servicios() {
 if ($Parar) {
   Servicios | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
   Get-Process gotrue, postgrest -ErrorAction SilentlyContinue | Stop-Process -Force
-  & "$nodo\pgsql\bin\pg_ctl.exe" -D "$nodo\pgdata" stop -m fast 2>&1 | Out-Null
-  Write-Host "Nodo parado." -ForegroundColor Yellow
+  if ($MantenerBd) {
+    Write-Host "Servicios parados (la base de datos sigue en marcha)." -ForegroundColor Yellow
+  } else {
+    & "$nodo\pgsql\bin\pg_ctl.exe" -D "$nodo\pgdata" stop -m fast 2>&1 | Out-Null
+    Write-Host "Nodo parado." -ForegroundColor Yellow
+  }
   return
 }
 
@@ -43,12 +52,27 @@ function Arranca($nombre, $bloque) {
 Write-Host "`nLevantando el nodo…`n" -ForegroundColor Cyan
 
 # ── Postgres ─────────────────────────────────────────────────────────────────
+#
+# Y ESPERAR A QUE ESTÉ LISTO DE VERDAD. No vale dormir unos segundos y cruzar los dedos:
+# `pg_ctl start` vuelve enseguida, pero Postgres tarda en aceptar conexiones — y más en
+# un mini-PC arrancando por la mañana, con el disco ocupado y Windows recién encendido.
+# Si GoTrue y PostgREST salen antes de tiempo, se mueren con «connection refused» y el
+# nodo amanece MUERTO: los TPV no cobran y nadie sabe por qué. Se espera a que conteste.
 Arranca "Postgres" {
-  $vivo = Get-Process postgres -ErrorAction SilentlyContinue
-  if (-not $vivo) {
-    & "$nodo\pgsql\bin\pg_ctl.exe" -D "$nodo\pgdata" -l "$nodo\tmp\pg.log" start | Out-Null
-    Start-Sleep -Seconds 3
+  if (-not (Get-Process postgres -ErrorAction SilentlyContinue)) {
+    # `-o "-p $Puerto"` NO sobra: sin él, pg_ctl usa el puerto de postgresql.conf, que es
+    # el 5432 de fábrica. PostgREST y GoTrue hablan al 55432 → no conectarían con nada y
+    # el nodo arrancaría "vivo" pero mudo. (Antes parecía funcionar sólo porque ya había
+    # una instancia levantada a mano con el puerto bueno.)
+    & "$nodo\pgsql\bin\pg_ctl.exe" -D "$nodo\pgdata" -o "-p $Puerto" -l "$nodo\tmp\pg.log" start | Out-Null
   }
+  $listo = $false
+  foreach ($i in 1..60) {   # hasta 60 s: un arranque lento no puede dejar el bar sin TPV
+    & "$nodo\pgsql\bin\pg_isready.exe" -h 127.0.0.1 -p $Puerto -q
+    if ($LASTEXITCODE -eq 0) { $listo = $true; break }
+    Start-Sleep -Seconds 1
+  }
+  if (-not $listo) { throw "Postgres no llegó a aceptar conexiones" }
 }
 
 # ── PostgREST ────────────────────────────────────────────────────────────────

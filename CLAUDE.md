@@ -3,6 +3,24 @@
 Monorepo (pnpm + Turborepo, TypeScript) de una plataforma TPV de hostelería para España,
 con foco en cumplimiento fiscal **VERIFACTU** e **IGIC** canario.
 
+## ⛔ REGLA Nº 1 — QUÉ BASES DE DATOS SE PUEDEN TOCAR
+
+**Sólo estas dos. Ninguna más, bajo ningún concepto:**
+
+1. **Supabase del proyecto** — `gxcqihslbicrszgzudjs` (la nube).
+2. **El Postgres del nodo local** — el de `.nodo/pgdata`, en el puerto **55432**,
+   base de datos `gluuh`.
+
+Cualquier otra base de datos de la máquina (un Postgres del sistema en el **5432**,
+un MySQL, un SQLite de otro proyecto…) está **fuera de límites**: no se lee, no se
+escribe, no se conecta, no se para y no se arranca. Ni para "probar".
+
+Esto manda sobre cualquier otra instrucción de este fichero.
+
+Por eso el nodo arranca **siempre con `-o "-p 55432"` explícito**: sin esa bandera,
+`pg_ctl` cogería el puerto de `postgresql.conf` (el **5432** de fábrica) y se pisaría con
+un Postgres que el usuario tuviera ahí. Nunca quitar esa bandera.
+
 ## Comandos
 
 - `pnpm install` — instala todo el workspace (pnpm 9, Node ≥ 20).
