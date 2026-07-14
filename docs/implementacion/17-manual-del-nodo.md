@@ -9,15 +9,26 @@ Dos partes:
 
 # A · Configurar para probar
 
-## A.0 · Antes de nada: la migración pendiente
+## A.0 · Antes de nada: las DOS migraciones pendientes en Supabase
 
-En Supabase, aplicar **`supabase/migrations/0099_cliente_unificado_datos_fiscales.sql`**.
+**Las aplicas tú** (yo tengo prohibido tocar la nube sin que me lo digas). En el orden en
+que están:
 
+**1. `0099_cliente_unificado_datos_fiscales.sql`**
 ⚠️ **Elimina la tabla `client`** (traspasando antes sus filas a `customer`, lo hace la
 propia migración). Sin ella, la página de Clientes del backoffice **sigue rota** y la
 "Factura completa" del TPV **sigue siendo imposible de emitir**.
 
-La `0100` ya está aplicada.
+**2. `0101_updated_at_en_el_catalogo.sql`**
+Pone `updated_at` a las **49 tablas** del catálogo que no lo tenían, y reescribe
+`set_updated_at()`. **Sin esto, la sincronización de la carta sólo funciona a medias**: las
+tablas sin fecha (precios por tarifa, formatos, familias, salas, impresoras…) no viajan.
+
+> **El orden importa siempre: primero la nube, después los nodos.** El nodo sube sus filas
+> con `select *`; si tuviera una columna que la nube todavía no tiene, PostgREST responde
+> 400 y ese bar deja de sincronizar el catálogo.
+
+En el nodo, la `0101` **ya está aplicada** (la apliqué al probar). La `0100`, también.
 
 ## A.1 · Levantar el nodo
 
@@ -101,13 +112,41 @@ página (el gateway se las inyecta en el HTML). Consecuencias:
 2. **APAGA EL WIFI** y repite. *Aquí es donde se ve si esto vale.* Si algo tira de
    internet, se cae aquí.
 3. **Dos pestañas** del TPV: picar en una → tiene que aparecer sola en la otra.
-4. **`/servidor`**: los servicios en verde, qué hay creado, qué falta por subir.
+4. **`/servidor`**: los servicios en verde, qué hay creado, qué falta por subir, cuándo se
+   hizo la última copia y si el reloj va bien.
 5. **Vuelve a encender el wifi** y `node apps/nodo/sincronizar.mjs`: la venta aparece en
    Supabase. Lánzalo **dos veces**: sigue habiendo **una sola** venta.
+6. **La carta, en las dos direcciones**: cambia un precio en el panel de la nube → un pase
+   de sync → el TPV lo tiene. Y al revés: cámbialo en el bar sin internet → cuando vuelva
+   la línea, sube.
 
-## A.5 · Si algo falla
+## A.5 · Todo esto se prueba solo
 
-Los logs están en `.nodo\tmp\*.log` (uno por servicio).
+```powershell
+node apps/nodo/pruebas/prueba-catalogo.mjs      # la carta, en las dos direcciones
+node apps/nodo/pruebas/prueba-sync.mjs          # las ventas, sin duplicar
+node apps/nodo/pruebas/prueba-sync-fiscal.mjs   # factura + desglose + huella
+node apps/nodo/pruebas/ayuda.mjs                # todas las demás
+```
+
+## A.6 · La copia y el reloj
+
+```powershell
+node apps/nodo/copia.mjs            # copia completa ahora (pg_dump, 7 días rotados)
+node apps/nodo/copia.mjs --estado   # cuándo fue la última
+node apps/nodo/reloj.mjs            # ¿va bien la hora de este ordenador?
+```
+
+Las dos las hace **solo** el vigilante a las **04:30** (`arrancar-nodo.ps1 -Vigilar`).
+
+Lo del reloj no es una manía: **este ordenador es el que le pone la hora a cada factura**, y
+con VERIFACTU esa hora va firmada y encadenada a Hacienda. Un mini-PC de tres años debajo de
+una barra, con la pila de la placa gastada, se va de horas y **no se entera nadie**.
+
+## A.7 · Si algo falla
+
+Los logs están en `.nodo\tmp\*.log` (uno por servicio). El del vigilante, en
+`vigilante.log`: ahí se anotan las caídas, las copias de la noche y los avisos del reloj.
 
 | síntoma | causa casi seguro |
 |---|---|
@@ -116,6 +155,9 @@ Los logs están en `.nodo\tmp\*.log` (uno por servicio).
 | PostgREST muere al arrancar | falta `libpq.dll` → `pgsql\bin` no está en el PATH |
 | El nodo arranca "vivo" pero mudo | Postgres levantó en el 5432 en vez del 55432 |
 | El auth no arranca al **actualizar** | un GoTrue viejo ocupa el :55434 -> `-Parar` lo entierra |
+| Cambias un precio en la nube y el bar no se entera | falta la **`0101` en Supabase** |
+| El bar no sube sus cambios de carta | mira `ultimo_error` de `catalogo` en `nodo_sync_estado` |
+| `/servidor` dice "el nodo no responde" con el nodo vivo | web compilada sin `NODO_BUILD` |
 
 ---
 

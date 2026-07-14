@@ -124,16 +124,75 @@ llamar a `admin.createUser`: el grant password ya resuelve.
 
 ---
 
-## Bloque 4 · El paquete "módulo nube honesto" (A3 + C1 + C2)
+## ✅ Bloque 4 · El catálogo en las dos direcciones + copia + reloj (A3 + C1 + C2) — HECHO
 
-- `bajarTabla` (espejo de `subirTabla`) para catálogo/config con LWW por `updated_at` y
-  soft-deletes; lista de tablas = las de provisionar **por local** (plan/11 §9).
-- `pg_dump` nocturno rotado (7 días) desde el vigilante; fecha visible en `/servidor`.
-- Deriva de reloj: en cada pase de sync, `abs(now_nube - now_local) > 120 s` → aviso
-  grande en `/servidor` + campo en el latido.
+**Probado contra el nodo y la nube de verdad**: `node apps/nodo/pruebas/prueba-catalogo.mjs`
+(7 comprobaciones, todas pasan).
 
-**Aceptación**: cambiar un precio en la nube → aparece en el nodo <5 min. Apagar
-internet 2 días (simulado) → la copia nocturna existe igual.
+Antes de poder escribir una sola línea de sincronización hubo que abrir un agujero de
+diseño: **la mayoría de las tablas de catálogo no tenían `updated_at`** (`family`,
+`modifier`, `product_price`, `product_format`, `room`, `tarifa`, `menu`, `printer`,
+`payment_method`, `plano_elemento`…). Sin saber cuándo se tocó una fila, no hay forma de
+saber quién gana — y esto era **literalmente imposible de construir**. Lo arregla la
+migración **`0101`**, por descubrimiento (cualquier tabla de negocio con `tenant_id` que no
+lo tenga lo recibe, con su trigger y su índice): **49 tablas**.
+
+Lo que se hizo:
+
+- **`0101`** — `updated_at` en todo el catálogo, y `set_updated_at()` reescrito.
+- **`apps/nodo/espejo.mjs`** — el espejo, que estaba duplicado en `provisionar.mjs`: orden
+  topológico por claves foráneas, PK reales, tipos por columna, `meterFilas`.
+- **`sincronizarCatalogo`** en `sincronizar.mjs` — LWW en las dos direcciones + propagación
+  de borrados con **tres cerrojos**.
+- **`copia.mjs`** — `pg_dump -Fc` nocturno, 7 días, escrito a `.parcial` y renombrado al
+  final (un backup a medias que *parece* entero es peor que ninguno).
+- **`reloj.mjs`** — deriva contra la nube, descontando la mitad del viaje de red.
+- Los dos los lanza el vigilante a las 04:30, y se ven en **`/servidor`**.
+
+### Las cuatro trampas (cada una habría sido un fallo mudo en producción)
+
+1. **PING-PONG INFINITO.** `set_updated_at()` ponía `now()` en cada UPDATE. Una fila bajada
+   de la nube quedaba, aquí, *más nueva que la de la nube* → el nodo se la volvía a subir →
+   la nube la volvía a marcar → para siempre, con la carta recargándose en los TPV cada
+   cinco minutos delante de los clientes. Ahora el trigger **respeta la fecha que trae la
+   fila, pero sólo si va hacia adelante**.
+
+2. **LA FECHA CONGELADA.** Varios formularios del panel hacen `select *` y luego
+   `upsert({...fila})`: **arrastran el `updated_at` viejo sin querer**. Si el trigger
+   respetara cualquier fecha, la fila se quedaría clavada en el pasado y el bar no vería el
+   cambio jamás. De ahí el «sólo hacia adelante».
+
+3. **DOS FECHAS QUE SON LA MISMA Y NO SE PARECEN.** Postgres da
+   `2026-07-14 10:48:34+02`; PostgREST da `2026-07-14T08:48:34+00:00`. Comparadas como
+   texto, **el espacio (0x20) es menor que la 'T' (0x54)**: la fila del bar *siempre*
+   parecía más vieja que la de la nube. Consecuencia: **el bar no podía subir un cambio de
+   carta nunca**. Se comparan como instantes (`instante()`).
+
+4. **EL `auth_user_id` QUE BORRA AL DUEÑO.** El espejo pone `auth_user_id` a null (las
+   cuentas de la nube no existen en el nodo). Si esa fila subiera tal cual, **dejaría a
+   null el de la nube y el dueño no podría volver a entrar en el panel desde casa**. De ahí
+   `NO_SUBIR_COLUMNAS`.
+
+### Los tres cerrojos de los borrados
+
+Ninguna tabla tiene `deleted_at`: en la nube se borra de verdad, así que hay que comparar
+las claves. Y **una lista mal leída borra el bar entero**:
+
+1. La nube devuelve 5000+ filas → puede venir **cortada** → no se borra nada, y se dice.
+2. La nube dice que la tabla está **vacía** y aquí hay cosas → casi seguro es un fallo (un
+   token de otra empresa, la RLS callada) → no se borra nada.
+3. La fila **acaba de subir en este mismo pase** → no está borrada, está llegando. Sin
+   esto, el producto que el dueño crea en la barra sin internet **se borraría solo**.
+
+### Y de paso
+
+- `order_event` (quién anuló qué) **es operativo, no catálogo** — no estaba en `NO_BAJAR`,
+  así que se habría intentado subir eventos de mesas abiertas y la clave foránea los habría
+  rechazado. Ahora sube por el camino operativo, con el mismo filtro que las líneas.
+- `06_auth_nodo.sql` **no se reaplicaba al actualizar**: un arreglo en las funciones de
+  entrada del dueño se publicaba… y no llegaba nunca al bar.
+- `/servidor` leía `process.env.NEXT_PUBLIC_SUPABASE_URL`: **le preguntaba a la nube por el
+  estado del nodo**. Decía «el nodo no responde» con el nodo vivo delante.
 
 ---
 
@@ -156,4 +215,9 @@ huecos ni choques.
 - El nodo **nunca** lleva `SUPABASE_SECRET_KEY` de la nube (`nube.mjs` es la puerta).
 - Las migraciones **no** son idempotentes: la cuenta la lleva `nodo_migracion`.
 - `PGCLIENTENCODING=UTF8` siempre que un proceso lance `psql` (Windows español).
-- Los timestamps de marcas de agua, **en texto** (microsegundos vs `Date` de JS).
+- Los timestamps de marcas de agua, **en texto** (microsegundos vs `Date` de JS)… pero
+  **las comparaciones, como instantes**: Postgres y PostgREST los escriben distinto y
+  compararlos con `<` da un resultado que parece bueno y no lo es.
+- **La nube se migra ANTES que los nodos.** El nodo sube filas con `select *`: si tuviera
+  una columna que la nube aún no tiene, PostgREST responde 400 y ese bar deja de
+  sincronizar el catálogo.

@@ -23,6 +23,9 @@ import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
 import { cabeceras, credenciales } from "./nube.mjs";
+import {
+  NO_BAJAR, NO_SUBIR_COLUMNAS, clavePk, fechasLocales, leerEsquema, meterFilas,
+} from "./espejo.mjs";
 
 // Las marcas de tiempo, en TEXTO tal como las da Postgres — no como Date de JS.
 //
@@ -31,6 +34,10 @@ import { cabeceras, credenciales } from "./nube.mjs";
 // último registro subido, y ese registro se vuelve a enviar en cada pase… para siempre.
 // No duplicaba nada (el on_conflict lo impide), pero era tráfico regalado en un bar con
 // una línea mala. En texto, la marca es exacta.
+//
+// (`espejo.mjs` hace lo mismo al importarse. Se deja aquí también, explícito: de esto
+// depende que no se reenvíe la misma venta cada cinco minutos, y no puede quedar colgando
+// del efecto de un import.)
 pg.types.setTypeParser(1184, (v) => v); // timestamptz
 pg.types.setTypeParser(1114, (v) => v); // timestamp
 
@@ -78,6 +85,16 @@ const TABLAS = [
     tiempo: "created_at",
     filtro: `order_id in (select id from public.sales_order where not (${ABIERTAS}))`,
   },
+  {
+    // QUIÉN ANULÓ QUÉ, Y POR QUÉ. Es lo primero que mira un dueño cuando la caja no le
+    // cuadra, y no llegaba a la nube: se quedaba encerrado en el mini-PC del bar — justo
+    // donde no puede mirarlo. Va con el mismo filtro que las líneas: su pedido tiene que
+    // haber subido antes, o la clave foránea lo rechaza.
+    nombre: "order_event",
+    conflicto: "id",
+    tiempo: "created_at",
+    filtro: `order_id in (select id from public.sales_order where not (${ABIERTAS}))`,
+  },
   { nombre: "payment", conflicto: "tenant_id,client_id", tiempo: "created_at" },
   { nombre: "invoice", conflicto: "id", tiempo: "created_at" },
 
@@ -116,6 +133,11 @@ const TABLAS = [
 ];
 
 const LOTE = 200;
+
+// Cuántas filas se piden de una tabla de la nube para compararla con la del bar. Si una
+// tabla llegara a este tope, la lista podría venir CORTADA — y lo que faltara parecería
+// borrado. Cuando pasa, no se borra nada y se dice por el log (`propagarBorrados`).
+const TOPE = 5000;
 
 const bd = new pg.Pool({ connectionString: BD });
 
@@ -251,6 +273,246 @@ async function subirTabla({ nombre, conflicto, tiempo, filtro, origen, columnas 
   return subidas;
 }
 
+// ── 3. EL CATÁLOGO, EN LAS DOS DIRECCIONES ───────────────────────────────────
+//
+// Hasta ahora el nodo se bajaba el bar al instalarse y **no volvía a mirar nunca**. El
+// dueño cambiaba un precio desde casa y el TPV seguía cobrando el viejo. Para siempre.
+//
+// El catálogo no es como las ventas. Una venta nace en el bar y sube, y punto. Un precio
+// se puede tocar en los dos sitios: desde casa con internet, o en la propia barra sin él.
+// Así que **gana el más reciente** (`updated_at`), en las dos direcciones.
+//
+// Aquí se ve por qué hizo falta la migración 0101: la mayoría de estas tablas NO TENÍAN
+// `updated_at`. Sin saber cuándo se tocó una fila no se puede saber quién gana, y esto
+// era literalmente imposible de construir.
+
+async function elBarDeEsteNodo() {
+  const c = credenciales().tenant;
+  if (c) return c;
+  const { rows: [t] } = await bd.query("select id from public.tenant limit 1");
+  return t?.id;
+}
+
+const marcaDeAgua = (clave) =>
+  bd.query("select hasta from public.nodo_sync_estado where tabla = $1", [clave])
+    .then(({ rows }) => rows[0]?.hasta ?? "1970-01-01T00:00:00Z");
+
+const anotarMarca = (clave, hasta) =>
+  bd.query(
+    `insert into public.nodo_sync_estado (tabla, hasta, ultimo_pase) values ($1, $2, now())
+     on conflict (tabla) do update set hasta = excluded.hasta, ultimo_pase = now()`,
+    [clave, hasta],
+  );
+
+/**
+ * DOS FECHAS QUE SON LA MISMA PERO NO SE PARECEN EN NADA.
+ *
+ *   Postgres  →  "2026-07-14 10:48:34.098381+02"     (espacio, y la hora del bar)
+ *   PostgREST →  "2026-07-14T08:48:34.098381+00:00"  (una T, y UTC)
+ *
+ * Es el MISMO instante. Pero comparados como texto con `<`, el espacio (0x20) es menor que
+ * la 'T' (0x54), así que **la fila del bar siempre parecía más vieja que la de la nube**,
+ * pasara lo que pasara. Consecuencia: el bar no podía subir un cambio de carta NUNCA, y se
+ * bajaba de la nube cosas que ya tenía.
+ *
+ * Y no habría dado ni un error: simplemente, el precio que el dueño cambia en la barra no
+ * llegaría jamás a la nube y él no sabría por qué.
+ *
+ * Se comparan como instantes. (Al milisegundo: los microsegundos hacen falta para la marca
+ * de agua —para no reenviar lo mismo eternamente—, pero no para decidir quién editó
+ * después. Dos ediciones en el mismo milisegundo desde dos sitios distintos no existen.)
+ */
+function instante(t) {
+  if (!t) return 0;
+  const s = String(t).replace(" ", "T");
+  // `+02` a secas no es ISO válido para JavaScript, que quiere `+02:00`. Se completa.
+  const ms = Date.parse(/[+-]\d{2}$/.test(s) ? `${s}:00` : s);
+  if (Number.isNaN(ms)) throw new Error(`fecha ininteligible: ${t}`);
+  return ms;
+}
+
+/** Las tablas del catálogo: las que saben cuándo se tocaron. */
+const tablasDeCatalogo = (esquema) =>
+  esquema.orden.filter((tabla) => {
+    if (NO_BAJAR.has(tabla)) return false;
+    const columnas = esquema.columnasDe.get(tabla);
+    if (!columnas?.has("updated_at") || !esquema.pkDe.get(tabla)?.length) return false;
+    return columnas.has("tenant_id") || tabla === "tenant";
+  });
+
+async function sincronizarCatalogo(tenantId, esquema) {
+  const cuenta = { bajadas: 0, subidas: 0, borradas: 0, fallos: [] };
+
+  for (const tabla of tablasDeCatalogo(esquema)) {
+    try {
+      const n = await sincronizarTablaDeCatalogo(tenantId, esquema, tabla);
+      cuenta.bajadas += n.bajadas;
+      cuenta.subidas += n.subidas;
+      cuenta.borradas += n.borradas;
+    } catch (e) {
+      // Una tabla que falla no puede dejar sin sincronizar a las demás. Si la nube no
+      // deja escribir en `licencia`, que no se quede la carta sin bajar por eso.
+      cuenta.fallos.push(`${tabla}: ${e.message.slice(0, 90)}`);
+    }
+  }
+
+  return cuenta;
+}
+
+async function sincronizarTablaDeCatalogo(tenantId, esquema, tabla) {
+  const cuenta = { bajadas: 0, subidas: 0, borradas: 0 };
+  const pk = esquema.pkDe.get(tabla);
+  const filtro = tabla === "tenant" ? `id=eq.${tenantId}` : `tenant_id=eq.${tenantId}`;
+
+  // ── LAS DOS FOTOS: qué hay a cada lado y de cuándo ──────────────────────────
+  //
+  // Se compara el bar con LA NUBE DE VERDAD, no con una marca de agua. Y esa es la
+  // corrección que hace que esto funcione:
+  //
+  //   Una fila recién BAJADA de la nube queda, aquí, con fecha nueva. Una marca de agua
+  //   local no sabe distinguir «esto lo he cambiado yo» de «esto me lo acaban de dar», así
+  //   que en el pase siguiente la daría por cambiada en el bar y **la volvería a subir**.
+  //   Y la nube, al recibirla, la marcaría otra vez… Un bar bajando y subiendo su propia
+  //   carta cada cinco minutos, con los TPV repintándose solos delante de los clientes.
+  //
+  // Comparando fecha contra fecha eso no puede pasar: si las dos son iguales, no hay nada
+  // que hacer. Cuesta una petición más por tabla — y esa petición hace falta igualmente
+  // para saber qué se ha borrado.
+  const mias = await fechasLocales(bd, esquema, tabla, tenantId);
+
+  const suyas = await fetch(
+    `${NUBE}/rest/v1/${tabla}?select=${pk.join(",")},updated_at&${filtro}&limit=${TOPE}`,
+    { headers: cab },
+  ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!suyas) return cuenta;   // sin línea: ya se hará en el pase siguiente
+
+  const enLaNube = new Map(suyas.map((f) => [clavePk(pk, f), f.updated_at]));
+
+  // ── BAJA: lo que la nube tiene más nuevo ────────────────────────────────────
+  //
+  // El delta (por `updated_at`) sirve para pedir SÓLO las filas cambiadas con todas sus
+  // columnas. La foto de arriba dice qué cambió; ésta trae el contenido.
+  const desdeBaja = await marcaDeAgua(`baja:${tabla}`);
+  const deLaNube = await fetch(
+    `${NUBE}/rest/v1/${tabla}?select=*&${filtro}&updated_at=gt.${encodeURIComponent(desdeBaja)}&limit=1000`,
+    { headers: cab },
+  ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!deLaNube) return cuenta;
+
+  const aBajar = deLaNube.filter((f) => {
+    const mia = mias.get(clavePk(pk, f));
+    return !mia || instante(mia.updated_at) < instante(f.updated_at);   // gana el reciente
+  });
+
+  if (aBajar.length) {
+    // Con los triggers PUESTOS: `set_updated_at` respeta la fecha que trae la fila (0101),
+    // así que la fecha no se corre — y el aviso de realtime salta solo, o sea que el TPV
+    // repinta el precio nuevo sin que nadie recargue nada.
+    await meterFilas(bd, esquema, tabla, aBajar);
+    cuenta.bajadas = aBajar.length;
+  }
+
+  // ── SUBE: lo que el dueño ha cambiado EN LA BARRA, sin internet ─────────────
+  //
+  // La marca `sube:` sólo sirve para no releer el catálogo entero de la base cada cinco
+  // minutos. Quién gana NO lo decide ella: lo decide la comparación con la nube.
+  const desdeSube = await marcaDeAgua(`sube:${tabla}`);
+  const delBar = tabla === "tenant" ? [] : (await bd.query(
+    `select * from public."${tabla}" where tenant_id = $1 and updated_at > $2 order by updated_at`,
+    [tenantId, desdeSube],
+  )).rows;
+
+  const aSubir = delBar.filter((f) => {
+    const suya = enLaNube.get(clavePk(pk, f));
+    // Misma fecha = ya están en sintonía (la fila bajó de la nube y no se ha tocado aquí).
+    return !suya || instante(f.updated_at) > instante(suya);
+  });
+  const subidas = new Set(aSubir.map((f) => clavePk(pk, f)));
+
+  if (aSubir.length) {
+    const r = await fetch(`${NUBE}/rest/v1/${tabla}?on_conflict=${pk.join(",")}`, {
+      method: "POST",
+      headers: { ...cab, prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(aSubir.map(limpiarParaLaNube)),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status} ${(await r.text()).slice(0, 160)}`);
+    cuenta.subidas = aSubir.length;
+  }
+
+  // Las marcas avanzan con TODO lo leído, no sólo con lo aplicado.
+  //
+  // ⚠ Y eso descansa en un invariante que hay que respetar si se toca esto: **cada fila de
+  // `delBar` queda resuelta en este pase**. O sube, o ya estaba en sintonía, o la nube la
+  // tiene más nueva y baja (y si baja es que está en el delta, porque su fecha es posterior
+  // a la marca `baja:`). Si alguien añade un «esta fila me la salto», la marca pasará por
+  // encima de ella y **ese cambio del bar no subirá jamás**. Sin error, sin rastro: el
+  // dueño cambia un precio en la barra y no llega nunca a la nube.
+  if (deLaNube.length) {
+    const ultima = deLaNube.reduce((a, b) => (instante(a.updated_at) >= instante(b.updated_at) ? a : b));
+    await anotarMarca(`baja:${tabla}`, ultima.updated_at);
+  }
+  if (delBar.length) {
+    await anotarMarca(`sube:${tabla}`, delBar[delBar.length - 1].updated_at);
+  }
+
+  cuenta.borradas = await propagarBorrados(tabla, pk, mias, enLaNube, suyas.length, subidas);
+  return cuenta;
+}
+
+/** El espejo no puede devolverle a la nube lo que aquí es distinto a propósito. */
+function limpiarParaLaNube(fila) {
+  const copia = { ...fila };
+  for (const c of NO_SUBIR_COLUMNAS) delete copia[c];
+  return copia;
+}
+
+/**
+ * LO QUE EL DUEÑO BORRA EN LA NUBE, DESAPARECE DEL BAR.
+ *
+ * Ninguna tabla del catálogo tiene `deleted_at`: en la nube se borra de verdad. Así que un
+ * delta por fecha **jamás vería una baja** — el producto retirado seguiría en la carta del
+ * bar para siempre. Hay que comparar las claves: lo que ya no está allí, se quita aquí.
+ *
+ * Y esto es lo más peligroso de todo el sincronizador: **una lista mal leída borra el bar
+ * entero**. Un token con el tenant equivocado, una respuesta cortada por el límite — y la
+ * RLS devuelve `[]` con un 200 tan tranquila. De ahí los tres cerrojos.
+ */
+async function propagarBorrados(tabla, pk, mias, enLaNube, cuantasAllí, subidas) {
+  // CERROJO 1 — la lista viene llena hasta el borde: puede estar CORTADA, y todo lo que
+  // faltara se borraría aquí. No se toca nada, y se dice.
+  if (cuantasAllí >= TOPE) {
+    console.warn(`  ${tabla}: la nube devuelve ${TOPE}+ filas; no se propagan borrados.`);
+    return 0;
+  }
+
+  // CERROJO 2 — la nube la da por VACÍA y aquí hay cosas. Casi seguro que es un fallo (un
+  // token de otra empresa, la RLS callada) y no que el dueño haya borrado la carta entera
+  // de golpe. Ante la duda no se borra: una carta vieja se arregla; una carta borrada, no.
+  if (cuantasAllí === 0 && mias.size > 0) {
+    console.warn(`  ${tabla}: la nube la da por VACÍA y aquí hay ${mias.size}. No se borra nada.`);
+    return 0;
+  }
+
+  let borradas = 0;
+  for (const [clave, fila] of mias) {
+    if (enLaNube.has(clave)) continue;
+
+    // CERROJO 3 — esta fila NACE EN EL BAR: la acabamos de subir en este mismo pase, y por
+    // eso no salía en la foto de la nube (que es de antes). No está borrada: está llegando.
+    //
+    // Sin esto, el producto que el dueño crea en la barra sin internet **se borraría solo**
+    // en el primer pase con línea. Lo vería desaparecer sin un solo error por ningún lado.
+    if (subidas.has(clave)) continue;
+
+    await bd.query(
+      `delete from public."${tabla}" where ${pk.map((k, i) => `"${k}" = $${i + 1}`).join(" and ")}`,
+      pk.map((k) => fila[k]),
+    );
+    borradas++;
+  }
+  return borradas;
+}
+
 // ── Pase completo ────────────────────────────────────────────────────────────
 async function pase() {
   if (!(await hayNube())) {
@@ -279,6 +541,26 @@ async function pase() {
       );
     }
   }
+
+  // Y el catálogo, en las dos direcciones. VA DESPUÉS de las ventas a propósito: si la
+  // línea es mala y sólo da para una cosa, que sea subir el dinero.
+  const tenantId = await elBarDeEsteNodo();
+  if (tenantId) {
+    const c = await sincronizarCatalogo(tenantId, await leerEsquema(bd));
+    console.log(
+      `\n  catálogo       ${c.bajadas} bajada(s), ${c.subidas} subida(s), ${c.borradas} borrada(s)`,
+    );
+    for (const f of c.fallos) console.error(`                 FALLÓ ${f}`);
+
+    await bd.query(
+      `insert into public.nodo_sync_estado (tabla, ultimo_pase, ultimo_error)
+            values ('catalogo', now(), $1)
+       on conflict (tabla) do update
+            set ultimo_pase = now(), ultimo_error = excluded.ultimo_error`,
+      [c.fallos.length ? c.fallos.join(" · ").slice(0, 300) : null],
+    );
+  }
+
   console.log("\nListo.");
 }
 

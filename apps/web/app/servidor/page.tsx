@@ -10,6 +10,7 @@
 // que alguien está mirando porque algo va mal.
 
 import * as React from "react";
+import { config } from "../lib/config";
 
 interface Estado {
   servicios: Record<string, boolean>;
@@ -22,6 +23,8 @@ interface Estado {
     ultimaSync: string | null;
     ultimaVenta: string | null;
   };
+  copia: { hay: number; ultima: string | null; ocupa: number };
+  reloj: { ok: boolean | null; deriva_segundos?: number; motivo?: string };
   ahora: string;
 }
 
@@ -55,7 +58,11 @@ export default function Servidor() {
   React.useEffect(() => {
     const pedir = async () => {
       try {
-        const r = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/nodo/estado`, { cache: "no-store" });
+        // `config()`, no `process.env`: el nodo inyecta su dirección al servir el HTML. Con
+        // la variable de compilación, esta página le preguntaba A LA NUBE por el estado DEL
+        // NODO — y la nube, claro, no sabe nada de eso: 404, y el panel diciendo "el nodo no
+        // responde" con el nodo perfectamente vivo delante.
+        const r = await fetch(`${config().url}/nodo/estado`, { cache: "no-store" });
         if (!r.ok) throw new Error();
         setE((await r.json()) as Estado);
         setCaido(false);
@@ -183,6 +190,54 @@ export default function Servidor() {
             </p>
           )}
         </section>
+
+        {/* La copia de este ordenador. La nube guarda lo cerrado; esto guarda TODO —
+            incluidas las mesas que ahora mismo están abiertas. Se enseña porque un backup
+            que nadie mira no existe: se descubre que llevaba meses fallando el día que hace
+            falta, que es siempre el peor. */}
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+              Copia de seguridad del bar
+            </h2>
+            <span className="text-xs text-zinc-500">
+              {e.copia.hay} copia(s) · {tamano(e.copia.ocupa)}
+            </span>
+          </div>
+
+          {e.copia.ultima ? (
+            <p className="mt-3 text-sm text-emerald-400">
+              La última se hizo <strong>{cuando(e.copia.ultima)}</strong>. Se guardan los 7
+              últimos días y se hace sola de madrugada.
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-amber-300">
+              Todavía no hay ninguna copia. Se hará esta noche.
+            </p>
+          )}
+        </section>
+
+        {/* EL RELOJ. Parece una tontería y no lo es: este ordenador es el que pone la hora
+            en cada factura, y con VERIFACTU esa hora va firmada y encadenada a Hacienda.
+            Una BIOS con la pila gastada —un mini-PC de tres años debajo de una barra— se va
+            de horas y nadie se entera. */}
+        {e.reloj.ok === false && (
+          <section className="rounded-xl border border-rose-800 bg-rose-950/40 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-rose-300">
+              El reloj de este ordenador va mal
+            </h2>
+            <p className="mt-2 text-sm text-rose-200">
+              Va <strong>{Math.abs(Math.round((e.reloj.deriva_segundos ?? 0) / 60))} minuto(s){" "}
+              {(e.reloj.deriva_segundos ?? 0) > 0 ? "adelantado" : "atrasado"}</strong>. Este
+              ordenador es el que le pone la hora a <strong>cada factura</strong>: hay que
+              arreglarlo hoy.
+            </p>
+            <p className="mt-1 text-xs text-rose-300/70">
+              Windows → Hora e idioma → Sincronizar ahora. Si se vuelve a desviar, la pila de
+              la placa está gastada.
+            </p>
+          </section>
+        )}
       </div>
     </main>
   );

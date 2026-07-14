@@ -10,9 +10,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
+import { derivaDelReloj } from "./reloj.mjs";
 
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
 const MEDIA = path.resolve(process.env.NODO_MEDIA_DIR ?? ".nodo/media");
+const COPIAS = path.resolve(process.env.NODO_COPIAS ?? ".nodo/copias");
 
 const bd = new pg.Pool({ connectionString: BD, max: 2 });
 
@@ -40,8 +42,22 @@ async function vivo(url) {
   }
 }
 
+/** La última copia de seguridad. Un backup que nadie mira es un backup que no existe. */
+function ultimaCopia() {
+  if (!fs.existsSync(COPIAS)) return { hay: 0, ultima: null, ocupa: 0 };
+  const copias = fs.readdirSync(COPIAS)
+    .filter((f) => f.endsWith(".dump"))
+    .map((f) => fs.statSync(path.join(COPIAS, f)))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return {
+    hay: copias.length,
+    ultima: copias[0]?.mtime.toISOString() ?? null,
+    ocupa: copias.reduce((n, c) => n + c.size, 0),
+  };
+}
+
 export async function estado() {
-  const [servicios, datos] = await Promise.all([
+  const [servicios, datos, reloj] = await Promise.all([
     Promise.all([
       vivo("http://127.0.0.1:55433/").then((v) => ["datos", v]),
       vivo("http://127.0.0.1:55434/health").then((v) => ["auth", v]),
@@ -67,6 +83,7 @@ export async function estado() {
               '-infinity'))                                                     as ventas_por_subir,
         pg_database_size(current_database())                                    as bytes_bd
     `),
+    derivaDelReloj(),
   ]);
 
   const d = datos.rows[0];
@@ -94,6 +111,13 @@ export async function estado() {
       ultimaSync: d.ultima_sync,
       ultimaVenta: d.ultima_venta,
     },
+    // La copia del bar. La nube tiene lo cerrado; esto tiene TODO, incluidas las mesas que
+    // ahora mismo están abiertas. Se enseña porque un backup que nadie mira no existe: se
+    // descubre que llevaba tres meses fallando el día que hace falta.
+    copia: ultimaCopia(),
+    // Este ordenador es el que le pone la hora a cada FACTURA. Si va desviado, está
+    // firmando facturas con una hora que no ocurrió.
+    reloj,
     ahora: new Date().toISOString(),
   };
 }

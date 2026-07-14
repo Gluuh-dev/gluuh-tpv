@@ -137,12 +137,12 @@ export async function guardarConfigModulo(
   modulo: Modulo,
   config: Record<string, unknown>,
 ): Promise<{ error: string | null }> {
+  // Sin `updated_at`: lo pone la base de datos (trigger `set_updated_at`). Antes iba el
+  // reloj DEL NAVEGADOR, y de esa fecha depende ahora quién gana al sincronizar el bar
+  // con la nube — un portátil con la hora atrasada dejaría al bar sin ver el cambio.
   const { error } = await sb
     .from("tenant_module")
-    .upsert(
-      { tenant_id: tenantId, modulo, config, updated_at: new Date().toISOString() },
-      { onConflict: "tenant_id,modulo" },
-    );
+    .upsert({ tenant_id: tenantId, modulo, config }, { onConflict: "tenant_id,modulo" });
   return { error: error?.message ?? null };
 }
 

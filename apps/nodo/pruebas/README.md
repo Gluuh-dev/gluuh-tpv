@@ -17,6 +17,7 @@ node apps/nodo/pruebas/prueba-realtime.mjs
 node apps/nodo/pruebas/prueba-media.mjs
 node apps/nodo/pruebas/prueba-sync.mjs
 node apps/nodo/pruebas/prueba-sync-fiscal.mjs
+node apps/nodo/pruebas/prueba-catalogo.mjs
 .\apps\nodo\pruebas\prueba-vigilante.ps1
 .\apps\nodo\pruebas\prueba-secretos.ps1
 ```
@@ -29,8 +30,17 @@ node apps/nodo/pruebas/prueba-sync-fiscal.mjs
 | `prueba-media.mjs` | subir foto **sin internet** → verla al instante → queda en cola para la nube → `../../` **bloqueado** |
 | `prueba-sync.mjs` | **dos pases de sincronización = UNA venta** en la nube (idempotencia por `client_id`) |
 | `prueba-sync-fiscal.mjs` | la nube recibe la factura, **su desglose de IVA y su registro de huella** — sin eso no podría declarar a la AEAT |
+| `prueba-catalogo.mjs` | la carta **viaja en las dos direcciones**, los borrados de la nube llegan al bar, lo que nace en el bar **no se borra solo**… y el segundo pase **NO MUEVE NADA** |
 | `prueba-vigilante.ps1` | se mata PostgREST y **vuelve solo en ~35 s**, sirviendo datos |
 | `prueba-secretos.ps1` | la clave del bar entra (200); **la del manual, 401 — firma inválida** |
+
+### La comprobación que parece tonta y es la que importa
+
+En `prueba-catalogo.mjs`, la número 2: **el segundo pase no mueve nada**.
+
+Sin ella, la fecha de cada fila se va corriendo sola en cada pase, el bar se pasa el día
+bajando y subiendo la misma carta, y **los TPV se repintan cada cinco minutos delante de los
+clientes**. Es un fallo que no da ningún error: sólo hace que el programa parezca embrujado.
 
 `ayuda.mjs` es lo común: el secreto del nodo, las claves `anon`/`service_role`, y
 `barDePrueba()` — que crea empresa + local + dueño con contraseña y su sesión.

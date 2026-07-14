@@ -48,7 +48,9 @@ export default function Personalizar() {
   function aviso(t: string) { setMsg(t); setTimeout(() => setMsg(""), 2500); }
 
   async function guardarMarca() {
-    await sb.from("tenant_branding").upsert({ tenant_id: tenantId, ...marca, updated_at: new Date().toISOString() });
+    // La fecha la pone la base de datos, no el navegador: de ella depende quién gana al
+    // sincronizar el bar con la nube, y el reloj de un portátil no es de fiar.
+    await sb.from("tenant_branding").upsert({ tenant_id: tenantId, ...marca });
     aviso("Marca guardada ✓");
   }
 

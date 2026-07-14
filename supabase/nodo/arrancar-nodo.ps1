@@ -306,12 +306,41 @@ function Anota([string]$t) {
 Anota "vigilante en marcha (pid $PID)"
 Write-Host "Vigilando. Cada 30 s se comprueba todo y se relevanta lo caído.`n" -ForegroundColor Cyan
 
+# ── Lo de cada noche ─────────────────────────────────────────────────────────
+#
+# A las 04:30, con el bar cerrado: la copia de seguridad y la comprobación del reloj. A esa
+# hora no hay nadie cobrando, así que un `pg_dump` que se coma el disco un minuto no le
+# estropea la noche a ningún camarero.
+#
+# El día se guarda para no repetirlo: el vigilante da una vuelta cada 30 segundos, y sin
+# esto haría 120 copias entre las 04:30 y las 05:00.
+$HORA_NOCTURNA = 4
+$ultimaNoche = ""
+
+function DeMadrugada() {
+  $hoy = Get-Date -Format 'yyyy-MM-dd'
+  if ($script:ultimaNoche -eq $hoy) { return }
+  if ((Get-Date).Hour -ne $script:HORA_NOCTURNA) { return }
+  $script:ultimaNoche = $hoy
+
+  Anota "copia de seguridad de la noche"
+  $salida = & node "$Raiz\apps\nodo\copia.mjs" 2>&1
+  Anota "  $($salida -join ' | ')"
+
+  # Y el reloj. Este ordenador es el que le pone la hora a cada FACTURA: si va desviado,
+  # está firmando facturas con una hora que no ocurrió — y eso, con VERIFACTU, va sellado
+  # y encadenado. No se arregla después.
+  $reloj = & node "$Raiz\apps\nodo\reloj.mjs" 2>&1
+  if ($LASTEXITCODE -ne 0) { Anota "AVISO DEL RELOJ: $($reloj -join ' ')" }
+}
+
 while ($true) {
   Start-Sleep -Seconds 30
   try {
     $revividos = LevantaLoCaido $true
     foreach ($r in $revividos) { Anota "SE CAYÓ $r -> relevantado" }
     RotaLogs
+    DeMadrugada
   } catch {
     # El vigilante NO se muere pase lo que pase. Si se muriera, el bar se quedaría sin
     # red de seguridad justo cuando más falta hace. Se anota y se sigue dando vueltas.

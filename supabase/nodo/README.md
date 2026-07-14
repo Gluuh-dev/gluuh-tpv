@@ -712,3 +712,107 @@ avisa y no instala: mejor enterarse ahora que cuando el camarero intente cobrar)
 lo que hay dentro (productos, mesas, empleados) y escribe **una línea** en
 `%APPDATA%\Gluuh TPV\config.json` — que es exactamente donde la app de escritorio la lee
 (`app.getPath("userData")`, `apps/desktop/src/config.ts`).
+
+---
+
+## El catálogo viaja en las dos direcciones (14-07-2026)
+
+El nodo se bajaba el bar al instalarse y **no volvía a mirar nunca**. El dueño cambiaba un
+precio desde casa y el TPV seguía cobrando el viejo. Para siempre, hasta reinstalar.
+
+Al ir a arreglarlo apareció el agujero de debajo: **la mayoría de las tablas de catálogo no
+tenían `updated_at`** (`family`, `modifier`, `product_price`, `product_format`, `room`,
+`tarifa`, `menu`, `printer`, `payment_method`, `plano_elemento`…). Sin saber cuándo se tocó
+una fila no se puede saber quién gana — esto era **imposible de construir**. Lo arregla la
+migración `0101`: 49 tablas.
+
+Va al revés que las ventas. Una venta nace en el bar y sube, y punto. Un precio se toca en
+los dos sitios: desde casa con internet, o en la propia barra sin él. **Gana el más
+reciente**, en las dos direcciones. Probado:
+`node apps/nodo/pruebas/prueba-catalogo.mjs`.
+
+### Cuatro trampas, y todas eran mudas
+
+**1. El ping-pong infinito.**
+`set_updated_at()` ponía `now()` en cada UPDATE. Una fila recién bajada de la nube quedaba
+*aquí* con fecha más nueva que la de allí → el nodo se la volvía a subir → la nube la
+volvía a marcar → el nodo se la volvía a bajar… La carta recargándose sola en los TPV cada
+cinco minutos delante de los clientes, para siempre, y sin un error en ningún log. El
+trigger ahora **respeta la fecha que trae la fila, y sólo si va hacia adelante**.
+
+**2. La fecha congelada** — y esto es por qué «sólo hacia adelante».
+Varios formularios del panel hacen `select *` y luego `upsert({...fila})`: **arrastran el
+`updated_at` viejo sin querer**. Un trigger que respetara cualquier fecha dejaría la fila
+clavada en el pasado y el bar no vería el cambio jamás.
+
+**3. Dos fechas que son la misma y no se parecen en nada.** La peor.
+
+```
+Postgres   →  "2026-07-14 10:48:34.098381+02"      (un espacio, y la hora del bar)
+PostgREST  →  "2026-07-14T08:48:34.098381+00:00"   (una T, y UTC)
+```
+
+Es el **mismo instante**. Pero comparados como texto, el espacio (`0x20`) es menor que la
+`T` (`0x54`): **la fila del bar siempre parecía más vieja que la de la nube**, pasara lo que
+pasara. Consecuencia: el bar **no podía subir un cambio de carta nunca**, y se bajaba de la
+nube cosas que ya tenía. Sin un error. El dueño cambia un precio en la barra, no llega a la
+nube, y no hay forma de saber por qué. Se comparan como **instantes**.
+
+*(Ojo: las marcas de agua siguen guardándose en TEXTO, que para eso hacen falta los
+microsegundos. Lo que se convierte es la comparación, no el almacenamiento.)*
+
+**4. El `auth_user_id` que le cierra la puerta al dueño.**
+El espejo pone `auth_user_id` a null al bajar (las cuentas de la nube no existen en el
+nodo). Si esa fila subiera tal cual, **dejaría a null el de la nube** y el dueño **no
+podría volver a entrar en el panel desde casa**. Un bar sincronizando su carta habría
+cerrado la puerta de la nube a su propio dueño. → `NO_SUBIR_COLUMNAS`.
+
+### Los borrados, y por qué llevan tres cerrojos
+
+Ninguna tabla del catálogo tiene `deleted_at`: en la nube se borra de verdad. Un delta por
+fecha **jamás vería una baja** — el producto retirado seguiría en la carta del bar para
+siempre. Hay que comparar las claves.
+
+Y ahí está el peligro de todo el sincronizador: **una lista mal leída borra el bar entero**.
+La RLS devuelve `[]` con un 200 tan tranquila si el token es de otra empresa.
+
+1. La nube devuelve 5000+ filas → puede venir **cortada** → no se borra nada, y se dice.
+2. La nube da la tabla por **vacía** y aquí hay cosas → casi seguro es un fallo → no se
+   borra nada. *Una carta vieja se arregla; una carta borrada, no.*
+3. La fila **acaba de subir en este mismo pase** → no está borrada, está llegando. Sin esto,
+   el producto que el dueño crea en la barra sin internet **se borraría solo** en el primer
+   pase con línea, delante de sus narices y sin un error.
+
+### La regla de despliegue que sale de aquí
+
+**La nube se migra ANTES que los nodos.** El nodo sube sus filas con `select *`; si tuviera
+una columna que la nube todavía no tiene, PostgREST responde 400 y ese bar **deja de
+sincronizar el catálogo**.
+
+---
+
+## La copia de la noche y el reloj (14-07-2026)
+
+`apps/nodo/copia.mjs` — `pg_dump -Fc`, 7 días rotados, a las 04:30 desde el vigilante. Se
+escribe a un `.parcial` y **se renombra al final**: si se va la luz a mitad del volcado —que
+es justo cuando pasan estas cosas—, lo que queda es un `.parcial` que nadie confundirá con
+una copia buena. *Un backup a medias que parece entero es peor que no tener ninguno: se
+descubre el día que hace falta.*
+
+No sustituye a la nube, la completa: la nube tiene lo **cerrado**; esto tiene **todo**,
+incluidas las mesas que ahora mismo están abiertas.
+
+`apps/nodo/reloj.mjs` — parece una tontería y no lo es: **este ordenador es el que le pone
+la hora a cada factura**, y con VERIFACTU esa hora va firmada y encadenada a Hacienda. No se
+arregla después. Un mini-PC de tres años debajo de una barra, con la pila de la placa
+gastada, se va de horas y no se entera nadie. Se mide contra la cabecera `Date` de la nube,
+**descontando la mitad del viaje de red** (si no, una línea lenta parecería un reloj
+desviado y el bar tendría un aviso rojo permanente… que acabaría ignorando, que es como
+mueren las alarmas). Aviso a partir de 2 minutos. **No se toca el reloj**: eso es de
+Windows, y cambiárselo a alguien por detrás es peor que el problema.
+
+Las dos cosas se ven en `/servidor`.
+
+*(Y de paso: `/servidor` leía `process.env.NEXT_PUBLIC_SUPABASE_URL` — o sea que en el nodo
+**le preguntaba a la nube por el estado del nodo**. Decía «el nodo no responde» con el nodo
+perfectamente vivo delante. Se me quedó fuera del bloque anterior.)*

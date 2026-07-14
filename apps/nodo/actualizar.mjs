@@ -204,7 +204,13 @@ try {
   // Éstas SÍ se reaplican siempre: son las del propio nodo (triggers de realtime,
   // permisos…) y están escritas para poder pasarse mil veces. Y hace falta: una
   // migración nueva puede traer una tabla que necesite su trigger y sus permisos.
-  for (const f of ["02_realtime_nodo.sql", "03_media_nodo.sql", "04_sync_nodo.sql", "05_permisos_nodo.sql"]) {
+  //
+  // `06_auth_nodo.sql` FALTABA. Ahí viven las funciones con las que entran el dueño y los
+  // camareros (`verificar_password_local`, `fijar_password_local`): un arreglo en ellas se
+  // publicaba, el bar se lo bajaba… y no se aplicaba nunca. Y `05_permisos` va EL ÚLTIMO
+  // porque tiene que cubrir todo lo que acaba de nacer.
+  for (const f of ["02_realtime_nodo.sql", "03_media_nodo.sql", "04_sync_nodo.sql",
+                   "06_auth_nodo.sql", "05_permisos_nodo.sql"]) {
     migrar(path.join(RAIZ, "supabase/nodo", f));
   }
 
