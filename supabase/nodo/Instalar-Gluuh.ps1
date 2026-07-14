@@ -52,6 +52,20 @@ Write-Host "   Este ordenador sera el SERVIDOR del bar: aqui viven los datos y d
 Write-Host "   aqui trabajan todos los TPV, tambien cuando no haya internet."
 Write-Host ""
 
+# La clave PUBLICA de Gluuh (la publishable: la que lleva dentro cualquier navegador que
+# abra app.gluuh.com — no es un secreto). El tecnico no tiene que teclear 60 caracteres:
+#
+#   · En el .exe la trae el propio paquete (se le pasa al compilar: ISCC /DAnonKey=...).
+#   · Desde el codigo fuente se coge de apps/web/.env.local, que ya la tiene.
+#
+# Y no se guarda en el repositorio: ni siendo publica. La regla es la regla.
+if (-not $AnonKey) {
+  $envLocal = Join-Path $Raiz "apps\web\.env.local"
+  if (Test-Path $envLocal) {
+    $m = Select-String -Path $envLocal -Pattern '^NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=(.+)$'
+    if ($m) { $AnonKey = $m.Matches[0].Groups[1].Value.Trim() }
+  }
+}
 if (-not $AnonKey) {
   $AnonKey = Read-Host "   Clave publica de Gluuh (sb_publishable_...)"
 }
@@ -70,8 +84,23 @@ while (-not $tenantId) {
   $norm = "{0}-{1}-{2}-{3}-{4}" -f $codigo.Substring(0,4), $codigo.Substring(4,4), $codigo.Substring(8,5), $codigo.Substring(13,4), $codigo.Substring(17,4)
 
   try {
+    # CANJEAR el codigo (RPC `empresa_por_codigo`, migracion 0104). NO se consulta la tabla
+    # `tenant` directamente: aqui todavia no hay sesion, o sea que somos ANONIMOS, y la RLS
+    # de `tenant` es `id = current_tenant_id()`. Un anonimo no tiene empresa, asi que
+    # devolvia CERO FILAS con un 200 tan tranquila.
+    #
+    # Traduccion: el instalador respondia "Ese codigo no es valido" SIEMPRE, con cualquier
+    # codigo. No se podia instalar ni un bar. Y no lo sabia nadie porque este script nunca
+    # se habia ejecutado.
+    #
+    # Tampoco se arregla abriendo `tenant` al anonimo: eso enseñaria la lista de TODOS
+    # nuestros clientes a cualquiera que tenga la clave publica (que va dentro de cualquier
+    # navegador que abra app.gluuh.com). El codigo de 21 digitos ES la credencial: se canjea
+    # por SU empresa y por ninguna mas.
     $cab = @{ apikey = $AnonKey; authorization = "Bearer $AnonKey" }
-    $t = Invoke-RestMethod "$Nube/rest/v1/tenant?select=id,nombre,activo&codigo_instalacion=eq.$norm" -Headers $cab -TimeoutSec 15
+    $cuerpo = @{ p_codigo = $norm } | ConvertTo-Json
+    $t = Invoke-RestMethod "$Nube/rest/v1/rpc/empresa_por_codigo" -Method Post `
+         -Headers $cab -ContentType "application/json" -Body $cuerpo -TimeoutSec 15
   } catch {
     Mal "No hay conexion con Gluuh. La instalacion necesita internet UNA vez."
     Mal $_.Exception.Message
@@ -229,8 +258,17 @@ Bien "Base de datos lista"
 Write-Host "   Bajando la carta, las mesas y los empleados..." -ForegroundColor DarkGray
 Push-Location $Raiz
 node "$Raiz\apps\nodo\provisionar.mjs" $tenantId | Out-File "$nodo\tmp\provision.log" -Encoding utf8
+
+# `??` NO EXISTE EN WINDOWS POWERSHELL 5.1, que es el que trae un Windows de fabrica — o
+# sea, el del mini-PC del bar. Y no es que fallara la linea: es un error de SINTAXIS, asi
+# que el script ENTERO no se cargaba. Ni una linea. El .exe habria creado la base de datos
+# y reventado justo aqui, dejando al tecnico con una maquina a medias y sin saber por que.
+#
+# No lo pillo nadie porque este script NUNCA SE HABIA EJECUTADO: probabamos a mano, con
+# otros comandos. Ahora lo prueba `prueba-instalador.ps1`.
 $filas = (Select-String -Path "$nodo\tmp\provision.log" -Pattern "filas bajadas").Line
-Bien ($filas ?? "Bar descargado")
+if (-not $filas) { $filas = "Bar descargado" }
+Bien $filas
 
 Write-Host "   Bajando las fotos de la carta..." -ForegroundColor DarkGray
 node "$Raiz\apps\nodo\descargar-imagenes.mjs" | Out-File "$nodo\tmp\imagenes.log" -Encoding utf8
@@ -256,6 +294,34 @@ $sqlPass | Out-File "$nodo\tmp\pass.sql" -Encoding utf8
 & "$nodo\pgsql\bin\psql.exe" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -q -f "$nodo\tmp\pass.sql" | Out-Null
 Remove-Item "$nodo\tmp\pass.sql" -Force   # que no quede la contrasena en un fichero
 Bien "El titular ya puede entrar al panel del bar SIN internet"
+
+# ── La interfaz ──────────────────────────────────────────────────────────────
+#
+# En el .exe viene ya compilada dentro del paquete. Desde el codigo fuente hay que
+# compilarla una vez.
+#
+# Y esto es lo que hace que ESTE script sirva para las dos cosas — que es el arreglo de
+# fondo: hasta hoy el tecnico ejecutaba este instalador y nosotros probabamos con OTROS
+# comandos. Probabamos un camino distinto del que recorre el cliente, y por eso este script
+# llevaba semanas sin poder ni cargarse (tenia un `??` de PowerShell 7) sin que nadie lo
+# supiera. Lo que probamos tiene que ser lo que se ejecuta en el bar.
+$standalone = Join-Path $Raiz "apps\web\.next\standalone\apps\web\server.js"
+if (-not (Test-Path $standalone)) {
+  if (Test-Path (Join-Path $Raiz "apps\web\package.json")) {
+    Write-Host "   Compilando la interfaz (solo la primera vez, tarda un par de minutos)..." -ForegroundColor DarkGray
+    Push-Location $Raiz
+    & pnpm --filter @gluuh/web build:nodo *> "$nodo\tmp\web-build.log"
+    Pop-Location
+    if (-not (Test-Path $standalone)) {
+      Mal "No se pudo compilar la interfaz. Mira .nodo\tmp\web-build.log"
+      exit 1
+    }
+    Bien "Interfaz compilada"
+  } else {
+    Mal "El paquete no trae la interfaz compilada. Instalador incompleto: avisa a Gluuh."
+    exit 1
+  }
+}
 
 Write-Host "   Arrancando los servicios..." -ForegroundColor DarkGray
 & "$PSScriptRoot\arrancar-nodo.ps1" | Out-Null

@@ -1,26 +1,65 @@
 # 17 — Manual del nodo local
 
-Dos partes:
+## Instalar un bar son DOS comandos. No cuarenta.
 
-- **A · Configurar para PROBAR** (en tu máquina, hoy).
-- **B · El INSTALADOR** para un cliente de verdad (qué pregunta y cómo se genera).
+```powershell
+pnpm install                          # sólo la primera vez
+.\supabase\nodo\Instalar-Gluuh.ps1    # y ya está
+```
+
+Ese segundo comando es **el instalador de verdad**: exactamente el que ejecuta el técnico en
+el bar, exactamente el que va dentro del `.exe`. Te hace cuatro preguntas (código de
+instalación, cuenta del titular, datos fiscales si faltan, y si arranca solo) y luego hace
+todo lo demás sin preguntar: crea la base de datos, se baja la carta y las fotos, compila la
+interfaz, arranca los siete servicios, registra el arranque automático y te escribe la
+dirección que hay que poner en cada TPV.
+
+> **Para probar aquí**, el código de instalación de *Plantilla base* (1 local, 2 salas,
+> 21 mesas, 4 empleados, 75 productos) es **`5244-7793-03261-5161-6093`**.
+
+### Por qué esto es lo importante, y no un detalle de comodidad
+
+Hasta hoy había **dos caminos**: el técnico ejecutaba `Instalar-Gluuh.ps1`, y nosotros
+instalábamos a mano con otros seis comandos. **Probábamos un camino distinto del que recorre
+el cliente.**
+
+Consecuencia: ese script llevaba semanas **sin poder ni cargarse**. Tenía un `??` — un
+operador de PowerShell 7 —, y un Windows de fábrica trae **PowerShell 5.1**, donde eso es un
+error de **sintaxis**. No es que fallara una línea: **no se ejecutaba ninguna**. El `.exe`
+habría creado la base de datos y reventado al instante, dejando al técnico con una máquina a
+medias y sin un mensaje que explicara nada.
+
+Nadie lo sabía porque **nadie lo había ejecutado nunca**. Ahora lo comprueba
+`.\apps\nodo\pruebas\prueba-instalador.ps1` en cada vuelta.
+
+*(Lo mismo, y por lo mismo, pasó con `/api/ticket`: el nodo **no podía cobrar** porque
+validaba la sesión contra la nube. Todas las pruebas escribían en la base directamente y
+ninguna pasaba por donde pasa un camarero.)*
 
 ---
 
-# A · Configurar para probar
+Lo que sigue es el detalle: qué hace cada pieza, qué probar y cómo se genera el `.exe`.
+
+- **A · Probar** en tu máquina, hoy.
+- **B · El INSTALADOR** para un cliente de verdad.
+
+---
+
+# A · Probar
 
 ## A.0 · Antes de nada: las migraciones pendientes en Supabase
 
 **Las aplicas tú** (yo tengo prohibido tocar la nube sin que me lo digas). La `0099` y la
-`0101` **ya están hechas**. Quedan estas dos:
+`0101` ya están hechas. Quedan **tres**:
 
-**`0102_guardar_cuenta_sin_pisarse.sql`** — dos camareros dejan de pisarse.
-⚠️ **Elimina `reemplazar_lineas_orden`** y la sustituye por `guardar_cuenta`. El TPV nuevo
-ya llama a la nueva, así que **la nube tiene que tenerla antes de que se despliegue la web**.
+| migración | qué pasa si no |
+|---|---|
+| **`0104_empresa_por_codigo_instalacion.sql`** | 🔴 **el instalador no instala nada**: dice «ese código no es válido» siempre |
+| **`0102_guardar_cuenta_sin_pisarse.sql`** | el TPV nuevo llama a `guardar_cuenta`, que no existiría: **no se puede guardar una cuenta** |
+| **`0103_jornada.sql`** | `/ventas-diarias` sigue agrupando por calendario: el cierre de los fines de semana está mal |
 
-**`0103_jornada.sql`** — el día del bar. Tabla `jornada` + `sales_order.jornada_id` +
-el Z y el cierre. Sin ella, `/ventas-diarias` sigue agrupando por fecha de calendario y
-**el cierre de todos los fines de semana está mal**.
+La **`0104` es la que bloquea la prueba de esta tarde.** Sin ella, `Instalar-Gluuh.ps1` no
+pasa de la primera pregunta.
 
 > ### El orden: PRIMERO LA NUBE, DESPUÉS LOS NODOS.
 >
@@ -31,19 +70,11 @@ el Z y el cierre. Sin ella, `/ventas-diarias` sigue agrupando por fecha de calen
 > Desde hoy el nodo aguanta ese error (le pregunta a la nube qué columnas tiene y le manda
 > sólo eso), pero **la regla no cambia**: la nube va delante.
 
-En el nodo, la `0102` y la `0103` **ya están aplicadas** (las apliqué al probar).
+En el nodo ya están aplicadas las tres (las apliqué al probar).
 
-## A.1 · Levantar el nodo
+## A.1 · Los siete servicios
 
-```powershell
-.\supabase\nodo\instalar-nodo.ps1 -Recrear   # sólo la primera vez (o para rehacerla)
-.\supabase\nodo\arrancar-nodo.ps1            # levanta los 7 servicios
-```
-
-Al terminar imprime la dirección. Compruébalo en el navegador:
-`http://127.0.0.1:54321/nodo/estado` → debe devolver un JSON.
-
-Para pararlo: `.\supabase\nodo\arrancar-nodo.ps1 -Parar`
+`Instalar-Gluuh.ps1` los levanta solo. Esto es para cuando algo falle y haya que mirar.
 
 | servicio | puerto | qué es |
 |---|---|---|
@@ -56,28 +87,26 @@ Para pararlo: `.\supabase\nodo\arrancar-nodo.ps1 -Parar`
 | **Gateway** | **54321** | ← **lo único que ve el TPV** |
 | Sync | — | sube a la nube cada 5 min |
 
-## A.1-bis · Compilar la web del nodo
-
 ```powershell
-pnpm --filter @gluuh/web build:nodo
+.\supabase\nodo\arrancar-nodo.ps1            # levanta lo que esté parado
+.\supabase\nodo\arrancar-nodo.ps1 -Parar     # lo para todo
+.\supabase\nodo\arrancar-nodo.ps1 -Vigilar   # y se queda vigilando (esto es lo que corre en el bar)
 ```
 
-Produce un servidor **autocontenido** (41 MB, sin `node_modules`) que el nodo sirve por su
-mismo puerto. Sin esto, el servicio `Web` tira de `next start` (vale para desarrollo).
+`http://127.0.0.1:54321/nodo/estado` → un JSON con todo: servicios, contenido, última copia,
+si el reloj va bien.
 
-## A.2 · Bajarse un bar de la nube
+### Y las piezas sueltas, por si hace falta
 
-El nodo nace **vacío**. Sin este paso no tiene ni carta, ni mesas, ni empleados:
+Lo hace todo el instalador; están aquí porque un día habrá que rehacer una sola cosa.
 
 ```powershell
-node apps/nodo/provisionar.mjs --listar        # ¿qué bares hay?
-node apps/nodo/provisionar.mjs <tenant-id>     # bájate ese
+.\supabase\nodo\instalar-nodo.ps1 -Recrear     # rehacer SÓLO la base de datos
+pnpm --filter @gluuh/web build:nodo            # recompilar SÓLO la interfaz
+node apps/nodo/provisionar.mjs --listar        # ¿qué bares hay en la nube?
+node apps/nodo/provisionar.mjs <tenant-id>     # volver a bajarse uno entero
 node apps/nodo/descargar-imagenes.mjs          # y sus fotos
 ```
-
-**Ojo con cuál eliges**: *Bar Demo Gluuh* tiene la carta pero **no tiene mesas ni
-empleados**. El bar completo (1 local, 2 salas, **21 mesas**, 4 empleados, 75 productos)
-es **Plantilla base**.
 
 ## A.3 · Apuntar el TPV al nodo: **ya no hay nada que hacer**
 

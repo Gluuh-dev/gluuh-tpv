@@ -29,6 +29,16 @@
 #define Empresa    "Gluuh"
 #define Web        "https://gluuh.com"
 
+; La clave PUBLICA de Gluuh (publishable). Se pasa AL COMPILAR, no va en el repositorio:
+;
+;     ISCC.exe /DAnonKey=sb_publishable_xxxxx gluuh-servidor.iss
+;
+; Si no se pasa, el instalador se la pedira al tecnico. Que es peor: son 60 caracteres y un
+; solo caracter mal copiado deja la instalacion a medias sin decir donde esta el fallo.
+#ifndef AnonKey
+  #define AnonKey ""
+#endif
+
 [Setup]
 AppId={{8F3A6C21-9B4E-4E7A-9C1D-GLUUH0000001}
 AppName={#Nombre}
@@ -93,8 +103,11 @@ Filename: "{app}\.nodo\pgsql\bin\initdb.exe"; \
 
 ; 2. Y el instalador de verdad: el que PREGUNTA (empresa, titular, datos fiscales).
 ;    Ventana visible a proposito: aqui el tecnico tiene que ver lo que teclea.
+;
+;    OJO: -ExecutionPolicy Bypass es obligatorio. Un Windows de fabrica trae la politica en
+;    Restricted y NO EJECUTA ningun .ps1: el instalador se quedaria mudo.
 Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\supabase\nodo\Instalar-Gluuh.ps1"" -Raiz ""{app}"""; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\supabase\nodo\Instalar-Gluuh.ps1"" -Raiz ""{app}"" -AnonKey ""{#AnonKey}"""; \
   StatusMsg: "Configurando el local..."; Flags: waituntilterminated
 
 ; 3. Y se le ensena la hoja de entrega al tecnico.

@@ -38,6 +38,30 @@ node apps/nodo/pruebas/prueba-facturas-a-la-vez.mjs
 | `prueba-jornada.mjs` | **el día del bar, no el del calendario**: la jornada se abre sola, seis ventas a la vez no abren seis jornadas, el Z cuadra, las **mesas abiertas no se tocan**, y la caña de la 1:30 cae en la jornada que le toca |
 | `prueba-vigilante.ps1` | se mata PostgREST y **vuelve solo en ~35 s**, sirviendo datos |
 | `prueba-secretos.ps1` | la clave del bar entra (200); **la del manual, 401 — firma inválida** |
+| `prueba-instalador.ps1` | **todos los `.ps1` arrancan en el Windows de un bar** (PowerShell 5.1 + BOM) |
+
+### La prueba más tonta de todas, y la que más caro habría salido
+
+`prueba-instalador.ps1` sólo comprueba que los scripts **carguen**. Nada más.
+
+Y hacía falta: `Instalar-Gluuh.ps1` —el instalador del cliente— tenía un `??`, que es un
+operador de **PowerShell 7**. Un Windows de fábrica trae **PowerShell 5.1**, donde eso es un
+error de **sintaxis**: no se ejecuta **ni una línea**. El `.exe` habría creado la base de
+datos y reventado al instante, dejando al técnico con una máquina a medias.
+
+Y el mismo script, un poco más abajo, validaba el código de instalación consultando `tenant`
+**como anónimo** — y la RLS de `tenant` es `id = current_tenant_id()`. Un anónimo no tiene
+empresa: **cero filas, con un 200**. O sea que respondía «ese código no es válido» **siempre,
+con cualquier código**. No se podía instalar ni un bar. *(Lo arregla la migración `0104`.)*
+
+**Dos tapones absolutos, en el único script que el cliente ejecuta. Y ninguno se había visto
+porque ese script nunca se había ejecutado**: nosotros instalábamos a mano, con otros
+comandos. Probábamos un camino distinto del que recorre el cliente.
+
+Es la misma enfermedad que dejó al nodo **sin poder cobrar** durante días (`/api/ticket`
+validaba la sesión contra la nube): **probar un camino que nadie recorre**. Por eso ahora
+`Instalar-Gluuh.ps1` es también **nuestro** camino de instalación — el manual empieza por
+ahí.
 
 ### Tres comprobaciones que parecen tontas y son las que importan
 
