@@ -196,16 +196,71 @@ las claves. Y **una lista mal leída borra el bar entero**:
 
 ---
 
-## Bloque 5 · Dinero concurrente (C3 + C4)
+## ✅ Bloque 5a · Dinero concurrente (C3 + C4) — HECHO
 
-- `reemplazar_lineas(p_updated_at_esperado)` → `raise` con código propio si la orden
-  cambió; el TPV captura, recarga la mesa y avisa. Migración nueva + `page.tsx`.
-- Numeración: RPC `siguiente_numero_factura(serie)` con
-  `pg_advisory_xact_lock(hashtext(serie))`; `/api/factura` la usa.
+Probado contra el nodo real: `prueba-dos-camareros.mjs` (7/7) y
+`prueba-facturas-a-la-vez.mjs` (5/5, seis cobros **simultáneos**).
 
-**Aceptación**: dos clientes simulados guardando la misma mesa a la vez → uno recibe
-conflicto y NO se pierden líneas. 20 cobros concurrentes → numeración correlativa sin
-huecos ni choques.
+### C3 · Dos camareros, la misma mesa (migración `0102`)
+
+Ana y Berto abren la mesa 5 en dos TPV. Ana añade una tortilla y guarda. Berto añade un
+vino y guarda: manda **su** foto de la mesa (2 cañas + vino) y **la tortilla desaparece**.
+Sin un error. El cliente se la come, no la paga, y el arqueo no cuadra por 8 €. Nadie sabría
+nunca por qué.
+
+- `guardar_cuenta(p_order_id, p_lineas, p_cuenta, p_version)` — cabecera **y** líneas en una
+  transacción, con `for update` y control optimista por `updated_at`. Si la versión no
+  coincide: `GLU01` y **no se toca nada**.
+- El TPV guarda la versión al abrir la cuenta (`tomarCuenta`, la **única** puerta) y la
+  refresca en cada guardado. En conflicto: avisa y **recarga la mesa**.
+- Se fue `reemplazar_lineas_orden`, y con ella **el camino de degradación**: si el RPC
+  fallaba, el TPV caía a un `delete` + `insert` a pelo — *exactamente* la pérdida de líneas
+  que el RPC venía a evitar.
+
+> La comprobación nº 4 de la prueba es la que importa: **un camarero puede guardar dos veces
+> seguidas**. Un control de concurrencia que hace chocar al TPV consigo mismo es un candado
+> que no deja cobrar — peor que el fallo que arregla.
+
+### C4 · Seis cobros a la vez y la cadena de VERIFACTU
+
+`UNIQUE (tenant_id, serie, numero)` ya impedía duplicar el número (esa restricción **es** la
+garantía). Y el que choca vuelve a leer, ve la factura que acaba de entrar **con su huella**,
+y encadena la suya detrás: la cadena no se bifurca. Lo que estaba mal era el número de
+intentos: **uno**. Con cuatro TPV en el pico de un sábado, eso deja un cobro tirado en la
+cara del camarero. Ahora insiste (6 intentos, espera desigual) y detecta la colisión por el
+**código 23505**, no buscando la palabra «unique» en un texto que Postgres puede traducir.
+
+### 🔴 Y lo que apareció al probarlo: **el nodo no podía cobrar**
+
+Las rutas de API construían su cliente con `NEXT_PUBLIC_SUPABASE_URL` — la dirección de **la
+nube**, incrustada al compilar. Dentro del nodo:
+
+- **`/api/ticket`** validaba la sesión **contra la nube**, con un token firmado por el
+  **nodo**. La nube lo rechaza (no es su firma) → 401 → «No se pudo calcular el ticket. No se
+  ha cobrado nada.» Y `cobrar()` llama a esa ruta **antes de tocar nada**. O sea: **un bar
+  con nodo no podía cobrar desde el TPV.** Ni sin internet (no llega), ni con él (lo
+  rechazan).
+- **`/api/factura`** pedía el local a la nube → «Tenant no encontrado» → **VERIFACTU era
+  imposible en un nodo**. Justo donde la ley obliga a emitir.
+
+No lo pilló ninguna prueba porque **todas escriben en la base directamente**: ninguna pasaba
+por donde pasa un camarero al darle a Cobrar.
+
+Arreglado en la raíz: `apps/web/app/lib/supabaseServidor.ts` — una sola puerta
+(`comoElLlamante`, `comoElServicio`, `quienLlama`) que resuelve contra quién hablar. La usan
+`factura`, `ticket`, `verifactu/verificar`, `dispositivos/generar`, `dispositivos/canjear` y
+`entrar-operario` (que era la única que lo hacía bien, a mano — y dos formas de resolver lo
+mismo acaban separándose).
+
+---
+
+## Bloque 5b · LA JORNADA (decisión plan/11 §11)
+
+- Tabla `jornada` + `sales_order.jornada_id`; botón "Cerrar día" (arqueo + Z) y cierre
+  automático de respaldo a la hora configurada (06:00 por defecto).
+- **Los informes agrupan por jornada, no por fecha de calendario.** Hoy `ventas-diarias`
+  corta `created_at` a `YYYY-MM-DD`, así que **las cañas de la 1:30 del sábado cuentan como
+  sábado y no como la jornada del viernes**: descuadra todos los fines de semana.
 
 ---
 

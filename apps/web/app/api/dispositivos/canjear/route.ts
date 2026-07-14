@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
+import { comoElServicio } from "@/app/lib/supabaseServidor";
 import { excedeLimite, ipDe } from "../limite";
 
 // Canjea un código de vinculación de 6 dígitos por una credencial de
@@ -30,11 +30,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Falta DEVICE_JWT_SECRET en el servidor" }, { status: 500 });
   }
 
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-    { auth: { persistSession: false } },
-  );
+  // Contra el NODO si estamos en el bar. Canjear el código de emparejado de una terminal
+  // no puede depender de que el bar tenga internet ese día.
+  const admin = comoElServicio();
+  if (!admin) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
 
   // Canje ATÓMICO: el UPDATE con WHERE (código vigente + sin vincular) es a la vez
   // la comprobación y el consumo. Dos peticiones simultáneas con el mismo código:

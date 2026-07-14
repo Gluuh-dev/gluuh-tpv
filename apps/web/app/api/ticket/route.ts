@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { quienLlama } from "@/app/lib/supabaseServidor";
 import {
   calcularImpuestosIncluidos,
   construirUrlQR,
@@ -14,37 +14,23 @@ import {
 // El motor VERIFACTU usa node:crypto → este handler debe ejecutarse en Node.
 export const runtime = "nodejs";
 
-// Seguridad M4: este endpoint calcula el preview fiscal (QR/huella) y NO es
-// anónimo. Era un endpoint de CÓMPUTO (hash + QR con node:crypto) abierto a
-// cualquiera: superficie de abuso de CPU gratis. Desde el 12-07 el TPV envía el
-// Bearer de la sesión en cobrar() y aquí se exige (PERMISIVO=false).
+// Seguridad M4: este endpoint calcula el preview fiscal (QR/huella) y NO es anónimo. Era un
+// endpoint de CÓMPUTO (hash + QR con node:crypto) abierto a cualquiera: superficie de abuso
+// de CPU gratis. Desde el 12-07 el TPV envía el Bearer de la sesión en cobrar().
 //
-// Si esto empieza a devolver 401 en producción, lo más probable NO es la sesión:
-// es que el Worker de Cloudflare no tenga NEXT_PUBLIC_SUPABASE_URL /
-// PUBLISHABLE_KEY en el entorno de RUNTIME (se necesitan aquí, en servidor).
-// Por eso ese caso se registra con un mensaje distinto y explícito.
+// ⚠ ESTA RUTA ESTÁ EN EL CAMINO DE CADA COBRO. `cobrar()` la llama ANTES de tocar nada, y
+// si devuelve 401 el TPV aborta: «No se pudo calcular el ticket. No se ha cobrado nada.»
+//
+// Y hasta hoy validaba la sesión contra `NEXT_PUBLIC_SUPABASE_URL` — LA NUBE — con un token
+// firmado por el NODO. La nube lo rechaza, porque no es su firma. Resultado: **un bar con
+// nodo no podía cobrar desde el TPV**. Ni sin internet (no llega), ni con él (lo rechazan).
+// Nadie lo había visto porque las pruebas del nodo escriben en la base directamente.
+//
+// `quienLlama` pregunta a QUIEN CORRESPONDE: al nodo si estamos en un nodo, a la nube si
+// no. Ver `lib/supabaseServidor.ts`.
 const PERMISIVO = false;
 
-async function haySesionValida(req: Request): Promise<boolean> {
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return false;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) {
-    console.error(
-      "[/api/ticket] FALTA CONFIGURACIÓN: NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY no están " +
-        "en el entorno del SERVIDOR. No se puede validar la sesión → el cobro fallará. " +
-        "Añádelas a los secretos de runtime del Worker.",
-    );
-    return false;
-  }
-  const supa = createClient(url, key, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false },
-  });
-  const { data, error } = await supa.auth.getUser();
-  return !error && !!data.user;
-}
+const haySesionValida = async (req: Request): Promise<boolean> => (await quienLlama(req)) !== null;
 
 interface LineaDto {
   nombre: string;

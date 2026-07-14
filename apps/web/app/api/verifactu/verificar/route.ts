@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { comoElLlamante } from "@/app/lib/supabaseServidor";
 import { formatImporte, verificarCadena, type RegistroEncadenado } from "@gluuh/core";
 
 // El motor VERIFACTU usa node:crypto → este handler debe ejecutarse en Node
@@ -39,11 +39,10 @@ export async function GET(req: Request) {
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
     if (!token) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
 
-    const supa = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } },
-    );
+    // Las facturas de un bar con nodo viven EN EL BAR: preguntárselas a la nube sería
+    // enseñar una cadena vacía y decir que está todo bien.
+    const supa = comoElLlamante(token);
+    if (!supa) return NextResponse.json({ ok: false, error: "Servidor sin configurar" }, { status: 500 });
 
     // RLS filtra por tenant. Orden por serie y número para reconstruir cada cadena.
     const { data, error } = await supa

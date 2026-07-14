@@ -43,7 +43,15 @@ export interface TpvState {
   mesa: Mesa | null;
   llevar: { nombre: string; telefono: string } | null;
   ordenAbiertaId: string | null;
-  
+
+  // LA VERSIÓN de la cuenta abierta (su `updated_at`). Es lo que impide que dos camareros
+  // se pisen: si al guardar no coincide con la que hay en la base, es que otro ha tocado la
+  // mesa mientras tanto y NO se guarda encima (RPC `guardar_cuenta`, migración 0102).
+  //
+  // Va pegada al id a propósito: cambiar de cuenta la borra sola (ver `setOrdenAbiertaId`).
+  // Una versión de la mesa 5 aplicada a la mesa 7 sería peor que no tener ninguna.
+  versionOrden: string | null;
+
   // Account properties
   cliente: Cliente | null;
   comensales: number;
@@ -69,7 +77,8 @@ export interface TpvState {
   setMesa: (val: Mesa | null | ((prev: Mesa | null) => Mesa | null)) => void;
   setLlevar: (val: { nombre: string; telefono: string } | null | ((prev: { nombre: string; telefono: string } | null) => { nombre: string; telefono: string } | null)) => void;
   setOrdenAbiertaId: (val: string | null | ((prev: string | null) => string | null)) => void;
-  
+  setVersionOrden: (val: string | null) => void;
+
   setCliente: (val: Cliente | null | ((prev: Cliente | null) => Cliente | null)) => void;
   setComensales: (val: number | ((prev: number) => number)) => void;
   setAlias: (val: string | ((prev: string) => string)) => void;
@@ -98,7 +107,8 @@ export const useTpvStore = create<TpvState>((set) => ({
   mesa: null,
   llevar: null,
   ordenAbiertaId: null,
-  
+  versionOrden: null,
+
   // Account properties
   cliente: null,
   comensales: 1,
@@ -123,8 +133,18 @@ export const useTpvStore = create<TpvState>((set) => ({
   
   setMesa: (val) => set((state) => ({ mesa: typeof val === "function" ? val(state.mesa) : val })),
   setLlevar: (val) => set((state) => ({ llevar: typeof val === "function" ? val(state.llevar) : val })),
-  setOrdenAbiertaId: (val) => set((state) => ({ ordenAbiertaId: typeof val === "function" ? val(state.ordenAbiertaId) : val })),
-  
+  // Cambiar de cuenta BORRA la versión. Siempre, sin excepción.
+  //
+  // Es el cierre de seguridad de todo esto: una versión de la mesa 5 aplicada a la mesa 7
+  // haría chocar cuentas que no tienen nada que ver, o —peor— dejaría pasar un guardado que
+  // debía rechazarse. Aquí no se puede olvidar; quien abre una cuenta pone la suya después
+  // (`tomarCuenta` en el TPV).
+  setOrdenAbiertaId: (val) => set((state) => ({
+    ordenAbiertaId: typeof val === "function" ? val(state.ordenAbiertaId) : val,
+    versionOrden: null,
+  })),
+  setVersionOrden: (val) => set({ versionOrden: val }),
+
   setCliente: (val) => set((state) => ({ cliente: typeof val === "function" ? val(state.cliente) : val })),
   setComensales: (val) => set((state) => ({ comensales: typeof val === "function" ? val(state.comensales) : val })),
   setAlias: (val) => set((state) => ({ alias: typeof val === "function" ? val(state.alias) : val })),

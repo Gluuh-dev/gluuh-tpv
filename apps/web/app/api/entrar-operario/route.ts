@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
+import { claveDeServicio, comoElServicio, enNodo, origenDeDatos } from "@/app/lib/supabaseServidor";
 import { excedeLimite, ipDe } from "../dispositivos/limite";
 
 // Login local por USUARIO (nombre) + clave (backoffice sin email). Verifica
@@ -26,14 +26,12 @@ export async function POST(req: Request) {
 
   // En el NODO esta ruta corre DENTRO del propio servidor del bar, así que habla con él
   // por loopback. Nada de variables NEXT_PUBLIC_: no hay que configurar cada terminal.
-  const enNodo = process.env.NODO_LOCAL === "1";
-  const url = enNodo
-    ? (process.env.NODO_URL_INTERNA ?? "http://127.0.0.1:54321")
-    : process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secret = enNodo ? process.env.NODO_CLAVE_SERVICIO : process.env.SUPABASE_SECRET_KEY;
-  if (!url || !secret) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
-
-  const admin = createClient(url, secret, { auth: { persistSession: false } });
+  //
+  // Esto lo hacía a mano y bien —era la ÚNICA ruta que lo hacía—. Ahora pasa por la misma
+  // puerta que las demás (`lib/supabaseServidor.ts`): dos formas de resolver lo mismo
+  // acaban separándose, y la que se quede atrás hablará con la nube desde dentro del bar.
+  const admin = comoElServicio();
+  if (!admin) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
   // Instalación fijada a una empresa (0078): el operario SOLO puede entrar en su
   // tenant, aunque usuario+clave coincidan en otra empresa.
   const { data, error } = await admin.rpc("verificar_clave_operario", {
@@ -58,7 +56,9 @@ export async function POST(req: Request) {
   //
   // El contrato con el navegador NO cambia: sigue llamando a signInWithPassword con lo
   // que le devolvemos aquí. Sólo que la "contraseña" es ahora un vale.
-  if (enNodo) {
+  if (enNodo()) {
+    const { url } = origenDeDatos();
+    const secret = claveDeServicio()!;   // `comoElServicio()` ya ha comprobado que está
     const r = await fetch(`${url}/auth/v1/vale`, {
       method: "POST",
       headers: { apikey: secret, authorization: `Bearer ${secret}`, "content-type": "application/json" },

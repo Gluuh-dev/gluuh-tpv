@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { comoElLlamante } from "@/app/lib/supabaseServidor";
 import {
   calcularImpuestosIncluidos,
   construirUrlQR,
@@ -48,14 +49,19 @@ function fechaHoy(): string {
 export async function POST(req: Request) {
   try {
     // ── 1. Autenticación con el token del llamante ──────────────────────────
+    //
+    // `comoElLlamante`, no `createClient(NEXT_PUBLIC_SUPABASE_URL, …)`: dentro del nodo,
+    // eso pedía el local A LA NUBE con un token firmado por el nodo. La nube lo rechaza
+    // → «Tenant no encontrado» → **VERIFACTU era imposible en un bar con nodo**. Justo
+    // donde la ley obliga a emitir. Ver `lib/supabaseServidor.ts`.
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
     if (!token) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supa = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false },
-    });
+    const cliente = comoElLlamante(token);
+    if (!cliente) return NextResponse.json({ ok: false, error: "Servidor sin configurar" }, { status: 500 });
+    // Con tipo, no `const supa = ...` a secas: las funciones de más abajo (que se declaran
+    // antes de esta comprobación, por el hoisting) no verían el estrechamiento.
+    const supa: SupabaseClient = cliente;
 
     // ── 2. Cuerpo de la petición ─────────────────────────────────────────────
     const body = (await req.json()) as FacturaDto;
@@ -207,19 +213,45 @@ export async function POST(req: Request) {
       return { data: data as { id: string } | null, error, numSerieFactura, huella: registro.huella, qrUrl, qrDataUrl };
     }
 
-    let { numero, huellaAnterior } = await obtenerSiguienteNumero();
-    let result = await intentarInsertar(numero, huellaAnterior);
+    // ── 6-bis. LA CARRERA POR EL NÚMERO DE FACTURA ───────────────────────────
+    //
+    // Dos camareros cobran a la vez. Los dos leen «la última es la 99» y los dos van a por
+    // la 100. La base de datos sólo deja pasar a uno —hay `UNIQUE (tenant_id, serie,
+    // numero)`, y esa restricción es LA garantía: la numeración no puede duplicarse pase lo
+    // que pase—. El otro se lleva un 23505.
+    //
+    // Ese que choca **vuelve a leer**, y esto es lo importante: lee la 100 que acaba de
+    // entrar, con su huella, y encadena la 101 SOBRE ELLA. La cadena de VERIFACTU no se
+    // bifurca: el que gana define la cadena y el que pierde se engancha detrás.
+    //
+    // Lo que estaba mal era el número de intentos: **uno**. Con dos TPV cobrando a la vez
+    // suele bastar; con cuatro en el pico de un sábado, no — y entonces el cobro FALLA en la
+    // cara del camarero, con el cliente delante y la tarjeta en la mano. Ahora insiste.
+    //
+    // (Y la colisión se detecta por el CÓDIGO 23505, no buscando la palabra "unique" en el
+    // texto del error: ese texto lo escribe Postgres y puede venir traducido.)
+    const esColision = (e: unknown): boolean => {
+      if (typeof e !== "object" || e === null) return false;
+      const code = "code" in e ? String((e as { code: unknown }).code) : "";
+      if (code === "23505") return true;
+      // Cinturón y tirantes: PostgREST podría no propagar el código en algún camino.
+      const msg = "message" in e ? String((e as { message: unknown }).message) : "";
+      return msg.includes("23505") || msg.includes("duplicate key");
+    };
 
-    // Reintento único en caso de colisión UNIQUE (carrera)
-    if (result.error) {
-      const errMsg = typeof result.error === "object" && result.error !== null && "message" in result.error
-        ? String((result.error as { message: string }).message)
-        : String(result.error);
-      const esConflicto = errMsg.includes("unique") || errMsg.includes("duplicate") || errMsg.includes("23505");
-      if (esConflicto) {
-        ({ numero, huellaAnterior } = await obtenerSiguienteNumero());
-        result = await intentarInsertar(numero, huellaAnterior);
-      }
+    const INTENTOS = 6;
+    let numero = 0;
+    let huellaAnterior = "";
+    let result!: Awaited<ReturnType<typeof intentarInsertar>>;
+
+    for (let i = 0; i < INTENTOS; i++) {
+      ({ numero, huellaAnterior } = await obtenerSiguienteNumero());
+      result = await intentarInsertar(numero, huellaAnterior);
+      if (!result.error || !esColision(result.error)) break;
+
+      // Una espera corta y DESIGUAL entre intentos. Si los dos reintentaran a la vez y con
+      // el mismo ritmo, volverían a chocar en la misma milésima, una y otra vez.
+      await new Promise((r) => setTimeout(r, 15 * (i + 1) + Math.random() * 25));
     }
 
     if (result.error || !result.data) {

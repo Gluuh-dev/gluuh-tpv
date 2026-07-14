@@ -196,6 +196,8 @@ export default function TPV() {
   /* Cuenta abierta de la mesa (un pedido reutilizable por mesa) + importes por mesa */
   const ordenAbiertaId = useTpvStore((s) => s.ordenAbiertaId);
   const setOrdenAbiertaId = useTpvStore((s) => s.setOrdenAbiertaId);
+  const versionOrden = useTpvStore((s) => s.versionOrden);
+  const setVersionOrden = useTpvStore((s) => s.setVersionOrden);
   const [totalesMesa, setTotalesMesa] = useState<Record<string, number>>({});
 
   /* ── Funciones de cuenta (columna estilo Glop) ── */
@@ -779,7 +781,15 @@ export default function TPV() {
     if (!ticket && mesa && ordenAbiertaId) {
       void (async () => {
         try {
-          await sb.from("sales_order").update({ estado: "POR_COBRAR" }).eq("id", ordenAbiertaId);
+          // Y RECOGER LA VERSIÓN NUEVA. Este `update` mueve el `updated_at` de la cuenta:
+          // sin recogerla, el camarero imprime la cuenta, le da a Cobrar, y el TPV le dice
+          // «otro TPV ha cambiado esta mesa»… siendo él mismo, tres segundos antes. Justo
+          // en el momento de cobrar, que es donde menos gracia hace.
+          const { data } = await sb.from("sales_order")
+            .update({ estado: "POR_COBRAR" }).eq("id", ordenAbiertaId)
+            .select("updated_at").maybeSingle();
+          if (data) setVersionOrden((data as { updated_at: string }).updated_at);
+
           await sb.from("restaurant_table").update({ estado: "POR_COBRAR" }).eq("id", mesa.id);
           void recargarMesas();
         } catch (e) {
@@ -990,7 +1000,7 @@ export default function TPV() {
     setComanda({}); setDescuentos({}); setPreciosManuales({}); setNotas({}); setInvitadas({}); setAnadidoPor({}); setPases({});
     setBuffer(""); setLineaSel(null); setVistaProds(false);
     setLlevar({ nombre: o.cliente_nombre, telefono: o.cliente_telefono ?? "" });
-    setOrdenAbiertaId(o.id);
+    await tomarCuenta(o.id);
     const { data: lns } = await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,modificadores,pase").eq("order_id", o.id);
     const cmd: Record<string, number> = {}, pr: Record<string, number> = {}, nt: Record<string, string> = {};
     const pasesCargados: Record<string, number> = {};
@@ -1043,40 +1053,78 @@ export default function TPV() {
       cliente_telefono: llevar?.telefono ?? null,
     };
 
-    let orderId = ordenAbiertaId;
-    // Inserta las líneas COMPROBANDO el resultado; degrada sin user_id (la col.
-    // de la mig. 0059 puede no existir). false = no se pudieron guardar.
-    const insertarLineas = async (oid: string): Promise<boolean> => {
-      if (!lineas.length) return true;
-      const filas = lineas.map((l) => ({ order_id: oid, ...l }));
-      const { error } = await sb.from("order_line").insert(filas);
-      if (!error) return true;
-      const { error: e2 } = await sb.from("order_line").insert(filas.map(({ user_id, ...r }) => r));
-      if (e2) { toast.error("No se pudieron guardar las líneas de la cuenta."); return false; }
-      return true;
-    };
-    if (orderId) {
-      await sb.from("sales_order").update({ estado, estado_preparacion: estadoPrep, total: totalRedondeado, ...camposCuenta }).eq("id", orderId);
-      // Reemplazo ATÓMICO de líneas (RPC 0094): elimina la ventana DELETE→INSERT
-      // en la que un fallo dejaba la cuenta sin líneas. Si la migración aún no
-      // está aplicada en este entorno, degrada al camino antiguo comprobando.
-      const { error: rpcErr } = await sb.rpc("reemplazar_lineas_orden", { p_order_id: orderId, p_lineas: lineas });
-      if (rpcErr) {
-        await sb.from("order_line").delete().eq("order_id", orderId);
-        if (!(await insertarLineas(orderId))) return null;
+    // ── Cuenta que YA EXISTE: guardado ATÓMICO y con VERSIÓN ──────────────────
+    //
+    // Una sola llamada (RPC `guardar_cuenta`, 0102): cabecera + líneas, o todo o nada. Y si
+    // otro TPV ha tocado la mesa desde que la abrimos, NO SE GUARDA ENCIMA.
+    //
+    // Antes eran dos llamadas sueltas y, si el RPC fallaba, se caía a un `delete` + `insert`
+    // a pelo — que es EXACTAMENTE la pérdida de líneas que el RPC venía a evitar. Ese camino
+    // de vuelta ya no existe: si algo falla, se dice y no se toca nada.
+    if (ordenAbiertaId) {
+      const { data: nuevaVersion, error } = await sb.rpc("guardar_cuenta", {
+        p_order_id: ordenAbiertaId,
+        p_lineas: lineas,
+        p_cuenta: { estado, estado_preparacion: estadoPrep, total: totalRedondeado, ...camposCuenta },
+        p_version: versionOrden,
+      });
+
+      if (error) {
+        // GLU01 = otro TPV guardó por medio. Reintentar sería volver a pisarlo: lo que hay
+        // que hacer es RECARGAR y que el camarero vea lo que hay de verdad en la mesa.
+        if (error.code === "GLU01") {
+          toast.error("Otro TPV ha cambiado esta mesa. La he vuelto a cargar: revísala antes de seguir.");
+          if (mesa) await cargarCuentaMesa(mesa);
+        } else {
+          toast.error("No se pudo guardar la cuenta. No se ha modificado nada.");
+        }
+        return null;
       }
-    } else {
-      const { data: order } = await sb.from("sales_order").insert({
-        location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId,
-        canal: "TPV", estado, estado_preparacion: estadoPrep,
-        total: totalRedondeado, client_id: crypto.randomUUID(), ...camposCuenta,
-      }).select("id").single();
-      if (!order) return null;
-      orderId = (order as { id: string }).id;
-      setOrdenAbiertaId(orderId);
-      if (!(await insertarLineas(orderId))) return null;
+
+      setVersionOrden(nuevaVersion as string);
+      return ordenAbiertaId;
     }
-    return orderId;
+
+    // ── Cuenta NUEVA: no hay con qué chocar ───────────────────────────────────
+    const { data: order } = await sb.from("sales_order").insert({
+      location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId,
+      canal: "TPV", estado, estado_preparacion: estadoPrep,
+      total: totalRedondeado, client_id: crypto.randomUUID(), ...camposCuenta,
+    }).select("id,updated_at").single();
+    if (!order) return null;
+
+    const nueva = order as { id: string; updated_at: string };
+    tomarCuenta(nueva.id, nueva.updated_at);
+
+    if (lineas.length) {
+      // Sin `user_id` si la columna no existe (migración 0059). Las líneas de una cuenta
+      // recién creada no pueden chocar con nadie: la cuenta acaba de nacer.
+      const filas = lineas.map((l) => ({ order_id: nueva.id, ...l }));
+      const { error } = await sb.from("order_line").insert(filas);
+      if (error) {
+        const { error: e2 } = await sb.from("order_line").insert(filas.map(({ user_id, ...r }) => r));
+        if (e2) { toast.error("No se pudieron guardar las líneas de la cuenta."); return null; }
+      }
+    }
+    return nueva.id;
+  }
+
+  /**
+   * LA ÚNICA PUERTA para quedarse con una cuenta abierta.
+   *
+   * Guarda el id **y su versión** (`updated_at`). La versión es lo que impide que dos
+   * camareros se pisen: sin ella, `guardar_cuenta` no comprueba nada y volvemos al mundo en
+   * el que la tortilla que añadió Ana desaparece cuando Berto guarda su vino.
+   *
+   * Por eso todo pasa por aquí. `setOrdenAbiertaId` a secas deja la versión a null — a
+   * propósito: es preferible que se note (no se comprueba) a que se arrastre la versión de
+   * otra mesa (se comprueba MAL).
+   */
+  async function tomarCuenta(id: string, version?: string) {
+    setOrdenAbiertaId(id);
+    if (version) { setVersionOrden(version); return; }
+    const { data } = await sb.from("sales_order").select("updated_at").eq("id", id).maybeSingle();
+    setVersionOrden((data as { updated_at: string } | null)?.updated_at ?? null);
   }
 
   // Carga la cuenta de una mesa en el estado (comanda, precios, notas, pedido).
@@ -1087,12 +1135,13 @@ export default function TPV() {
     setLineaSel(null); setVistaProds(false); setOrdenAbiertaId(null);
 
     const { data: ord } = await sb.from("sales_order")
-      .select("id").eq("table_id", m.id)
+      .select("id,updated_at").eq("table_id", m.id)
       .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (!ord) { setNotaMesa(""); return false; }
-    const oid = (ord as { id: string }).id;
-    setOrdenAbiertaId(oid);
+    const o = ord as { id: string; updated_at: string };
+    const oid = o.id;
+    await tomarCuenta(oid, o.updated_at);   // el id Y su versión: ver `tomarCuenta`
     // La nota (best-effort, la columna puede no existir) viaja EN PARALELO con las líneas.
     const pNotas = Promise.resolve(sb.from("sales_order").select("notas").eq("id", oid).maybeSingle());
 
@@ -1381,7 +1430,15 @@ export default function TPV() {
         if (payErr) {
           // El pedido ya quedó COBRADA (crearOrden): lo devolvemos a POR_COBRAR
           // para que el descuadre sea visible y recuperable, no silencioso.
-          await sb.from("sales_order").update({ estado: "POR_COBRAR" }).eq("id", orderId);
+          //
+          // Y se recoge la versión nueva: la cuenta se queda ABIERTA en el TPV para que el
+          // camarero vuelva a cobrarla, y sin esto el segundo intento chocaría con el
+          // primero — con el cliente delante esperando.
+          const { data } = await sb.from("sales_order")
+            .update({ estado: "POR_COBRAR" }).eq("id", orderId)
+            .select("updated_at").maybeSingle();
+          if (data) setVersionOrden((data as { updated_at: string }).updated_at);
+
           if (mesa) await sb.from("restaurant_table").update({ estado: "POR_COBRAR" }).eq("id", mesa.id);
           toast.error("El pago NO quedó registrado. La cuenta sigue pendiente de cobro.");
           await recargarMesas();
@@ -1628,8 +1685,11 @@ export default function TPV() {
     setModalActivo(null);
     reset();
     setNavSala(false); setBarra(true);   // vuelve a la pantalla Ticket con la cuenta cargada
+    // El `update` mueve el `updated_at`, así que la versión se coge DESPUÉS. Al revés, el
+    // TPV se quedaría con una versión ya caducada y el primer guardado chocaría consigo
+    // mismo: «otro TPV ha tocado esto»… cuando el otro TPV era él.
     await sb.from("sales_order").update({ aparcado_como: null }).eq("id", o.id);
-    setOrdenAbiertaId(o.id);
+    await tomarCuenta(o.id);
     await cargarLineas(o.id);
     await recargarAparcados();
   }

@@ -18,6 +18,8 @@ node apps/nodo/pruebas/prueba-media.mjs
 node apps/nodo/pruebas/prueba-sync.mjs
 node apps/nodo/pruebas/prueba-sync-fiscal.mjs
 node apps/nodo/pruebas/prueba-catalogo.mjs
+node apps/nodo/pruebas/prueba-dos-camareros.mjs
+node apps/nodo/pruebas/prueba-facturas-a-la-vez.mjs
 .\apps\nodo\pruebas\prueba-vigilante.ps1
 .\apps\nodo\pruebas\prueba-secretos.ps1
 ```
@@ -31,16 +33,31 @@ node apps/nodo/pruebas/prueba-catalogo.mjs
 | `prueba-sync.mjs` | **dos pases de sincronización = UNA venta** en la nube (idempotencia por `client_id`) |
 | `prueba-sync-fiscal.mjs` | la nube recibe la factura, **su desglose de IVA y su registro de huella** — sin eso no podría declarar a la AEAT |
 | `prueba-catalogo.mjs` | la carta **viaja en las dos direcciones**, los borrados de la nube llegan al bar, lo que nace en el bar **no se borra solo**… y el segundo pase **NO MUEVE NADA** |
+| `prueba-dos-camareros.mjs` | Ana y Berto abren la mesa 5 a la vez. Ana añade una tortilla, Berto un vino: **la tortilla ya no desaparece** |
+| `prueba-facturas-a-la-vez.mjs` | 6 cobros **simultáneos** contra `/api/factura`: 6 facturas correlativas y **la cadena de huellas no se bifurca** |
 | `prueba-vigilante.ps1` | se mata PostgREST y **vuelve solo en ~35 s**, sirviendo datos |
 | `prueba-secretos.ps1` | la clave del bar entra (200); **la del manual, 401 — firma inválida** |
 
-### La comprobación que parece tonta y es la que importa
+### Tres comprobaciones que parecen tontas y son las que importan
 
-En `prueba-catalogo.mjs`, la número 2: **el segundo pase no mueve nada**.
-
+**`prueba-catalogo.mjs`, la número 2: el segundo pase no mueve nada.**
 Sin ella, la fecha de cada fila se va corriendo sola en cada pase, el bar se pasa el día
 bajando y subiendo la misma carta, y **los TPV se repintan cada cinco minutos delante de los
-clientes**. Es un fallo que no da ningún error: sólo hace que el programa parezca embrujado.
+clientes**. No da ningún error: sólo hace que el programa parezca embrujado.
+
+**`prueba-dos-camareros.mjs`, la número 4: un camarero puede guardar dos veces seguidas.**
+Es lo que separa un control de concurrencia de un candado tonto. Si el TPV chocara consigo
+mismo, el bar no podría cobrar — y el arreglo sería peor que el fallo.
+
+**`prueba-facturas-a-la-vez.mjs`, la cadena.**
+Que los seis cobros entren no basta. VERIFACTU es una **cadena**: si dos facturas cuelgan de
+la misma anterior, se bifurca, la AEAT rechaza el envío y **no se arregla después** — hay
+que anularlo todo. Esa comprobación es la razón de ser del fichero.
+
+> Y esta última prueba es, de paso, la primera vez que un nodo **emite una factura de
+> verdad**: hasta hoy `/api/factura` le preguntaba el local **a la nube**, con un token
+> firmado por el nodo, y la nube lo rechazaba. Ninguna prueba lo pilló porque todas
+> escribían en la base directamente, sin pasar por donde pasa un camarero.
 
 `ayuda.mjs` es lo común: el secreto del nodo, las claves `anon`/`service_role`, y
 `barDePrueba()` — que crea empresa + local + dueño con contraseña y su sesión.

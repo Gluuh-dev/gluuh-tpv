@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomInt } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { comoElLlamante, comoElServicio } from "@/app/lib/supabaseServidor";
 import { excedeLimite, ipDe } from "../limite";
 
 // Genera un código de vinculación de 6 dígitos (caduca en 10 min, un solo uso).
@@ -28,11 +28,11 @@ export async function POST(req: Request) {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const caller = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false },
-  });
+  // Contra el NODO si estamos en el bar; contra la nube si no. Con la dirección incrustada
+  // al compilar, emparejar un TPV dentro de un bar sin internet era imposible.
+  const caller = comoElLlamante(token);
+  if (!caller) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
+
   const { error: eUser } = await caller.auth.getUser();
   if (eUser) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
@@ -49,7 +49,8 @@ export async function POST(req: Request) {
   const { data: loc } = await caller.from("location").select("id").limit(1).maybeSingle();
   if (!loc) return NextResponse.json({ error: "La empresa no tiene local" }, { status: 400 });
 
-  const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+  const admin = comoElServicio();
+  if (!admin) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
 
   // Límite de dispositivos de la empresa (licencia_limites.dispositivos, 0084):
   // si se alcanza, no se crean más — el técnico de Gluuh lo amplía en la consola.
