@@ -15,6 +15,7 @@
 //  Antes esto estaba copiado en 5 sitios, cada uno con su propio debounce a mano.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { config, esNodo } from "./config";
 
 export type EventoCambio = "*" | "INSERT" | "UPDATE" | "DELETE";
 
@@ -55,11 +56,12 @@ export interface OpcionesEscucha {
  * que trae el suyo: Postgres LISTEN/NOTIFY servido por SSE. Cambia el transporte, no el
  * contrato: las pantallas siguen pidiendo "avísame cuando cambien estas tablas".
  */
-const ES_NODO = process.env.NEXT_PUBLIC_NODO_LOCAL === "1";
+// Se pregunta al EJECUTAR, no al compilar: en el nodo la configuración la inyecta el
+// propio servidor del bar en el HTML (ver app/lib/config.ts).
 
 /** Realtime del nodo: un flujo SSE con todos los cambios; aquí se filtra por tabla. */
 function escucharPorSse(opts: OpcionesEscucha, avisar: (c: Cambio) => void): () => void {
-  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/cambios`;
+  const url = `${config().url}/realtime/v1/cambios`;
   const fuente = new EventSource(url);
   const quiere = new Set(opts.tablas);
   const evento = opts.evento ?? "*";
@@ -93,7 +95,7 @@ export function escucharCambios(sb: SupabaseClient, opts: OpcionesEscucha): () =
     }, debounceMs);
   };
 
-  if (ES_NODO) {
+  if (esNodo()) {
     const cerrar = escucharPorSse(opts, avisar);
     return () => {
       if (temporizador) clearTimeout(temporizador);

@@ -35,11 +35,21 @@ Para pararlo: `.\supabase\nodo\arrancar-nodo.ps1 -Parar`
 |---|---|---|
 | Postgres | 55432 | la verdad |
 | PostgREST | 55433 | los datos por HTTP |
-| GoTrue | 55434 | quién eres |
+| Auth | 55434 | quién eres (**nuestro** firmador; ya no hay GoTrue) |
 | Realtime | 55435 | "el comandero ha picado algo" |
 | Media | 55436 | las fotos de la carta |
+| Web | 3100 | la interfaz (Next). **La sirve el propio nodo** |
 | **Gateway** | **54321** | ← **lo único que ve el TPV** |
 | Sync | — | sube a la nube cada 5 min |
+
+## A.1-bis · Compilar la web del nodo
+
+```powershell
+pnpm --filter @gluuh/web build:nodo
+```
+
+Produce un servidor **autocontenido** (41 MB, sin `node_modules`) que el nodo sirve por su
+mismo puerto. Sin esto, el servicio `Web` tira de `next start` (vale para desarrollo).
 
 ## A.2 · Bajarse un bar de la nube
 
@@ -55,35 +65,35 @@ node apps/nodo/descargar-imagenes.mjs          # y sus fotos
 empleados**. El bar completo (1 local, 2 salas, **21 mesas**, 4 empleados, 75 productos)
 es **Plantilla base**.
 
-## A.3 · Apuntar el TPV al nodo
+## A.3 · Apuntar el TPV al nodo: **ya no hay nada que hacer**
+
+El nodo **sirve la web además de los datos**, así que una terminal sólo tiene que saber la
+dirección del servidor:
 
 ```powershell
-node apps/nodo/claves.mjs "clave-jwt-de-desarrollo-del-nodo-gluuh-min-32-chars"
+.\supabase
+odo\Instalar-TPV.ps1     # una pregunta: la IP del servidor
 ```
 
-Imprime **dos** claves. La **primera** es `anon`, la **segunda** es `service_role`.
-En `apps/web/.env.local`:
+O directamente: abre `http://<ip-del-nodo>:54321` en el navegador. **Y ya.**
 
-```env
-NEXT_PUBLIC_NODO_LOCAL=1
-NEXT_PUBLIC_SUPABASE_URL=http://<ip-del-nodo>:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<la 1ª>
-SUPABASE_SECRET_KEY=<la 2ª — la del NODO, NO la de Supabase>
-NEXT_PUBLIC_SUPABASE_URL_NUBE=https://<proyecto>.supabase.co
-```
+### Lo que se ha ido (y por qué importa)
 
-### ⚠️ El error que más cuesta diagnosticar
+Antes había que rellenar **cuatro variables en un `.env.local` en cada máquina**. Y
+equivocarse en una —poner la clave de Supabase donde va la del nodo— **dejaba a los
+camareros fuera sin decir por qué**. Ese fichero ya no existe.
 
-**`SUPABASE_SECRET_KEY` tiene que ser la del NODO**, no la de Supabase (`sb_secret_…`).
+La clave, la URL de los datos y la de la nube se las da el propio servidor al cargar la
+página (el gateway se las inyecta en el HTML). Consecuencias:
 
-`/api/entrar-operario` usa esa clave **contra `NEXT_PUBLIC_SUPABASE_URL`**, que en modo
-nodo **es el nodo**. Con la clave de la nube ahí, el nodo la rechaza y **ningún camarero
-puede entrar**. No da un error claro: sólo "no puedo entrar".
+- **Una sola compilación de la web para todos los bares** (antes habría hecho falta una
+  por cliente: cada nodo tiene su IP y su secreto, y por tanto su clave).
+- **Al actualizar el servidor se actualizan todas las terminales a la vez.** No hay que ir
+  máquina por máquina.
+- Si el servidor cambia de IP, se vuelve a ejecutar el instalador de terminal. *(Mejor:
+  fija la IP en el router y no cambia.)*
 
-`NEXT_PUBLIC_SUPABASE_URL_NUBE` sí es la de Supabase de verdad: es la que se guarda en la
-base de datos al subir una foto (ver §B.4).
-
-Arrancar: `pnpm --filter @gluuh/web dev` → `http://localhost:3100`
+> Para desarrollo contra la nube, `apps/web/.env.local` sigue siendo el de siempre.
 
 ## A.4 · Qué probar (y en qué orden)
 
@@ -105,7 +115,7 @@ Los logs están en `.nodo\tmp\*.log` (uno por servicio).
 | El TPV no ve nada, sin errores | la RLS no resuelve el tenant → `auth.uid()` |
 | PostgREST muere al arrancar | falta `libpq.dll` → `pgsql\bin` no está en el PATH |
 | El nodo arranca "vivo" pero mudo | Postgres levantó en el 5432 en vez del 55432 |
-| El TPV no ve las fotos | falta `NEXT_PUBLIC_NODO_LOCAL=1` (no reescribe las URLs) |
+| El auth no arranca al **actualizar** | un GoTrue viejo ocupa el :55434 -> `-Parar` lo entierra |
 
 ---
 
@@ -150,7 +160,7 @@ En su lugar (`apps/nodo/nube.mjs`):
 
 - El nodo **inicia sesión como el bar**, con la cuenta del titular.
 - Guarda **sólo el `refresh_token`** — nunca la contraseña, nunca una clave maestra.
-- GoTrue **rota** ese token en cada uso, y el nodo guarda el nuevo.
+- El token **rota** en cada uso, y el nodo guarda el nuevo.
 - **La RLS lo acota a su empresa.** No puede tocar nada de nadie más.
 
 Si le roban el ordenador a un bar, se llevan los datos **de ese bar**. De ninguno más.
@@ -167,10 +177,10 @@ Con **Inno Setup** (gratis, es el estándar en Windows). El guion está en
 
 ```
 carga\pgsql\          Postgres portable          (~300 MB)
-carga\bin\            postgrest.exe, gotrue.exe  (~120 MB)
+carga\bin\            postgrest.exe              (~66 MB)   <- ya NO va gotrue.exe
 carga\node\           Node.js portable           (~50 MB)
 carga\postgrest.conf
-carga\gotrue.env
+carga\web\            .next/standalone           (~41 MB)   <- la interfaz
 ```
 
 ⚠️ **`postgrest.exe` necesita `libpq.dll`, que viene con Postgres y NO en su propio zip.**
@@ -194,7 +204,8 @@ un aviso rojo de "aplicación no reconocida" — y ahí se acaba la instalación
 
 1. `initdb` — crea el cluster de Postgres. **Es lo único que no se puede traer hecho**:
    el directorio de datos lleva dentro rutas absolutas de la máquina donde se creó.
-2. Las 100 migraciones (bootstrap → GoTrue → reparar `auth.uid()` → migraciones).
+2. Las 100 migraciones (bootstrap → migraciones → lo propio del nodo). El orden ya es
+   el evidente: se fue GoTrue y con él las dos trampas.
 3. Se baja el bar entero de la nube y sus fotos.
 4. Arranca los 7 servicios y registra el arranque automático.
 5. Escribe `INSTALACION.txt` con la dirección para los TPV.

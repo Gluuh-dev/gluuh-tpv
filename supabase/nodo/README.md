@@ -659,3 +659,56 @@ antes para siempre. Por eso `-Parar` lo entierra y el chequeo comprueba **quién
 `00_bootstrap_nodo.sql` vuelve a crear `auth.users` y `auth.uid()` **como debe ser**, y ya
 no hay nadie que las pise. El instalador pasó de **6 pasos a 4**, y `01_despues_de_gotrue.sql`
 —que existía sólo para reparar lo que GoTrue rompía— **se ha borrado**.
+
+---
+
+## El nodo sirve la web — y con eso desaparece la configuración de las terminales
+
+```powershell
+pnpm --filter @gluuh/web build:nodo   # servidor autocontenido (41 MB, sin node_modules)
+```
+
+El gateway sirve la web (Next, en el 3100) por el **mismo puerto** que los datos. Un TPV
+abre `http://<ip-del-nodo>:54321` y funciona.
+
+### Lo que esto se lleva por delante
+
+Antes hacían falta **cuatro variables en un `.env.local` en cada terminal**. Y equivocarse
+en una —poner la clave de Supabase donde va la del nodo— **dejaba a los camareros fuera
+sin decir por qué**. Ese fichero ya no existe: la configuración se la da el servidor al
+cargar la página.
+
+Y de regalo: **una sola compilación de la web para todos los bares** (cada nodo tiene su
+IP y su secreto, o sea su clave: con `NEXT_PUBLIC_*` habría que compilar una web por
+cliente), y **al actualizar el servidor se actualizan todas las terminales a la vez**.
+
+### La trampa: el `layout` de Next NO puede inyectar la configuración
+
+Lo intenté primero ahí —leer la variable en el servidor y meter un `<script>`—. Limpio,
+evidente… y **no funciona**: casi todas las pantallas (incluido `/tpv`) son **estáticas**,
+Next las prerenderiza **al compilar**, y en ese momento la variable ni existe. El script
+salía vacío y el TPV se quedaba sin configuración — **sirviendo la web perfectamente y sin
+un error en ningún log**.
+
+La inyección la hace el **gateway**, que ve pasar cada respuesta HTML y le mete el script
+en el `<head>`. Da igual que la página sea estática o dinámica. (Y por eso al proxy de la
+web se le pide `accept-encoding: identity`: en gzip no podríamos abrir el HTML.)
+
+### La otra trampa: el `standalone` no copia `static` ni `public`
+
+Next **no** los mete en el build autocontenido. Si se olvida, **la web arranca igual** y
+sirve el HTML **sin CSS y sin JavaScript**: una página en blanco en el TPV de un bar, y ni
+un error en los logs. (Y sin `public`, el plano de mesas se queda sin sus SVG.)
+`build-nodo.mjs` los copia.
+
+### El instalador de terminal: **una** pregunta
+
+```powershell
+.\supabase\nodo\Instalar-TPV.ps1
+```
+
+Pide la dirección del servidor, **comprueba que esté sano** (si tiene servicios caídos,
+avisa y no instala: mejor enterarse ahora que cuando el camarero intente cobrar), enseña
+lo que hay dentro (productos, mesas, empleados) y escribe **una línea** en
+`%APPDATA%\Gluuh TPV\config.json` — que es exactamente donde la app de escritorio la lee
+(`app.getPath("userData")`, `apps/desktop/src/config.ts`).

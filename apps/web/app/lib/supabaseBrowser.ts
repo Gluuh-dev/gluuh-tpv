@@ -1,5 +1,6 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { config } from "./config";
 
 // Cliente de Supabase para el NAVEGADOR (clave publishable, segura para el cliente).
 // La RLS protege los datos: cada usuario solo ve los de su empresa.
@@ -15,8 +16,10 @@ export function supabaseBrowser(): SupabaseClient {
       auth: { persistSession: true, autoRefreshToken: true, experimental: { passkey: true } },
     } as never;
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    // En el NODO esto no viene de las NEXT_PUBLIC_ (que se incrustan al compilar): lo
+    // inyecta el propio servidor del bar en el HTML. Así una sola compilación vale para
+    // todos los bares, y en las terminales no hay ni una variable que configurar.
+    const { url, clave: key } = config();
 
     // En el prerender de `next build` las NEXT_PUBLIC_ pueden no estar definidas
     // y `createClient` lanzaría "supabaseUrl is required", rompiendo la build.

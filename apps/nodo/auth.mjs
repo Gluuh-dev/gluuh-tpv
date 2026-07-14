@@ -33,10 +33,9 @@
 //  (`getSession` es del navegador: lee su almacén local y no llama a nadie.)
 
 import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
 import pg from "pg";
+import { secretoDelNodo } from "./secreto.mjs";
 
 const PUERTO = Number(process.env.NODO_AUTH_PUERTO ?? 55434);
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
@@ -45,23 +44,9 @@ const DURACION = 3600;                    // el access token vive 1 h
 const TICKET_SEGUNDOS = 120;              // el vale de un solo uso, 2 min
 const REFRESCO_DIAS = 30;
 
-// ── El secreto de ESTE nodo ──────────────────────────────────────────────────
-// El mismo con el que PostgREST valida. Si no cuadraran, no entraría nadie.
-function secreto() {
-  const env = path.resolve(".nodo/nodo.env");
-  if (fs.existsSync(env)) {
-    const m = /^NODO_JWT_SECRETO=(.*)$/m.exec(fs.readFileSync(env, "utf8"));
-    if (m) return m[1].trim();
-  }
-  // De donde manda de verdad: la configuración de PostgREST.
-  const conf = path.resolve(".nodo/postgrest.conf");
-  if (fs.existsSync(conf)) {
-    const m = /^jwt-secret\s*=\s*"(.*)"$/m.exec(fs.readFileSync(conf, "utf8"));
-    if (m) return m[1];
-  }
-  throw new Error("No encuentro el secreto JWT del nodo (.nodo/nodo.env o postgrest.conf)");
-}
-const SECRETO = secreto();
+// El secreto de ESTE nodo: el mismo con el que PostgREST valida. Si no cuadraran, no
+// entraría nadie.
+const SECRETO = secretoDelNodo();
 
 const bd = new pg.Pool({ connectionString: BD });
 

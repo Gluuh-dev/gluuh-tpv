@@ -66,7 +66,6 @@ Source: "..\..\..\node_modules\pg\*"; DestDir: "{app}\node_modules\pg"; Flags: i
 
 ; La configuracion de los servicios.
 Source: "carga\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion
-Source: "carga\gotrue.env";     DestDir: "{app}\.nodo"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\.nodo\tmp"

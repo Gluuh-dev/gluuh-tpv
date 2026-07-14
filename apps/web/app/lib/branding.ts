@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { config } from "./config";
 
 export interface Branding {
   nombre_comercial: string | null;
@@ -91,8 +92,9 @@ export async function subirMedia(
   // lleva dentro una dirección de la red del bar (que fuera de ese bar no significa
   // nada), y el dueño ve la foto desde su casa. Al pintar, `urlFoto()` la redirige al
   // nodo. Nunca guardes aquí la URL del nodo.
-  if (process.env.NEXT_PUBLIC_NODO_LOCAL === "1") {
-    const nodo = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const cfg = config();
+  if (cfg.nodo) {
+    const nodo = cfg.url;
     const r = await fetch(`${nodo}/storage/v1/object/media/${path}`, {
       method: "POST",
       headers: { "content-type": file.type || "application/octet-stream" },
@@ -100,8 +102,8 @@ export async function subirMedia(
     });
     if (!r.ok) throw new Error(`El nodo no pudo guardar la imagen (HTTP ${r.status})`);
 
-    const nube = process.env.NEXT_PUBLIC_SUPABASE_URL_NUBE;
-    if (!nube) throw new Error("Falta NEXT_PUBLIC_SUPABASE_URL_NUBE: no sé qué URL guardar");
+    const nube = cfg.urlNube;
+    if (!nube) throw new Error("El nodo no dice cuál es su Supabase: no sé qué URL guardar");
     return `${nube}/storage/v1/object/public/media/${path}`;
   }
 

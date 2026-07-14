@@ -24,8 +24,13 @@ export async function POST(req: Request) {
   const { usuario, clave, tenant_id } = await req.json().catch(() => ({}));
   if (!usuario || !clave) return NextResponse.json({ error: "Falta el usuario o la clave" }, { status: 400 });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secret = process.env.SUPABASE_SECRET_KEY;
+  // En el NODO esta ruta corre DENTRO del propio servidor del bar, así que habla con él
+  // por loopback. Nada de variables NEXT_PUBLIC_: no hay que configurar cada terminal.
+  const enNodo = process.env.NODO_LOCAL === "1";
+  const url = enNodo
+    ? (process.env.NODO_URL_INTERNA ?? "http://127.0.0.1:54321")
+    : process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secret = enNodo ? process.env.NODO_CLAVE_SERVICIO : process.env.SUPABASE_SECRET_KEY;
   if (!url || !secret) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
 
   const admin = createClient(url, secret, { auth: { persistSession: false } });
@@ -53,7 +58,7 @@ export async function POST(req: Request) {
   //
   // El contrato con el navegador NO cambia: sigue llamando a signInWithPassword con lo
   // que le devolvemos aquí. Sólo que la "contraseña" es ahora un vale.
-  if (process.env.NEXT_PUBLIC_NODO_LOCAL === "1") {
+  if (enNodo) {
     const r = await fetch(`${url}/auth/v1/vale`, {
       method: "POST",
       headers: { apikey: secret, authorization: `Bearer ${secret}`, "content-type": "application/json" },

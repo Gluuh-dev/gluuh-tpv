@@ -21,18 +21,19 @@
  * En la nube es la identidad: devuelve lo que le des.
  */
 
-const ES_NODO = process.env.NEXT_PUBLIC_NODO_LOCAL === "1";
+import { config } from "./config";
 
 /** Todo lo que Supabase Storage sirve cuelga de aquí; es lo que buscamos para cortar. */
 const MARCA = "/storage/v1/object/public/";
 
 export function urlFoto(url: string | null | undefined): string {
   if (!url) return "";
-  if (!ES_NODO) return url;
+
+  const cfg = config();
+  if (!cfg.nodo) return url;
 
   const corte = url.indexOf(MARCA);
   if (corte === -1) return url; // no es de Storage (un data: o una URL suelta): tal cual
 
-  const nodo = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  return `${nodo}${url.slice(corte)}`;
+  return `${cfg.url}${url.slice(corte)}`;
 }

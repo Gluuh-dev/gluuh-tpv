@@ -11,7 +11,8 @@
     "test": "vitest run",
     "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "build:nodo": "node build-nodo.mjs"
   },
   "dependencies": {
     "@gluuh/core": "workspace:*",

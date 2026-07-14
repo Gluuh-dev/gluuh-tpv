@@ -5,7 +5,8 @@
 #   Auth       :55434   quién eres (NUESTRO firmador; ya no hay GoTrue)
 #   Realtime   :55435   "el comandero ha picado algo"
 #   Media      :55436   las fotos de la carta
-#   Gateway    :54321   <- lo único que ve el TPV. Reparte a los otros cinco.
+#   Web        :3100    la interfaz (Next). La sirve el propio nodo
+#   Gateway    :54321   <- lo ÚNICO que ve el TPV. Reparte a todos los demás.
 #   Sync       —        sube a la nube cada 5 min (sólo si hay credenciales)
 #
 #   .\arrancar-nodo.ps1           arranca lo que esté parado y sale
@@ -174,6 +175,15 @@ $SERVICIOS = @(
     arrancar = { ArrancaNode "media.mjs" }
   }
   @{
+    # La WEB. El nodo la sirve el mismo: la app de escritorio del TPV carga la interfaz de
+    # una URL, y en un bar sin internet esa URL tiene que ser el propio servidor.
+    # Al salir la web y los datos del MISMO origen, en las terminales no hay NADA que
+    # configurar: ni IP, ni claves, ni .env. Solo abrir el navegador.
+    nombre   = "Web"
+    vivo     = { Responde "http://127.0.0.1:3100/" }
+    arrancar = { ArrancaNode "web.mjs" }
+  }
+  @{
     nombre   = "Gateway"
     vivo     = { Responde "http://127.0.0.1:54321/nodo/estado" }
     arrancar = { ArrancaNode "gateway.mjs" }
@@ -197,7 +207,7 @@ if ($Parar) {
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'gateway\.mjs|realtime\.mjs|media\.mjs|sincronizar\.mjs|auth\.mjs' } |
+    Where-Object { $_.CommandLine -match 'gateway\.mjs|realtime\.mjs|media\.mjs|sincronizar\.mjs|auth\.mjs|web\.mjs' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   Get-Process postgrest -ErrorAction SilentlyContinue | Stop-Process -Force
 

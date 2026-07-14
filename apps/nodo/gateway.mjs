@@ -12,6 +12,7 @@
 
 import http from "node:http";
 import { estado } from "./estado.mjs";
+import { firmar, urlNube } from "./secreto.mjs";
 
 const PUERTO = Number(process.env.NODO_PUERTO ?? 54321);
 
@@ -27,6 +28,39 @@ const RUTAS = [
   { prefijo: "/storage/v1", destino: { host: "127.0.0.1", port: 55436 } },
 ];
 
+// El RESTO de peticiones son la web: el nodo la sirve él mismo (Next, en el 3100).
+//
+// Que la web y los datos salgan del MISMO ORIGEN es lo que hace que un TPV no tenga NADA
+// que configurar: abre `http://<ip-del-nodo>:54321` y ya. Antes había que poner cuatro
+// variables en un `.env.local` en cada máquina, y equivocarse en una —poner la clave de
+// la nube donde va la del nodo— dejaba a los camareros fuera sin decir por qué.
+const WEB = { host: "127.0.0.1", port: Number(process.env.NODO_WEB_PUERTO ?? 3100) };
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LA CONFIGURACIÓN DEL BAR, INYECTADA EN EL HTML AL VUELO
+//
+//  Primero lo intenté en el `layout.tsx` de Next: leer la variable en el servidor y meter
+//  el `<script>`. Limpio y evidente… y NO FUNCIONA. Casi todas las pantallas (incluido
+//  `/tpv`) son ESTÁTICAS: Next las prerenderiza **al compilar**, cuando esa variable ni
+//  existe. El script salía vacío y el TPV se quedaba sin configuración — sirviendo la web
+//  perfectamente, y sin un error en ningún log.
+//
+//  Aquí sí: el gateway ve pasar cada respuesta y le mete el script en el `<head>`. Da
+//  igual que la página sea estática o dinámica, y la web se compila UNA vez para todos
+//  los bares.
+// ─────────────────────────────────────────────────────────────────────────────
+const CONFIG_DEL_BAR = {
+  nodo: true,
+  url: "",                       // vacío = el MISMO origen (nada que teclear en el TPV)
+  clave: firmar("anon"),         // la clave pública de ESTE bar, derivada de su secreto
+  urlNube: urlNube(),
+};
+
+// `JSON.stringify` del JSON: el navegador recibe una CADENA y la parsea. Así un valor con
+// `</script>` dentro no puede cerrar la etiqueta e inyectar HTML.
+const SCRIPT_CONFIG =
+  `<script>window.__GLUUH__=JSON.parse(${JSON.stringify(JSON.stringify(CONFIG_DEL_BAR))})</script>`;
+
 const servidor = http.createServer(async (req, res) => {
   // El panel del servidor: qué hay levantado, qué lleva creado, cuánto ocupa.
   if (req.url.startsWith("/nodo/estado")) {
@@ -41,15 +75,26 @@ const servidor = http.createServer(async (req, res) => {
     return;
   }
 
-  const ruta = RUTAS.find((r) => req.url.startsWith(r.prefijo));
-
-  if (!ruta) {
-    // Un 501 explícito, no un 404: que se vea que es el nodo el que no sirve eso
-    // todavía, y no que el dato no exista.
-    res.writeHead(501, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: `El nodo aún no sirve ${req.url}` }));
+  // La configuración de ESTE nodo. La app la lee al arrancar en vez de llevarla
+  // incrustada al compilar — por eso una sola compilación vale para todos los bares.
+  // (La app servida por el nodo la recibe ya inyectada en el HTML; esto es para quien
+  // la necesite desde fuera: la app de escritorio, un diagnóstico, un técnico.)
+  if (req.url.startsWith("/nodo/config")) {
+    res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
+    res.end(JSON.stringify(CONFIG_DEL_BAR));
     return;
   }
+
+  // Lo que no es una API del nodo, es la WEB. La sirve el propio nodo (Next, en el 3100).
+  const esWeb = !RUTAS.some((r) => req.url.startsWith(r.prefijo));
+  const ruta = RUTAS.find((r) => req.url.startsWith(r.prefijo)) ?? { destino: WEB, conservarPrefijo: true, prefijo: "" };
+
+  const cabeceras = { ...req.headers, host: `${ruta.destino.host}:${ruta.destino.port}` };
+
+  // A la web se le pide SIN COMPRIMIR: si viniera en gzip no podríamos abrir el HTML para
+  // meterle la configuración del bar. Es tráfico por la red local del local, no por
+  // internet: comprimirlo no aporta nada y complicaría esto.
+  if (esWeb) cabeceras["accept-encoding"] = "identity";
 
   const destino = http.request(
     {
@@ -58,9 +103,34 @@ const servidor = http.createServer(async (req, res) => {
       // El prefijo se QUITA antes de reenviar (PostgREST espera /category, no
       // /rest/v1/category), salvo donde el destino lo espera entero.
       path: (ruta.conservarPrefijo ? req.url : req.url.slice(ruta.prefijo.length)) || "/",
-      headers: { ...req.headers, host: `${ruta.destino.host}:${ruta.destino.port}` },
+      headers: cabeceras,
     },
     (r) => {
+      // ── El HTML de la web: se le mete la configuración de ESTE bar ───────────
+      const esHtml = (r.headers["content-type"] ?? "").includes("text/html");
+      if (esWeb && esHtml) {
+        const trozos = [];
+        r.on("data", (t) => trozos.push(t));
+        r.on("end", () => {
+          const html = Buffer.concat(trozos).toString("utf8");
+          // Antes de nada, para que `config()` lo tenga listo cuando arranque la app.
+          const conConfig = html.includes("<head>")
+            ? html.replace("<head>", `<head>${SCRIPT_CONFIG}`)
+            : SCRIPT_CONFIG + html;
+
+          const cab = { ...r.headers };
+          // La longitud ha cambiado (y ya no hay compresión que declarar).
+          delete cab["content-length"];
+          delete cab["content-encoding"];
+          res.writeHead(r.statusCode ?? 200, {
+            ...cab,
+            "content-length": Buffer.byteLength(conConfig),
+          });
+          res.end(conConfig);
+        });
+        return;
+      }
+
       res.writeHead(r.statusCode ?? 502, r.headers);
       // El realtime es un flujo que no termina (SSE): hay que soltar cada evento en
       // cuanto llega. Sin esto, Node agrupa la salida y el aviso de una comanda podría
