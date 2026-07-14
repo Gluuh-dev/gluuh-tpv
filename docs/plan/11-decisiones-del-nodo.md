@@ -1,6 +1,6 @@
 # 11 — Decisiones del nodo local (14-07-2026)
 
-Diez decisiones tomadas con el cliente. Cada una con **por qué** y con **qué obliga a
+Once decisiones tomadas con el cliente. Cada una con **por qué** y con **qué obliga a
 construir**. Las que no están aquí, no están decididas.
 
 ---
@@ -161,6 +161,51 @@ bares, el nuevo propietario se queda con los datos de los demás.
 3. Latido y modo emergencia.
 4. Impresión por IP.
 5. Envío a la AEAT desde la nube.
+
+---
+
+## 11 · La jornada: cómo se cierra la facturación del día (añadida 14-07 tarde)
+
+**Botón "Cerrar día" en el TPV + cierre automático de respaldo.**
+
+El encargado pulsa "Cerrar día" al terminar la noche: hace el **arqueo de caja**, ve el
+resumen de la jornada (el **Z** de toda la vida) y cierra. Si a la **hora configurada**
+(por local; por defecto **06:00**) nadie lo hizo, el nodo cierra la jornada solo y la
+marca `cierre = AUTOMATICO, arqueo pendiente` — al abrir al día siguiente, el TPV avisa
+y pide el recuento. Es el comportamiento de Ágora/Glop, y encaja con la realidad: los
+encargados se olvidan y las noches largas existen.
+
+**Mesas abiertas al cerrar**: en el cierre manual, el TPV las enseña ("quedan 2 mesas:
+mesa 5 — 34,50 €…") y el encargado decide — cobrar, anular **o cerrar igual**. Si cierra
+igual (o cierra el automático, que no puede preguntar), las mesas **siguen abiertas y su
+venta cuenta en la jornada en que se cobren**. La jornada se cierra con lo cobrado; lo
+pendiente no se inventa — con VERIFACTU delante, fabricar cobros o anulaciones
+automáticas de ventas no confirmadas es buscarse un problema. El Z deja constancia:
+"quedaron N mesas abiertas".
+
+**La jornada, no el calendario, es el día del bar.** Hoy los informes cortan
+`created_at` a `YYYY-MM-DD` (`ventas-diarias`), así que **las cañas de la 1:30 del
+sábado cuentan como sábado, no como la jornada del viernes** — descuadra todos los
+fines de semana. Las ventas pertenecen a **la jornada en la que se cobran**.
+
+**Obliga a**:
+
+- Tabla `jornada` (`location_id`, `abierta_en`, `cerrada_en`, `cerrada_por`,
+  `tipo_cierre MANUAL|AUTOMATICO`, totales del Z) + `sales_order.jornada_id` (se asigna
+  al crear/cobrar contra la jornada abierta del local).
+- Botón "Cerrar día" en el TPV: arqueo (`cash_session`) + resumen Z + cierre; aviso de
+  mesas abiertas.
+- El cierre automático vive en el **vigilante del nodo** (implementación 18, bloque 1):
+  a la hora configurada, si hay jornada abierta, la cierra como AUTOMATICO.
+- Informes del panel: agrupar por `jornada`, no por fecha de calendario.
+- El cierre dispara: **pase de sincronización final** + **abre la ventana de
+  actualización** del nodo (`actualizar.mjs` puede comprobar "jornada cerrada" además de
+  cuentas/cajas abiertas).
+- Hora de cierre automático: ajuste por local (`setting`), por defecto 06:00.
+
+Entra en el orden de trabajo antes del primer bar real (junto al bloque 5 de
+`implementacion/18`): sin jornada, los informes de cualquier bar que cierre pasada la
+medianoche están mal.
 
 ---
 
