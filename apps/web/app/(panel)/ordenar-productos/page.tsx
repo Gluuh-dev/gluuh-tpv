@@ -105,7 +105,9 @@ export default function OrdenarProductos() {
 
           <Card className="overflow-hidden py-0">
             <CardContent className="p-0">
-              {lista.length === 0 && (
+              {/* `cargado &&`: la bandera ya existía y no se usaba aquí. Sin ella, decía «No
+                  hay productos en esta categoría» mientras los estaba cargando. */}
+              {cargado && lista.length === 0 && (
                 <p className="px-5 py-4 text-sm text-muted-foreground">No hay productos en esta categoría.</p>
               )}
               <div className="divide-y divide-border">

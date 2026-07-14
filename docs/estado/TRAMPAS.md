@@ -201,7 +201,37 @@ pueda **decirlo**. Una cocina muda que no avisa de que está muda es peor que un
 
 ---
 
-## 11 · Cosas sueltas que muerden
+## 11 · El panel MENTÍA: «no hay nada» mientras cargaba
+
+Una página que hace `useEffect` + fetch empieza con la lista **vacía**. Y **vacía no es lo
+mismo que "no hay nada"**. Sin comprobar si aún se está cargando, el panel afirmaba:
+
+> *«Aún no hay empleados»* · *«Sin descuentos»* · *«Aún no hay tarifas»* ·
+> *«Sin planos todavía»* · *«Sin movimientos de efectivo»* · *«Aún no hay ventas registradas»*
+
+El dueño abre el panel **desde casa, con una 4G regular**, y durante dos segundos lee que su
+plantilla, su carta, su caja o sus ventas **han desaparecido**. Y llama.
+
+**Una zona en blanco se entiende. Una página que afirma algo falso, no.** No es un problema
+de pulido: es una página que miente sobre el estado del negocio.
+
+El patrón correcto —y la mayoría del panel ya lo hacía bien— es:
+
+```tsx
+{!loading && lista.length === 0 && <EmptyState … />}
+```
+
+Y `<FilasCargando />` (`components/ui/filas-cargando.tsx`) para que además no dé un salto.
+
+> **No hace falta ninguna librería.** `Skeleton` ya estaba en el proyecto desde el principio.
+> Lo que faltaba era **acordarse de mirar si aún se está cargando**. *(Boneyard —la librería
+> que lo prometía— arranca un **navegador de verdad en tiempo de compilación** con
+> `playwright`; contra un panel **autenticado y multi-empresa** eso es más trabajo que el
+> arreglo, y encima **no arregla la mentira**: arregla el parpadeo.)*
+
+---
+
+## 12 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.
   La cuenta la lleva `nodo_migracion`.

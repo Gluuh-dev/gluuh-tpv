@@ -16,6 +16,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { eur } from "@/app/lib/money";
 
 interface Tarifa { id: string; nombre: string }
@@ -39,6 +40,11 @@ export default function Tarifas() {
   const [precios, setPrecios] = useState<Record<string, string>>({});
   const [guardados, setGuardados] = useState<Record<string, number>>({});
 
+  // ESTO SON LOS PRECIOS. Mientras cargaban, la página decía «Aún no hay tarifas» y «No hay
+  // productos en la carta» — o sea, que el dueño abría sus precios y leía que no tenía
+  // ninguno. Vacío no es lo mismo que "todavía no ha llegado".
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     void (async () => {
       const { data: t } = await sb.from("tenant").select("id").limit(1).maybeSingle();
@@ -51,6 +57,7 @@ export default function Tarifas() {
       setCats((c as Categoria[]) ?? []);
       const { data: p } = await sb.from("product").select("id,nombre,precio,category_id").order("nombre");
       setProds((p as Producto[]) ?? []);
+      setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -176,7 +183,8 @@ export default function Tarifas() {
         <Card className="self-start">
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              {tarifas.length === 0 && (
+              {loading && <Skeleton className="h-8 w-full" />}
+              {!loading && tarifas.length === 0 && (
                 <p className="py-2 text-sm text-(--text-muted)">Aún no hay tarifas. Crea la primera abajo.</p>
               )}
               {tarifas.map((t) =>
@@ -244,7 +252,13 @@ export default function Tarifas() {
               <SearchInput value={busca} onChange={setBusca} placeholder="Buscar producto…" />
               <Card className="overflow-hidden py-0">
                 <CardContent className="p-0">
-                  {grupos.length === 0 && (
+                  {loading && (
+                    <div className="space-y-2 px-5 py-4">
+                      {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-5 w-full" />)}
+                    </div>
+                  )}
+                  {/* «No hay productos en la carta» sólo cuando de verdad no los hay. */}
+                  {!loading && grupos.length === 0 && (
                     <p className="px-5 py-4 text-sm text-(--text-muted)">
                       {prods.length === 0 ? "No hay productos en la carta." : "Ningún producto coincide con la búsqueda."}
                     </p>

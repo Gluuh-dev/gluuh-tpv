@@ -154,7 +154,10 @@ export default function Caja() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Movimientos</CardTitle></CardHeader>
         <CardContent className="p-0">
-          {movs.length === 0 && <p className="px-5 py-6 text-center text-sm text-muted-foreground">Sin movimientos de efectivo.</p>}
+          {/* `!loading &&`: esto es DINERO. Sin la comprobación, el dueño abría la caja y leía
+              «Sin movimientos de efectivo» mientras se cargaban — o sea, que la caja del día
+              está a cero. Dos segundos de susto por nada. */}
+          {!loading && movs.length === 0 && <p className="px-5 py-6 text-center text-sm text-muted-foreground">Sin movimientos de efectivo.</p>}
           <div className="divide-y divide-border">
             {movs.map((m) => (
               <div key={m.id} className="flex items-center justify-between px-5 py-2.5 text-sm">

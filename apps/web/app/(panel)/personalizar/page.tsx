@@ -180,7 +180,8 @@ export default function Personalizar() {
           <Button onClick={addOferta}><Plus className="h-4 w-4" /> Nueva oferta</Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {ofertas.length === 0 && (
+          {/* `!loading &&`: sin eso decía «sin ofertas» mientras las cargaba. */}
+          {!loading && ofertas.length === 0 && (
             <EmptyState
               title="Sin ofertas todavía"
               description="Crea la primera oferta para mostrarla en bucle en la pantalla de ofertas."

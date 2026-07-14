@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FilasCargando } from "@/components/ui/filas-cargando";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -76,6 +77,13 @@ export default function Empleados() {
   const [claveAcceso, setClaveAcceso] = useState("");
   const [guardando, setGuardando] = useState(false);
 
+  // MIENTRAS CARGA, LA LISTA ESTÁ VACÍA — Y ESO NO ES LO MISMO QUE ESTAR VACÍA.
+  //
+  // Sin esta bandera, esta página le decía al dueño **«Aún no hay empleados»** mientras los
+  // estaba pidiendo. Desde casa con 4G eso son dos segundos leyendo que su plantilla ha
+  // desaparecido. Una zona en blanco se entiende; una página que **miente**, no.
+  const [loading, setLoading] = useState(true);
+
   async function cargar() {
     const { data } = await sb
       .from("app_user")
@@ -85,6 +93,7 @@ export default function Empleados() {
     // Perfiles para el selector (el usuario hereda sus permisos por perfil_id).
     const perf = await sb.from("perfil").select("id,nombre").order("nombre");
     setPerfiles(perf.error ? [] : ((perf.data as Perfil[]) ?? []));
+    setLoading(false);
   }
   useEffect(() => { void cargar();   }, []);
 
@@ -237,7 +246,9 @@ export default function Empleados() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtrada.length === 0 && (
+            {loading && <FilasCargando filas={6} columnas={5} />}
+
+            {!loading && filtrada.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                   {lista.length === 0 ? "Aún no hay empleados. Crea el primero con «Nuevo empleado»." : "Sin resultados."}

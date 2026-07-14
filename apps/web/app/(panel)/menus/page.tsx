@@ -90,7 +90,8 @@ export default function Menus() {
         </CardContent>
       </Card>
 
-      {menus.length === 0 && <EmptyState title="Sin menús" description="Crea tu primer menú del día o combo arriba." />}
+      {/* `!loading &&`: sin eso decía «Sin menús» mientras los cargaba. */}
+      {!loading && menus.length === 0 && <EmptyState title="Sin menús" description="Crea tu primer menú del día o combo arriba." />}
 
       {menus.map((m) => (
         <MenuCard key={m.id} menu={m} grupos={grupos.filter((g) => g.menu_id === m.id)} choices={choices} prods={prods}

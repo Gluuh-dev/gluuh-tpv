@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FilasCargando } from "@/components/ui/filas-cargando";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,10 @@ export default function Impresoras() {
   const [guardando, setGuardando] = useState(false);
   const [rutaNueva, setRutaNueva] = useState<{ estacion: string; room_id: string; printer_id: string }>({ estacion: "COCINA", room_id: CUALQUIERA, printer_id: "" });
 
+  // Mientras carga, la lista está vacía — y eso no es lo mismo que estar vacía. Sin esta
+  // bandera, la página decía «Aún no hay impresoras» en un bar que SÍ tiene impresoras.
+  const [loading, setLoading] = useState(true);
+
   async function cargar() {
     const [{ data: p }, { data: r }, { data: d }, { data: z }] = await Promise.all([
       sb.from("printer").select("id,nombre,rol,transporte,destino,ancho,tipo,device_id,activa").order("nombre"),
@@ -73,6 +78,7 @@ export default function Impresoras() {
     setRutas((r as Ruta[]) ?? []);
     setDispositivos((d as Dispositivo[]) ?? []);
     setZonas((z as Zona[]) ?? []);
+    setLoading(false);
   }
   useEffect(() => { void cargar();   }, []);
 
@@ -150,7 +156,9 @@ export default function Impresoras() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {lista.length === 0 && (
+            {loading && <FilasCargando filas={4} columnas={6} />}
+
+            {!loading && lista.length === 0 && (
               <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Aún no hay impresoras. Añade la primera con «Nueva impresora».</TableCell></TableRow>
             )}
             {lista.map((p) => (

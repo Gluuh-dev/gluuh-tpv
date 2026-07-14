@@ -89,6 +89,30 @@ segundo es más robusto; lo primero, más barato.
 
 ---
 
+## 🧹 Tarea limpia y suelta (buena para coger en paralelo)
+
+**Quitar la mentira de las páginas de detalle.** Ya está hecho en las 10 páginas principales
+(empleados, tarifas, impresoras, descuentos, promociones, formas-pago, menús, planos, caja,
+informes, personalizar, ordenar-productos) — ver `TRAMPAS.md` §11.
+
+Faltan las de **detalle**, que hacen lo mismo:
+
+| fichero | lo que dice mientras carga |
+|---|---|
+| `(panel)/productos/[id]` | «Sin categorías: el producto no aparece en la pantalla de venta» 😬 |
+| `(panel)/categorias/[id]` | «Esta categoría aún no tiene productos» |
+| `(panel)/familias/[id]` | «Esta familia aún no tiene productos» |
+| `(panel)/grupos-mayores/[id]` | «Sin familias todavía» |
+| `(panel)/ordenar-familias-y-categorias` | «No hay categorías en este grupo» |
+
+El arreglo es siempre el mismo: una bandera `loading` y `{!loading && x.length === 0 && …}`.
+Y `<FilasCargando />` de `components/ui/filas-cargando.tsx` si es una tabla.
+
+*(La de `productos/[id]` es la más fea: le dice al dueño que su producto **no aparece en el
+TPV** cuando en realidad sólo está cargando.)*
+
+---
+
 ## ⏭️ Lo siguiente (por orden)
 
 Sale de `docs/plan/11-decisiones-del-nodo.md`.

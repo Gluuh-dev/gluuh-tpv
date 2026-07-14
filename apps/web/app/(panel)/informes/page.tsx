@@ -5,6 +5,7 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FilasCargando } from "@/components/ui/filas-cargando";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { eur } from "@/app/lib/money";
@@ -22,6 +23,9 @@ interface Venta {
 export default function Informes() {
   const sb = supabaseBrowser();
   const [ventas, setVentas] = useState<Venta[]>([]);
+  // Esto son las VENTAS. Sin esta bandera, la página decía «Aún no hay ventas registradas»
+  // mientras las cargaba: el dueño abre los informes desde casa y lee que no ha vendido nada.
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -32,6 +36,7 @@ export default function Informes() {
         .order("created_at", { ascending: false })
         .limit(100);
       setVentas((data as unknown as Venta[]) ?? []);
+      setLoading(false);
     })();
     /* eslint-disable-next-line */
   }, []);
@@ -69,7 +74,8 @@ export default function Informes() {
               <TableRow><TableHead>Fecha</TableHead><TableHead>Origen</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Total</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {ventas.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Aún no hay ventas registradas.</TableCell></TableRow>}
+              {loading && <FilasCargando filas={6} columnas={4} />}
+              {!loading && ventas.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Aún no hay ventas registradas.</TableCell></TableRow>}
               {ventas.slice(0, 30).map((v) => (
                 <TableRow key={v.id}>
                   <TableCell>{new Date(v.created_at).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</TableCell>

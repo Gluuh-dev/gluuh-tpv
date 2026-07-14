@@ -103,7 +103,8 @@ export default function FormasPago() {
         </CardContent>
       </Card>
 
-      {list.length === 0 ? (
+      {/* `!loading &&`: sin eso decía «Sin formas de pago» mientras las cargaba. */}
+      {!loading && list.length === 0 ? (
         <EmptyState title="Sin formas de pago" description="Añade las tuyas o crea las habituales (Efectivo, Tarjeta, Bizum)."
           action={<Button onClick={habituales}><Sparkles className="h-4 w-4" /> Crear habituales</Button>} />
       ) : (

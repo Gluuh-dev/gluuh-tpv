@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Room { id: string; nombre: string; orden: number; suelo: string | null }
 interface Mesa { id: string; nombre: string; room_id: string; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number }
@@ -26,6 +27,9 @@ export default function PlanosDeMesas() {
   const sb = supabaseBrowser();
   const [locationId, setLocationId] = useState<string | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  // Mientras carga, `rooms` está vacío — y eso no es «no tiene planos». Sin esta bandera, el
+  // dueño abría la sala y leía «Sin planos todavía»: su salón y su terraza, desaparecidos.
+  const [loading, setLoading] = useState(true);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [elems, setElems] = useState<Elem[]>([]);
   const [marca, setMarca] = useState<Branding>(BRANDING_DEFAULT);
@@ -57,6 +61,7 @@ export default function PlanosDeMesas() {
     setMesas((m as Mesa[]) ?? []);
     setElems((e as Elem[]) ?? []);
     setMarca(await leerBranding(sb));
+    setLoading(false);
   }
   useEffect(() => { cargar();   }, []);
   // Centrar el lienzo al abrir un plano
@@ -236,7 +241,12 @@ export default function PlanosDeMesas() {
             </form>
           }
         />
-        {rooms.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        ) : rooms.length === 0 ? (
           <EmptyState icon={<LayoutGrid className="h-8 w-8" />} title="Sin planos todavía" description="Crea tu primer plano (p. ej. «Salón» o «Terraza»)." />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">

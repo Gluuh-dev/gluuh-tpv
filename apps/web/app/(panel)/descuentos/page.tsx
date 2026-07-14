@@ -67,7 +67,10 @@ export default function Descuentos() {
         </CardContent>
       </Card>
 
-      {list.length === 0 ? (
+      {/* `!loading &&`: sin eso, esta página le dice al dueño «Sin descuentos» MIENTRAS los
+          está cargando. Desde casa con 4G eso son dos segundos diciéndole que su
+          configuración ha desaparecido. Una página en blanco se entiende; una que MIENTE, no. */}
+      {!loading && list.length === 0 ? (
         <EmptyState title="Sin descuentos" description="Crea descuentos para aplicarlos al cobrar (p. ej. 10% personal, 2 € fidelidad)." />
       ) : (
         <Card>

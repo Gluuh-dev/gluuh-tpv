@@ -392,7 +392,9 @@ export default function Promociones() {
         </Card>
       )}
 
-      {promos.length === 0 ? (
+      {/* `cargado &&`: la bandera ya existía y no se estaba usando aquí. Sin ella, la página
+          decía «Sin promociones» mientras las cargaba. */}
+      {cargado && promos.length === 0 ? (
         <EmptyState
           title="Sin promociones"
           description={sinMigracion
