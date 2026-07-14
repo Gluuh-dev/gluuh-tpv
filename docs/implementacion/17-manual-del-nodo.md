@@ -9,26 +9,29 @@ Dos partes:
 
 # A · Configurar para probar
 
-## A.0 · Antes de nada: las DOS migraciones pendientes en Supabase
+## A.0 · Antes de nada: las migraciones pendientes en Supabase
 
-**Las aplicas tú** (yo tengo prohibido tocar la nube sin que me lo digas). En el orden en
-que están:
+**Las aplicas tú** (yo tengo prohibido tocar la nube sin que me lo digas). La `0099` y la
+`0101` **ya están hechas**. Quedan estas dos:
 
-**1. `0099_cliente_unificado_datos_fiscales.sql`**
-⚠️ **Elimina la tabla `client`** (traspasando antes sus filas a `customer`, lo hace la
-propia migración). Sin ella, la página de Clientes del backoffice **sigue rota** y la
-"Factura completa" del TPV **sigue siendo imposible de emitir**.
+**`0102_guardar_cuenta_sin_pisarse.sql`** — dos camareros dejan de pisarse.
+⚠️ **Elimina `reemplazar_lineas_orden`** y la sustituye por `guardar_cuenta`. El TPV nuevo
+ya llama a la nueva, así que **la nube tiene que tenerla antes de que se despliegue la web**.
 
-**2. `0101_updated_at_en_el_catalogo.sql`**
-Pone `updated_at` a las **49 tablas** del catálogo que no lo tenían, y reescribe
-`set_updated_at()`. **Sin esto, la sincronización de la carta sólo funciona a medias**: las
-tablas sin fecha (precios por tarifa, formatos, familias, salas, impresoras…) no viajan.
+**`0103_jornada.sql`** — el día del bar. Tabla `jornada` + `sales_order.jornada_id` +
+el Z y el cierre. Sin ella, `/ventas-diarias` sigue agrupando por fecha de calendario y
+**el cierre de todos los fines de semana está mal**.
 
-> **El orden importa siempre: primero la nube, después los nodos.** El nodo sube sus filas
-> con `select *`; si tuviera una columna que la nube todavía no tiene, PostgREST responde
-> 400 y ese bar deja de sincronizar el catálogo.
+> ### El orden: PRIMERO LA NUBE, DESPUÉS LOS NODOS.
+>
+> Y esto ya nos ha mordido. El nodo sube sus filas con `select *`: al aplicar la `0103` sólo
+> en el nodo, empezó a mandar `jornada_id` — una columna que la nube no tenía — y **el bar
+> dejó de subir sus ventas** (`PGRST204`).
+>
+> Desde hoy el nodo aguanta ese error (le pregunta a la nube qué columnas tiene y le manda
+> sólo eso), pero **la regla no cambia**: la nube va delante.
 
-En el nodo, la `0101` **ya está aplicada** (la apliqué al probar). La `0100`, también.
+En el nodo, la `0102` y la `0103` **ya están aplicadas** (las apliqué al probar).
 
 ## A.1 · Levantar el nodo
 
@@ -123,13 +126,35 @@ página (el gateway se las inyecta en el HTML). Consecuencias:
 ## A.5 · Todo esto se prueba solo
 
 ```powershell
-node apps/nodo/pruebas/prueba-catalogo.mjs      # la carta, en las dos direcciones
-node apps/nodo/pruebas/prueba-sync.mjs          # las ventas, sin duplicar
-node apps/nodo/pruebas/prueba-sync-fiscal.mjs   # factura + desglose + huella
-node apps/nodo/pruebas/ayuda.mjs                # todas las demás
+node apps/nodo/pruebas/prueba-jornada.mjs          # el día del bar (Z, arqueo, cierre)
+node apps/nodo/pruebas/prueba-dos-camareros.mjs    # la misma mesa a la vez, sin pisarse
+node apps/nodo/pruebas/prueba-facturas-a-la-vez.mjs # 6 cobros: la cadena no se bifurca
+node apps/nodo/pruebas/prueba-catalogo.mjs         # la carta, en las dos direcciones
+node apps/nodo/pruebas/prueba-sync.mjs             # las ventas, sin duplicar
+node apps/nodo/pruebas/prueba-sync-fiscal.mjs      # factura + desglose + huella
 ```
 
-## A.6 · La copia y el reloj
+Las demás, en `apps/nodo/pruebas/README.md`.
+
+## A.6 · El cierre del día
+
+En el TPV: **Utilidades → Cerrar día (Z)**. Enseña lo cobrado, las formas de pago, los
+impuestos, **las mesas que quedan abiertas** y pide el recuento del cajón (y te dice al
+momento si falta o sobra).
+
+Si nadie lo hace, el nodo cierra la jornada solo a las **06:00** y la marca con **arqueo
+pendiente** — nadie contó la caja, y eso se ve luego en `/ventas-diarias`.
+
+```powershell
+node apps/nodo/jornada.mjs --estado   # ¿qué jornada hay abierta y cómo va?
+node apps/nodo/jornada.mjs --forzar   # ciérrala ahora (para probar)
+```
+
+**Las mesas abiertas no se tocan.** Ni al cerrar a mano ni en el automático: siguen abiertas
+y su venta cuenta en la jornada en la que se cobre. Con VERIFACTU delante, inventarse un
+cobro que nadie ha confirmado es firmar ante Hacienda algo que no ha pasado.
+
+## A.7 · La copia y el reloj
 
 ```powershell
 node apps/nodo/copia.mjs            # copia completa ahora (pg_dump, 7 días rotados)

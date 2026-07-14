@@ -145,6 +145,23 @@ const bd = new pg.Pool({ connectionString: BD });
 // renovarlo. Si vuelve null es que no hay línea (o no hay credenciales): no es un error.
 let cab = null;
 
+// ── QUÉ COLUMNAS ENTIENDE LA NUBE ────────────────────────────────────────────
+//
+// Un nodo puede ir POR DELANTE de la nube: se publica una versión, el bar se actualiza, y
+// la migración de la nube todavía no está. Entonces el nodo sube sus filas con `select *`,
+// mete una columna que allí no existe, y PostgREST devuelve un 400:
+//
+//     «Could not find the 'jornada_id' column of 'sales_order' in the schema cache»
+//
+// Y ese bar **deja de subir sus ventas**. El dinero se queda encerrado en el mini-PC de la
+// barra hasta que alguien se dé cuenta.
+//
+// La regla sigue siendo «la nube se migra ANTES que los nodos» — pero un error de orden no
+// puede costarle a un bar sus ventas. Así que se le pregunta a la nube qué columnas tiene
+// (la raíz de PostgREST devuelve su esquema) y se le manda sólo eso. La columna nueva
+// empieza a viajar sola el día que la nube la tenga.
+let columnasDeLaNube = new Map();
+
 async function hayNube() {
   cab = await cabeceras();
   if (!cab) return false;
@@ -153,10 +170,36 @@ async function hayNube() {
     const t = setTimeout(() => c.abort(), 5000);
     const r = await fetch(`${NUBE}/rest/v1/`, { headers: cab, signal: c.signal });
     clearTimeout(t);
-    return r.ok;
+    if (!r.ok) return false;
+
+    const esquema = await r.json().catch(() => null);
+    columnasDeLaNube = new Map(
+      Object.entries(esquema?.definitions ?? {}).map(
+        ([tabla, def]) => [tabla, new Set(Object.keys(def?.properties ?? {}))],
+      ),
+    );
+    return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Quita de una fila lo que la nube no sabe qué es.
+ *
+ * Si no se pudo leer el esquema, **va todo** (fallar abierto, no cerrado): más vale que un
+ * lote lo rechace la nube y se reintente, a que el nodo empiece a comerse columnas de verdad
+ * —el `total` de una venta— porque no supo leer una respuesta.
+ */
+function loQueLaNubeEntiende(tabla, fila) {
+  const suyas = columnasDeLaNube.get(tabla);
+  if (!suyas?.size) return fila;
+
+  const limpia = {};
+  for (const [k, v] of Object.entries(fila)) {
+    if (suyas.has(k)) limpia[k] = v;
+  }
+  return limpia;
 }
 
 // ── 1. Las imágenes que sólo existen en este ordenador ───────────────────────
@@ -228,11 +271,12 @@ async function subirTabla({ nombre, conflicto, tiempo, filtro, origen, columnas 
     if (rows.length === 0) break;
 
     // `_marca` es nuestra, no de la tabla: si se envía, PostgREST rechaza el lote entero
-    // («column _marca does not exist»). Se quita antes de salir por el cable.
+    // («column _marca does not exist»). Se quita antes de salir por el cable — y de paso, lo
+    // que la nube todavía no sabe qué es (un nodo puede ir por delante de ella).
     const aSubir = rows.map((r) => {
       const fila = { ...r };
       delete fila._marca;
-      return fila;
+      return loQueLaNubeEntiende(nombre, fila);
     });
 
     const r = await fetch(`${NUBE}/rest/v1/${nombre}?on_conflict=${conflicto}`, {
@@ -433,7 +477,7 @@ async function sincronizarTablaDeCatalogo(tenantId, esquema, tabla) {
     const r = await fetch(`${NUBE}/rest/v1/${tabla}?on_conflict=${pk.join(",")}`, {
       method: "POST",
       headers: { ...cab, prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify(aSubir.map(limpiarParaLaNube)),
+      body: JSON.stringify(aSubir.map((f) => loQueLaNubeEntiende(tabla, limpiarParaLaNube(f)))),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status} ${(await r.text()).slice(0, 160)}`);
     cuenta.subidas = aSubir.length;

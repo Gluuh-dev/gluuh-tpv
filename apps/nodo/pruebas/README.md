@@ -35,6 +35,7 @@ node apps/nodo/pruebas/prueba-facturas-a-la-vez.mjs
 | `prueba-catalogo.mjs` | la carta **viaja en las dos direcciones**, los borrados de la nube llegan al bar, lo que nace en el bar **no se borra solo**… y el segundo pase **NO MUEVE NADA** |
 | `prueba-dos-camareros.mjs` | Ana y Berto abren la mesa 5 a la vez. Ana añade una tortilla, Berto un vino: **la tortilla ya no desaparece** |
 | `prueba-facturas-a-la-vez.mjs` | 6 cobros **simultáneos** contra `/api/factura`: 6 facturas correlativas y **la cadena de huellas no se bifurca** |
+| `prueba-jornada.mjs` | **el día del bar, no el del calendario**: la jornada se abre sola, seis ventas a la vez no abren seis jornadas, el Z cuadra, las **mesas abiertas no se tocan**, y la caña de la 1:30 cae en la jornada que le toca |
 | `prueba-vigilante.ps1` | se mata PostgREST y **vuelve solo en ~35 s**, sirviendo datos |
 | `prueba-secretos.ps1` | la clave del bar entra (200); **la del manual, 401 — firma inválida** |
 

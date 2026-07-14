@@ -334,6 +334,26 @@ function DeMadrugada() {
   if ($LASTEXITCODE -ne 0) { Anota "AVISO DEL RELOJ: $($reloj -join ' ')" }
 }
 
+# ── El cierre del día, si nadie lo hizo ──────────────────────────────────────
+#
+# Lo normal es que el encargado le dé a "Cerrar día". Pero se olvidan, y las noches largas
+# existen. Si a la hora configurada (06:00 por defecto) sigue habiendo jornada abierta, la
+# cierra el nodo y la marca con el ARQUEO PENDIENTE: nadie ha contado la caja, y eso hay que
+# decirlo al abrir — un descuadre que no se ve al día siguiente ya no se reconstruye.
+#
+# `jornada.mjs` sólo cierra si es la hora, así que se le puede llamar en cada ronda: mira el
+# reloj y no hace nada las otras 23 horas del día.
+$ultimoCierre = ""
+
+function CierraElDiaSiToca() {
+  $marca = Get-Date -Format 'yyyy-MM-dd HH'
+  if ($script:ultimoCierre -eq $marca) { return }   # una vez por hora, no 120
+  $script:ultimoCierre = $marca
+
+  $salida = & node "$Raiz\apps\nodo\jornada.mjs" 2>&1
+  if ($salida -match 'CERRADA') { Anota "cierre de jornada: $($salida -join ' | ')" }
+}
+
 while ($true) {
   Start-Sleep -Seconds 30
   try {
@@ -341,6 +361,7 @@ while ($true) {
     foreach ($r in $revividos) { Anota "SE CAYÓ $r -> relevantado" }
     RotaLogs
     DeMadrugada
+    CierraElDiaSiToca
   } catch {
     # El vigilante NO se muere pase lo que pase. Si se muriera, el bar se quedaría sin
     # red de seguridad justo cuando más falta hace. Se anota y se sigue dando vueltas.

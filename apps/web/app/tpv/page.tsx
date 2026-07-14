@@ -28,6 +28,7 @@ import { TileProducto } from "./components/TileProducto";
 import { TileCategoria } from "./components/TileCategoria";
 import { TecladoTPV } from "./components/TecladoTPV";
 import { RailSalas, type RailTab } from "./components/RailSalas";
+import { CerrarDiaModal, type Z } from "./components/CerrarDiaModal";
 import { useCatalogo, gruposDeProducto, categoriaDisponible, type Prod } from "../lib/catalogo-store";
 import { CLASES_FISCALES, ivaAuto } from "@/lib/fiscal-clases";
 import { Plus, ChevronUp, ChevronDown, Search,
@@ -213,7 +214,9 @@ export default function TPV() {
   // Desglose de líneas por cuenta abierta, para las tarjetas de la vista Barra.
   const [aparcadosLineas, setAparcadosLineas] = useState<Record<string, { nombre: string; cantidad: number; total: number }[]>>({});
   const [ultimoDoc, setUltimoDoc] = useState<TicketImpresion | null>(null);
-  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | null>(null);
+  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | null>(null);
+  // El Z de la jornada en curso, tal como está AHORA MISMO. Se pide al abrir el cierre.
+  const [cierre, setCierre] = useState<{ jornada: { id: string; numero: number; abierta_en: string }; z: Z } | null>(null);
   const { resolvedTheme } = useTheme();
   const { setSurfaceTheme } = useSurfaceTheme("tpv");   // tema propio del TPV (independiente del panel)
   const invitadas = useTpvStore((s) => s.invitadas);
@@ -1763,6 +1766,64 @@ export default function TPV() {
 
   // Bloquear: pone el VELO. NO hace logout ni resetea: la cuenta en curso se conserva
   // debajo y se sigue con solo re-identificarse (pulsera o PIN).
+  // ── CERRAR EL DÍA ───────────────────────────────────────────────────────────
+  //
+  // El Z de toda la vida. Se pide EN EL MOMENTO (no se guarda en el estado del TPV): lo que
+  // se enseña tiene que ser lo que hay en la base, incluidas las ventas que hayan hecho los
+  // otros TPV de la barra hace un minuto.
+  async function abrirCierreDelDia() {
+    setModalActivo(null);
+    if (!locationId) return;
+
+    const { data: j, error } = await sb
+      .from("jornada")
+      .select("id,numero,abierta_en")
+      .eq("location_id", locationId)
+      .is("cerrada_en", null)
+      .maybeSingle();
+
+    if (error || !j) {
+      toast.info("No hay ninguna jornada abierta: hoy todavía no se ha vendido nada.");
+      return;
+    }
+    const jornada = j as { id: string; numero: number; abierta_en: string };
+
+    const { data: z } = await sb.rpc("z_de_jornada", { p_jornada: jornada.id });
+    if (!z) { toast.error("No se pudo calcular el resumen del día."); return; }
+
+    setCierre({ jornada, z: z as Z });
+    setModalActivo('CERRAR_DIA');
+  }
+
+  async function cerrarElDia(contado: number | null) {
+    if (!cierre) return;
+
+    // El recuento va DENTRO del cierre, en la misma llamada: el arqueo del día es del día.
+    // (Iba a `cash_move`, y ahí no cabe: esa tabla cuelga de una sesión de cajón que puede
+    // no estar abierta y sólo admite ENTRADA/SALIDA. El recuento se habría perdido en
+    // silencio — con el dinero, justo lo que no puede pasar.)
+    const { error } = await sb.rpc("cerrar_jornada", {
+      p_jornada: cierre.jornada.id,
+      p_por: operario?.id ?? userId ?? null,
+      p_tipo: "MANUAL",
+      p_contado: contado,
+    });
+
+    if (error) {
+      // GLU04 = ya estaba cerrada (otro TPV se adelantó, o el cierre automático). No se
+      // insiste: reescribir un cierre ya declarado es peor que no cerrar.
+      toast.error(error.code === "GLU04"
+        ? "El día ya estaba cerrado."
+        : "No se pudo cerrar el día. No se ha modificado nada.");
+      setModalActivo(null); setCierre(null);
+      return;
+    }
+
+    toast.success(`Día cerrado · jornada ${cierre.jornada.numero} · ${eur(Number(cierre.z.total))}`);
+    setModalActivo(null); setCierre(null);
+    reset();
+  }
+
   function bloquear() { setModalActivo(null); setBloqueado(true); }
 
   async function recargarProductos() {
@@ -2968,6 +3029,11 @@ export default function TPV() {
                 <button type="button" onClick={() => { setModalActivo(null); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
               )}
               <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
+              {/* CERRAR DÍA. Sólo el que puede cobrar: cerrar el día congela el Z de la
+                  noche, y eso no lo hace un camarero de paso. */}
+              {puede("cobrar") && (
+                <button type="button" onClick={abrirCierreDelDia} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm font-medium hover:bg-accent">Cerrar día (Z)</button>
+              )}
               <button type="button" onClick={() => { setModalActivo(null); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
               <button type="button" onClick={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
               <button type="button" onClick={() => { setModalActivo(null); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
@@ -2991,6 +3057,16 @@ export default function TPV() {
           onCobrar={cobrarDesdeModal}
           onImprimirCuenta={imprimirRecibo}
           onCancelar={() => setModalActivo(null)}
+        />
+      )}
+
+      {/* ── Cerrar día: el Z, las mesas que quedan abiertas y el arqueo ── */}
+      {modalActivo === 'CERRAR_DIA' && cierre && (
+        <CerrarDiaModal
+          jornada={cierre.jornada}
+          z={cierre.z}
+          onCerrar={cerrarElDia}
+          onCancelar={() => { setModalActivo(null); setCierre(null); }}
         />
       )}
 

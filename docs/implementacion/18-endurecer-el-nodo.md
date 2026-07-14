@@ -254,13 +254,84 @@ mismo acaban separándose).
 
 ---
 
-## Bloque 5b · LA JORNADA (decisión plan/11 §11)
+## ✅ Bloque 5b · LA JORNADA (plan/11 §11) — HECHO
 
-- Tabla `jornada` + `sales_order.jornada_id`; botón "Cerrar día" (arqueo + Z) y cierre
-  automático de respaldo a la hora configurada (06:00 por defecto).
-- **Los informes agrupan por jornada, no por fecha de calendario.** Hoy `ventas-diarias`
-  corta `created_at` a `YYYY-MM-DD`, así que **las cañas de la 1:30 del sábado cuentan como
-  sábado y no como la jornada del viernes**: descuadra todos los fines de semana.
+Probado: `node apps/nodo/pruebas/prueba-jornada.mjs` (14/14). Migración **`0103`**.
+
+### Las cañas de la 1:30
+
+Un bar cierra el viernes a las 2 de la mañana. Las últimas cañas se cobran a la 1:30. Para
+el **calendario** esa venta es del sábado; para el **bar** es del viernes — la noche del
+viernes, la caja del viernes, el turno del viernes.
+
+`/ventas-diarias` agrupaba por `created_at.slice(0, 10)`. O sea que **el cierre de todos los
+fines de semana estaba mal**: parte de la noche del viernes contaba como sábado. El dueño
+cuadraba la caja a mano cada lunes sin entender por qué le bailaban cien euros.
+
+No era un problema de informes: **faltaba el concepto**. La venta pertenece a la **jornada**
+en la que se cobra, y la jornada la abre y la cierra el bar — no la medianoche.
+
+### Qué hay
+
+- **`jornada`** — correlativa por local (el encargado dice «la jornada 412»), con el Z
+  congelado al cerrar, el arqueo y las mesas que quedaron abiertas.
+- **`sales_order.jornada_id`**, asignado por un **trigger**, no desde el TPV: por ahí pasan
+  el TPV, el kiosko, el comandero y los pedidos web. Si dependiera de que cada uno se
+  acuerde, el primero que se olvide deja ventas **huérfanas** — y esas no salen en ningún
+  cierre. Nadie las echa de menos hasta que falta el dinero.
+- **`jornada_abierta(local)`** con `pg_advisory_xact_lock` — dos camareros que abren la
+  primera mesa del día en el mismo instante **no crean dos jornadas** (la noche se partiría
+  en dos y no cuadraría ningún informe). Un índice único parcial lo remata.
+- **`z_de_jornada`** — tickets, cobrado, ticket medio, por método, impuestos, invitaciones y
+  autoconsumo **aparte** (no son venta), anuladas, facturas y mesas abiertas.
+- **`cerrar_jornada`** — congela el Z, guarda el **recuento de efectivo** y calcula el
+  **descuadre**. Cerrar dos veces se rechaza (`GLU04`): reescribiría un cierre ya declarado.
+- **Botón «Cerrar día (Z)»** en Utilidades + `CerrarDiaModal` (Z, mesas abiertas, arqueo con
+  la diferencia en la cara).
+- **Cierre automático de respaldo** (`apps/nodo/jornada.mjs`, desde el vigilante): a la hora
+  configurada (06:00 por defecto), si sigue abierta, la cierra como `AUTOMATICO` **con el
+  arqueo pendiente** — nadie contó la caja, y eso hay que decirlo al abrir.
+- **`/ventas-diarias` agrupa por jornada** y avisa de las jornadas **sin arquear**.
+
+### Las mesas abiertas NO se tocan
+
+Si a las 6 de la mañana quedan 2 mesas abiertas, el nodo **no las cobra ni las anula**. Las
+deja, y su venta contará en la jornada en la que se cobre de verdad. La jornada se cierra
+con lo **cobrado**; lo pendiente no se inventa.
+
+Con VERIFACTU delante, fabricar cobros o anulaciones de ventas que nadie ha confirmado es
+**firmar ante Hacienda algo que no ha pasado**. El Z deja constancia («quedaron 2 mesas
+abiertas») y ya está.
+
+### Y dos cosas que aparecieron al probarlo
+
+- **El arqueo iba a `cash_move`, y ahí no cabe**: esa tabla cuelga de una `cash_session` que
+  puede no estar abierta, no tiene `location_id` ni `user_id`, y su `check` sólo admite
+  `ENTRADA`/`SALIDA`. **El recuento se habría perdido en silencio.** Vive en la `jornada`,
+  que es de quien es.
+- **`create table if not exists` no añade columnas a una tabla que ya está.** Una migración
+  que sólo funciona sobre una base virgen falla exactamente donde importa: un bar en marcha.
+
+---
+
+## 🔴 Y la regla de despliegue, mordiendo de verdad
+
+Al aplicar la `0103` en el nodo (y no en la nube), el bar **dejó de subir sus ventas**:
+
+```
+sales_order  FALLÓ — HTTP 400 PGRST204
+  «Could not find the 'jornada_id' column of 'sales_order' in the schema cache»
+```
+
+El nodo sube con `select *`. Una columna que la nube no tiene → 400 → **el dinero se queda
+encerrado en el mini-PC de la barra** hasta que alguien lo mire.
+
+La regla sigue siendo **«la nube se migra ANTES que los nodos»**. Pero un error de orden no
+puede costarle a un bar sus ventas: ahora el nodo **le pregunta a la nube qué columnas
+tiene** (la raíz de PostgREST devuelve su esquema) y le manda sólo eso. La columna nueva
+empieza a viajar sola el día que la nube la tenga. Y si no se puede leer el esquema, **va
+todo** — fallar abierto, no cerrado: más vale que la nube rechace un lote y se reintente, a
+que el nodo se coma el `total` de una venta porque no supo leer una respuesta.
 
 ---
 
