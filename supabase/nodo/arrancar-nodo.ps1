@@ -43,6 +43,23 @@ param(
 $ErrorActionPreference = "Stop"
 $nodo = Join-Path $Raiz ".nodo"
 $env:PATH = "$nodo\pgsql\bin;$env:PATH"   # postgrest.exe necesita libpq.dll de aquí
+
+# ── NODE, EL DEL PAQUETE ─────────────────────────────────────────────────────
+#
+# En el ordenador de un bar NO HAY NODE INSTALADO. Va dentro del `.exe`, en `{app}\node` —
+# pero si nadie lo mete en el PATH, `node` no existe y **no arranca ni un servicio**. El
+# gateway, el auth, el realtime, las imágenes, la web: todos son Node.
+#
+# O sea: el instalador habría terminado diciendo "Servidor en marcha", y no habría nada en
+# marcha. Aquí no se ve porque en NUESTRA máquina Node está instalado — otra vez lo mismo:
+# probar un camino que el cliente no recorre.
+#
+# Si no está el portable (nuestra máquina), se tira del Node del sistema y todo sigue igual.
+$nodePortable = Join-Path $Raiz "node"
+if (Test-Path (Join-Path $nodePortable "node.exe")) {
+  $env:PATH = "$nodePortable;$env:PATH"
+}
+
 New-Item -ItemType Directory -Force -Path "$nodo\tmp" | Out-Null
 
 # ── Utilidades de comprobación ───────────────────────────────────────────────
@@ -305,6 +322,16 @@ function Anota([string]$t) {
 
 Anota "vigilante en marcha (pid $PID)"
 Write-Host "Vigilando. Cada 30 s se comprueba todo y se relevanta lo caído.`n" -ForegroundColor Cyan
+
+# EL DIRECTORIO DE TRABAJO, EN LA RAÍZ DEL NODO. Y no es un detalle:
+#
+# `copia.mjs` busca `pg_dump.exe` en `.nodo\pgsql\bin` **relativo al directorio actual**
+# (`path.resolve(".")`). El vigilante lo arranca la tarea programada de Windows, cuyo
+# directorio de trabajo es `C:\Windows\System32` — no el del nodo.
+#
+# O sea: la copia de seguridad de todas las noches habría fallado en silencio (un error en
+# el diario que nadie lee), y el día que se rompiera el disco del bar no habría ninguna.
+Set-Location $Raiz
 
 # ── Lo de cada noche ─────────────────────────────────────────────────────────
 #

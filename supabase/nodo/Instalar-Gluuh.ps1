@@ -35,6 +35,19 @@ $ErrorActionPreference = "Stop"
 $nodo = Join-Path $Raiz ".nodo"
 New-Item -ItemType Directory -Force -Path "$nodo\tmp" | Out-Null
 
+# ── NODE, EL DEL PAQUETE ─────────────────────────────────────────────────────
+#
+# En el ordenador de un bar NO HAY NODE INSTALADO. Va dentro del `.exe` (en `{app}\node`),
+# pero si nadie lo mete en el PATH, `node` no existe: este instalador no podria ni bajarse
+# la carta, ni las fotos, ni arrancar un solo servicio.
+#
+# En NUESTRA maquina Node esta instalado, asi que esto no se nota. Otra vez lo mismo: el
+# camino del cliente no es el que probamos.
+$nodePortable = Join-Path $Raiz "node"
+if (Test-Path (Join-Path $nodePortable "node.exe")) {
+  $env:PATH = "$nodePortable;$env:PATH"
+}
+
 function Titulo($t) {
   Write-Host ""
   Write-Host "  $t" -ForegroundColor Cyan

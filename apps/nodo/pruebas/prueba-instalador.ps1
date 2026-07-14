@@ -33,6 +33,7 @@ Write-Host ""
 
 $scripts = @(
   Get-ChildItem "$raiz\supabase\nodo\*.ps1"
+  Get-ChildItem "$raiz\supabase\nodo\instalador\*.ps1"
   Get-ChildItem "$raiz\apps\nodo\pruebas\*.ps1"
 )
 

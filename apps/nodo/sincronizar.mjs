@@ -72,6 +72,22 @@ const ABIERTAS = "estado = 'ABIERTA'";
 
 const TABLAS = [
   {
+    // ── LA JORNADA VA PRIMERO. NO ES DECORATIVO ────────────────────────────────
+    //
+    // Cada venta apunta a su jornada (`sales_order.jornada_id`, migración 0103). Si la venta
+    // sube antes que la jornada, la clave foránea de la nube la rechaza:
+    //
+    //     23503 — Key (jornada_id)=(...) is not present in table "jornada"
+    //
+    // Y no es que se pierda una venta: **deja de subir ninguna**. El bar sigue cobrando y
+    // el dinero se queda encerrado en el mini-PC de la barra.
+    //
+    // Y sube ENTERA, abierta o cerrada: la venta de la noche en curso ya apunta a ella.
+    nombre: "jornada",
+    conflicto: "id",
+    tiempo: "updated_at",
+  },
+  {
     nombre: "sales_order",
     // El único índice es COMPUESTO: (tenant_id, client_id). Con `client_id` a secas,
     // PostgREST responde «no unique or exclusion constraint matching».

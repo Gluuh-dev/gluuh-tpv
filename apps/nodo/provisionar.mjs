@@ -18,7 +18,7 @@
 
 import pg from "pg";
 import { cabeceras, credenciales } from "./nube.mjs";
-import { NO_BAJAR, leerEsquema, meterFilas } from "./espejo.mjs";
+import { NO_BAJAR, SOLO_AL_PROVISIONAR, leerEsquema, meterFilas } from "./espejo.mjs";
 
 // El nodo se identifica como SU bar y la RLS lo acota a él. NUNCA lleva la clave maestra
 // de la plataforma: en el mini-PC de un cliente, esa clave sería la llave de los datos de
@@ -65,7 +65,10 @@ const esquema = await leerEsquema(bd);
 
 let total = 0;
 for (const tabla of esquema.orden) {
-  if (NO_BAJAR.has(tabla)) continue;
+  // Lo operativo no se baja… salvo las JORNADAS, y sólo aquí, una vez. Sin ellas, un bar que
+  // ya venía de la nube empezaría a numerar desde 1, chocaría con la jornada 1 que ya está
+  // allí, y **dejaría de subir sus ventas** (cada venta apunta a su jornada). Ver espejo.mjs.
+  if (NO_BAJAR.has(tabla) && !SOLO_AL_PROVISIONAR.has(tabla)) continue;
   const columnas = esquema.columnasDe.get(tabla);
   if (!columnas || !esquema.pkDe.get(tabla)?.length) continue;   // sin PK no hay upsert
 

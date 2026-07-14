@@ -51,3 +51,9 @@ supabase/.temp/
 # Nodo local (spike): binarios portables y datos de Postgres. NUNCA a git.
 # Todo esto es borrable: `rm -rf .nodo` y es como si no hubiera pasado.
 .nodo/
+
+# El paquete del instalador. Se monta en C:\gluuh-paquete (FUERA del repositorio), pero por
+# si alguien lo apunta aquí: son 510 MB de binarios, y el .iss empaqueta `supabase\*` entero
+# y recursivo — o sea que una carga aquí dentro se METERÍA A SÍ MISMA EN EL PAQUETE.
+supabase/nodo/instalador/carga/
+supabase/nodo/instalador/dist/

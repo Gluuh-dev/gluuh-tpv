@@ -29,26 +29,57 @@
 #define Empresa    "Gluuh"
 #define Web        "https://gluuh.com"
 
-; La clave PUBLICA de Gluuh (publishable). Se pasa AL COMPILAR, no va en el repositorio:
+; ESTO NO SE COMPILA A MANO. Lo monta `Montar-Paquete.ps1`, que prepara la carga (Postgres
+; podado, PostgREST, Node portable, la interfaz, las dependencias) y llama aqui con todo
+; puesto:
 ;
-;     ISCC.exe /DAnonKey=sb_publishable_xxxxx gluuh-servidor.iss
+;     .\supabase\nodo\instalador\Montar-Paquete.ps1
 ;
-; Si no se pasa, el instalador se la pedira al tecnico. Que es peor: son 60 caracteres y un
-; solo caracter mal copiado deja la instalacion a medias sin decir donde esta el fallo.
+; Un paquete al que le falta una pieza NO DA ERROR: se entrega, se instala, y el bar no
+; arranca. Por eso el montaje es un script y no una lista de pasos en un documento.
+
+; La clave PUBLICA de Gluuh (publishable). Va AL COMPILAR, no en el repositorio.
 #ifndef AnonKey
   #define AnonKey ""
 #endif
 
+; La carga y la salida, FUERA DEL REPOSITORIO (C:\gluuh-paquete por defecto). Dos motivos:
+;
+;   1. Si la carga vive dentro de `supabase\`, la seccion [Files] de abajo —que empaqueta
+;      `supabase\*` entero y recursivo— **mete el instalador dentro de si mismo**.
+;
+;   2. Windows no pasa de 260 caracteres de ruta, y pnpm crea carpetas como
+;      `.pnpm\next@16.2.9_babel-plugin-react-compiler@1.0.0_react-dom@...\node_modules\@swc\helpers\cjs\`.
+;      Desde dentro del repositorio eso se pasa del limite y la compilacion revienta a media
+;      faena, con un error que no dice ni que fichero.
+#ifndef Carga
+  #error Falta /DCarga. Ejecuta Montar-Paquete.ps1 en vez de llamar a ISCC a mano.
+#endif
+#ifndef Dist
+  #define Dist Carga + "\dist"
+#endif
+
 [Setup]
-AppId={{8F3A6C21-9B4E-4E7A-9C1D-GLUUH0000001}
+; El AppId identifica la aplicacion para actualizar y desinstalar. TIENE QUE SER ESTABLE:
+; si cambia, Windows se cree que es otro programa distinto y una actualizacion instalaria una
+; SEGUNDA copia al lado, con su segundo Postgres, sus segundos puertos, y el bar con dos
+; servidores peleandose por el 55432.
+;
+; El que habia (`...-GLUUH0000001`) NI SIQUIERA ES UN GUID: la G, la L, la U y la H no son
+; digitos hexadecimales. Este si.
+AppId={{7B3F9C24-6A1E-4D58-9E7B-0C4A2F81D6E3}
 AppName={#Nombre}
 AppVersion={#Version}
 AppPublisher={#Empresa}
 AppPublisherURL={#Web}
+; C:\Gluuh, y CORTO A PROPOSITO. Dentro va un `node_modules` de pnpm, con carpetas como
+; `.pnpm\next@16.2.9_babel-plugin-react-compiler@1.0.0_react-dom@...\`. Instalado en
+; `C:\Program Files\Gluuh TPV\` se pasaria de los 260 caracteres de Windows y habria
+; ficheros que no se copian — sin error, y con la web sirviendo paginas en blanco.
 DefaultDirName=C:\Gluuh
 DefaultGroupName=Gluuh
 DisableProgramGroupPage=yes
-OutputDir=dist
+OutputDir={#Dist}
 OutputBaseFilename=GluuhServidor-{#Version}
 Compression=lzma2/max
 SolidCompression=yes
@@ -58,9 +89,18 @@ PrivilegesRequired=admin
 ; Un servidor de bar no se instala en un portatil de 32 bits.
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-LicenseFile=..\..\..\LICENSE
 SetupIconFile=gluuh.ico
 UninstallDisplayName={#Nombre}
+
+; SIN PAGINA DE LICENCIA, y a proposito: no hay texto legal que ensenar todavia.
+;
+; Es preferible no ensenar ninguna que ensenar una inventada: una licencia de mentira que
+; el cliente ACEPTA es peor que no tener licencia. Cuando exista el texto de verdad
+; (revisado por quien sepa), se anade aqui:
+;
+;     LicenseFile=condiciones.txt
+;
+; TODO: condiciones de uso antes del primer cliente de pago.
 
 [Languages]
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -69,25 +109,41 @@ Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 ; Los binarios (Postgres, PostgREST, Node). Postgres y PostgREST van JUNTOS a proposito:
 ; libpq.dll viene con Postgres y no en el zip de PostgREST. Separados, PostgREST muere en
 ; silencio nada mas arrancar.
-Source: "carga\pgsql\*";      DestDir: "{app}\.nodo\pgsql"; Flags: ignoreversion recursesubdirs
-Source: "carga\bin\*";        DestDir: "{app}\.nodo\bin";   Flags: ignoreversion
-Source: "carga\node\*";       DestDir: "{app}\node";        Flags: ignoreversion recursesubdirs
+Source: "{#Carga}\pgsql\*";   DestDir: "{app}\.nodo\pgsql"; Flags: ignoreversion recursesubdirs
+Source: "{#Carga}\bin\*";     DestDir: "{app}\.nodo\bin";   Flags: ignoreversion
 
-; LA INTERFAZ, ya compilada (`pnpm --filter @gluuh/web build:nodo`). El nodo la sirve por
-; su mismo puerto: por eso en las terminales no hay NADA que configurar.
+; NODE. En el ordenador de un bar NO HAY NODE INSTALADO, y el gateway, el auth, el realtime,
+; las imagenes y la web son TODOS Node: sin esto no arranca ni un servicio. Los .ps1 meten
+; {app}\node al principio del PATH.
+Source: "{#Carga}\node\*";    DestDir: "{app}\node";        Flags: ignoreversion recursesubdirs
+
+; LA INTERFAZ, ya compilada. El nodo la sirve por su mismo puerto: por eso en las terminales
+; no hay NADA que configurar.
 ;
-; OJO al preparar la carga: `build:nodo` copia `.next\static` y `public` DENTRO del
-; standalone. Si se empaqueta el standalone sin ellos, la web ARRANCA IGUAL y sirve el
-; HTML sin CSS ni JavaScript: pagina en blanco en el TPV, y ni un error en los logs.
-Source: "carga\web\*";        DestDir: "{app}\apps\web\.next\standalone"; Flags: ignoreversion recursesubdirs
+; `build:nodo` copia `.next\static` y `public` DENTRO del standalone, y `Montar-Paquete.ps1`
+; comprueba que esten. Sin ellos la web ARRANCA IGUAL y sirve el HTML sin CSS ni JavaScript:
+; pagina en blanco en el TPV de un bar, y ni un error en los logs.
+Source: "{#Carga}\web\*";     DestDir: "{app}\apps\web\.next\standalone"; Flags: ignoreversion recursesubdirs
 
 ; El codigo del servidor.
+;
+; OJO con `supabase\*`: la carga NO puede vivir ahi dentro. Vivia en
+; `supabase\nodo\instalador\carga\`, y esta linea —recursiva— se metia los 510 MB del
+; paquete DENTRO DEL PAQUETE. Por eso la carga se monta fuera del repositorio.
 Source: "..\..\..\apps\nodo\*";   DestDir: "{app}\apps\nodo"; Flags: ignoreversion recursesubdirs
 Source: "..\..\..\supabase\*";    DestDir: "{app}\supabase";  Flags: ignoreversion recursesubdirs
-Source: "..\..\..\node_modules\pg\*"; DestDir: "{app}\node_modules\pg"; Flags: ignoreversion recursesubdirs
 
-; La configuracion de los servicios.
-Source: "carga\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion
+; Las dependencias de Node: `pg` Y LAS SUYAS, en un arbol PLANO montado con npm.
+;
+; NO se copia `node_modules\pg` del repositorio: con pnpm eso es un ENLACE SIMBOLICO, y sus
+; dependencias (pg-pool, pg-protocol, pg-types, pgpass...) viven fuera del enlace. Copiarlo
+; se lleva `pg` sin sus tripas, y en el bar `import pg` revienta con "Cannot find module
+; 'pg-pool'": el nodo no podria ni conectar a su propia base de datos.
+Source: "{#Carga}\node_modules\*"; DestDir: "{app}\node_modules"; Flags: ignoreversion recursesubdirs
+
+; La configuracion de los servicios (plantilla: el instalador la reescribe con las claves
+; aleatorias de ESE bar).
+Source: "{#Carga}\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\.nodo\tmp"

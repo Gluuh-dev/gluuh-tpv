@@ -264,37 +264,82 @@ Si le roban el ordenador a un bar, se llevan los datos **de ese bar**. De ningun
 > En **nuestra** máquina de desarrollo `nube.mjs` sí acepta `SUPABASE_SECRET_KEY`, porque
 > es cómodo y la máquina es nuestra. Eso **no debe salir de aquí**.
 
-## B.3 · Cómo se genera el `.exe`
-
-Con **Inno Setup** (gratis, es el estándar en Windows). El guion está en
-`supabase/nodo/instalador/gluuh-servidor.iss`.
-
-**1. Preparar la carga** (`supabase/nodo/instalador/carga/`):
-
-```
-carga\pgsql\          Postgres portable          (~300 MB)
-carga\bin\            postgrest.exe              (~66 MB)   <- ya NO va gotrue.exe
-carga\node\           Node.js portable           (~50 MB)
-carga\postgrest.conf
-carga\web\            .next/standalone           (~41 MB)   <- la interfaz
-```
-
-⚠️ **`postgrest.exe` necesita `libpq.dll`, que viene con Postgres y NO en su propio zip.**
-Si empaquetas uno sin el otro, **PostgREST muere en silencio** nada más arrancar. Por eso
-van juntos, y por eso los scripts ponen `pgsql\bin` en el PATH.
-
-**2. Compilar:**
+## B.3 · Cómo se genera el `.exe` — **un comando**
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" supabase\nodo\instalador\gluuh-servidor.iss
+winget install --id JRSoftware.InnoSetup     # sólo la primera vez
+.\supabase\nodo\instalador\Montar-Paquete.ps1
 ```
 
-Sale `dist\GluuhServidor-1.0.0.exe`. Un solo fichero, ~500 MB. Parece mucho hasta que te
-acuerdas de que la alternativa es pedirle al cliente que instale Postgres y Node a mano
-por teléfono.
+Sale **`C:\gluuh-paquete\dist\GluuhServidor-1.0.0.exe`** — un solo fichero de **86 MB**.
 
-**3. Fírmalo** si tienes certificado. Sin firma, Windows SmartScreen le enseña al cliente
-un aviso rojo de "aplicación no reconocida" — y ahí se acaba la instalación.
+`Montar-Paquete.ps1` prepara la carga y compila. **Y es un script, no una lista de pasos en
+un documento, a propósito:** un paquete al que le falta una pieza **no da error**. Se
+entrega, se instala, y el bar no arranca.
+
+| dentro del paquete | | |
+|---|---|---|
+| `pgsql\` | 120 MB | Postgres **podado**: `bin`+`lib`+`share`. Fuera pgAdmin (616 MB) y los símbolos (156 MB) |
+| `bin\` | 66 MB | `postgrest.exe` |
+| `node\` | 94 MB | **Node portable** — en el ordenador de un bar no hay Node |
+| `web\` | 230 MB | la interfaz, sin los 5.185 mapas de código ni los runtimes de desarrollo |
+| `node_modules\` | 1 MB | `pg` y sus dependencias, en árbol **plano** |
+| | **510 MB** | → comprimido: **86 MB** |
+
+**Fírmalo** antes de dárselo a un cliente. Sin firma, Windows SmartScreen enseña un aviso
+rojo de "aplicación no reconocida" — y el técnico no va a pulsar *"ejecutar de todas formas"*
+en el ordenador de un cliente.
+
+### Las seis trampas de empaquetar esto
+
+Todas descubiertas montándolo. **Ninguna daba un error que se entendiera.**
+
+**1. No había Node en el paquete… y sí lo había, pero no en el PATH.**
+El gateway, el auth, el realtime, las imágenes y la web son **todos Node**. En el mini-PC de
+un bar no hay Node instalado. El `.iss` lo empaquetaba en `{app}\node`, pero **ningún script
+lo metía en el PATH**: `node` no existía y no arrancaba ni un servicio. El instalador habría
+terminado diciendo *"Servidor en marcha"* con nada en marcha.
+
+**2. `node_modules\pg` copiado del repositorio: `pg` sin sus tripas.**
+Con pnpm eso es un **enlace simbólico**, y sus dependencias (`pg-pool`, `pg-protocol`,
+`pg-types`, `pgpass`…) viven fuera del enlace. En el bar, `import pg` reventaría con
+*"Cannot find module 'pg-pool'"* y **el nodo no podría ni conectar a su propia base de
+datos**. Ahora se monta un árbol plano con npm.
+
+**3. El instalador se empaquetaba a sí mismo.**
+La carga vivía en `supabase\nodo\instalador\carga\`, y el `.iss` empaqueta `supabase\*`
+**entero y recursivo**. Los 510 MB, otra vez, dentro del paquete. Por eso la carga se monta
+**fuera del repositorio** (`C:\gluuh-paquete`).
+
+**4. Los 260 caracteres de Windows.**
+pnpm crea carpetas como
+`.pnpm\next@16.2.9_babel-plugin-react-compiler@1.0.0_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\@swc\helpers\cjs\`.
+Desde dentro del repositorio, eso se pasa del límite y la compilación **revienta a media
+faena** — después de veinte minutos comprimiendo, y con un error que no dice ni qué fichero.
+(Por lo mismo el destino es `C:\Gluuh` y no `C:\Program Files\...`.)
+
+**5. El `AppId` no era un GUID.**
+`{{8F3A6C21-...-GLUUH0000001}` — la `G`, la `L`, la `U` y la `H` no son dígitos
+hexadecimales. El `AppId` identifica la aplicación para actualizar y desinstalar: si Windows
+no lo reconoce como el mismo programa, una actualización instalaría **una segunda copia al
+lado**, con su segundo Postgres peleándose por el puerto 55432.
+
+**6. La tarea programada arranca en `C:\Windows\System32`.**
+Y `copia.mjs` busca `pg_dump.exe` **relativo al directorio actual**. La copia de seguridad de
+todas las noches habría fallado en silencio — y el día que se rompiera el disco del bar, no
+habría ninguna.
+
+### ⚠️ Lo que todavía NO está probado
+
+**El `.exe` no se ha ejecutado en una máquina limpia.** Compila y pesa lo que tiene que
+pesar, pero eso no demuestra que instale. Lo que hay que hacer, en una máquina **sin Node,
+sin Postgres y sin nuestro repositorio**:
+
+1. Ejecutarlo. Que pase las cuatro preguntas.
+2. Que los siete servicios queden en verde en `http://<ip>:54321/nodo/estado`.
+3. **Cobrar una mesa.** Es la prueba de verdad.
+4. Apagar el wifi y volver a cobrar.
+5. Reiniciar el ordenador y comprobar que todo vuelve solo.
 
 ## B.4 · Lo que el instalador hace por su cuenta
 

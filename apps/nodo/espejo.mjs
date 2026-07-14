@@ -20,12 +20,33 @@ pg.types.setTypeParser(1114, (v) => v);
 // venta — y la regla es que en eso manda el nodo. Las `nodo_*` son la libreta interna
 // del nodo y ni siquiera existen en la nube.
 export const NO_BAJAR = new Set([
+  "jornada",
   "sales_order", "order_line", "order_event", "payment", "invoice", "invoice_tax_line",
   "tax_line", "verifactu_record", "ticketbai_record", "cash_session", "cash_move",
   "print_job", "shift", "stock_move", "online_order", "reservation",
   "nodo_migracion", "nodo_sync_estado", "nodo_media_pendiente", "nodo_release", "nodo_sesion",
   "platform_admin", "pago_gluuh", "contact_request",
 ]);
+// `jornada` es el DÍA DEL BAR: nace en el bar, como las ventas. Si se tratara como catálogo
+// (bidireccional), su `numero` —correlativo por local— chocaría contra el que la nube genera
+// por su cuenta: «duplicate key value violates unique constraint jornada_location_id_numero».
+
+/**
+ * Lo que el SINCRONIZADOR no baja nunca… pero el PROVISIONADOR sí, una vez.
+ *
+ * Las jornadas del bar. Y hace falta:
+ *
+ *   Un bar que llevaba tiempo en la nube y ahora pone un nodo YA TIENE jornadas allí (la
+ *   migración 0103 le agrupó sus ventas viejas). Si el nodo empezara a numerar desde 1,
+ *   chocaría con la jornada 1 de la nube en cuanto intentara subirla — y **dejaría de subir
+ *   las ventas**, porque cada venta apunta a su jornada.
+ *
+ *   Bajándolas al instalar, `jornada_abierta()` calcula `max(numero) + 1` y **continúa la
+ *   numeración donde la dejó la nube**. La 412 sigue siendo la 412.
+ *
+ * A partir de ahí, sólo suben. El día del bar lo decide el bar.
+ */
+export const SOLO_AL_PROVISIONAR = new Set(["jornada"]);
 // `order_event` (quién anuló qué línea, y por qué) es OPERATIVO, no catálogo: nace en el
 // bar. Como no estaba aquí, se habría tratado como carta y se habría intentado subir
 // eventos de mesas todavía abiertas — cuyo pedido aún no existe en la nube. Clave foránea

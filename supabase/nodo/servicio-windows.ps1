@@ -58,8 +58,15 @@ if (-not $admin) { throw "Abre PowerShell como Administrador para instalar el ar
 # quedaban huérfanos: un PostgREST muerto a las 15:00 seguía muerto hasta el siguiente
 # reinicio del ordenador. Dos niveles de defensa: si el vigilante muriera, esta tarea lo
 # reinicia (RestartCount, abajo).
+#
+# `-WorkingDirectory`: una tarea de SYSTEM arranca en `C:\Windows\System32`. Y varios
+# scripts del nodo buscan cosas RELATIVAS al directorio actual — `copia.mjs` busca
+# `pg_dump.exe` en `.nodo\pgsql\bin` con `path.resolve(".")`. Sin esto, la copia de
+# seguridad de todas las noches fallaria en silencio, y el dia que se rompa el disco del bar
+# no habria ninguna.
 $accion = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" -Raiz `"$Raiz`" -Vigilar"
+  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" -Raiz `"$Raiz`" -Vigilar" `
+  -WorkingDirectory $Raiz
 
 # Al ARRANCAR el ordenador, no al iniciar sesion: el bar enciende el mini-PC y ya está,
 # aunque nadie toque el teclado ni entre con ningun usuario.
