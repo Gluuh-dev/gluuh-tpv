@@ -46,8 +46,17 @@ Orden de lectura recomendado:
 
 Todo vive en carpetas; en la raíz solo queda este índice.
 
+> ### 👉 Si vienes a trabajar en el código, empieza por **[`estado/`](estado/)**
+>
+> Es el **tablero vivo**: por dónde vamos, qué está a medias, qué sigue — y, sobre todo,
+> **[`estado/TRAMPAS.md`](estado/TRAMPAS.md)**, que son los fallos que ya nos comimos y que
+> **no dan ningún error**. Es lo que más caro ha salido del repositorio.
+>
+> Está pensado para que **dos sesiones trabajen a la vez** (escritorio y chat) sin pisarse.
+
 | Carpeta | Rol | Estado |
 |---------|-----|--------|
+| [`estado/`](estado/) | **El tablero vivo**: `AHORA.md` (por dónde vamos) + `TRAMPAS.md` (los fallos mudos). Lo primero que hay que leer | ★★ **Empieza aquí** |
 | [`plan/`](plan/) | Decisiones del 02-07-2026: estado real del código, app de escritorio, módulos, TPV estilo Glop y **checklist maestro** | ★ **Plan vigente** |
 | [`implementacion/`](implementacion/) | Guías ejecutables (el *cómo*): DDL, ficheros a tocar y criterios de aceptación, una por frente | ★ **Plan vigente** |
 | [`dossier/`](dossier/) | Los 15 documentos de producto de junio (tabla de arriba): mercado, decisiones, arquitectura, fiscal, negocio | Referencia estable |

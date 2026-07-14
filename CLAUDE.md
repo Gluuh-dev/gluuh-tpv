@@ -3,6 +3,21 @@
 Monorepo (pnpm + Turborepo, TypeScript) de una plataforma TPV de hostelería para España,
 con foco en cumplimiento fiscal **VERIFACTU** e **IGIC** canario.
 
+## 📍 EMPIEZA POR AQUÍ
+
+**`docs/estado/`** es el tablero vivo. Antes de tocar nada:
+
+- **`docs/estado/AHORA.md`** — por dónde vamos, qué está a medias, qué sigue, qué está
+  bloqueado, y **el siguiente número de migración libre** (resérvalo ahí *antes* de escribir
+  el fichero, o dos sesiones crearán la misma).
+- **`docs/estado/TRAMPAS.md`** — los fallos que ya nos comimos y que **no dan ningún error**.
+  Es lo que más caro ha salido del repositorio. Si vas a tocar el nodo, el instalador o la
+  sincronización, **léelo**.
+
+Se trabaja **desde dos sitios a la vez** (escritorio y chat): apúntate en *En marcha* de
+`AHORA.md` antes de empezar, y **haz push al terminar** — si no está en el remoto, para la
+otra sesión no existe.
+
 ## ⛔ REGLA Nº 1 — QUÉ BASES DE DATOS SE PUEDEN TOCAR
 
 **Sólo estas dos. Ninguna más, bajo ningún concepto:**
