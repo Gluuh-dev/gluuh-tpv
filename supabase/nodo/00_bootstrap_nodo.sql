@@ -57,69 +57,71 @@ alter default privileges in schema public grant all on functions to service_role
 create schema if not exists auth;
 grant usage on schema auth to anon, authenticated, service_role;
 
--- AQUÍ NO SE CREA `auth.users` NI `auth.uid()`. Es deliberado, y costó averiguarlo:
+-- ── `auth.users`, `auth.uid()` y compañía ────────────────────────────────────
 --
---   · `auth.users` la crea GoTrue con su propio automigrate. Si la creamos antes,
---     su `CREATE TABLE IF NOT EXISTS` la ve y NO la crea… pero luego indexa columnas
---     que nuestro esbozo no tiene → «column "instance_id" does not exist» y GoTrue
---     no arranca.
+-- Ya se pueden crear AQUÍ, y esto es una historia con final feliz.
 --
---   · Peor: la migración `00_init_auth_schema` de GoTrue hace
---     `create or replace function auth.uid()` usando `request.jwt.claim.sub`
---     (la forma ANTIGUA, singular). PostgREST moderno publica `request.jwt.claims`
---     (plural, JSON). Si GoTrue se ejecuta DESPUÉS de definir nosotros auth.uid(),
---     la pisa con una versión que devuelve NULL → `current_tenant_id()` = NULL →
---     **toda la RLS multi-tenant deja de ver nada**, en silencio.
+-- Mientras hubo GoTrue en el nodo, no se podía: las creaba él con su automigrate y
+-- montaba dos trampas que costaron horas encontrar.
+--   · Si las creábamos antes, su `CREATE TABLE IF NOT EXISTS` veía la tabla, no la
+--     creaba… y luego indexaba columnas que nuestro esbozo no tenía → GoTrue no arrancaba.
+--   · Peor: su migración pisaba `auth.uid()` con la forma ANTIGUA
+--     (`request.jwt.claim.sub`), que PostgREST ya no publica → `current_tenant_id()` a
+--     NULL → **toda la RLS devolvía CERO filas a todo el mundo, en silencio**.
 --
--- Por eso el orden de instalación es:
---     1) este fichero            (roles, esquema auth vacío, pgcrypto, publicación…)
---     2) arrancar GoTrue         (crea auth.users y pisa auth.uid)
---     3) 01_despues_de_gotrue.sql (vuelve a poner auth.uid/role/jwt BIEN)
---     4) las migraciones 0001…   (sus FK a auth.users ya resuelven)
+-- GoTrue se fue (ahora firma `apps/nodo/auth.mjs`). Nadie pisa nada. El orden de
+-- instalación vuelve a ser el evidente: esto, y luego las migraciones.
+--
+-- `auth.users` se conserva porque las migraciones tienen claves foráneas hacia ella
+-- (`app_user.auth_user_id`). En el nodo queda vacía: los empleados viven en `app_user`,
+-- que es donde estaban de verdad desde el principio.
+create table if not exists auth.users (
+  id                 uuid primary key default gen_random_uuid(),
+  email              text,
+  raw_user_meta_data jsonb,          -- la lee el trigger handle_new_user (0002)
+  created_at         timestamptz default now()
+);
 
--- `supabase_auth_admin`: el rol con el que el servicio de Auth ejecuta el hook del
--- token (0011 le hace GRANT EXECUTE). GoTrue se conecta con él.
+-- `auth.uid()`: el usuario del JWT. De ella cuelga `current_tenant_id()` (0002) y con
+-- ella, TODA la RLS multi-tenant. `request.jwt.claims` (plural) es lo que publica
+-- PostgREST; la forma singular es la vieja y devuelve NULL.
+create or replace function auth.uid() returns uuid
+  language sql stable
+as $$
+  select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid
+$$;
+
+create or replace function auth.role() returns text
+  language sql stable
+as $$
+  select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'role', '')::text
+$$;
+
+create or replace function auth.jwt() returns jsonb
+  language sql stable
+as $$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+
+grant execute on function auth.uid(), auth.role(), auth.jwt()
+  to anon, authenticated, service_role;
+grant select on auth.users to authenticated, service_role;
+
+-- `supabase_auth_admin`: el rol existe SÓLO porque la migración 0011 le hace un
+-- GRANT EXECUTE sobre el hook del token (y esa migración es compartida con la nube, donde
+-- sí hay GoTrue). En el nodo ya no se conecta nadie con él: no tiene login.
+--
+-- Y ya no hace falta traspasarle la propiedad del esquema `auth`. Eso existía porque las
+-- migraciones de GoTrue hacían `comment on table auth.users` y eso exige ser DUEÑO, no
+-- tener permisos: sin el traspaso, GoTrue moría al arrancar con «must be owner of table
+-- users». Se fue GoTrue, se fue el traspaso, se fue el problema.
 do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
-    create role supabase_auth_admin login noinherit password 'auth_admin_dev';
+    create role supabase_auth_admin nologin noinherit;
   end if;
 end $$;
 grant usage on schema auth to supabase_auth_admin;
-grant all on all tables in schema auth to supabase_auth_admin;
-alter role supabase_auth_admin set search_path = auth, public;
-
--- OJO: con GRANT no basta. GoTrue arranca con GOTRUE_DB_AUTOMIGRATE y sus migraciones
--- hacen `comment on table auth.users`, `alter table`… — eso exige ser **DUEÑO**, no
--- tener permisos. Como este bootstrap crea `auth.users` (y auth.uid/role/jwt) siendo
--- `postgres`, hay que traspasarle la propiedad de todo el esquema o GoTrue muere al
--- arrancar con: «must be owner of table users (SQLSTATE 42501)».
-alter schema auth owner to supabase_auth_admin;
-
-do $$
-declare r record;
-begin
-  for r in
-    select c.relname, c.relkind
-      from pg_class c
-      join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'auth' and c.relkind in ('r', 'v', 'S')
-  loop
-    execute format(
-      'alter %s auth.%I owner to supabase_auth_admin',
-      case r.relkind when 'r' then 'table' when 'v' then 'view' else 'sequence' end,
-      r.relname);
-  end loop;
-
-  for r in
-    select p.proname, pg_get_function_identity_arguments(p.oid) as args
-      from pg_proc p
-      join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'auth'
-  loop
-    execute format('alter function auth.%I(%s) owner to supabase_auth_admin', r.proname, r.args);
-  end loop;
-end $$;
 
 -- ── 2-bis. La cuenta de qué migraciones se han aplicado ya ───────────────────
 --

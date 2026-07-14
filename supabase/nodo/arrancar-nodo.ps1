@@ -2,7 +2,7 @@
 #
 #   Postgres   :55432   la verdad
 #   PostgREST  :55433   los datos por HTTP
-#   GoTrue     :55434   quién eres
+#   Auth       :55434   quién eres (NUESTRO firmador; ya no hay GoTrue)
 #   Realtime   :55435   "el comandero ha picado algo"
 #   Media      :55436   las fotos de la carta
 #   Gateway    :54321   <- lo único que ve el TPV. Reparte a los otros cinco.
@@ -141,16 +141,25 @@ $SERVICIOS = @(
     }
   }
   @{
-    nombre = "GoTrue"
-    vivo   = { Responde "http://127.0.0.1:55434/health" }
+    # NUESTRO firmador de tokens. Antes aquí había un GoTrue: un fork de Go parcheado a
+    # mano, 50 MB, que había que recompilar con cada aviso de seguridad de Supabase — y
+    # que en el nodo no autenticaba a nadie: sólo firmaba. Ahora firmamos nosotros.
+    nombre = "Auth"
+    vivo   = {
+      # NO basta con que ALGO conteste en el 55434: hay que saber QUIÉN.
+      # Un GoTrue viejo (de un nodo que se actualiza) contesta al /health tan campante,
+      # el vigilante lo daría por bueno, y nuestro firmador no arrancaría nunca. El bar se
+      # quedaría con el auth de antes para siempre. Se comprueba el nombre.
+      try {
+        $r = Invoke-RestMethod "http://127.0.0.1:55434/health" -TimeoutSec 4
+        return $r.name -eq "nodo-auth"
+      } catch { return $false }
+    }
     arrancar = {
+      # Si hay un GoTrue okupando el puerto, fuera: si no, nuestro firmador no puede atar.
       Get-Process gotrue -ErrorAction SilentlyContinue | Stop-Process -Force
-      Get-Content "$nodo\gotrue.env" | Where-Object { $_ -match '^\s*[A-Z]' } | ForEach-Object {
-        $k, $v = $_ -split '=', 2
-        [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim(), 'Process')
-      }
-      Start-Process "$nodo\bin\gotrue.exe" -WorkingDirectory $nodo `
-        -RedirectStandardOutput "$nodo\tmp\gt.log" -RedirectStandardError "$nodo\tmp\gt.err" -WindowStyle Hidden
+      Start-Sleep -Milliseconds 500
+      ArrancaNode "auth.mjs"
     }
   }
   @{
@@ -188,9 +197,16 @@ if ($Parar) {
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'gateway\.mjs|realtime\.mjs|media\.mjs|sincronizar\.mjs' } |
+    Where-Object { $_.CommandLine -match 'gateway\.mjs|realtime\.mjs|media\.mjs|sincronizar\.mjs|auth\.mjs' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-  Get-Process gotrue, postgrest -ErrorAction SilentlyContinue | Stop-Process -Force
+  Get-Process postgrest -ErrorAction SilentlyContinue | Stop-Process -Force
+
+  # Y el GoTrue de las versiones viejas. Ya no lo arrancamos, pero un nodo que se
+  # ACTUALIZA lo tiene corriendo: si no se le mata, se queda ocupando el 55434, responde
+  # al chequeo de salud (el vigilante lo da por vivo) y nuestro firmador NO PUEDE ARRANCAR.
+  # El nodo se quedaría con el auth viejo para siempre, y nadie sabría por qué.
+  Get-Process gotrue -ErrorAction SilentlyContinue | Stop-Process -Force
+
   if ($MantenerBd) {
     Write-Host "Servicios parados (la base de datos sigue en marcha)." -ForegroundColor Yellow
   } else {

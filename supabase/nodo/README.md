@@ -587,3 +587,75 @@ se imprime en `INSTALACION.txt`.
 
 > La contraseña del superusuario `postgres` sigue siendo fija, a propósito: la base de
 > datos **sólo escucha en 127.0.0.1** y no es alcanzable desde la red del bar.
+
+---
+
+## GoTrue se fue del nodo
+
+El nodo **firma sus propios tokens** (`apps/nodo/auth.mjs`, ~230 líneas). En la nube no
+cambia nada: allí GoTrue es el de Supabase y lo mantienen ellos.
+
+### Qué hacía GoTrue aquí, de verdad: nada de autenticar
+
+El PIN del camarero **ya lo validábamos nosotros** contra `app_user.clave_hash` (bcrypt,
+en la RPC `verificar_clave_operario`). Lo único que hacía GoTrue era **firmar** el JWT — y
+para conseguir esa firma le montábamos una pantomima: **crearle un usuario falso con una
+contraseña aleatoria** y hacer login con él.
+
+### Lo que costaba ese notario
+
+| | |
+|---|---|
+| `gotrue.exe` | **50,5 MB** |
+| el fork de Go parcheado a mano | 5 MB — SO_REUSEPORT no existe en Windows, así que lo parcheamos y compilamos **nosotros**. Cada aviso de seguridad de Supabase = re-parchear y recompilar. **Para siempre** |
+| el toolchain de Go para compilarlo | **1,3 GB** |
+| las dos trampas del orden de instalación | existían **sólo** por él |
+| un proceso más que vigilar | y su fichero de configuración |
+| el bug del dueño | **no podía entrar al panel local sin internet** |
+
+Y un detalle que habría roto el instalador en casa del cliente: `GOTRUE_DB_MIGRATIONS_PATH`
+apunta a `./auth-src/migrations`, o sea que el `.exe` tendría que empaquetar **las
+migraciones del código fuente de Go**.
+
+### Qué lo sustituye
+
+Las **cuatro rutas** que `supabase-js` llama de verdad (medidas en el código):
+
+```
+  POST /auth/v1/token?grant_type=password        entrar
+  POST /auth/v1/token?grant_type=refresh_token   renovar (el token dura 1 h)
+  GET  /auth/v1/user                             ¿quién soy?
+  POST /auth/v1/logout                           salir
+```
+
+Más `POST /auth/v1/vale`, que sustituye a `admin.createUser`: `/api/entrar-operario` valida
+el PIN y pide un **vale de un solo uso** (2 minutos) que el navegador canjea por una
+sesión. **El contrato con el navegador no cambia**: sigue llamando a `signInWithPassword`.
+
+**PostgREST no nota la diferencia**: mismo secreto, mismo formato, mismos claims
+(`tenant_id`, `user_rol` — los que ponía el hook 0011). La RLS no se toca.
+
+Lo que **no** inventamos, que es casi todo: el hash de contraseñas lo hace **bcrypt en
+Postgres**, la autorización la hace **la RLS**, y el JWT es **HS256 estándar**. Lo que
+escribimos es *comprobar una clave, firmar, y rotar el refresco*.
+
+### Y el dueño ya puede entrar sin internet
+
+Su contraseña vivía **sólo en el GoTrue de la nube**, así que no podía abrir el panel de su
+propio bar sin línea: ni para cambiar un precio ni para ver la caja. Ahora vive también
+aquí, en `app_user.password_hash` — **una columna que existía y no usaba nadie** — y la
+siembra el instalador, que ya le pide la contraseña al titular.
+
+### El zombi que casi se cuela
+
+Un nodo que se **actualiza** tiene el GoTrue viejo corriendo. Si no se le mata, se queda
+ocupando el **:55434**, contesta al chequeo de salud tan campante (el vigilante lo da por
+vivo) y **nuestro firmador no puede arrancar nunca**: el bar se quedaría con el auth de
+antes para siempre. Por eso `-Parar` lo entierra y el chequeo comprueba **quién** contesta
+(`name == "nodo-auth"`), no sólo *que* contesta.
+
+### Las dos trampas, muertas
+
+`00_bootstrap_nodo.sql` vuelve a crear `auth.users` y `auth.uid()` **como debe ser**, y ya
+no hay nadie que las pise. El instalador pasó de **6 pasos a 4**, y `01_despues_de_gotrue.sql`
+—que existía sólo para reparar lo que GoTrue rompía— **se ha borrado**.

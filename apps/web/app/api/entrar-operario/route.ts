@@ -41,6 +41,32 @@ export async function POST(req: Request) {
   if (!op) return NextResponse.json({ error: "Usuario o clave incorrectos" }, { status: 401 });
 
   const email = emailSintetico(op.codigo, op.tenant_id);
+
+  // ── EN EL NODO: un VALE de un solo uso, no un usuario falso ─────────────────
+  //
+  // El nodo no lleva GoTrue: firma sus tokens él mismo (apps/nodo/auth.mjs). Aquí ya
+  // hemos validado el PIN contra `clave_hash`, así que sólo hay que pedir un vale que el
+  // navegador canjee por una sesión. Un solo uso, dos minutos de vida.
+  //
+  // Desaparece la pantomima que había que hacerle a GoTrue: crearle un usuario falso con
+  // una contraseña aleatoria única y exclusivamente para que nos firmara el token.
+  //
+  // El contrato con el navegador NO cambia: sigue llamando a signInWithPassword con lo
+  // que le devolvemos aquí. Sólo que la "contraseña" es ahora un vale.
+  if (process.env.NEXT_PUBLIC_NODO_LOCAL === "1") {
+    const r = await fetch(`${url}/auth/v1/vale`, {
+      method: "POST",
+      headers: { apikey: secret, authorization: `Bearer ${secret}`, "content-type": "application/json" },
+      body: JSON.stringify({ app_user_id: op.id }),
+    });
+    if (!r.ok) {
+      return NextResponse.json({ error: "El servidor del local no pudo preparar el acceso" }, { status: 500 });
+    }
+    const { vale } = (await r.json()) as { vale: string };
+    return NextResponse.json({ ok: true, email, secret: vale });
+  }
+
+  // ── EN LA NUBE: GoTrue, como siempre ───────────────────────────────────────
   // La clave (4+ díg.) ya se verificó contra clave_hash. La contraseña de la cuenta
   // sintética es un TOKEN aleatorio fuerte (Supabase exige ≥6) que se fija ahora y se
   // devuelve para que el cliente inicie sesión. Nunca toca un email real (verificar

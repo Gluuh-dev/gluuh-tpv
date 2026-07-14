@@ -19,7 +19,10 @@ const PUERTO = Number(process.env.NODO_PUERTO ?? 54321);
 // /category, no /rest/v1/category.
 const RUTAS = [
   { prefijo: "/rest/v1", destino: { host: "127.0.0.1", port: 55433 } },
-  { prefijo: "/auth/v1", destino: { host: "127.0.0.1", port: 55434 } },
+  // :55434 ya no es GoTrue: es NUESTRO firmador de tokens (apps/nodo/auth.mjs). El
+  // prefijo NO se quita aquí — auth.mjs lo espera, porque `supabase-js` habla de
+  // /auth/v1/token y de /auth/v1/user.
+  { prefijo: "/auth/v1", destino: { host: "127.0.0.1", port: 55434 }, conservarPrefijo: true },
   { prefijo: "/realtime/v1", destino: { host: "127.0.0.1", port: 55435 }, flujo: true },
   { prefijo: "/storage/v1", destino: { host: "127.0.0.1", port: 55436 } },
 ];
@@ -52,7 +55,9 @@ const servidor = http.createServer(async (req, res) => {
     {
       ...ruta.destino,
       method: req.method,
-      path: req.url.slice(ruta.prefijo.length) || "/",
+      // El prefijo se QUITA antes de reenviar (PostgREST espera /category, no
+      // /rest/v1/category), salvo donde el destino lo espera entero.
+      path: (ruta.conservarPrefijo ? req.url : req.url.slice(ruta.prefijo.length)) || "/",
       headers: { ...req.headers, host: `${ruta.destino.host}:${ruta.destino.port}` },
     },
     (r) => {

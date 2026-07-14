@@ -237,6 +237,26 @@ node "$Raiz\apps\nodo\descargar-imagenes.mjs" | Out-File "$nodo\tmp\imagenes.log
 Bien "Fotos descargadas"
 Pop-Location
 
+# ── La contrasena del titular, TAMBIEN en el nodo ────────────────────────────
+#
+# El backoffice entra con email + contrasena. Esa contrasena vivia SOLO en la nube, asi
+# que el dueno NO PODIA abrir el panel de su propio bar sin internet: ni para cambiar un
+# precio, ni para ver la caja. (Los camareros si entraban al TPV: ellos van por PIN.)
+#
+# El titular acaba de teclearla aqui arriba, asi que se siembra en el nodo. Se guarda
+# HASHEADA con bcrypt (lo hace Postgres, no nosotros); la contrasena en claro no se
+# escribe en ningun sitio.
+Write-Host "   Preparando el acceso del titular al panel local..." -ForegroundColor DarkGray
+$env:PGPASSWORD = "gluuh"
+$env:PGCLIENTENCODING = "UTF8"
+$sqlPass = "select public.fijar_password_local(" +
+           "'" + $email.Replace("'","''") + "', " +
+           "'" + $passTxt.Replace("'","''") + "');"
+$sqlPass | Out-File "$nodo\tmp\pass.sql" -Encoding utf8
+& "$nodo\pgsql\bin\psql.exe" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -q -f "$nodo\tmp\pass.sql" | Out-Null
+Remove-Item "$nodo\tmp\pass.sql" -Force   # que no quede la contrasena en un fichero
+Bien "El titular ya puede entrar al panel del bar SIN internet"
+
 Write-Host "   Arrancando los servicios..." -ForegroundColor DarkGray
 & "$PSScriptRoot\arrancar-nodo.ps1" | Out-Null
 Bien "Servidor en marcha"
