@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Drawer } from "hiraki";
 import { supabaseBrowser } from "../lib/supabaseBrowser";
 import { estacionDe } from "../lib/estaciones";
 import { eur } from "@/app/lib/money";
+import * as sonidos from "../lib/sonidos";
 
 interface Empleado { id: string; nombre: string; rol: string }
 interface Mesa { id: string; nombre: string; estado: string }
@@ -67,8 +69,24 @@ export default function Comandera() {
     [comanda, prods],
   );
   const unidades = Object.values(comanda).reduce((s, q) => s + q, 0);
-  const add = (id: string) => setComanda((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
-  const sub = (id: string) => setComanda((c) => { const n = (c[id] ?? 0) - 1; const { [id]: _, ...r } = c; return n > 0 ? { ...c, [id]: n } : r; });
+
+  // El camarero pica en la mesa, con el móvil en una mano y sin mirarlo: el clic le dice que
+  // ha entrado. (Y el navegador no deja sonar hasta que se toca la pantalla — como aquí se
+  // toca para todo, se desbloquea al primer toque. Ver `lib/sonidos.ts`.)
+  const add = (id: string) => {
+    sonidos.tap();
+    setComanda((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+  };
+  const sub = (id: string) => {
+    sonidos.quitar();
+    setComanda((c) => { const n = (c[id] ?? 0) - 1; const { [id]: _, ...r } = c; return n > 0 ? { ...c, [id]: n } : r; });
+  };
+
+  useEffect(() => {
+    const intentar = () => { void sonidos.desbloquear(); };
+    window.addEventListener("pointerdown", intentar);
+    return () => window.removeEventListener("pointerdown", intentar);
+  }, []);
 
   async function enviar() {
     if (!mesa || !empleado || !unidades) return;
@@ -79,13 +97,17 @@ export default function Comandera() {
         canal: "COMANDERA", tipo_operacion: "VENTA", estado: "ENVIADA_COCINA",
         estado_preparacion: "PENDIENTE", total: Math.round(total * 100) / 100, client_id: crypto.randomUUID(),
       }).select("id").single();
-      if (error || !order) { alert("Error: " + error?.message); return; }
+      if (error || !order) { sonidos.error(); alert("Error: " + error?.message); return; }
       const lineas = Object.entries(comanda).map(([id, cantidad]) => {
         const p = prods.find((x) => x.id === id)!;
         return { order_id: order.id, product_id: id, nombre: p.nombre, cantidad, precio_unitario: p.precio, tipo_impositivo: p.tipo_impositivo, estacion: estacionDe(p.estacion) };
       });
       await sb.from("order_line").insert(lineas);
       await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
+
+      // ENVIADA. El camarero ya puede irse a la siguiente mesa sin volver a mirar la
+      // pantalla: es exactamente para eso.
+      sonidos.exito();
       setComanda({}); setCarrito(false); setMesa(null);
     } finally {
       setEnviando(false);
@@ -216,16 +238,32 @@ export default function Comandera() {
         </button>
       )}
 
-      {/* Hoja inferior con la comanda */}
-      {carrito && (
-        <div className="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/40" onClick={() => setCarrito(false)}>
-          <div className="max-h-[80%] rounded-t-2xl border-t border-border bg-card p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-muted" />
+      {/* ── LA COMANDA, EN UNA HOJA QUE SE ARRASTRA ────────────────────────────
+          Antes esto era un `div` a mano con un tirador dibujado… QUE NO SE ARRASTRABA. Un
+          camarero ve esa barrita gris y tira de ella — es lo que hace todo el mundo con el
+          móvil. Y no pasaba nada. Un control que MIENTE sobre lo que hace es peor que no
+          tenerlo: el camarero se queda pensando que la aplicación va lenta.
+
+          Hiraki (sin dependencias) lo hace de verdad: se arrastra, tiene inercia, y ancla en
+          dos alturas — a media pantalla para echar un vistazo mientras se sigue picando, o
+          arriba del todo para repasar la comanda entera antes de enviarla. */}
+      <Drawer.Root
+        open={carrito}
+        onOpenChange={setCarrito}
+        snapPoints={["55%", "92%"]}
+        direction="bottom"
+      >
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-30 bg-foreground/40" />
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl border-t border-border bg-card p-4 outline-none">
+            <Drawer.Handle className="mx-auto mb-3 h-1.5 w-10 shrink-0 rounded-full bg-muted" />
+
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-semibold">Comanda · {mesa.nombre}</h2>
-              <button onClick={() => setCarrito(false)} className="text-sm text-muted-foreground">Cerrar</button>
+              <Drawer.Title className="font-semibold">Comanda · {mesa.nombre}</Drawer.Title>
+              <Drawer.Close className="text-sm text-muted-foreground">Cerrar</Drawer.Close>
             </div>
-            <div className="max-h-[40vh] space-y-1 overflow-y-auto">
+
+            <div className="flex-1 space-y-1 overflow-y-auto">
               {Object.entries(comanda).map(([id, q]) => {
                 const p = prods.find((x) => x.id === id)!;
                 return (
@@ -239,15 +277,16 @@ export default function Comandera() {
                 );
               })}
             </div>
-            <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold tabular-nums">
+
+            <div className="mt-2 flex shrink-0 justify-between border-t border-border pt-2 text-lg font-bold tabular-nums">
               <span>Total</span><span>{eur(total)}</span>
             </div>
-            <button onClick={enviar} disabled={!unidades || enviando} className="mt-3 w-full rounded-2xl bg-brand py-3.5 text-base font-semibold text-brand-foreground disabled:opacity-50 active:scale-[0.99]">
+            <button onClick={enviar} disabled={!unidades || enviando} className="mt-3 w-full shrink-0 rounded-2xl bg-brand py-3.5 text-base font-semibold text-brand-foreground disabled:opacity-50 active:scale-[0.99]">
               {enviando ? "Enviando…" : "Enviar a cocina"}
             </button>
-          </div>
-        </div>
-      )}
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
     </div>
   );
 }

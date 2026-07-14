@@ -20,6 +20,8 @@
     "@tabler/icons-react": "^3.44.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cuelume": "^0.1.0",
+    "hiraki": "^0.0.7",
     "jose": "^6.0.10",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.18.0",

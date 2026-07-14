@@ -146,6 +146,12 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      cuelume:
+        specifier: ^0.1.0
+        version: 0.1.0
+      hiraki:
+        specifier: ^0.0.7
+        version: 0.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       jose:
         specifier: ^6.0.10
         version: 6.2.3
@@ -4529,6 +4535,9 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  cuelume@0.1.0:
+    resolution: {integrity: sha512-J2RRt92Gh1a0ztnjwLEyLfGnDIiWz14vC9aTmg7ZgxRkEk8vR+QxFOz+v1tqntFvl06n5G4si8QCQgHfWjnneA==}
+
   dank-do-while@0.1.2:
     resolution: {integrity: sha512-pyMrgXfugjvdernLCcXNixYqGijUZzYxrb+hAeED2EBpNbctCCxdA/O6NIQXn6vIjwzY1IMmV29d2Y6vaayrwQ==}
 
@@ -5311,6 +5320,12 @@ packages:
 
   hermes-parser@0.35.0:
     resolution: {integrity: sha512-9JLjeHxBx8T4CAsydZR49PNZUaix+WpQJwu9p2010lu+7Kwl6D/7wYFFJxoz+aXkaaClp9Zfg6W6/zVlSJORaA==}
+
+  hiraki@0.0.7:
+    resolution: {integrity: sha512-7lsrMe4df6dtPIcyPIUFE7he3/R0yMw/2frEM2YuLy0HrsnNCwmrsXZjfy2FGNU6UZs5F52CyW1XFf9+nsTyTA==}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   hosted-git-info@4.1.0:
     resolution: {integrity: sha512-kyCuEOWjJqZuDbRHzL8V93NzQhwIB71oFWSyzVo+KPZI+pnQPPxucdkrOZvkLRnrf5URsQM+IJ09Dw29cRALIA==}
@@ -12771,6 +12786,8 @@ snapshots:
 
   csstype@3.2.3: {}
 
+  cuelume@0.1.0: {}
+
   dank-do-while@0.1.2: {}
 
   dayjs@1.11.21:
@@ -13776,6 +13793,11 @@ snapshots:
   hermes-parser@0.35.0:
     dependencies:
       hermes-estree: 0.35.0
+
+  hiraki@0.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
 
   hosted-git-info@4.1.0:
     dependencies:

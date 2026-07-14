@@ -175,7 +175,33 @@ tranquila si el token es de otra empresa.
 
 ---
 
-## 10 · Cosas sueltas que muerden
+## 10 · El sonido: una pantalla puede quedarse MUDA sin decírselo a nadie
+
+Los navegadores **no dejan sonar** a una página en la que nadie ha tocado nada (política de
+autoplay). Y **no avisan**: `new AudioContext()` **no lanza ninguna excepción** — devuelve un
+contexto `suspended`, y todo lo que suene después, simplemente, no suena.
+
+O sea que un `try/catch` alrededor **no atrapa nada**. (El KDS tenía uno.)
+
+Y el caso en el que falla es justo el real: **la pantalla de cocina, colgada de la pared**.
+Arranca sola por la mañana y **nadie la toca nunca** — nadie toca una pantalla de cocina con
+las manos llenas de aceite. El audio se queda bloqueado **para siempre** y el cocinero **no
+oye ni una comanda en todo el servicio**.
+
+→ `apps/web/app/lib/sonidos.ts`. Una sola puerta, con **`estaMudo()`** — para que la pantalla
+pueda **decirlo**. Una cocina muda que no avisa de que está muda es peor que una sin sonido.
+
+> Y ojo con las librerías de sonido: **cuelume** dice en su documentación que reanuda el audio
+> bloqueado *«sin mostrar errores»*. Está bien para una web bonita; en una cocina es
+> exactamente el fallo. Por eso se usa **detrás de nuestra puerta**, no directamente.
+>
+> Lo mismo con sus `data-cuelume-press` / `release`: los ata a **«puntero fino» (ratón)** a
+> propósito. En **una pantalla táctil —o sea, el TPV de un bar— no suenan**. Hay que llamar a
+> `play()` a mano.
+
+---
+
+## 11 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.
   La cuenta la lleva `nodo_migracion`.

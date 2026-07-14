@@ -7,6 +7,7 @@ import { escucharCambios } from "../lib/cambios";
 import { COLOR, LABEL, SIGUIENTE, type EstadoPrep } from "../lib/estados";
 import { estacionDe } from "../lib/estaciones";
 import { CONFIG_COCINA_DEF, configCon, leerConfigModulo, type ConfigCocina } from "../lib/modulos";
+import { activarSonido, avisoCocina, desbloquear, estaMudo } from "../lib/sonidos";
 
 interface Linea { nombre: string; cantidad: number; estacion: string | null; notas: string | null }
 type Filtro = "COCINA" | "BARRA" | "CAMARERO" | "TODAS";
@@ -26,24 +27,29 @@ interface Pedido {
 
 const minutos = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
 
-// Beep corto (WebAudio, sin ficheros) al entrar una comanda nueva.
-function beep() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
-    osc.onended = () => { void ctx.close(); };
-  } catch {
-    // Sin interacción previa el navegador puede bloquear el audio: silencio.
-  }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+//  EL AVISO DE COCINA. Y por qué esto no era una tontería.
+//
+//  Esta pantalla vive COLGADA DE LA PARED, encima del pase. El cocinero NO la está mirando:
+//  está en la plancha, de espaldas. **El pitido es lo único que le dice que ha entrado una
+//  comanda.** Si no suena, el plato sale tarde y nadie sabe por qué.
+//
+//  ── EL FALLO QUE HABÍA (y era mudo, cómo no) ──────────────────────────────
+//
+//  Los navegadores **no dejan sonar** a una página en la que nadie ha tocado nada (política
+//  de autoplay). Y no avisan: `new AudioContext()` **no lanza ninguna excepción** — devuelve
+//  un contexto `suspended`, y lo que suene después simplemente no suena.
+//
+//  O sea que el `try/catch` que había aquí **no atrapaba nada**. Y el caso en el que fallaba
+//  es exactamente el real: la pantalla arranca sola por la mañana, se queda en la pared, y
+//  **nadie la toca nunca** — nadie toca una pantalla de cocina con las manos llenas de
+//  aceite. El audio se queda bloqueado **para siempre**, y el cocinero se pierde las
+//  comandas de todo el servicio. Sin un aviso, sin un error, sin nada.
+//
+//  Ahora: se desbloquea al primer toque, y **si sigue mudo LA PANTALLA LO DICE** —grande, y
+//  sin quitarse hasta que alguien la toque. Una cocina muda que no avisa de que está muda es
+//  peor que una cocina sin sonido.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Cocina() {
   const sb = supabaseBrowser();
@@ -57,6 +63,8 @@ export default function Cocina() {
   const idsRef = useRef<Set<string> | null>(null);
   // Re-render periódico para que los minutos y sus umbrales avancen solos.
   const [, setTick] = useState(0);
+  // ¿Está la pantalla MUDA? (el navegador no deja sonar hasta que alguien la toca)
+  const [mudo, setMudo] = useState(false);
 
   const cargar = useCallback(async () => {
     const { data } = await sb
@@ -68,7 +76,7 @@ export default function Cocina() {
     const rows = (data as unknown as Pedido[]) ?? [];
     setPedidos(rows);
     const previos = idsRef.current;
-    if (previos && sonidoRef.current && rows.some((r) => !previos.has(r.id))) beep();
+    if (previos && sonidoRef.current && rows.some((r) => !previos.has(r.id))) avisoCocina();
     idsRef.current = new Set(rows.map((r) => r.id));
   }, [sb]);
 
@@ -113,6 +121,30 @@ export default function Cocina() {
     return () => clearInterval(t);
   }, []);
 
+  // ── DESBLOQUEAR EL SONIDO ───────────────────────────────────────────────────
+  //
+  // Sólo se puede DENTRO de un gesto del usuario: llamarlo al arrancar no sirve de nada.
+  // Se engancha al primer toque en cualquier sitio de la pantalla — y se comprueba cada
+  // pocos segundos, porque un navegador puede volver a suspender el audio (al bloquearse la
+  // pantalla, al cambiar de pestaña) y la cocina se quedaría muda otra vez sin avisar.
+  useEffect(() => {
+    const intentar = () => { void desbloquear().then(() => setMudo(estaMudo())); };
+
+    intentar();                                   // por si el navegador ya lo permitía
+    window.addEventListener("pointerdown", intentar);
+    document.addEventListener("visibilitychange", intentar);
+
+    const t = setInterval(() => setMudo(estaMudo()), 5_000);
+    return () => {
+      window.removeEventListener("pointerdown", intentar);
+      document.removeEventListener("visibilitychange", intentar);
+      clearInterval(t);
+    };
+  }, []);
+
+  // El interruptor de sonido del módulo manda sobre todo.
+  useEffect(() => { activarSonido(cfg.sonido); }, [cfg.sonido]);
+
   async function avanzar(p: Pedido) {
     const sig = SIGUIENTE[p.estado_preparacion];
     if (!sig) return;
@@ -131,6 +163,26 @@ export default function Cocina() {
   return (
     <div className={cfg.tema === "claro" ? "" : "dark"}>
       <main className="min-h-screen bg-background text-foreground">
+
+        {/* ── LA PANTALLA ESTÁ MUDA, Y HAY QUE DECIRLO ───────────────────────
+            El navegador no deja sonar hasta que alguien toca la pantalla. Una cocina que se
+            queda muda EN SILENCIO es lo peor que puede pasar aquí: el cocinero está en la
+            plancha, de espaldas, y se pierde las comandas de todo el servicio sin enterarse.
+
+            Por eso esto es una barra ENTERA, en rojo, arriba del todo y a pantalla completa
+            de ancho. Que no se pueda ignorar. Se quita sola con el primer toque. */}
+        {mudo && cfg.sonido && (
+          <button
+            type="button"
+            onClick={() => { void desbloquear().then(() => setMudo(estaMudo())); }}
+            className="flex w-full items-center justify-center gap-3 bg-rose-600 px-6 py-4 text-lg font-bold text-white animate-pulse"
+          >
+            <span className="text-2xl">🔇</span>
+            TOCA LA PANTALLA PARA ACTIVAR EL AVISO SONORO
+            <span className="text-sm font-normal opacity-80">— ahora mismo no suena</span>
+          </button>
+        )}
+
         <header className="border-b border-border bg-card px-6 py-3">
           <div className="flex items-center justify-between">
             <strong className="text-lg font-semibold tracking-tight">Preparación</strong>

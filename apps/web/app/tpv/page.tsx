@@ -29,6 +29,7 @@ import { TileCategoria } from "./components/TileCategoria";
 import { TecladoTPV } from "./components/TecladoTPV";
 import { RailSalas, type RailTab } from "./components/RailSalas";
 import { CerrarDiaModal, type Z } from "./components/CerrarDiaModal";
+import * as sonidos from "../lib/sonidos";
 import { useCatalogo, gruposDeProducto, categoriaDisponible, type Prod } from "../lib/catalogo-store";
 import { CLASES_FISCALES, ivaAuto } from "@/lib/fiscal-clases";
 import { Plus, ChevronUp, ChevronDown, Search,
@@ -242,6 +243,18 @@ export default function TPV() {
     const t = setInterval(() => setTickHorario((x) => x + 1), 60_000);
     return () => clearInterval(t);
   }, [horariosCat]);
+
+  // ── DESBLOQUEAR EL SONIDO ───────────────────────────────────────────────────
+  //
+  // El navegador no deja sonar hasta que el usuario toca la pantalla, y **no avisa**: crea
+  // el contexto de audio en estado suspendido y todo lo que suene después, simplemente, no
+  // suena. Aquí no hace falta un aviso como en la cocina —el camarero TOCA el TPV para
+  // trabajar, así que se desbloquea con el primer toque, siempre—, pero hay que hacerlo.
+  useEffect(() => {
+    const intentar = () => { void sonidos.desbloquear(); };
+    window.addEventListener("pointerdown", intentar);
+    return () => window.removeEventListener("pointerdown", intentar);
+  }, []);
   // Grupos EFECTIVOS de un producto: los suyos + los heredados de la biblioteca.
   const gruposDe = (pid: string) =>
     gruposDeProducto({ gruposMod, biblioteca, asignaciones, prods, cats, prodCats }, pid);
@@ -881,6 +894,14 @@ export default function TPV() {
       lineasGuardadasRef.current.has(k)
     );
     setComanda((c) => ({ ...c, [clave]: (c[clave] ?? 0) + qty }));
+
+    // EL CLIC. Un TPV es una pantalla de cristal: al tocarla no se hunde nada y no hay
+    // recorrido. En una barra ruidosa, un camarero que pica veinte cañas seguidas sin mirar
+    // necesita SABER que ha entrado. Por eso suenan todos los TPV del mercado. (Ver
+    // `lib/sonidos.ts`: se apaga desde /modulos, y no usa ficheros — el bar no tiene
+    // internet y un .mp3 sin cachear es un sonido que no suena.)
+    sonidos.tap();
+
     // Atribución: sella la línea con el operario ACTIVO (por ref: sobrevive al cambio de camarero).
     const op = operarioRef.current;
     if (op) setAnadidoPor((a) => ({ ...a, [clave]: { id: op.id, nombre: op.nombre } }));
@@ -1443,6 +1464,10 @@ export default function TPV() {
           if (data) setVersionOrden((data as { updated_at: string }).updated_at);
 
           if (mesa) await sb.from("restaurant_table").update({ estado: "POR_COBRAR" }).eq("id", mesa.id);
+
+          // Y SUENA DISTINTO. El camarero está mirando al cliente, no a la pantalla: un
+          // aviso rojo que nadie ve es un cobro que se da por bueno y no lo es.
+          sonidos.error();
           toast.error("El pago NO quedó registrado. La cuenta sigue pendiente de cobro.");
           await recargarMesas();
           return;   // sin cajón, sin liberar mesa, sin ticket
@@ -1450,6 +1475,10 @@ export default function TPV() {
         // Cajón: abre si alguna forma usada lo pide (abre_cajon); si no, por efectivo.
         if (opts.abrirCajon ?? finales.some((p) => p.metodo === "EFECTIVO")) void window.gluuh?.abrirCajon();
       }
+      // COBRADO. Es el único sonido que el camarero **espera oír**: le dice que ya puede
+      // soltar la mesa e irse a la siguiente sin volver a mirar la pantalla.
+      sonidos.exito();
+
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
       setOrdenAbiertaId(null);
       await recargarMesas();
