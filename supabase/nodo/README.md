@@ -525,3 +525,65 @@ error fácil de cometer y el más caro de diagnosticar.
 
 Probado: crear la cuenta del operario en el GoTrue del nodo → iniciar sesión → pedir
 datos. Y la RLS sigue viva: un operario sin bar asignado **no ve nada**.
+
+---
+
+## El vigilante, los secretos, y cuatro trampas de PowerShell
+
+### `-Vigilar`: lo que hace verdad el "nunca cerrándose"
+
+```powershell
+.\arrancar-nodo.ps1 -Vigilar   # arranca Y SE QUEDA vigilando (es lo que corre en el bar)
+```
+
+La tarea programada reiniciaba **el script**, pero el script arrancaba los servicios y
+**terminaba**: los hijos quedaban huérfanos. Un PostgREST muerto a las 15:00 de un martes
+seguía muerto **hasta el siguiente reinicio del ordenador**.
+
+Ahora el script se queda dando vueltas: cada 30 s comprueba cada servicio y **relevanta
+sólo al caído**, y rota los logs (>10 MB) para que no llenen el disco de un mini-PC — un
+disco lleno es una base de datos que no puede escribir, o sea un bar que no cobra.
+
+Probado a lo bruto (`apps/nodo/pruebas/prueba-vigilante.ps1`): se mata PostgREST y **vuelve
+solo en 35 s, sirviendo datos**.
+
+### Cuatro trampas de PowerShell que costaron encontrar
+
+**1. Los `.ps1` se leen como ANSI si no llevan BOM.** El proyecto es en español, así que
+están llenos de acentos: sin BOM, PowerShell 5.1 los mal-decodifica y **rompe el
+intérprete**. Una flecha `→` en una cadena tumbó el vigilante entero. *Todos los `.ps1` de
+este repo van en UTF-8 **con BOM**.*
+
+**2. `& pg_ctl … | Out-Null` cuelga para siempre.** `pg_ctl start` deja corriendo el
+servidor Postgres, que **hereda la salida** y la mantiene abierta de por vida; PowerShell
+espera a que se cierre la tubería y nunca se cierra.
+
+**3. `Start-Process -Wait` tampoco vale**: espera al proceso **y a sus descendientes**.
+`pg_ctl` termina, pero deja `postgres.exe`… que no termina nunca.
+→ **Arrancar y soltar** (`Start-Process` sin `-Wait`), y sondear con `pg_isready`.
+
+Las dos colgaban justo donde más duele: la tarea programada corre **sin consola**, así que
+el vigilante se habría quedado clavado sin vigilar nada, para siempre.
+
+**4. `$args` es una variable automática.** Usarla como parámetro de función la pisa.
+
+Y una de propina: `-Parar` mata **primero al vigilante** (vive en `powershell.exe`, no en
+`node.exe`). Sin eso, paraba los servicios y el vigilante los relevantaba 30 s después:
+un nodo imposible de apagar.
+
+### Cada bar, sus propias claves
+
+El instalador genera **secreto JWT y contraseñas de Postgres aleatorios en cada
+instalación**. Antes todos los nodos compartían los de desarrollo… que están en este
+repositorio y en el manual: cualquiera que los leyera podía firmar un token de
+`service_role` válido para **cualquier nodo al que alcanzara por red** —el wifi del bar,
+un portátil en la terraza— y saltarse toda su RLS.
+
+Probado (`prueba-secretos.ps1`): con la clave del bar, **HTTP 200**; con la del manual,
+**HTTP 401 — firma inválida**.
+
+El secreto de cada nodo queda en `.nodo/nodo.env`, y la clave `anon` que necesitan los TPV
+se imprime en `INSTALACION.txt`.
+
+> La contraseña del superusuario `postgres` sigue siendo fija, a propósito: la base de
+> datos **sólo escucha en 127.0.0.1** y no es alcanzable desde la red del bar.

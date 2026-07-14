@@ -80,6 +80,36 @@ const TABLAS = [
   },
   { nombre: "payment", conflicto: "tenant_id,client_id", tiempo: "created_at" },
   { nombre: "invoice", conflicto: "id", tiempo: "created_at" },
+
+  // ── LO FISCAL. Sin esto, la nube NO PUEDE ENVIAR A LA AEAT ──────────────────
+  //
+  // La decisión es que el nodo genera la factura sin internet y la NUBE la remite a
+  // Hacienda (docs/plan/11 §7). Para eso la nube necesita, además de la factura:
+  //   · el desglose de impuestos (base y cuota por tipo)  → invoice_tax_line
+  //   · el registro de la cadena de huellas               → verifactu_record
+  //
+  // Faltaban las dos. Nadie lo habría notado hasta activar VERIFACTU en un cliente
+  // real: la nube habría recibido facturas mudas y no habría podido declarar nada.
+  {
+    nombre: "invoice_tax_line",
+    conflicto: "id",
+    // OJO: esta tabla NO TIENE created_at ni updated_at (id, tenant_id, invoice_id,
+    // tipo, base, cuota — y ya). No hay columna de tiempo por la que llevar la marca
+    // de agua, así que se marca por la fecha de SU FACTURA. Por eso lleva un `origen`
+    // con join en vez de la tabla a secas.
+    origen: 'public.invoice_tax_line l join public.invoice i on i.id = l.invoice_id',
+    columnas: "l.*",
+    tiempo: "i.created_at",
+  },
+  {
+    nombre: "verifactu_record",
+    conflicto: "id",
+    tiempo: "created_at",
+    // `device_id` apunta a `device`, que hoy NO se sincroniza. Mientras /api/factura no
+    // lo rellene (hoy lo deja a null) no hay problema; el día que lo rellene, hay que
+    // subir `device` ANTES que esto o la clave foránea rechazará el registro.
+  },
+
   // Una caja se sube cuando se ha cerrado (cuadrada), no mientras está en marcha.
   { nombre: "cash_session", conflicto: "id", tiempo: "abierta_en", filtro: "cerrada_en is not null" },
   { nombre: "cash_move", conflicto: "id", tiempo: "created_at" },
@@ -147,7 +177,7 @@ async function subirImagenes() {
 }
 
 // ── 2. Las ventas y lo fiscal ────────────────────────────────────────────────
-async function subirTabla({ nombre, conflicto, tiempo, filtro }) {
+async function subirTabla({ nombre, conflicto, tiempo, filtro, origen, columnas }) {
   const { rows: est } = await bd.query(
     "select hasta from public.nodo_sync_estado where tabla = $1",
     [nombre],
@@ -158,27 +188,41 @@ async function subirTabla({ nombre, conflicto, tiempo, filtro }) {
   let subidas = 0;
   let marca = desde;
   const donde = filtro ? `and (${filtro})` : "";
+  const de = origen ?? `public."${nombre}"`;
+  const que = columnas ?? "*";
 
   for (;;) {
+    // `as _marca`: la columna de tiempo se pide con un alias fijo porque puede venir de
+    // OTRA tabla (invoice_tax_line se ordena por la fecha de su factura) y entonces no
+    // está en la fila que se sube. Con el alias, la marca de agua siempre se lee igual.
     const { rows } = await bd.query(
-      `select * from public."${nombre}"
-        where "${tiempo}" > $1 ${donde}
-        order by "${tiempo}"
+      `select ${que}, ${tiempo} as _marca
+         from ${de}
+        where ${tiempo} > $1 ${donde}
+        order by ${tiempo}
         limit ${LOTE}`,
       [marca],
     );
     if (rows.length === 0) break;
 
+    // `_marca` es nuestra, no de la tabla: si se envía, PostgREST rechaza el lote entero
+    // («column _marca does not exist»). Se quita antes de salir por el cable.
+    const aSubir = rows.map((r) => {
+      const fila = { ...r };
+      delete fila._marca;
+      return fila;
+    });
+
     const r = await fetch(`${NUBE}/rest/v1/${nombre}?on_conflict=${conflicto}`, {
       method: "POST",
       headers: { ...cab, prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify(rows),
+      body: JSON.stringify(aSubir),
     });
     if (!r.ok) throw new Error(`${nombre}: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
 
     // La marca avanza SÓLO ahora, con la nube ya confirmando. Si esto no se alcanza,
     // el próximo pase reenvía el lote — y por el on_conflict no duplica nada.
-    marca = rows[rows.length - 1][tiempo];
+    marca = rows[rows.length - 1]._marca;
     subidas += rows.length;
 
     await bd.query(

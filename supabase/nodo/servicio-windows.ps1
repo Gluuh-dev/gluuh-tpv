@@ -1,4 +1,4 @@
-# servicio-windows.ps1 — que el nodo arranque SOLO al encender el ordenador y no se
+﻿# servicio-windows.ps1 — que el nodo arranque SOLO al encender el ordenador y no se
 # cierre nunca, sin que nadie tenga que acordarse de nada.
 #
 # "El servicio se levantará automático y se pondrá ahí, nunca cerrándose."
@@ -53,8 +53,13 @@ $admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
          ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $admin) { throw "Abre PowerShell como Administrador para instalar el arranque automatico." }
 
+# `-Vigilar`: el script NO termina — se queda comprobando cada 30 s y relevantando lo que
+# se caiga. Sin esta bandera, la tarea sólo arrancaba los servicios y salía, y los hijos
+# quedaban huérfanos: un PostgREST muerto a las 15:00 seguía muerto hasta el siguiente
+# reinicio del ordenador. Dos niveles de defensa: si el vigilante muriera, esta tarea lo
+# reinicia (RestartCount, abajo).
 $accion = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" -Raiz `"$Raiz`""
+  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" -Raiz `"$Raiz`" -Vigilar"
 
 # Al ARRANCAR el ordenador, no al iniciar sesion: el bar enciende el mini-PC y ya está,
 # aunque nadie toque el teclado ni entre con ningun usuario.

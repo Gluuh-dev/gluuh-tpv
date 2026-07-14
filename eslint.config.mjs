@@ -52,7 +52,16 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": [
         "warn",
         // El patrón `const { [k]: _, ...resto } = obj` (borrar clave) es idiomático aquí.
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" },
+        //
+        // `ignoreRestSiblings`: quitar un campo de una fila antes de enviarla es
+        // exactamente eso — `rows.map(({ _marca, ...fila }) => fila)` en el
+        // sincronizador. La variable "sin usar" ES el propósito de la línea.
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+          ignoreRestSiblings: true,
+        },
       ],
       "@typescript-eslint/no-empty-object-type": "off",
       "no-empty": ["warn", { allowEmptyCatch: true }],    // `catch {}` deliberados

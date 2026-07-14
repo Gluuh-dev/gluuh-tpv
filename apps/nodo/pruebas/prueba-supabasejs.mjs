@@ -37,7 +37,7 @@ const { data: cat, error: eCat } = await sb
 if (eCat) throw new Error(`insert: ${eCat.message}`);
 
 console.log("3. insert de producto con su precio…");
-const { data: prod, error: eProd } = await sb
+const { error: eProd } = await sb
   .from("product")
   .insert({ nombre: "Caña", precio: 2.5, category_id: cat.id })
   .select()

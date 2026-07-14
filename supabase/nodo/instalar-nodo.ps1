@@ -1,4 +1,4 @@
-# instalar-nodo.ps1 — levanta la base de datos del NODO LOCAL desde cero.
+﻿# instalar-nodo.ps1 — levanta la base de datos del NODO LOCAL desde cero.
 #
 # El ORDEN es lo único que importa aquí, y no es el obvio:
 #
@@ -16,7 +16,18 @@ param(
   [string]$Raiz  = (Resolve-Path "$PSScriptRoot\..\.."),
   [int]   $Puerto = 55432,
   [string]$Bd     = "gluuh",
-  [switch]$Recrear   # borra la BD y la rehace desde cero
+  [switch]$Recrear,   # borra la BD y la rehace desde cero
+
+  # SECRETOS DE ESTE BAR. Los genera el instalador (Instalar-Gluuh.ps1), distintos en
+  # cada local. Sin ellos se usan los de desarrollo — que valen para NUESTRA máquina y
+  # para nada más: están en el repositorio y en el manual.
+  #
+  # El que de verdad importa es el JWT: con él se firman los tokens que valida PostgREST.
+  # Si fuera el mismo en todos los bares, cualquiera que leyera el manual podría firmar un
+  # `service_role` válido para CUALQUIER nodo al que alcanzara por red — el wifi del local,
+  # un portátil en la terraza — y saltarse toda la RLS de ese bar.
+  [string]$JwtSecreto = "clave-jwt-de-desarrollo-del-nodo-gluuh-min-32-chars",
+  [string]$PgClave    = "authenticator_dev"
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,9 +57,48 @@ if ($Recrear) {
 Paso 1 "Bootstrap (roles, esquema auth, pgcrypto, publicación realtime)"
 Sql "$PSScriptRoot\00_bootstrap_nodo.sql"
 
+# ── 1-bis. Las contraseñas de los roles, propias de este bar ─────────────────
+# El bootstrap crea los roles con contraseñas de desarrollo (están en el repositorio).
+# Aquí se cambian por las de esta instalación. La base de datos sólo escucha en 127.0.0.1
+# —no es alcanzable desde la red del bar— pero un secreto compartido entre clientes no se
+# defiende solo: se cambia.
+@"
+alter role authenticator        with password '$PgClave';
+alter role supabase_auth_admin  with password '$PgClave';
+"@ | Out-File "$nodo\tmp\claves_roles.sql" -Encoding ascii
+Sql "$nodo\tmp\claves_roles.sql"
+Remove-Item "$nodo\tmp\claves_roles.sql" -Force   # no dejar la contraseña en un fichero
+
 # ── 2. GoTrue: que cree SU auth.users con automigrate ────────────────────────
 Paso 2 "Arrancando GoTrue para que migre el esquema auth"
 Get-Process gotrue -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# El gotrue.env de este bar: su secreto JWT y su contraseña de base de datos. Tiene que
+# firmar con EL MISMO secreto con el que PostgREST valida, o no entra nadie.
+@"
+GOTRUE_JWT_SECRET=$JwtSecreto
+GOTRUE_JWT_EXP=3600
+GOTRUE_JWT_AUD=authenticated
+GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
+GOTRUE_JWT_ADMIN_ROLES=service_role,supabase_admin
+GOTRUE_DB_DRIVER=postgres
+DATABASE_URL=postgres://supabase_auth_admin:$PgClave@127.0.0.1:$Puerto/$Bd`?search_path=auth
+GOTRUE_DB_NAMESPACE=auth
+GOTRUE_DB_MIGRATIONS_PATH=./auth-src/migrations
+GOTRUE_API_HOST=127.0.0.1
+PORT=55434
+API_EXTERNAL_URL=http://127.0.0.1:55434
+GOTRUE_SITE_URL=http://localhost:3100
+GOTRUE_MAILER_AUTOCONFIRM=true
+GOTRUE_SMS_AUTOCONFIRM=true
+GOTRUE_EXTERNAL_EMAIL_ENABLED=true
+GOTRUE_EXTERNAL_PHONE_ENABLED=false
+GOTRUE_DISABLE_SIGNUP=false
+GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED=true
+GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI=pg-functions://postgres/public/custom_access_token_hook
+GOTRUE_LOG_LEVEL=info
+"@ | Out-File "$nodo\gotrue.env" -Encoding ascii
+
 Get-Content "$nodo\gotrue.env" | Where-Object { $_ -match '^\s*[A-Z]' } | ForEach-Object {
   $k, $v = $_ -split '=', 2
   [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim(), 'Process')

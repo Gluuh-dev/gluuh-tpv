@@ -16,11 +16,10 @@ const sb = createClient(URL, ANON, { auth: { persistSession: false } });
 
 // Un bar con su mesa
 const email = `rt${Math.floor(Math.random() * 999999)}@prueba.local`;
-const { data: alta } = await sb.auth.signUp({
+await sb.auth.signUp({
   email, password: "Prueba1234!",
   options: { data: { empresa_nombre: "Bar del Realtime" } },
 });
-const token = alta.session.access_token;
 
 // ── TPV nº 2: se queda escuchando (esto es lo que hace escucharCambios) ──────
 const recibidos = [];

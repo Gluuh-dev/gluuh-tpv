@@ -1,11 +1,11 @@
-# Instalar-Gluuh.ps1 — INSTALADOR DEL NODO. Lo ejecuta el técnico en el bar.
+﻿# Instalar-Gluuh.ps1 — INSTALADOR DEL NODO. Lo ejecuta el técnico en el bar.
 #
 # Pregunta lo justo, comprueba lo que puede, y deja el bar funcionando.
 #
-#   1. Código de instalación   → identifica la empresa (ya existe: 21 dígitos)
-#   2. Cuenta del dueño        → para que el NODO se identifique como ESE bar
-#   3. Datos fiscales          → sólo si faltan; sin CIF no se puede facturar
-#   4. ¿Arrancar solo?         → sí, salvo que digan que no
+#   1. Código de instalación   -> identifica la empresa (ya existe: 21 dígitos)
+#   2. Cuenta del dueño        -> para que el NODO se identifique como ESE bar
+#   3. Datos fiscales          -> sólo si faltan; sin CIF no se puede facturar
+#   4. ¿Arrancar solo?         -> sí, salvo que digan que no
 #
 # Y luego, sin preguntar más: base de datos, se baja el bar de la nube, las fotos,
 # arranca los servicios, registra el arranque automático y escribe una hoja de entrega
@@ -181,8 +181,49 @@ $auto = (Read-Host "   Arrancar automaticamente al encender? (S/n)") -notmatch '
 # ── Manos a la obra ──────────────────────────────────────────────────────────
 Titulo "Instalando (esto tarda unos minutos)"
 
+# ── SECRETOS PROPIOS DE ESTE BAR ─────────────────────────────────────────────
+#
+# Hasta ahora todos los nodos compartian el secreto JWT y la contrasena de Postgres del
+# entorno de desarrollo... que ademas estan escritos en el manual, en el repositorio y en
+# este mismo chat.
+#
+# Con un secreto compartido, CUALQUIERA que lo lea puede firmar un token de
+# `service_role` valido para CUALQUIER nodo al que alcance por red: el wifi del bar, un
+# portatil en la terraza. Y con ese token se salta toda la RLS de ese nodo.
+#
+# Aqui se generan secretos NUEVOS, aleatorios y distintos en cada instalacion. No salen
+# nunca de este ordenador.
+Write-Host "   Generando las claves de este servidor..." -ForegroundColor DarkGray
+
+function Aleatorio([int]$bytes) {
+  $b = New-Object byte[] $bytes
+  [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+  # Base64 sin caracteres que molesten en ficheros de configuracion ni en URLs.
+  [Convert]::ToBase64String($b).Replace('+','x').Replace('/','y').Replace('=','')
+}
+
+$jwtSecreto = Aleatorio 48    # >= 32 caracteres, como exige GoTrue
+$pgClave    = Aleatorio 24
+
+# postgrest.conf: apunta a la base con la contrasena nueva y valida los JWT con el
+# secreto nuevo.
+@"
+db-uri = "postgres://authenticator:$pgClave@127.0.0.1:55432/gluuh"
+db-schemas = "public"
+db-anon-role = "anon"
+jwt-secret = "$jwtSecreto"
+server-port = 55433
+server-host = "127.0.0.1"
+"@ | Out-File "$nodo\postgrest.conf" -Encoding ascii
+
+# El secreto del nodo, para que los servicios que firman tokens usen el mismo.
+"NODO_JWT_SECRETO=$jwtSecreto" | Out-File "$nodo\nodo.env" -Encoding ascii
+
+Bien "Claves generadas (unicas de este bar)"
+
 Write-Host "   Preparando la base de datos..." -ForegroundColor DarkGray
-& "$PSScriptRoot\instalar-nodo.ps1" -Recrear | Out-File "$nodo\tmp\instalacion.log" -Encoding utf8
+& "$PSScriptRoot\instalar-nodo.ps1" -Recrear -JwtSecreto $jwtSecreto -PgClave $pgClave |
+  Out-File "$nodo\tmp\instalacion.log" -Encoding utf8
 Bien "Base de datos lista"
 
 Write-Host "   Bajando la carta, las mesas y los empleados..." -ForegroundColor DarkGray
@@ -211,6 +252,13 @@ $ip = (Get-NetIPAddress -AddressFamily IPv4 |
        Select-Object -First 1).IPAddress
 $url = "http://${ip}:54321"
 
+# Las claves que usaran los TPV. Se DERIVAN del secreto de este bar: son distintas en
+# cada local, y las de un bar no valen en otro.
+Push-Location $Raiz
+$claves = node "$Raiz\apps\nodo\claves.mjs" $jwtSecreto
+Pop-Location
+$anon = ($claves | Where-Object { $_ -match '^eyJ' })[0]
+
 $hoja = @"
 GLUUH TPV - SERVIDOR DEL LOCAL
 ==============================
@@ -222,6 +270,10 @@ Ordenador  : $env:COMPUTERNAME
 DIRECCION DEL SERVIDOR (esto es lo que hay que poner en cada TPV):
 
     $url
+
+CLAVE DE ACCESO DE LOS TPV (unica de este bar):
+
+    $anon
 
 IMPORTANTE
 - Este ordenador tiene que quedarse ENCENDIDO. Es donde estan los datos.

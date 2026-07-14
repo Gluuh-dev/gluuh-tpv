@@ -1,4 +1,4 @@
-# Prueba de extremo a extremo del nodo: GoTrue emite el token, PostgREST lo acepta,
+﻿# Prueba de extremo a extremo del nodo: GoTrue emite el token, PostgREST lo acepta,
 # y la RLS multi-tenant aísla a un bar de otro.
 $AUTH = "http://127.0.0.1:55434"
 $REST = "http://127.0.0.1:55433"
