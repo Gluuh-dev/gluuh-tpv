@@ -14,8 +14,14 @@ todo lo demás sin preguntar: crea la base de datos, se baja la carta y las foto
 interfaz, arranca los siete servicios, registra el arranque automático y te escribe la
 dirección que hay que poner en cada TPV.
 
-> **Para probar aquí**, el código de instalación de *Plantilla base* (1 local, 2 salas,
-> 21 mesas, 4 empleados, 75 productos) es **`5244-7793-03261-5161-6093`**.
+> **Para probar aquí**, usa el bar *Plantilla base* (1 local, 2 salas, 21 mesas, 4 empleados,
+> 75 productos). Su **código de instalación NO se escribe aquí**: este repositorio es
+> **público**, y ese código —21 dígitos— **es la credencial** con la que se canjea la empresa
+> (ver la migración `0104`). Sácalo del panel de Supabase:
+>
+> ```sql
+> select nombre, codigo_instalacion from public.tenant;
+> ```
 
 ### Por qué esto es lo importante, y no un detalle de comodidad
 

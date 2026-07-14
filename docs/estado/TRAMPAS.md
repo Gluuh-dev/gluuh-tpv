@@ -231,7 +231,35 @@ Y `<FilasCargando />` (`components/ui/filas-cargando.tsx`) para que además no d
 
 ---
 
-## 12 · Cosas sueltas que muerden
+## 12 · EL REPOSITORIO ES PÚBLICO. Y las credenciales se cuelan solas
+
+`github.com/Gluuh-dev/gluuh-tpv` → **public**. Cualquiera lo lee.
+
+Y una credencial escrita en un fichero **no se borra borrando el fichero**: se queda en el
+historial de git **para siempre**.
+
+Ya ha estado a punto de pasar **dos veces en un solo día**:
+
+1. Una **contraseña de Supabase**, escrita en `AHORA.md` «para no olvidarla». La paró el
+   guardián justo antes del push.
+2. El **código de instalación** de un bar, escrito en el manual «para poder probar». Y ese
+   código —21 dígitos— **es la credencial** con la que se canjea la empresa: lo dice la
+   propia migración `0104`. Publicarlo se carga el diseño entero.
+
+**La regla, sin excepciones:** ni una contraseña, ni una clave, ni un token, ni un código de
+instalación. Ni en un comentario, ni en un ejemplo, ni «temporalmente». Los secretos van en
+`.env.local` (que está en `.gitignore`); en el repositorio, sólo `.env.example` con
+marcadores.
+
+Si hace falta un dato de prueba, se escribe **cómo sacarlo**, no el dato:
+
+```sql
+select nombre, codigo_instalacion from public.tenant;
+```
+
+---
+
+## 13 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.
   La cuenta la lleva `nodo_migracion`.
