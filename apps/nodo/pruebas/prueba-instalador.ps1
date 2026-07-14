@@ -102,6 +102,23 @@ foreach ($s in $scripts) {
   }
 }
 
+# ── Y el .iss: ninguna linea puede EMPEZAR por `#` ───────────────────────────
+#
+# El preprocesador de Inno Setup se cree que es una directiva suya («Unknown preprocessor
+# directive») aunque este dentro de una cadena de Pascal. Y no lo dice hasta que compilas —
+# despues de veinte minutos preparando la carga.
+$iss = "$raiz\supabase\nodo\instalador\gluuh-servidor.iss"
+if (Test-Path $iss) {
+  $n = 0
+  foreach ($l in (Get-Content $iss)) {
+    $n++
+    if ($l -match '^\s*#(13|10|\$)') {
+      $fallos++
+      Write-Host ("  ISS      linea $n empieza por '#': el preprocesador lo tomara por una directiva") -ForegroundColor Red
+    }
+  }
+}
+
 Write-Host ""
 if ($fallos -eq 0) {
   Write-Host "  Todos los scripts arrancan en el Windows de un bar." -ForegroundColor Green

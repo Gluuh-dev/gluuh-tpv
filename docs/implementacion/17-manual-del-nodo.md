@@ -217,6 +217,44 @@ Los logs están en `.nodo\tmp\*.log` (uno por servicio). El del vigilante, en
 
 # B · El instalador para un cliente
 
+## B.0 · Lo que ve el técnico: **un asistente, no una consola negra**
+
+Cuatro páginas de ventana, con «Atrás» y «Siguiente». **Y cada una se valida contra la nube
+antes de dejar pasar**, así que los errores salen **antes de tocar el ordenador** — nada de
+instalar Postgres, crear la base de datos, y reventar en la última pantalla porque la
+contraseña estaba mal.
+
+| página | valida |
+|---|---|
+| 1 · Qué bar es | canjea el código contra la nube y **pide confirmación con el nombre de la empresa** |
+| 2 · Cuenta del titular | entra de verdad, y comprueba que la cuenta **sea de esa empresa** |
+| 3 · Datos fiscales | **sólo aparece si faltan** (lo mira en la nube) |
+| 4 · Arranque automático | una casilla |
+
+Antes esas preguntas se hacían en una **consola negra de PowerShell**. Aparte de la
+impresión que da un técnico pidiéndole a un hostelero su contraseña y su CIF en una pantalla
+así, **una consola no sabe volver atrás**: un dígito mal tecleado en el código y el único
+camino era empezar de cero.
+
+Las respuestas llegan al script en un fichero de `{tmp}` (no por línea de comandos: **la
+contraseña quedaría a la vista en la lista de procesos de Windows**), y el script lo borra en
+cuanto lo lee.
+
+> El mismo `Instalar-Gluuh.ps1` sirve para las dos cosas: con `-Respuestas` no pregunta nada
+> (lo que hace el `.exe`), y sin él pregunta por consola — que es **nuestro** camino. Un solo
+> script. Lo que probamos es lo que se ejecuta en el bar.
+
+### Y dos cerrojos que no estaban
+
+**Reinstalar encima de un bar que ya funciona.** `Instalar-Gluuh.ps1` **recrea la base de
+datos desde cero**: reinstalar habría borrado las ventas, la caja, las facturas y la cadena
+de VERIFACTU de ese bar. Ahora, si encuentra un Postgres con datos, **avisa en rojo y por
+defecto dice que no**. *(Para actualizar un bar no se reinstala: el nodo se actualiza solo.)*
+
+**Desinstalar.** `pgdata` no lo crea el instalador (lo crea `initdb` al vuelo), así que Inno
+no lo borraba — y se quedaban 250 MB con las ventas del bar dentro, en silencio. Ahora
+**pregunta**, y por defecto **no los borra**.
+
 ## B.1 · Qué pregunta (y por qué eso y no más)
 
 `supabase/nodo/Instalar-Gluuh.ps1` — cuatro preguntas, ni una de más:
