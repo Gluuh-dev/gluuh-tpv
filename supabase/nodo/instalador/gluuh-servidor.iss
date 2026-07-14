@@ -9,13 +9,15 @@
 ;
 ; QUE METE DENTRO (todo, para que no dependa de nada que haya en el ordenador del bar):
 ;
-;     pgsql\        Postgres portable       ~300 MB
-;     bin\          postgrest.exe, gotrue.exe  ~120 MB
-;     node\         Node.js portable         ~50 MB
+;     pgsql\        Postgres portable        ~300 MB
+;     bin\          postgrest.exe             ~66 MB   (ya NO va gotrue.exe: el nodo
+;                                                       firma sus propios tokens)
+;     node\         Node.js portable          ~50 MB
+;     web\          .next\standalone          ~41 MB   (la INTERFAZ: la sirve el nodo)
 ;     apps\nodo\    el codigo del servidor
 ;     supabase\     migraciones y scripts
 ;
-; Son ~500 MB. Parece mucho hasta que te acuerdas de que la alternativa es pedirle al
+; Son ~460 MB. Parece mucho hasta que te acuerdas de que la alternativa es pedirle al
 ; cliente que instale Postgres y Node a mano por telefono.
 ;
 ; OJO: postgrest.exe NECESITA libpq.dll, que viene con Postgres y NO en su zip. Si
@@ -54,10 +56,20 @@ UninstallDisplayName={#Nombre}
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
-; Los binarios (Postgres, PostgREST, GoTrue, Node). Van juntos a proposito.
+; Los binarios (Postgres, PostgREST, Node). Postgres y PostgREST van JUNTOS a proposito:
+; libpq.dll viene con Postgres y no en el zip de PostgREST. Separados, PostgREST muere en
+; silencio nada mas arrancar.
 Source: "carga\pgsql\*";      DestDir: "{app}\.nodo\pgsql"; Flags: ignoreversion recursesubdirs
 Source: "carga\bin\*";        DestDir: "{app}\.nodo\bin";   Flags: ignoreversion
 Source: "carga\node\*";       DestDir: "{app}\node";        Flags: ignoreversion recursesubdirs
+
+; LA INTERFAZ, ya compilada (`pnpm --filter @gluuh/web build:nodo`). El nodo la sirve por
+; su mismo puerto: por eso en las terminales no hay NADA que configurar.
+;
+; OJO al preparar la carga: `build:nodo` copia `.next\static` y `public` DENTRO del
+; standalone. Si se empaqueta el standalone sin ellos, la web ARRANCA IGUAL y sirve el
+; HTML sin CSS ni JavaScript: pagina en blanco en el TPV, y ni un error en los logs.
+Source: "carga\web\*";        DestDir: "{app}\apps\web\.next\standalone"; Flags: ignoreversion recursesubdirs
 
 ; El codigo del servidor.
 Source: "..\..\..\apps\nodo\*";   DestDir: "{app}\apps\nodo"; Flags: ignoreversion recursesubdirs
