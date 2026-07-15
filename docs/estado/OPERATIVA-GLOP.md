@@ -408,6 +408,19 @@ Es LA pantalla de cobro. Elementos de Glop:
 formas, selector de **tipo de documento**, selector de **cliente**, **enviar por email** (feature
 ya apuntada). → La captura #4 es EL diseño de referencia del visor de cobro.
 
+**✅ DISEÑO HECHO por el cliente:** `docs/diseño/gluuh-cobro-claro.html` — autocontenido (CSS
+inline, logo base64, JS plano, fuentes de sistema, SIN red ✅). Cubre TODO: pago dividido (3
+líneas), tipo de documento, cliente/empleado/terminal, base+impuesto+descuento, notas, propina,
+zonas de impresión, A devolver, y F10/F11/F12 + Enviar email. Táctil (tap 56px), foco accesible.
+→ **Este es el mockup a implementar** para M1. Es **tema CLARO** (paneles blancos, morado de
+acento), "lenguaje de la app actual".
+
+> ⚠️ **Coherencia claro/oscuro (decidir):** el **lanzador** que hice es OSCURO (mockup Gluuh);
+> este **cobro es CLARO** (app actual). Hay que decidir si la operativa es clara u oscura para
+> que todo case. Opciones: (a) operativa CLARA (cobro manda, y reharía el lanzador claro), (b)
+> operativa OSCURA (rehacer el cobro oscuro), (c) el TPV en claro y solo el lanzador oscuro (a
+> propósito). Lo dejo como pregunta al cliente.
+
 ### M2. Dividir cuenta — captura "Dividir cuenta"
 - "Divide el documento en tantos como necesites". Ticket Actual a la derecha.
 - Controles: **Nº Docs** (spinner ±), **División manual**, **División automática**, **Unidades**
