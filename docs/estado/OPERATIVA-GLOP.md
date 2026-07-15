@@ -362,6 +362,30 @@ de control)**, reinstalar y restaurar. Los datos se conservan si copias bien.
 
 Todo lo demás (el ~75%) **ya lo tenemos** o lo resolvemos mejor (web/nodo vs su Firebird).
 
+## Cómo debe VERSE (dirección visual) — honestidad sobre las fuentes
+
+**Aviso honesto:** los artículos de texto de la web de Glop dan **poco detalle visual** (son
+FAQs de texto). Para "cómo debe verse" las fuentes buenas son las **imágenes/mockups**, no los
+artículos. Lo que SÍ tenemos y manda:
+
+1. **El mockup del cliente** `docs/diseño/gluuh-inicio-diseño.html` — **la referencia visual
+   nº1.** Define el estilo Gluuh: oscuro **morado `#572370`**, moderno, por **tiles**, botones
+   grandes, placa en forma de **escudo**, degradados, foco accesible. → Es el norte del look.
+2. **Capturas de Ágora** (config-una-vez, pantallas de conexión) → patrón "configura y se queda".
+3. **Capturas de Glop** (menú de config verde, selección masiva por familia) → estructura de
+   navegación y edición masiva.
+
+**Regla de estilo (dos mundos, ya en el proyecto):**
+- **Operativa** (TPV, camarero, táctil): estilo **Glop/Ágora** — colorido, botones GRANDES,
+  marca del cliente, oscuro Gluuh del mockup. NADA de estilo backoffice aquí.
+- **Backoffice** (dueño, ratón): estilo **Supabase/Notion** (el que ya tiene el panel).
+
+El teclado en pantalla ya sigue el look (morado Gluuh, botones grandes). Cada pieza nueva de la
+operativa se hace con la **paleta y el estilo del mockup**, no con el del backoffice.
+
+> Si el cliente quiere que clave un aspecto concreto (una pantalla igual que una captura suya),
+> que pase LA IMAGEN — de un artículo de texto no se saca el pixel.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
