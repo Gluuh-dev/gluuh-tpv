@@ -141,7 +141,11 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0107`.**
+**Siguiente número libre: `0108`.**
+
+- `0107` — terminal por defecto al crear empresa (`admin_sembrar_terminal_defecto`):
+  un TPV `tpv1`/`121212` listo para conectar. Ojo sync: verificar que `device.clave_hash`
+  baja al nodo.
 
 - `0105` — credencial propia por terminal (`device.usuario`/`clave_hash` + RPCs
   `fijar_clave_dispositivo`/`verificar_clave_dispositivo`). Base del rediseño de conexión

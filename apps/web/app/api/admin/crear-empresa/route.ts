@@ -89,6 +89,9 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   // recién creado no puede cobrar (la pantalla de cobro sin métodos).
   await admin.rpc("admin_sembrar_formas_pago", { p_tenant: tid });
 
+  // Terminal por defecto (tpv1 / 121212) para poder conectar un TPV nada más instalar (0107).
+  await admin.rpc("admin_sembrar_terminal_defecto", { p_tenant: tid });
+
   return { codigoInstalacion, claveTecnica };
 }
 
