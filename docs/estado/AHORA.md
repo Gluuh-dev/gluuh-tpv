@@ -70,22 +70,30 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 
 ---
 
-## ⚠️ Sin confirmar — hay que mirarlo
+## 🔴 CONFIRMADO — el emparejado de terminales está ROTO en la nube
 
-**El hook `custom_access_token_hook` NO está activado en Supabase.** La función existe en la
-base, pero el token que devuelve el login **no trae `tenant_id` ni `user_rol`**.
+**El hook `custom_access_token_hook` NO está activado en Supabase.** Comprobado el 14-07
+haciendo el login de verdad y decodificando el token: **sólo trae `role: authenticated`**,
+ni `tenant_id` ni `user_rol`.
 
-La aplicación no se entera porque `current_tenant_id()` tiene un plan B (busca el `app_user`
-por `auth.uid()`). Pero **hay código que lee los claims a pelo**:
+La app normal no se entera porque `current_tenant_id()` tiene un plan B (busca el `app_user`
+por `auth.uid()`). Pero **hay una ruta que lee los claims a pelo**:
 
-- `apps/web/app/api/dispositivos/generar/route.ts` → exige `user_rol` ∈ {PROPIETARIO,
-  ENCARGADO} leyéndolo del JWT. **Si el hook está apagado, esto devuelve 403 siempre** → el
-  **emparejado de terminales estaría roto**. *Hay que comprobarlo.*
-- `es_admin_plataforma()` / `is_platform_admin` → mirar si el panel de admin depende de ello.
+- `apps/web/app/api/dispositivos/generar/route.ts:39-44` → exige `user_rol` ∈ {PROPIETARIO,
+  ENCARGADO} **del JWT**, y como no viene → **403 «Solo encargado o propietario» SIEMPRE**.
+  → **desde el panel no se puede vincular ningún TPV nuevo.**
+- Mirar de paso si el panel de admin depende de `is_platform_admin` (mismo problema).
 
-Dos salidas: **activar el hook** en Supabase (Authentication → Hooks → Customize Access
-Token), o **quitar la dependencia del claim** como se hizo en `Instalar-Gluuh.ps1`. Lo
-segundo es más robusto; lo primero, más barato.
+**Dos salidas:**
+- **Barata:** activar el hook en Supabase (Authentication → Hooks → Customize Access Token →
+  apuntar a `public.custom_access_token_hook`). Un clic, pero **hay que acordarse en cada
+  entorno** y no lo cubre ninguna migración.
+- **Robusta (recomendada):** quitar la dependencia del claim en esa ruta y **preguntar el rol
+  a la base** — exactamente lo que se hizo en `Instalar-Gluuh.ps1` cuando dio este mismo
+  problema (leer `app_user` por `auth.uid()`). Así funciona con el hook y sin él.
+
+> Es la **misma familia** que ya nos mordió tres veces: código que da por hecho que el token
+> trae algo que no trae. Ver `TRAMPAS.md` §7.
 
 ---
 
