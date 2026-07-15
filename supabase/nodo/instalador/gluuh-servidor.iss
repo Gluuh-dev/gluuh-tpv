@@ -156,34 +156,27 @@ Source: "{#Carga}\node_modules\*"; DestDir: "{app}\node_modules"; Flags: ignorev
 ; aleatorias de ESE bar).
 Source: "{#Carga}\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion
 
-[UninstallDelete]
-; El .url lo crea [INI] a mano, asi que Inno no lo borra solo al desinstalar.
-Type: files; Name: "{app}\Servidor Gluuh.url"
-
 [Dirs]
 Name: "{app}\.nodo\tmp"
 Name: "{app}\.nodo\media"
 Name: "{app}\.nodo\pgdata"
 
-; El acceso directo que faltaba. Es un acceso a INTERNET (una .url) que abre el panel del
-; servidor en el navegador: http://localhost:54321/servidor. Ahi se ve si esta activo, la
-; version, y estan los botones de Reiniciar y Buscar actualizacion.
-;
-; Por que una .url y no un .lnk a un .exe: el "programa" del servidor ES su panel web (lo
-; sirve el propio nodo). No hay ninguna ventana nativa que abrir; hay una pagina.
-[INI]
-Filename: "{app}\Servidor Gluuh.url"; Section: "InternetShortcut"; Key: "URL"; \
-  String: "http://localhost:54321/servidor"
-Filename: "{app}\Servidor Gluuh.url"; Section: "InternetShortcut"; Key: "IconFile"; \
-  String: "{app}\supabase\nodo\instalador\gluuh.ico"
-Filename: "{app}\Servidor Gluuh.url"; Section: "InternetShortcut"; Key: "IconIndex"; \
-  String: "0"
-
 [Icons]
-; En el escritorio y en el menu inicio. El bar enciende el ordenador, ve el icono de Gluuh
-; y con un clic tiene el panel del servidor delante.
-Name: "{autodesktop}\Servidor Gluuh";      Filename: "{app}\Servidor Gluuh.url"; IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
-Name: "{autoprograms}\Gluuh\Servidor del local"; Filename: "{app}\Servidor Gluuh.url"; IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
+; ── EL ICONO EN LA BANDEJA (y en el escritorio) ──────────────────────────────
+;
+; `bandeja.vbs` pone el icono del servidor en la BANDEJA del sistema (la esquina, junto al
+; reloj). Va en el ARRANQUE del usuario: al encender el ordenador aparece solo. Los .vbs
+; y .ps1 ya se copian con `supabase\*`, asi que aqui solo hay que crear los accesos.
+Name: "{commonstartup}\Servidor Gluuh"; Filename: "{app}\supabase\nodo\bandeja.vbs"; \
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; \
+  Comment: "Pone el servidor del bar en la bandeja del sistema"
+
+; Y en el escritorio y el menu inicio: al pulsar, abre el PANEL en una ventana de app (sin
+; barras de navegador). Ahi se ve si esta activo, la version, y estan Reiniciar y Actualizar.
+Name: "{autodesktop}\Servidor Gluuh"; Filename: "{app}\supabase\nodo\abrir-panel.vbs"; \
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
+Name: "{autoprograms}\Gluuh\Panel del servidor"; Filename: "{app}\supabase\nodo\abrir-panel.vbs"; \
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
 
 [Run]
 ; 1. Crear el cluster de Postgres (initdb). Es lo unico que no se puede traer hecho:
@@ -213,12 +206,22 @@ Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\supabase\nodo\Instalar-Gluuh.ps1"" -Raiz ""{app}"" -AnonKey ""{#AnonKey}"" -Respuestas ""{tmp}\gluuh-respuestas.txt"""; \
   StatusMsg: "Instalando el servidor del local (unos minutos)..."; Flags: waituntilterminated
 
-; 3. Y se le ensena la hoja de entrega al tecnico.
+; 3. El icono en la bandeja, YA — sin esperar a reiniciar. `wscript` lanza el .vbs, que a su
+;    vez arranca la bandeja sin ninguna ventana negra. A partir de aqui esta en la esquina.
+Filename: "wscript.exe"; Parameters: """{app}\supabase\nodo\bandeja.vbs"""; \
+  Flags: nowait runhidden skipifsilent
+
+; 4. Y se le ensena la hoja de entrega al tecnico.
 Filename: "notepad.exe"; Parameters: """{app}\INSTALACION.txt"""; \
   Description: "Ver la direccion que hay que poner en los TPV"; \
   Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
+; Cerrar la bandeja (el arranque automatico se quita solo con los [Icons]). En su propio
+; .ps1, no inline: Inno lee cualquier { } como una constante suya y peta.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\supabase\nodo\cerrar-bandeja.ps1"""; \
+  Flags: runhidden; RunOnceId: "CerrarBandeja"
 ; Al desinstalar: parar los servicios y quitar el arranque automatico. Si no, quedan
 ; procesos huerfanos comiendo memoria y una tarea programada que apunta a la nada.
 Filename: "powershell.exe"; \
