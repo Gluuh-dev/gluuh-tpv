@@ -196,15 +196,15 @@ Filename: "{app}\.nodo\pgsql\bin\initdb.exe"; \
 ;    fiscales al dueño de un bar no inspira ninguna confianza — y ademas no sabe volver
 ;    atras: un digito mal tecleado y a empezar de cero.
 ;
-;    La consola SIGUE VISIBLE, pero solo para enseñar el progreso: la instalacion tarda
-;    varios minutos (104 migraciones, la carta, las fotos) y una barra parada sin decir nada
-;    parece un programa colgado.
+;    LA CONSOLA YA NO SE VE. Antes se lanzaba aqui, en [Run], VISIBLE — una ventana negra
+;    llena de texto tecnico ([0] Arrancando Postgres, 104 migraciones...) mientras el
+;    asistente decia solo "Instalando... (unos minutos)". Al dueno de un bar eso le parece
+;    que algo va mal. Ahora se lanza OCULTO desde [Code] (ver `EjecutarNodoConProgreso`,
+;    abajo), y cada fase del script se ensena como texto DENTRO del asistente. El progreso
+;    de verdad, sin la consola.
 ;
 ;    OJO: -ExecutionPolicy Bypass es obligatorio. Un Windows de fabrica trae la politica en
-;    Restricted y NO EJECUTA ningun .ps1: el instalador se quedaria mudo.
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\supabase\nodo\Instalar-Gluuh.ps1"" -Raiz ""{app}"" -AnonKey ""{#AnonKey}"" -Respuestas ""{tmp}\gluuh-respuestas.txt"""; \
-  StatusMsg: "Instalando el servidor del local (unos minutos)..."; Flags: waituntilterminated
+;    Restricted y NO EJECUTA ningun .ps1: el instalador se quedaria mudo.  (Va en el codigo.)
 
 ; 3. El icono en la bandeja, YA — sin esperar a reiniciar. `wscript` lanza el .vbs, que a su
 ;    vez arranca la bandeja sin ninguna ventana negra. A partir de aqui esta en la esquina.
@@ -593,6 +593,98 @@ end;
 // En un fichero de `{tmp}`, no por linea de comandos: la contraseña quedaria a la vista en
 // la lista de procesos de Windows. El script lo lee y LO BORRA EN EL ACTO; Inno borra `{tmp}`
 // entero al terminar.
+// ── El instalador del nodo, OCULTO y con el progreso a la vista ──────────────
+//
+// El problema: la instalacion tarda varios minutos y hay que ir enseñando lo que hace, PERO
+// un bucle con Sleep congela la ventana ("no responde") porque no repinta. La solucion de
+// Inno es un TEMPORIZADOR de Windows: se arranca antes del Exec, y como Inno bombea mensajes
+// mientras espera a que el proceso termine, el temporizador dispara solo y refresca el texto.
+//
+// PowerShell se lanza con la ventana escondida (SW_HIDE + -WindowStyle Hidden). El script
+// escribe cada fase en un fichero (una linea, sobrescribiendo); el temporizador lo lee y lo
+// pone como texto del asistente. Al final el fichero dice "@@FIN@@", o "@@ERROR@@ <motivo>".
+function SetTimer(Wnd, IdEvent, Elapse, TimerFunc: LongWord): LongWord;
+  external 'SetTimer@user32.dll stdcall';
+function KillTimer(Wnd, IdEvent: LongWord): LongWord;
+  external 'KillTimer@user32.dll stdcall';
+
+var
+  GFicheroProgreso: string;
+  GUltimoTexto: string;
+
+// Lee la ultima linea del fichero y la ensena. Devuelve el texto crudo (para mirar sentinelas).
+function LeerProgreso(): string;
+var
+  Lineas: TArrayOfString;
+  Texto: string;
+begin
+  Result := '';
+  // Leer puede fallar si justo en ese instante el script esta reescribiendo el fichero: no
+  // pasa nada, se reintenta a la siguiente y se conserva el ultimo texto que se vio.
+  if LoadStringsFromFile(GFicheroProgreso, Lineas) and (GetArrayLength(Lineas) > 0) then
+  begin
+    Texto := Trim(Lineas[0]);
+    Result := Texto;
+    if (Texto <> '') and (Texto <> GUltimoTexto)
+       and (Pos('@@FIN@@', Texto) <> 1) and (Pos('@@ERROR@@', Texto) <> 1) then
+    begin
+      WizardForm.StatusLabel.Caption := Texto;
+      GUltimoTexto := Texto;
+    end;
+  end;
+end;
+
+// El temporizador. La firma es la de un TIMERPROC de Windows (4 argumentos), aunque no los use.
+procedure AlDisparar(Wnd, Msg, IdEvent, Tiempo: LongWord);
+begin
+  LeerProgreso();
+end;
+
+procedure EjecutarNodoConProgreso();
+var
+  Params, Texto: string;
+  RC: Integer;
+  Timer: LongWord;
+begin
+  GFicheroProgreso := ExpandConstant('{tmp}\gluuh-progreso.txt');
+  GUltimoTexto := '';
+  SaveStringToFile(GFicheroProgreso, 'Preparando la instalacion...', False);
+  WizardForm.StatusLabel.Caption := 'Preparando la instalacion...';
+
+  // -NonInteractive: si el script intentara preguntar algo (no deberia, en modo asistente lo
+  // lee todo del fichero), fallaria en el acto en vez de colgarse invisible.
+  Params :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "'
+    + ExpandConstant('{app}\supabase\nodo\Instalar-Gluuh.ps1') + '"'
+    + ' -Raiz "' + ExpandConstant('{app}') + '"'
+    + ' -AnonKey "{#AnonKey}"'
+    + ' -Respuestas "' + ExpandConstant('{tmp}\gluuh-respuestas.txt') + '"'
+    + ' -Progreso "' + GFicheroProgreso + '"';
+
+  // Refresca cada 400 ms mientras Inno espera al proceso.
+  Timer := SetTimer(0, 0, 400, CreateCallback(@AlDisparar));
+
+  // Oculto y BLOQUEANTE: Inno bombea mensajes durante la espera (por eso el temporizador
+  // dispara), y al volver ya sabemos si fue bien por el codigo de salida.
+  if not Exec('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, RC) then
+    RC := -1;
+
+  KillTimer(0, Timer);
+  Texto := LeerProgreso();   // ultima lectura, por si el temporizador se perdio la del final
+
+  if (Pos('@@ERROR@@', Texto) = 1) then
+    MsgBox('La instalacion del servidor no se pudo completar:' + #13#10#13#10
+      + Copy(Texto, 11, Length(Texto)) + #13#10#13#10
+      + 'Puedes ver el detalle en la carpeta del programa, en .nodo\tmp.',
+      mbCriticalError, MB_OK)
+  else if (RC <> 0) or (Pos('@@FIN@@', Texto) <> 1) then
+    MsgBox('La instalacion del servidor termino con un problema.' + #13#10
+      + 'Revisa la carpeta .nodo\tmp del programa para ver que paso.',
+      mbCriticalError, MB_OK)
+  else
+    WizardForm.StatusLabel.Caption := 'Servidor instalado y en marcha.';
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Lineas: TArrayOfString;
@@ -623,6 +715,11 @@ begin
 
     SaveStringsToUTF8File(ExpandConstant('{tmp}\gluuh-respuestas.txt'), Lineas, False);
   end;
+
+  // Despues de que [Run] haya creado el cluster con initdb, se lanza el instalador del nodo
+  // (base de datos, bar, fotos, servicios) OCULTO y con el progreso a la vista del asistente.
+  if CurStep = ssPostInstall then
+    EjecutarNodoConProgreso();
 end;
 
 // Aviso ANTES de instalar. Un servidor que alguien apaga por la noche "para ahorrar"

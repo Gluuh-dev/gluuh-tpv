@@ -42,7 +42,16 @@ param(
   #
   # Sin este parametro, pregunta por consola. Ese es NUESTRO camino de desarrollo... y es
   # exactamente el mismo script. Lo que probamos es lo que se ejecuta en el bar.
-  [string]$Respuestas
+  [string]$Respuestas,
+
+  # ── EL PROGRESO, PARA QUE SE VEA DENTRO DEL ASISTENTE ──────────────────────
+  #
+  # Cuando esto lo lanza el `.exe`, la consola va OCULTA: una ventana negra llena de texto
+  # tecnico asusta al dueno de un bar y parece que algo va mal. Pero una barra parada sin
+  # decir nada durante cinco minutos parece un programa colgado. Solucion: cada fase se
+  # escribe (una linea, sobrescribiendo) en este fichero, y el asistente lo lee y lo ensena
+  # como texto suyo. Al terminar escribe "@@FIN@@"; si algo falla, "@@ERROR@@ <motivo>".
+  [string]$Progreso
 )
 
 $ErrorActionPreference = "Stop"
@@ -79,7 +88,24 @@ function Titulo($t) {
   Write-Host "  $('-' * $t.Length)" -ForegroundColor DarkGray
 }
 function Bien($t) { Write-Host "   $t" -ForegroundColor Green }
-function Mal($t)  { Write-Host "   $t" -ForegroundColor Red }
+# Mal guarda el ultimo mensaje: asi `Fallo` sabe que motivo mandarle al asistente sin tener
+# que repetirlo en cada sitio.
+$script:ultimoMal = "La instalacion no se pudo completar."
+function Mal($t)  { $script:ultimoMal = $t; Write-Host "   $t" -ForegroundColor Red }
+
+# El progreso al asistente: una linea, sobrescribiendo, en UTF-8 SIN BOM (para que Inno la
+# lea limpia). En modo consola ($Progreso vacio) no hace nada.
+function Progreso($t) {
+  if ($Progreso) {
+    try { [IO.File]::WriteAllText($Progreso, $t, (New-Object Text.UTF8Encoding($false))) } catch {}
+  }
+}
+# Todos los caminos de error del script pasan por aqui: avisan al asistente y salen. El
+# mensaje es el ultimo que enseno `Mal`, justo antes.
+function Fallo { Progreso "@@ERROR@@ $script:ultimoMal"; exit 1 }
+# Y cualquier error inesperado (una excepcion que nadie atrapo) tambien avisa, no deja al
+# asistente esperando un sentinela que no va a llegar.
+trap { Progreso "@@ERROR@@ $($_.Exception.Message)"; exit 1 }
 
 Clear-Host
 Write-Host ""
@@ -108,6 +134,8 @@ if (-not $AnonKey) {
   $AnonKey = Read-Host "   Clave publica de Gluuh (sb_publishable_...)"
 }
 
+Progreso "Comprobando la empresa y la cuenta del titular..."
+
 # ── 1. ¿Qué empresa es? ──────────────────────────────────────────────────────
 Titulo "1 de 4 - Que empresa es"
 if (-not $conAsistente) {
@@ -127,7 +155,7 @@ while (-not $tenantId) {
 
   if ($codigo.Length -ne 21) {
     Mal "El codigo tiene que tener 21 digitos."
-    if ($conAsistente) { exit 1 }
+    if ($conAsistente) { Fallo }
     continue
   }
   $norm = "{0}-{1}-{2}-{3}-{4}" -f $codigo.Substring(0,4), $codigo.Substring(4,4), $codigo.Substring(8,5), $codigo.Substring(13,4), $codigo.Substring(17,4)
@@ -153,17 +181,17 @@ while (-not $tenantId) {
   } catch {
     Mal "No hay conexion con Gluuh. La instalacion necesita internet UNA vez."
     Mal $_.Exception.Message
-    exit 1
+    Fallo
   }
 
   if (-not $t -or $t.Count -eq 0) {
     Mal "Ese codigo no es valido. Comprueba que lo has copiado bien."
-    if ($conAsistente) { exit 1 }
+    if ($conAsistente) { Fallo }
     continue
   }
   if (-not $t[0].activo) {
     Mal "Esa empresa esta dada de baja. Llama a Gluuh."
-    exit 1
+    Fallo
   }
 
   $tenantId = $t[0].id
@@ -200,7 +228,7 @@ while (-not $refresco) {
          -Headers @{ apikey = $AnonKey } -ContentType "application/json" -Body $cuerpo -TimeoutSec 20
   } catch {
     Mal "Email o contrasena incorrectos."
-    if ($conAsistente) { exit 1 }
+    if ($conAsistente) { Fallo }
     continue
   }
 
@@ -230,18 +258,18 @@ while (-not $refresco) {
           -Headers @{ apikey = $AnonKey; authorization = "Bearer $($s.access_token)" } -TimeoutSec 15
   } catch {
     Mal "No se pudo comprobar a que empresa pertenece esa cuenta."
-    if ($conAsistente) { exit 1 }
+    if ($conAsistente) { Fallo }
     continue
   }
 
   if (-not $yo -or $yo.Count -eq 0) {
     Mal "Esa cuenta no esta dada de alta como empleado de ninguna empresa."
-    if ($conAsistente) { exit 1 }
+    if ($conAsistente) { Fallo }
     continue
   }
   if ($yo[0].tenant_id -ne $tenantId) {
     Mal "Esa cuenta no pertenece a '$empresa'. Usa la del titular de esta empresa."
-    if ($conAsistente) { exit 1 }
+    if ($conAsistente) { Fallo }
     continue
   }
 
@@ -267,7 +295,7 @@ $loc = Invoke-RestMethod "$Nube/rest/v1/location?select=id,nombre,cif,razon_soci
 
 if (-not $loc -or $loc.Count -eq 0) {
   Mal "Esta empresa no tiene ningun local dado de alta. Hay que crearlo antes en el panel."
-  exit 1
+  Fallo
 }
 $local = $loc[0]
 
@@ -297,7 +325,7 @@ if ($local.cif -and $local.cif -ne "PENDIENTE") {
 
   if (-not $cif -or -not $razon) {
     Mal "Faltan los datos fiscales. Sin CIF no se pueden emitir facturas."
-    exit 1
+    Fallo
   }
 
   $cuerpo = @{ cif = $cif; razon_social = $razon; territorio_fiscal = $terr } | ConvertTo-Json
@@ -331,6 +359,7 @@ Titulo "Instalando (esto tarda unos minutos)"
 #
 # Aqui se generan secretos NUEVOS, aleatorios y distintos en cada instalacion. No salen
 # nunca de este ordenador.
+Progreso "Generando las claves unicas de este servidor..."
 Write-Host "   Generando las claves de este servidor..." -ForegroundColor DarkGray
 
 function Aleatorio([int]$bytes) {
@@ -359,11 +388,13 @@ server-host = "127.0.0.1"
 
 Bien "Claves generadas (unicas de este bar)"
 
+Progreso "Creando la base de datos del bar (104 migraciones)..."
 Write-Host "   Preparando la base de datos..." -ForegroundColor DarkGray
 & "$PSScriptRoot\instalar-nodo.ps1" -Recrear -JwtSecreto $jwtSecreto -PgClave $pgClave |
   Out-File "$nodo\tmp\instalacion.log" -Encoding utf8
 Bien "Base de datos lista"
 
+Progreso "Bajando de la nube la carta, las mesas y los empleados..."
 Write-Host "   Bajando la carta, las mesas y los empleados..." -ForegroundColor DarkGray
 Push-Location $Raiz
 node "$Raiz\apps\nodo\provisionar.mjs" $tenantId | Out-File "$nodo\tmp\provision.log" -Encoding utf8
@@ -379,6 +410,7 @@ $filas = (Select-String -Path "$nodo\tmp\provision.log" -Pattern "filas bajadas"
 if (-not $filas) { $filas = "Bar descargado" }
 Bien $filas
 
+Progreso "Bajando las fotos de la carta..."
 Write-Host "   Bajando las fotos de la carta..." -ForegroundColor DarkGray
 node "$Raiz\apps\nodo\descargar-imagenes.mjs" | Out-File "$nodo\tmp\imagenes.log" -Encoding utf8
 Bien "Fotos descargadas"
@@ -393,6 +425,7 @@ Pop-Location
 # El titular acaba de teclearla aqui arriba, asi que se siembra en el nodo. Se guarda
 # HASHEADA con bcrypt (lo hace Postgres, no nosotros); la contrasena en claro no se
 # escribe en ningun sitio.
+Progreso "Preparando el acceso del titular al panel..."
 Write-Host "   Preparando el acceso del titular al panel local..." -ForegroundColor DarkGray
 $env:PGPASSWORD = "gluuh"
 $env:PGCLIENTENCODING = "UTF8"
@@ -423,15 +456,16 @@ if (-not (Test-Path $standalone)) {
     Pop-Location
     if (-not (Test-Path $standalone)) {
       Mal "No se pudo compilar la interfaz. Mira .nodo\tmp\web-build.log"
-      exit 1
+      Fallo
     }
     Bien "Interfaz compilada"
   } else {
     Mal "El paquete no trae la interfaz compilada. Instalador incompleto: avisa a Gluuh."
-    exit 1
+    Fallo
   }
 }
 
+Progreso "Arrancando los servicios del servidor..."
 Write-Host "   Arrancando los servicios..." -ForegroundColor DarkGray
 & "$PSScriptRoot\arrancar-nodo.ps1" | Out-Null
 Bien "Servidor en marcha"
@@ -493,3 +527,7 @@ Write-Host "        $url" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "    Queda escrito en INSTALACION.txt" -ForegroundColor DarkGray
 Write-Host ""
+
+# Y el sentinela: le dice al asistente que todo fue bien y ya puede cerrar la pantalla de
+# instalacion. Sin esto se quedaria esperando eternamente.
+Progreso "@@FIN@@"
