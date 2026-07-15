@@ -386,6 +386,68 @@ operativa se hace con la **paleta y el estilo del mockup**, no con el del backof
 > Si el cliente quiere que clave un aspecto concreto (una pantalla igual que una captura suya),
 > que pase LA IMAGEN — de un artículo de texto no se saca el pixel.
 
+## Modales de la operativa (CAPTURAS de Glop — referencia visual buena)
+
+El cliente pasó capturas de los modales del TPV de Glop (verde, botones grandes, acento
+naranja en la acción principal). Son la referencia visual para construir/afinar los nuestros.
+
+### M1. Cobrar (VISOR DE COBRO) — captura "Cobrar mesa 4" ⭐ = prioridad #2
+Es LA pantalla de cobro. Elementos de Glop:
+- Cabecera: **Cliente / Empleado / Terminal** (con toggles) + **Tipo de documento** (Fra.
+  simplificada / completa) + Fecha + Importe + Base imponible + Impuesto + Descuento.
+- **Total GRANDE** centrado (40,00) + **teclado numérico**.
+- **Formas de pago** en lista grande: CONTADO, TARJETA, CHEQUE, PAGO QR (→ Efectivo/Tarjeta/
+  Bizum/QR en lo nuestro).
+- **PAGO DIVIDIDO**: 3 líneas de importe (paga una parte en efectivo, otra en tarjeta). ← gap
+- **Descuento** y **Propina**.
+- **A devolver** (cambio) grande en verde.
+- Zonas de impresión (activadas).
+- Pie: Cancelar · **Enviar por Email** · Imprimir cuenta (F10) · Cobrar Imprimir (F11) · **Cobrar (F12)** (naranja).
+
+**Qué tenemos:** `CobrarModal` (con propina, cambio). **Gaps vs Glop:** pago DIVIDIDO en varias
+formas, selector de **tipo de documento**, selector de **cliente**, **enviar por email** (feature
+ya apuntada). → La captura #4 es EL diseño de referencia del visor de cobro.
+
+### M2. Dividir cuenta — captura "Dividir cuenta"
+- "Divide el documento en tantos como necesites". Ticket Actual a la derecha.
+- Controles: **Nº Docs** (spinner ±), **División manual**, **División automática**, **Unidades**
+  (spinner ±), **Traspasar**, y Cancelar división / Abrir cajón / **Cobrar todos** / Cobrar.
+**Qué tenemos:** split bill parcial (🟡). → Modal a construir con esta referencia.
+
+### M3. Invitaciones en ticket — captura "Invitaciones en ticket"
+- Tabla de artículos con checkbox. Acciones: **Invitar artículo(s)**, Anular invitación,
+  **Entrada / consumo**, Anular entrada/cons, **Desglosar artículos**, Salir.
+**Qué tenemos:** `tipo_operacion` (AUTOCONSUMO/invitación) 🟡. → Modal a construir.
+
+### M4. Comentarios + extras del artículo — captura "ENTRECOT"
+- Al tocar un producto con opciones: **dos columnas** → izq. **Comentarios** del grupo
+  (POCO HECHO/AL PUNTO/MUY HECHO/SIN SALSA…) con checkbox; der. **Extras** (PIMIENTA, ROQUEFORT,
+  BARBACOA) con **unidades ±**. Botón **Comentario manual** (→ teclado en pantalla), **Guardar**
+  (naranja), Cancelar, flechas de orden.
+**Qué tenemos:** `modifier` / `modifier_group` / `nota_preparacion` ✅ (motor). → Verificar que
+nuestro modal de modificadores tiene ESTE layout (comentarios + extras con uds + comentario libre).
+
+### M5. Home/launcher de Glop — captura "GLOP TPV HOSTELERIA"
+- Barra de título con empresa/CIF/terminal. Sidebar izq: Menú, Manual, Demo guiada, Conoce tu
+  negocio, **Acceso a TPV** (naranja grande). Sidebar der: **ARTÍCULOS** (familias, formatos,
+  artículos, actualización de precios), **COMPRAS**, **UTILIDADES** (agenda, apuntes de caja),
+  **GLOP** (Mi Glop, Salir, Apagar ordenador).
+**Nuestro lanzador** (recién hecho) es más limpio y por tiles; el menú de config de Glop mapea a
+nuestro **backoffice**. La captura confirma: **Acceso a TPV** destacado + config a un lado.
+> Nota: "Apagar ordenador" desde el TPV es una idea útil para el mini-PC del bar (apagar limpio).
+
+### Lo que FALTA de estos modales (resumen)
+- **Pago dividido** en el cobro (parte efectivo + parte tarjeta) 🆕
+- **Selector de tipo de documento** (simplificada/completa) en el cobro 🆕
+- **Selector de cliente** en el cobro 🟡
+- **Modal Dividir cuenta** (manual/automática) 🆕
+- **Modal Invitaciones** 🟡
+- Verificar **modal de comentarios+extras** con el layout de Glop 🟡
+- (Idea) **Apagar el equipo** desde el menú del TPV 🟡
+
+> El **vídeo de YouTube no lo puedo "ver"** (WebFetch no lee vídeo). Para el aspecto, las
+> CAPTURAS como estas son lo que vale — sigue pasándolas.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
