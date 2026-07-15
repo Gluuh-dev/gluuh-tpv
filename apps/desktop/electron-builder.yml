@@ -8,10 +8,17 @@ files:
   - package.json
 win:
   target: nsis
+  # El icono de Gluuh (morado, visible en oscuro). Sin esto, el TPV sale con el icono por
+  # defecto de Electron y parece de cualquiera. build\icon.ico es el mismo del servidor.
+  icon: build/icon.ico
 nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
+  # Accesos directos con el nombre bonito, en escritorio y menu inicio.
+  shortcutName: Gluuh TPV
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
 # Auto-update vía GitHub Releases. Ajustar owner/repo al publicar la primera release.
 publish:
   provider: github

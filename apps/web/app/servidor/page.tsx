@@ -118,19 +118,26 @@ export default function Servidor() {
     <main className="min-h-screen bg-zinc-950 p-8 text-zinc-100">
       <div className="mx-auto max-w-4xl space-y-8">
         <header className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="flex items-center gap-3 text-3xl font-bold">
-              Servidor del local
-              {/* ACTIVO, en verde y latiendo: lo primero que quieres ver al abrir esto. Si
-                  estás viendo esta pantalla, es que el nodo contesta — así que está activo. */}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950 px-2.5 py-1 text-xs font-medium text-emerald-400">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                Activo
-              </span>
-            </h1>
-            <p className="mt-1 text-zinc-400">
-              Todo lo que el bar necesita para funcionar sin internet · versión {e.version}
-            </p>
+          <div className="flex items-start gap-4">
+            {/* El logo: marca de verdad en la cabecera. Sobre el fondo oscuro va en su
+                cuadrado morado (el mismo icono que en la bandeja), no el logo transparente
+                —que se perdería—. */}
+            <img src="/icono-app.png" alt="Gluuh" className="h-14 w-14 rounded-2xl shadow-lg shadow-purple-950/50" />
+            <div>
+              <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
+                Servidor del local
+                {/* ACTIVO, en verde y latiendo: si estás viendo esta pantalla, el nodo
+                    contesta — así que está activo. */}
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                  Activo
+                </span>
+              </h1>
+              <p className="mt-1 text-sm text-zinc-400">
+                Todo lo que el bar necesita para funcionar sin internet
+                <span className="ml-2 rounded-md bg-zinc-800/80 px-1.5 py-0.5 font-mono text-xs text-zinc-400">v{e.version}</span>
+              </p>
+            </div>
           </div>
 
           {/* Las acciones. A la derecha, separadas del resto: son para el técnico o el dueño
