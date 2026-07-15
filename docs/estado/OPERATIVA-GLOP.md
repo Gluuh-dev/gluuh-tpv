@@ -29,10 +29,22 @@
   numérico para cantidades/PIN y QWERTY para nombres/CIF, igual en todos los equipos, sin
   depender de la config de Windows.
 
-**Plan:** componente de teclado en pantalla (React) integrado en la operativa. Aparece al
-tocar un campo (o botón "Teclado"), overlay abajo, manda las teclas al campo con foco.
-Variantes: numérico y completo. Autocontenido (offline). *(Opción: `react-simple-keyboard`,
-ligero y probado, o uno mínimo propio.)*
+**Spec (aclarada por el cliente):**
+- **Teclado COMPLETO** (QWERTY + números + símbolos), no solo numérico. Para escribir de
+  todo: nombres de producto, precios, CIF…
+- **FLOTANTE, por encima de todo** (overlay top-most), no docked fijo abajo.
+- **NO tapa el campo que estás editando.** Como se usa para **crear productos, cambiar
+  precios, etc.** (formularios con varios campos), tiene que poder verse el input a la vez.
+  → **Movible/arrastrable** (lo apartas si estorba) y/o auto-reposiciona / hace scroll del
+  campo con foco a la zona visible. Recuerda su última posición.
+- Se usa en la **operativa Y en la config** (backoffice), porque en un TPV táctil sin teclado
+  físico hay que poder configurar también. → El componente debe ser **global**, no solo del TPV.
+
+**Plan:** componente de teclado en pantalla (React), **flotante y arrastrable**, montado a
+nivel global (layout) para que salga en cualquier pantalla. Aparece al tocar un campo (o
+botón "Teclado"), manda las teclas al campo con foco. Autocontenido (offline). *(Opción:
+`react-simple-keyboard` para las teclas + una capa propia de ventana flotante/arrastrable,
+o todo propio.)*
 
 **Estado:** por empezar. Es el gap más notado en el día a día.
 
