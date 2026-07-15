@@ -70,6 +70,15 @@ function irAOperativa(): void {
   void ventana?.loadURL(`${URL_BASE}${rutaDeInicio()}`);
 }
 
+// Primer arranque: pantalla LOCAL de conexión (IP + usuario + contraseña del terminal). Va
+// dentro de la app porque el nodo aún no se conoce. Se enseña cuando no hay identidad guardada.
+function mostrarConexion(): void {
+  if (!ventana) return;
+  void ventana.loadFile(path.join(app.getAppPath(), "conectar-terminal.html"), {
+    query: { servidor: ORIGEN },
+  });
+}
+
 // Mostrar la pantalla de espera y sondear el nodo hasta que responda.
 function mostrarEsperando(): void {
   if (!ventana) return;
@@ -111,9 +120,11 @@ function crearVentana(): void {
       nodeIntegration: false,
     },
   });
-  // Carga inicial a la operativa. Si el nodo aún no está arriba, el did-fail-load de abajo
-  // nos lleva a la pantalla de espera y reintenta solo.
-  irAOperativa();
+  // Primer arranque: sin identidad guardada → pantalla de conexión (IP + credencial del
+  // terminal). Con identidad → directo a la operativa (si el nodo no responde, el
+  // did-fail-load de abajo lleva a "Conectando…" y reintenta).
+  if (identidad) irAOperativa();
+  else mostrarConexion();
 
   // Si no se puede cargar del nodo (apagado, reiniciándose, red caída), a la pantalla de
   // espera. -3 (ERR_ABORTED) es una navegación normal, no un fallo; y file:// es la propia
@@ -203,6 +214,44 @@ app.whenReady().then(() => {
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
+  });
+
+  // Primer arranque: login del TERMINAL (IP + usuario + contraseña). El fetch va por el main
+  // (no el renderer) para no chocar con CORS desde un file://.
+  ipcMain.handle("gluuh:conectar-terminal", async (_e, datos: { servidor: string; usuario: string; clave: string; recordar?: boolean }) => {
+    const base = normalizaUrl(datos.servidor ?? "");
+    if (!base) return { error: "Falta la dirección del servidor." };
+    let origen: string;
+    try { origen = new URL(base).origin; } catch { return { error: "La dirección del servidor no es válida." }; }
+
+    let r: Response;
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 8000);
+      r = await fetch(`${base}/auth/v1/dispositivo`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ usuario: datos.usuario, clave: datos.clave }),
+        signal: c.signal,
+      });
+      clearTimeout(t);
+    } catch {
+      return { error: "No se pudo contactar con el servidor. Comprueba la dirección y la red." };
+    }
+    if (r.status === 401) return { error: "Usuario o contraseña del terminal incorrectos." };
+    if (!r.ok) return { error: "El servidor rechazó la conexión." };
+
+    const j = (await r.json()) as { device_id: string; nombre: string; modulo: string; token: string };
+    // La dirección del servidor se guarda siempre (para reintentos y para prerrellenar).
+    guardarConfig(userData, { ...leerConfig(userData), servidor: base });
+    URL_BASE = base;
+    ORIGEN = origen;
+    // La identidad (con el token del dispositivo) solo si "recordar"; si no, vive en memoria.
+    const id: Identidad = { device_id: j.device_id, nombre: j.nombre, modulo: j.modulo, token: j.token };
+    if (datos.recordar !== false) guardarIdentidad(userData, id);
+    identidad = id;
+    irAOperativa();
+    return { ok: true };
   });
 
   // ── Ventanas ────────────────────────────────────────────────────────────

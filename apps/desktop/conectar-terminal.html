@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Conectar terminal</title>
+<style>
+  /* Primer arranque del terminal. Pantalla LOCAL (no la sirve el nodo): pide la dirección del
+     servidor y la credencial del terminal (usuario+contraseña, migración 0105). El login lo
+     hace el proceso principal contra el nodo; aquí solo se recogen los datos y se muestran errores. */
+  *{margin:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;color:#fff;
+    background:#0C1116;
+    background-image:radial-gradient(1200px 700px at 70% 10%,#1B3350 0,transparent 60%),
+                     radial-gradient(900px 600px at 10% 90%,#14243A 0,transparent 60%);
+    display:grid;place-items:center;-webkit-user-select:none;user-select:none;
+  }
+  .tarjeta{width:min(420px,calc(100vw - 48px));background:#1F1F1F;border:1px solid rgba(255,255,255,.09);
+    border-radius:10px;box-shadow:0 32px 64px rgba(0,0,0,.5);padding:28px 28px 24px}
+  h1{font-family:"Segoe UI Variable Display","Segoe UI",sans-serif;font-size:22px;font-weight:600;margin-bottom:4px}
+  .sub{color:rgba(255,255,255,.55);font-size:14px;margin-bottom:22px;line-height:20px}
+  label{display:block;font-size:13px;color:rgba(255,255,255,.7);margin:14px 0 6px}
+  input[type=text],input[type=password]{width:100%;height:40px;border-radius:6px;background:#2B2B2B;
+    border:1px solid rgba(255,255,255,.1);border-bottom-color:rgba(255,255,255,.22);color:#fff;
+    font-family:inherit;font-size:15px;padding:0 12px}
+  input:focus{outline:none;border-color:#60CDFF;border-bottom-width:2px;background:#1B1B1B}
+  input::placeholder{color:rgba(255,255,255,.35)}
+  .recordar{display:flex;align-items:center;gap:9px;margin:18px 0 4px;font-size:14px;color:rgba(255,255,255,.8);cursor:pointer}
+  .recordar input{width:17px;height:17px;accent-color:#4CC2FF}
+  button{width:100%;height:42px;margin-top:20px;border:0;border-radius:6px;background:#4CC2FF;color:#000;
+    font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{background:#60CDFF}
+  button:disabled{opacity:.6;cursor:default}
+  .error{margin-top:16px;background:#3a1d20;border:1px solid rgba(255,153,164,.35);color:#FF99A4;
+    border-radius:6px;padding:10px 12px;font-size:13px;display:none}
+  .error.visible{display:block}
+  .pie{margin-top:18px;font-size:12px;color:rgba(255,255,255,.35);line-height:18px}
+</style>
+</head>
+<body>
+  <form class="tarjeta" id="f">
+    <h1>Conectar este terminal</h1>
+    <div class="sub">Introduce la dirección del servidor de la barra y la credencial de este terminal (te la da el encargado desde el panel).</div>
+
+    <label for="servidor">Dirección del servidor</label>
+    <input type="text" id="servidor" placeholder="http://192.168.1.50:54321" autocomplete="off" spellcheck="false">
+
+    <label for="usuario">Usuario del terminal</label>
+    <input type="text" id="usuario" placeholder="TPV-Barra" autocomplete="off" spellcheck="false">
+
+    <label for="clave">Contraseña</label>
+    <input type="password" id="clave" autocomplete="off">
+
+    <label class="recordar"><input type="checkbox" id="recordar" checked> Recordar este terminal (no volver a pedir la credencial)</label>
+
+    <button type="submit" id="btn">Conectar</button>
+    <div class="error" id="err"></div>
+
+    <div class="pie">Encima de esto, cada camarero entra con su PIN. Esta credencial identifica el equipo, no a la persona.</div>
+  </form>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    // Prerrellenar el servidor con lo último conocido (lo pasa el proceso principal).
+    const s = new URLSearchParams(location.search).get("servidor");
+    if (s && s !== "null") $("servidor").value = s;
+    $((s && s !== "null") ? "usuario" : "servidor").focus();
+
+    $("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const err = $("err");
+      err.classList.remove("visible");
+      const datos = {
+        servidor: $("servidor").value.trim(),
+        usuario: $("usuario").value.trim(),
+        clave: $("clave").value,
+        recordar: $("recordar").checked,
+      };
+      if (!datos.servidor || !datos.usuario || !datos.clave) {
+        err.textContent = "Rellena la dirección, el usuario y la contraseña.";
+        err.classList.add("visible");
+        return;
+      }
+      $("btn").disabled = true;
+      $("btn").textContent = "Conectando…";
+      const r = await window.gluuh.conectarTerminal(datos);
+      // Si va bien, el proceso principal navega a la operativa y esta pantalla desaparece.
+      if (r && r.error) {
+        err.textContent = r.error;
+        err.classList.add("visible");
+        $("btn").disabled = false;
+        $("btn").textContent = "Conectar";
+      }
+    });
+  </script>
+</body>
+</html>

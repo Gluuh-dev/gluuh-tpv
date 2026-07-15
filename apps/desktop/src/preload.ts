@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld("gluuh", {
     ipcRenderer.invoke("gluuh:guardar-backup", nombreCarpeta, ficheros),
   leerConfigTerminal: () => ipcRenderer.invoke("gluuh:leer-config"),
   guardarConfigTerminal: (cfg: unknown) => ipcRenderer.invoke("gluuh:guardar-config", cfg),
+  // Primer arranque: la pantalla local de conexión manda IP + usuario + contraseña del
+  // terminal; el main hace el login contra el nodo y, si va, entra a la operativa.
+  conectarTerminal: (datos: unknown) => ipcRenderer.invoke("gluuh:conectar-terminal", datos),
   onEvento: (cb: (evento: { tipo: string; datos?: unknown }) => void) => {
     const listener = (_e: unknown, evento: { tipo: string; datos?: unknown }) => cb(evento);
     ipcRenderer.on("gluuh:evento", listener);
