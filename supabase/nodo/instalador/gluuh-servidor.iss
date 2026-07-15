@@ -85,6 +85,16 @@ OutputBaseFilename=GluuhServidor-{#Version}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; El logo de Gluuh en el asistente: el banner de las pantallas de Bienvenida y Fin, y el
+; iconito de la esquina en las paginas de en medio. Sin esto salen las imagenes por defecto
+; de Inno y el instalador parece de cualquiera. Son BMP (lo que pide Inno), derivados de
+; apps/web/public/logo.png. Van commiteados como asset, igual que gluuh.ico; si cambia el
+; logo, se regeneran.
+WizardImageFile=wizard-grande.bmp
+WizardSmallImageFile=wizard-peque.bmp
+; El logo va sobre fondo blanco: que el banner no se corte con un color raro.
+WizardImageStretch=no
+WizardImageBackColor=clWhite
 ; Hace falta administrador: se registra el arranque automatico como SYSTEM.
 PrivilegesRequired=admin
 ; Un servidor de bar no se instala en un portatil de 32 bits.
