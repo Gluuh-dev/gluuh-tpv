@@ -42,13 +42,60 @@ $env:PGCLIENTENCODING = "UTF8"
 
 function Paso($n, $txt) { Write-Host "`n[$n] $txt" -ForegroundColor Cyan }
 function Sql($file) {
-  psql -h 127.0.0.1 -p $Puerto -U postgres -d $Bd -q -v ON_ERROR_STOP=1 -f $file
+  # `ErrorActionPreference = 'Continue'` local, y esto NO es opcional:
+  #
+  # psql escribe los NOTICE por STDERR (p. ej. «role ... already granted», o los `raise
+  # notice` de las migraciones). Con `ErrorActionPreference = 'Stop'` puesto arriba, cada
+  # linea de stderr de un ejecutable nativo se convierte en un ERROR TERMINANTE en
+  # PowerShell 5.1 — y un NOTICE (que no es un fallo) mataria la instalacion a media faena.
+  #
+  # No saltaba en el instalador real porque su salida va a un fichero (los stderr se
+  # consumen ahi y no burbujean), pero en cuanto alguien ejecuta esto a mano, revienta con
+  # un "error" que en realidad es un aviso inofensivo.
+  #
+  # Un ERROR de verdad SI se detecta: `-v ON_ERROR_STOP=1` hace que psql salga con codigo
+  # distinto de cero, y de eso nos ocupamos abajo.
+  $ErrorActionPreference = 'Continue'
+  & psql -h 127.0.0.1 -p $Puerto -U postgres -d $Bd -q -v ON_ERROR_STOP=1 -f $file 2>&1 |
+    ForEach-Object { "$_" }
   if ($LASTEXITCODE -ne 0) { throw "falló: $file" }
 }
 
-# ── 0. Base de datos limpia ──────────────────────────────────────────────────
+# ── 0. ARRANCAR POSTGRES ─────────────────────────────────────────────────────
+#
+# `initdb` (que corre antes que esto, desde el instalador) CREA la base de datos pero NO la
+# arranca. Y `dropdb`/`createdb` y todas las migraciones de abajo necesitan un Postgres EN
+# MARCHA. En una maquina limpia no lo esta:
+#
+#     dropdb: fallo la conexion al servidor en 127.0.0.1, puerto 55432: Connection refused
+#
+# En NUESTRA maquina no se veia porque el Postgres de desarrollo ya estaba corriendo y se
+# colaba ahi. En el ordenador de un bar, recien instalado, no hay ningun Postgres. Otra vez
+# el mismo patron: probar un camino que el cliente no recorre.
+#
+# `-o "-p $Puerto"` es OBLIGATORIO (REGLA Nº1): sin esa bandera pg_ctl coge el puerto del
+# postgresql.conf (el 5432 de fabrica) y se pisaria con un Postgres del sistema.
+Paso 0 "Arrancando Postgres"
+& "$nodo\pgsql\bin\pg_isready.exe" -h 127.0.0.1 -p $Puerto -q
+if ($LASTEXITCODE -ne 0) {
+  # Lanzar y soltar, NUNCA `| Out-Null` ni `Start-Process -Wait`: los dos se cuelgan para
+  # siempre cuando no hay consola (postgres.exe no cierra la tuberia / no termina nunca).
+  Start-Process -FilePath "$nodo\pgsql\bin\pg_ctl.exe" `
+    -ArgumentList "-D `"$nodo\pgdata`" -o `"-p $Puerto`" -l `"$nodo\tmp\pg.log`" start" `
+    -WindowStyle Hidden
+
+  $listo = $false
+  foreach ($i in 1..60) {
+    & "$nodo\pgsql\bin\pg_isready.exe" -h 127.0.0.1 -p $Puerto -q
+    if ($LASTEXITCODE -eq 0) { $listo = $true; break }
+    Start-Sleep -Seconds 1
+  }
+  if (-not $listo) { throw "Postgres no llego a aceptar conexiones en el puerto $Puerto" }
+}
+
+# ── 0-bis. Base de datos limpia ──────────────────────────────────────────────
 if ($Recrear) {
-  Paso 0 "Recreando la base de datos '$Bd'"
+  Write-Host "    Recreando la base de datos '$Bd'" -ForegroundColor Cyan
   # --force echa a PostgREST y a quien tenga la BD abierta (si no, dropdb falla).
   dropdb   -h 127.0.0.1 -p $Puerto -U postgres --if-exists --force $Bd
   createdb -h 127.0.0.1 -p $Puerto -U postgres $Bd
