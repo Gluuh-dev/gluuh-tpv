@@ -33,6 +33,10 @@ pnpm --filter @gluuh/web dev
 | **Usuario** | `admin@gluuh.com` |
 | **Contraseña** | la que fijes tú (ver abajo) — **no se versiona** por seguridad |
 
+> 🔑 **Los datos concretos para probar** (código de instalación del `.exe`, contraseña,
+> datos fiscales) están en **`CREDENCIALES-PRUEBA.local.md`** — en la raíz, **sin subir al
+> repo** (está en `.gitignore` porque esto es público). Ábrelo y ahí lo tienes todo.
+
 Para fijar una contraseña de prueba (necesita `SUPABASE_URL` y `SUPABASE_SECRET_KEY`, que están en `apps/api/.env`):
 
 ```bash

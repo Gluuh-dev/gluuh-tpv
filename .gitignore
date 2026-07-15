@@ -32,6 +32,10 @@ apps/desktop/src-tauri/target/
 *.p12
 *.pfx
 
+# Notas locales con credenciales de prueba (código de instalación, contraseñas). El repo es
+# PÚBLICO: nada de esto se sube. Se abre en local y ya.
+*.local.md
+
 # Logs / cachés
 *.log
 .turbo/
