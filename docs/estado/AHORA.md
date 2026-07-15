@@ -141,7 +141,11 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0105`.**
+**Siguiente número libre: `0106`.**
+
+- `0105` — credencial propia por terminal (`device.usuario`/`clave_hash` + RPCs
+  `fijar_clave_dispositivo`/`verificar_clave_dispositivo`). Base del rediseño de conexión
+  del TPV (IP + usuario/contraseña por terminal). **Pendiente de aplicar en nube y nodo.**
 *(Cógelo, **súbelo aquí primero**, y luego escribe el fichero. Si dos sesiones escriben una
 0105, git mezcla las dos y se aplican en un orden que nadie decidió.)*
 
