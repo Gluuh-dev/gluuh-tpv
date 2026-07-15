@@ -184,6 +184,30 @@ Se activa en Activación puntos.
 **Criterio:** de nicho (gimnasios, piscinas, algunos bares con "bote"). Extensión del módulo
 fidelización, **baja prioridad** salvo que un cliente concreto lo pida.
 
+### 14. Cambiar datos fiscales de la licencia — AQUÍ SOMOS MEJORES
+**Referencia:** Glop — los datos fiscales (nombre comercial, razón social, CIF, dirección,
+teléfono) van en el **archivo de licencia** y **SOLO los cambia el distribuidor** con un
+formulario; no se pueden tocar desde el software.
+
+**Qué tenemos:** editables en el **panel** (`location`: razón social, CIF, dirección, nombre
+comercial, teléfono) y se fijan en el alta/instalación. ✅ **Más flexible que Glop.**
+**Ojo (VERIFACTU):** una vez emitiendo facturas, cambiar datos fiscales tiene implicaciones
+(las facturas van firmadas con esos datos). Conviene avisar/controlar el cambio, no bloquearlo.
+
+### 15. Actualizar versión conservando datos — VALIDA NUESTRO "MODO MANTENIMIENTO"
+**Referencia:** Glop — subir de MiniGlop a Glop = **licencia nueva + copiar a mano** la BD
+(`glop.fdb`), config (`glop.ini`) y diseños, **desinstalar con `unins000.exe` (NO por el Panel
+de control)**, reinstalar y restaurar. Los datos se conservan si copias bien.
+
+**Lo que confirma:**
+- **`unins000.exe` es estándar de Inno Setup** (Glop lo usa igual) → nuestra decisión del
+  acceso directo "Desinstalar" apuntando a `unins000` es correcta.
+- **Conservar datos al actualizar** es justo el **modo mantenimiento** que propusimos para
+  nuestro instalador. Glop lo hace **a mano** (backup+restore); nosotros podemos hacerlo
+  **automático** (Reinstalar/Reparar conservando datos). → Buen argumento para priorizarlo.
+- **MiniGlop = versión capada** (sin stock/compras/proveedores) → mapea a nuestro gating por
+  **módulos/licencia** (`licencia_limites`, `tenant_module`). Ya lo tenemos.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
