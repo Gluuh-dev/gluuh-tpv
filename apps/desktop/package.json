@@ -9,6 +9,7 @@
     "build": "tsc",
     "dev": "tsc && electron .",
     "start": "tsc && electron .",
+    "servidor": "tsc && electron dist/servidor.main.js",
     "dist": "tsc && electron-builder",
     "typecheck": "tsc --noEmit"
   },
