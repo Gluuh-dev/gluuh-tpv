@@ -122,7 +122,7 @@ export default function Servidor() {
             {/* El logo: marca de verdad en la cabecera. Sobre el fondo oscuro va en su
                 cuadrado morado (el mismo icono que en la bandeja), no el logo transparente
                 —que se perdería—. */}
-            <img src="/icono-app.png" alt="Gluuh" className="h-14 w-14 rounded-2xl shadow-lg shadow-purple-950/50" />
+            <img src="/icono-servidor.png" alt="Gluuh" className="h-14 w-14 drop-shadow-lg" />
             <div>
               <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
                 Servidor del local
