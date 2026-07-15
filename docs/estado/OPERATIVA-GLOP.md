@@ -146,6 +146,44 @@ capadas) para vender. Es negocio, no operativa — para más adelante.
 > Nota: los artículos de la web de Glop dan **poco detalle visual** (son texto). Para el
 > aspecto (colores, tamaños, distribución) me sirven más las **capturas/vídeos** que pasas tú.
 
+### 10. Reordenar artículos/familias de la pantalla de ventas ⭐ (cliente: "importante")
+**Referencia:** Glop — Config → Terminales → modificar → Familias de venta. Dos columnas
+(familias / artículos), reordena con **flechas** o metiendo el **nº de orden** + botón ORDEN.
+Aplica al instante. Lo hace **por terminal**.
+
+**Qué tenemos:** `category.orden` / `product.orden` + página `/ordenar-familias-y-categorias`
+en el backoffice. ✅ (ordenación GLOBAL).
+**Gaps:** (a) hacerlo **por terminal** (cada TPV con su propio orden), (b) **arrastrar táctil**
+en vez de flechas/números. → Tenemos la base; falta la capa por-terminal y el drag táctil.
+**Prioridad:** media-alta (el cliente lo marca importante).
+
+### 11. Enviar facturas por email (SMTP saliente) 🆕 (cliente: "no lo tenemos, añadirlo")
+**Referencia:** Glop — Utilidades → Configuración de correo (credenciales SMTP, carpeta de
+copia, ruta PDF). En cobro: botón "Enviar por Email" → hasta 2 destinatarios → PDF. Mensaje
+predefinido. "Verificar correo".
+
+**Qué tenemos:** nada de email saliente. ❌
+**Propuesta: AÑADIRLO.** Config SMTP por empresa (backoffice) + botón "Enviar factura por
+email" en el cobro/factura → PDF al cliente. Ojo: **necesita internet** → en el nodo se
+enviaría al estar online o se **encola** (como la sync). Esfuerzo medio, valor alto.
+**Prioridad:** media (buen candidato).
+
+### 12. Categorías/etiquetas de producto (cliente: "importante")
+**Referencia:** Glop — "Tipo de Productos": 2 etiquetas complementarias para clasificar
+artículos (Limpieza/Desechables, Marca/Temporada…), para filtrar en informes, stock y ofertas.
+
+**Qué tenemos:** ✅ ya está — `etiqueta_producto` + `product_etiqueta` (etiquetas de producto),
+además de familias + categorías + grupos mayores. Cubierto de sobra en el modelo.
+**Gap posible:** exponer bien el **filtrado por etiqueta** en informes/ofertas. A revisar.
+
+### 13. Tarjetas prepago / monedero (fidelización)
+**Referencia:** Glop — tarjeta prepago ligada al cliente (recargar saldo, pagar con saldo).
+Se activa en Activación puntos.
+
+**Qué tenemos:** módulo fidelización (cliente + puntos), pero **no monedero/saldo prepago**. 🟡
+**Criterio:** de nicho (gimnasios, piscinas, algunos bares con "bote"). Extensión del módulo
+fidelización, **baja prioridad** salvo que un cliente concreto lo pida.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
