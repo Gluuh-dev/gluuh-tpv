@@ -93,6 +93,87 @@ const DEFECTOS_CONFIG = {
 type ModuloConfigurable = keyof typeof DEFECTOS_CONFIG;
 const esConfigurable = (m: Modulo): m is ModuloConfigurable => m in DEFECTOS_CONFIG;
 
+// Tipos de terminal que se dan de alta con CREDENCIAL propia (usuario+contraseña, 0105). El
+// TPV y la comandera son los interactivos; la cocina (KDS) también puede ir por app.
+const TIPOS_TERMINAL = [
+  { v: "TPV", label: "TPV (punto de venta)", tipo: "TPV", modulo: "TPV" },
+  { v: "COMANDERA", label: "Comandera", tipo: "COMANDERA", modulo: "COMANDERA" },
+  { v: "COCINA", label: "Pantalla de cocina (KDS)", tipo: "KDS", modulo: "COCINA" },
+] as const;
+
+// Alta de un terminal con su usuario+contraseña. A diferencia del código de 6 dígitos (de un
+// solo uso), esta credencial es REUTILIZABLE: se mete en el primer arranque del equipo y, si
+// se reinstala, se vuelve a meter la misma sin generar nada nuevo. Encima va el PIN del camarero.
+function CrearTerminal({ onCreado }: { onCreado: () => void | Promise<void> }) {
+  const [tipoSel, setTipoSel] = useState<string>("TPV");
+  const [nombre, setNombre] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [clave, setClave] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function crear() {
+    if (!nombre.trim() || !usuario.trim() || !clave) {
+      toast.error("Rellena nombre, usuario y contraseña.");
+      return;
+    }
+    const t = TIPOS_TERMINAL.find((x) => x.v === tipoSel) ?? TIPOS_TERMINAL[0];
+    setBusy(true);
+    try {
+      const sb = supabaseBrowser();
+      const token = (await sb.auth.getSession()).data.session?.access_token;
+      const res = await fetch("/api/dispositivos/generar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ tipo: t.tipo, modulo: t.modulo, nombre: nombre.trim(), usuario: usuario.trim(), clave }),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) { toast.error(j.error ?? "No se pudo crear el terminal."); return; }
+      toast.success(`Terminal "${nombre.trim()}" creado. En el equipo: mete la IP del servidor y esta credencial.`);
+      setNombre(""); setUsuario(""); setClave("");
+      await onCreado();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>Nuevo terminal (usuario y contraseña)</CardTitle>
+        <CardDescription>
+          Crea un TPV o comandera con su propia credencial. En el equipo se introduce una vez
+          (IP del servidor + este usuario y contraseña) y queda recordado. Encima, cada camarero
+          entra con su PIN.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-1.5">
+          <Label>Tipo</Label>
+          <Select value={tipoSel} onValueChange={setTipoSel}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TIPOS_TERMINAL.map((x) => <SelectItem key={x.v} value={x.v}>{x.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Nombre</Label>
+          <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="TPV Barra" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Usuario del terminal</Label>
+          <Input value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="tpv-barra" autoComplete="off" spellCheck={false} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Contraseña</Label>
+          <Input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="new-password" />
+        </div>
+        <div className="sm:col-span-2">
+          <Button onClick={crear} disabled={busy}>{busy ? "Creando…" : "Crear terminal"}</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function FilaDispositivo({ d, gruposPV, onGrupo, onEstacion, onDesvincular }: {
   d: Dispositivo;
   /** null = la 0067 no está aplicada (se oculta el selector). */
@@ -549,6 +630,8 @@ export default function Modulos() {
           title="Módulos"
           description="Activa lo que use tu negocio y vincula sus pantallas con un código de 6 dígitos."
         />
+
+        <CrearTerminal onCreado={cargarDispositivos} />
 
         <Card size="sm">
           <CardHeader>
