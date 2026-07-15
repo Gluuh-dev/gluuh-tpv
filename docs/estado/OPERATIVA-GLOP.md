@@ -48,16 +48,36 @@ o todo propio.)*
 
 **Estado:** por empezar. Es el gap más notado en el día a día.
 
-### 2. Lanzador de inicio "Abrir TPV / Configuración"
-**Referencia:** Glop abre en un menú (Tarifas, Promociones, Actualizaciones de precios… +
-"Acceso a TPV"). Ágora igual (elige tipo de terminal).
+### 2. Lanzador de inicio "Abrir TPV / Configuración" ⭐ (tiene diseño ya)
+**Referencia:** Glop abre en un menú (Tarifas, Promociones… + "Acceso a TPV"). Ágora igual.
 
-**Tensión:** hoy la app de escritorio carga **solo la operativa** (decisión del proyecto:
-el camarero no configura). **Reconciliación:** el lanzador (`/inicio`) ofrece **"Abrir TPV"**
-(directo) y **"Configuración"** (pide clave técnica/dueño → backoffice). Entrada estilo Glop
-sin abrir la config a cualquiera.
+**Tensión:** hoy la app de escritorio carga **solo la operativa**. **Reconciliación:** el
+lanzador ofrece **"Abrir TPV"** (directo) y **"Configuración"** (pide clave técnica/dueño →
+backoffice). Entrada estilo Glop sin abrir la config a cualquiera.
 
-**Estado:** existe `/inicio` pero flojo. Por rehacer.
+**DISEÑO QUE PASÓ EL CLIENTE (mockup HTML "Gluuh · Inicio"):** ← la línea a seguir
+- Fondo **oscuro morado Gluuh** (`#572370`) con degradados radiales y textura sutil de azulejo.
+- **Barra superior:** marca (logo + "Gluuh") + chips de estado (reloj, punto verde de conexión,
+  nodo) + pastilla de usuario (avatar + nombre + rol).
+- **Saludo** ("Buenas tardes, …").
+- **Rejilla de tiles:** un **HERO grande "TPV"** (2×2, con silueta de escudo, un par de stats
+  —mesas abiertas, caja— y botón "Entrar →" blanco) + tiles secundarios (Equipo/camareros,
+  Servidor/nodo, Ajustes…). Cada tile: placa con forma de **escudo** + título + descripción +
+  **atajo de teclado** en la esquina (encaja con el teclado en pantalla).
+- **Botón de ayuda ámbar** → modal con filas de opciones + caja con el ID del terminal.
+- Interacciones: hover que levanta el tile, **anillo de foco accesible**, toast de feedback.
+- Tipografías: **Bricolage Grotesque** (display), **DM Sans** (texto), **JetBrains Mono** (mono).
+
+**⚠️ Ojo al construirlo:**
+- El mockup carga las fuentes de **Google Fonts (CDN)** → **hay que auto-alojarlas** (el nodo
+  no tiene internet). Regla de oro: nada que se baje de fuera.
+- Adaptar de HTML suelto a **Next/Tailwind** (nuestra stack), y **cablear las acciones reales**:
+  "Abrir TPV" → operativa; "Configuración" → clave técnica → backoffice; chips → estado real del
+  nodo; stats del hero → datos reales.
+- El mockup llegó **truncado** en el chat (imagen base64 gigante). Tengo el CSS y la estructura
+  completos; si hace falta el HTML entero, que el cliente lo deje en un fichero.
+
+**Estado:** existe `/inicio` pero flojo. **Con diseño ya** → buen candidato tras el teclado.
 
 ### 3. Config táctil estilo Glop (por fases)
 **Referencia:** pantallas de Glop de tarifas, promociones, actualización de precios, selección
