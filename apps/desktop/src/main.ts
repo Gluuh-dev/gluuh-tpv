@@ -70,12 +70,19 @@ function irAOperativa(): void {
   void ventana?.loadURL(`${URL_BASE}${rutaDeInicio()}`);
 }
 
+// ¿Habíamos guardado ya una dirección de servidor? (para no dar falsos avisos de "caído" en
+// el primer arranque de todos, cuando aún no se ha configurado nada).
+let huboServidor = false;
+
 // Primer arranque: pantalla LOCAL de conexión (IP + usuario + contraseña del terminal). Va
 // dentro de la app porque el nodo aún no se conoce. Se enseña cuando no hay identidad guardada.
-function mostrarConexion(): void {
+// Si ya conocíamos un servidor y ahora mismo no responde, se avisa en la propia pantalla.
+async function mostrarConexion(): Promise<void> {
+  if (!ventana) return;
+  const nodoCaido = huboServidor && !(await servidorVivo());
   if (!ventana) return;
   void ventana.loadFile(path.join(app.getAppPath(), "conectar-terminal.html"), {
-    query: { servidor: ORIGEN },
+    query: { servidor: ORIGEN, nodo: nodoCaido ? "off" : "" },
   });
 }
 
@@ -124,7 +131,7 @@ function crearVentana(): void {
   // terminal). Con identidad → directo a la operativa (si el nodo no responde, el
   // did-fail-load de abajo lleva a "Conectando…" y reintenta).
   if (identidad) irAOperativa();
-  else mostrarConexion();
+  else void mostrarConexion();
 
   // Si no se puede cargar del nodo (apagado, reiniciándose, red caída), a la pantalla de
   // espera. -3 (ERR_ABORTED) es una navegación normal, no un fallo; y file:// es la propia
@@ -173,6 +180,7 @@ app.whenReady().then(() => {
   // edita en Configuración). Si está mal escrita, se mantiene el valor por defecto.
   const servidor = leerConfig(userData).servidor;
   if (servidor) {
+    huboServidor = true;
     try { const u = normalizaUrl(servidor); ORIGEN = new URL(u).origin; URL_BASE = u; }
     catch { /* servidor inválido: se conserva GLUUH_URL / localhost */ }
   }

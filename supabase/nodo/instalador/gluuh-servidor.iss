@@ -102,6 +102,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 SetupIconFile=gluuh.ico
 UninstallDisplayName={#Nombre}
+; El icono verde de Gluuh en "Agregar o quitar programas".
+UninstallDisplayIcon={app}\supabase\nodo\instalador\gluuh.ico
 
 ; SIN PAGINA DE LICENCIA, y a proposito: no hay texto legal que ensenar todavia.
 ;
@@ -177,6 +179,19 @@ Name: "{autodesktop}\Servidor Gluuh"; Filename: "{app}\supabase\nodo\abrir-panel
   IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
 Name: "{autoprograms}\Gluuh\Panel del servidor"; Filename: "{app}\supabase\nodo\abrir-panel.vbs"; \
   IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
+
+; ── DESINSTALAR ──────────────────────────────────────────────────────────────
+;
+; El desinstalador de Inno se llama SIEMPRE `unins000.exe` y NO se puede renombrar por
+; configuracion (asi numera varias desinstalaciones, y busca su `unins000.dat` por ese
+; nombre: copiarlo a `uninstall.exe` lo dejaria sin funcionar). En su lugar, un acceso
+; directo con nombre claro que apunta a el — en la carpeta del programa y en el menu inicio.
+Name: "{app}\Desinstalar Gluuh"; Filename: "{uninstallexe}"; \
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; \
+  Comment: "Quita el servidor Gluuh de este equipo"
+Name: "{autoprograms}\Gluuh\Desinstalar el servidor"; Filename: "{uninstallexe}"; \
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; \
+  Comment: "Quita el servidor Gluuh de este equipo"
 
 [Run]
 ; 1. Crear el cluster de Postgres (initdb). Es lo unico que no se puede traer hecho:

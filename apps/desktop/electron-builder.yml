@@ -16,8 +16,15 @@ win:
   # defecto de Electron y parece de cualquiera. build\icon.ico es el mismo del servidor.
   icon: build/icon.ico
 nsis:
-  oneClick: true
+  # Instalador ASISTIDO (no one-click): así al terminar sale la página final con el check
+  # "Ejecutar Gluuh TPV", que el usuario puede desmarcar si no quiere abrirlo aún. Con
+  # one-click se instalaba y abría de golpe, sin preguntar.
+  oneClick: false
   perMachine: false
+  # Que no pida elegir carpeta: instala en el sitio por defecto y va directo al lío.
+  allowToChangeInstallationDirectory: false
+  # La página final ofrece abrir la app (check marcado; se puede desmarcar).
+  runAfterFinish: true
   deleteAppDataOnUninstall: false
   # Accesos directos con el nombre bonito, en escritorio y menu inicio.
   shortcutName: Gluuh TPV
