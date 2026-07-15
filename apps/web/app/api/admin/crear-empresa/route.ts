@@ -83,6 +83,12 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   const grupos = Array.isArray(datos.importar) ? datos.importar.filter((g): g is string => typeof g === "string") : [];
   await clonarDesdePlantilla(admin, tid, grupos);
 
+  // Formas de pago por defecto (Efectivo/Tarjeta/Bizum), SIEMPRE — como semilla, no de la
+  // plantilla (0106). Va después del clonado y es idempotente: si el admin marcó "importar
+  // formas de pago", respeta las importadas; si no, siembra las de defecto. Sin esto, un bar
+  // recién creado no puede cobrar (la pantalla de cobro sin métodos).
+  await admin.rpc("admin_sembrar_formas_pago", { p_tenant: tid });
+
   return { codigoInstalacion, claveTecnica };
 }
 

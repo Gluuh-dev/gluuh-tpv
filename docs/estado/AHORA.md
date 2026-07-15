@@ -141,11 +141,13 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0106`.**
+**Siguiente número libre: `0107`.**
 
 - `0105` — credencial propia por terminal (`device.usuario`/`clave_hash` + RPCs
   `fijar_clave_dispositivo`/`verificar_clave_dispositivo`). Base del rediseño de conexión
-  del TPV (IP + usuario/contraseña por terminal). **Pendiente de aplicar en nube y nodo.**
+  del TPV (IP + usuario/contraseña por terminal). Aplicada en nube y nodo.
+- `0106` — semilla de formas de pago (`admin_sembrar_formas_pago`): Efectivo/Tarjeta/Bizum
+  al crear empresa, SIEMPRE, sin depender de la plantilla. La llama `api/admin/crear-empresa`.
 *(Cógelo, **súbelo aquí primero**, y luego escribe el fichero. Si dos sesiones escriben una
 0105, git mezcla las dos y se aplican en un orden que nadie decidió.)*
 
