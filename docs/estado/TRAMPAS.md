@@ -10,6 +10,15 @@
 
 ## 0 · LA MADRE DE TODAS: probar un camino que nadie recorre
 
+> **Van CUATRO veces.** El nodo no podía cobrar (`/api/ticket` → nube), el instalador no
+> validaba el código (`tenant` como anónimo), el token sin `tenant_id`, y ahora: **el
+> instalador moría en un ordenador limpio** con `Connection refused` — `initdb` crea la base
+> pero no la arranca, y `dropdb`/`createdb` necesitan Postgres en marcha. No se vio porque
+> el Postgres de **desarrollo** ya estaba corriendo en el 55432 y se colaba ahí. En el bar,
+> recién instalado, no hay ninguno. **Si un camino sólo lo recorre el cliente, recórrelo tú
+> en su estado — no en el tuyo, que tiene medio mundo ya montado.**
+
+
 **Es la causa de fondo de casi todo lo demás.** Escribimos pruebas que escriben en la base de
 datos directamente. Ninguna pasaba por donde pasa **un camarero al darle a Cobrar**, ni por
 donde pasa **un técnico al instalar**.
