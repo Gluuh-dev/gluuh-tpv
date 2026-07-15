@@ -46,7 +46,11 @@ export async function POST(req: Request) {
   }
   const tenantId = yo.tenant_id as string;
 
-  const { tipo = "TPV", modulo = "TPV", nombre = "" } = await req.json().catch(() => ({}));
+  const { tipo = "TPV", modulo = "TPV", nombre = "", usuario = "", clave = "" } = await req.json().catch(() => ({}));
+  // Dos formas de dar de alta un terminal:
+  //  · con CREDENCIAL (usuario+contraseña, 0105): reutilizable, se mete en el primer arranque.
+  //  · sin ella: CÓDIGO de 6 dígitos de un solo uso (el flujo de siempre, /conectar).
+  const conCredencial = Boolean(String(usuario).trim() && String(clave));
 
   // Local del tenant (RLS del llamante).
   const { data: loc } = await caller.from("location").select("id").limit(1).maybeSingle();
@@ -67,8 +71,8 @@ export async function POST(req: Request) {
   // NOTA DE SEGURIDAD: 6 dígitos = 900k combinaciones. El canje es de un solo uso,
   // caduca en 10 min y tanto este endpoint como el canje llevan rate-limit por IP
   // en memoria (../limite.ts) como fricción anti fuerza bruta.
-  const codigo = String(randomInt(100000, 1000000));
-  const expira = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const codigo = conCredencial ? null : String(randomInt(100000, 1000000));
+  const expira = conCredencial ? null : new Date(Date.now() + 10 * 60 * 1000).toISOString();
   const { data: dev, error } = await admin
     .from("device")
     .insert({
@@ -83,6 +87,26 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Con credencial: se fija usuario+contraseña (bcrypt en Postgres, 0105). Si el usuario ya
+  // existe en este bar, el índice único lo rechaza; se borra el device recién creado para no
+  // dejar una fila a medias.
+  if (conCredencial) {
+    const { error: eCred } = await admin.rpc("fijar_clave_dispositivo", {
+      p_device: dev.id,
+      p_usuario: String(usuario).trim(),
+      p_clave: String(clave),
+    });
+    if (eCred) {
+      await admin.from("device").delete().eq("id", dev.id);
+      const dup = /duplicate|unique/i.test(eCred.message);
+      return NextResponse.json(
+        { error: dup ? "Ya hay un terminal con ese usuario." : eCred.message },
+        { status: dup ? 409 : 500 },
+      );
+    }
+    return NextResponse.json({ ok: true, device_id: dev.id, usuario: String(usuario).trim() });
+  }
 
   return NextResponse.json({ ok: true, device_id: dev.id, codigo, expira });
 }
