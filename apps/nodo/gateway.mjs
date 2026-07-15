@@ -11,10 +11,49 @@
 // dentro de un servicio de Windows que no puede caerse.
 
 import http from "node:http";
+import path from "node:path";
+import { spawn } from "node:child_process";
 import { estado } from "./estado.mjs";
 import { firmar, urlNube } from "./secreto.mjs";
 
 const PUERTO = Number(process.env.NODO_PUERTO ?? 54321);
+const RAIZ = path.resolve(".");
+
+// ── ¿La petición viene del PROPIO ordenador del servidor? ────────────────────
+//
+// Reiniciar el nodo o buscar actualizaciones son cosas que hace el técnico o el dueño
+// DELANTE del mini-PC (por el acceso directo del escritorio, que abre localhost). NO desde
+// un TPV de la barra: un camarero no reinicia el servidor a mitad de servicio, ni por error
+// ni por gracia. Así que estas acciones sólo se aceptan desde 127.0.0.1.
+function esLocal(req) {
+  const ip = req.socket.remoteAddress ?? "";
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+}
+
+// Lanza un script del nodo y SE DESENTIENDE (`detached` + `unref`): la acción devuelve
+// "recibido" al instante y el trabajo sigue aunque se cierre el navegador. Un reinicio que
+// dependiera de que la pestaña siga abierta sería un reinicio que a veces no pasa.
+function lanzarSuelto(comando, args) {
+  const hijo = spawn(comando, args, {
+    cwd: RAIZ,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  });
+  hijo.unref();
+}
+
+const ACCIONES = {
+  // Relanza lo que esté caído. NO para nada primero: parar incluye a este mismo gateway, y
+  // se cortaría la respuesta a media frase. Esto sólo levanta lo que falte.
+  reiniciar: () => lanzarSuelto("powershell.exe", [
+    "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-File", path.join(RAIZ, "supabase", "nodo", "arrancar-nodo.ps1"),
+  ]),
+  // Mira si hay versión nueva y, si la hay, se actualiza (con copia de seguridad y vuelta
+  // atrás si algo sale mal: eso ya lo hace actualizar.mjs).
+  actualizar: () => lanzarSuelto(process.execPath, [path.join(RAIZ, "apps", "nodo", "actualizar.mjs")]),
+};
 
 // A dónde va cada prefijo. El prefijo se QUITA antes de reenviar: PostgREST espera
 // /category, no /rest/v1/category.
@@ -72,6 +111,31 @@ const servidor = http.createServer(async (req, res) => {
       res.writeHead(500, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // Acciones del panel del servidor: reiniciar, buscar actualización. Sólo desde el propio
+  // ordenador (el acceso directo del escritorio), nunca desde un TPV de la barra.
+  if (req.url.startsWith("/nodo/accion/")) {
+    const que = req.url.split("/nodo/accion/")[1]?.split("?")[0];
+    if (!esLocal(req)) {
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Sólo desde el ordenador del servidor." }));
+      return;
+    }
+    const accion = ACCIONES[que];
+    if (!accion) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "acción desconocida" }));
+      return;
+    }
+    try { accion(); } catch (e) {
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: e.message }));
+      return;
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, accion: que }));
     return;
   }
 

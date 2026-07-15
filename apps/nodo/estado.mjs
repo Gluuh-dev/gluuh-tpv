@@ -15,6 +15,16 @@ import { derivaDelReloj } from "./reloj.mjs";
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
 const MEDIA = path.resolve(process.env.NODO_MEDIA_DIR ?? ".nodo/media");
 const COPIAS = path.resolve(process.env.NODO_COPIAS ?? ".nodo/copias");
+const VERSION_FICHERO = path.resolve("apps/nodo/version.json");
+
+/** La versión instalada. Se enseña en el panel para saber qué tiene el bar. */
+function versionInstalada() {
+  try {
+    return JSON.parse(fs.readFileSync(VERSION_FICHERO, "utf8")).version ?? "?";
+  } catch {
+    return "?";
+  }
+}
 
 const bd = new pg.Pool({ connectionString: BD, max: 2 });
 
@@ -118,6 +128,7 @@ export async function estado() {
     // Este ordenador es el que le pone la hora a cada FACTURA. Si va desviado, está
     // firmando facturas con una hora que no ocurrió.
     reloj,
+    version: versionInstalada(),
     ahora: new Date().toISOString(),
   };
 }

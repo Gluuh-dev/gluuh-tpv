@@ -25,6 +25,7 @@ interface Estado {
   };
   copia: { hay: number; ultima: string | null; ocupa: number };
   reloj: { ok: boolean | null; deriva_segundos?: number; motivo?: string };
+  version: string;
   ahora: string;
 }
 
@@ -54,6 +55,24 @@ function cuando(iso: string | null): string {
 export default function Servidor() {
   const [e, setE] = React.useState<Estado | null>(null);
   const [caido, setCaido] = React.useState(false);
+  // El aviso de la última acción («reiniciando…», «buscando actualización…»). Se borra solo.
+  const [aviso, setAviso] = React.useState<string | null>(null);
+
+  // Reiniciar / buscar actualización. El gateway sólo las acepta desde ESTE ordenador (el
+  // acceso directo del escritorio abre localhost), nunca desde un TPV de la barra.
+  async function accion(que: "reiniciar" | "actualizar", texto: string, confirmar?: string) {
+    if (confirmar && !window.confirm(confirmar)) return;
+    setAviso(texto);
+    try {
+      const r = await fetch(`${config().url}/nodo/accion/${que}`, { method: "POST" });
+      setAviso(r.ok
+        ? (que === "reiniciar" ? "Reiniciando el servidor… en unos segundos vuelve." : "Buscando actualización… si hay una nueva, se instalará sola.")
+        : "No se pudo. Esta acción sólo funciona desde el ordenador del servidor.");
+    } catch {
+      setAviso("No se pudo contactar con el servidor.");
+    }
+    setTimeout(() => setAviso(null), 8000);
+  }
 
   React.useEffect(() => {
     const pedir = async () => {
@@ -98,10 +117,47 @@ export default function Servidor() {
   return (
     <main className="min-h-screen bg-zinc-950 p-8 text-zinc-100">
       <div className="mx-auto max-w-4xl space-y-8">
-        <header>
-          <h1 className="text-3xl font-bold">Servidor del local</h1>
-          <p className="mt-1 text-zinc-400">Todo lo que el bar necesita para funcionar sin internet.</p>
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="flex items-center gap-3 text-3xl font-bold">
+              Servidor del local
+              {/* ACTIVO, en verde y latiendo: lo primero que quieres ver al abrir esto. Si
+                  estás viendo esta pantalla, es que el nodo contesta — así que está activo. */}
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950 px-2.5 py-1 text-xs font-medium text-emerald-400">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                Activo
+              </span>
+            </h1>
+            <p className="mt-1 text-zinc-400">
+              Todo lo que el bar necesita para funcionar sin internet · versión {e.version}
+            </p>
+          </div>
+
+          {/* Las acciones. A la derecha, separadas del resto: son para el técnico o el dueño
+              delante del ordenador, no para el uso diario. */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => accion("actualizar", "Buscando actualización…")}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium hover:bg-zinc-800"
+            >
+              Buscar actualización
+            </button>
+            <button
+              type="button"
+              onClick={() => accion("reiniciar", "Reiniciando…", "¿Reiniciar el servidor? Los TPV se quedarán unos segundos sin cobrar.")}
+              className="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-sm font-medium text-amber-200 hover:bg-amber-900/40"
+            >
+              Reiniciar
+            </button>
+          </div>
         </header>
+
+        {aviso && (
+          <div className="rounded-lg border border-sky-800 bg-sky-950/40 px-4 py-3 text-sm text-sky-200">
+            {aviso}
+          </div>
+        )}
 
         {/* Servicios: lo primero que se mira cuando algo va mal */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">

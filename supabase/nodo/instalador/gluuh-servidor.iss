@@ -146,10 +146,34 @@ Source: "{#Carga}\node_modules\*"; DestDir: "{app}\node_modules"; Flags: ignorev
 ; aleatorias de ESE bar).
 Source: "{#Carga}\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion
 
+[UninstallDelete]
+; El .url lo crea [INI] a mano, asi que Inno no lo borra solo al desinstalar.
+Type: files; Name: "{app}\Servidor Gluuh.url"
+
 [Dirs]
 Name: "{app}\.nodo\tmp"
 Name: "{app}\.nodo\media"
 Name: "{app}\.nodo\pgdata"
+
+; El acceso directo que faltaba. Es un acceso a INTERNET (una .url) que abre el panel del
+; servidor en el navegador: http://localhost:54321/servidor. Ahi se ve si esta activo, la
+; version, y estan los botones de Reiniciar y Buscar actualizacion.
+;
+; Por que una .url y no un .lnk a un .exe: el "programa" del servidor ES su panel web (lo
+; sirve el propio nodo). No hay ninguna ventana nativa que abrir; hay una pagina.
+[INI]
+Filename: "{app}\Servidor Gluuh.url"; Section: "InternetShortcut"; Key: "URL"; \
+  String: "http://localhost:54321/servidor"
+Filename: "{app}\Servidor Gluuh.url"; Section: "InternetShortcut"; Key: "IconFile"; \
+  String: "{app}\supabase\nodo\instalador\gluuh.ico"
+Filename: "{app}\Servidor Gluuh.url"; Section: "InternetShortcut"; Key: "IconIndex"; \
+  String: "0"
+
+[Icons]
+; En el escritorio y en el menu inicio. El bar enciende el ordenador, ve el icono de Gluuh
+; y con un clic tiene el panel del servidor delante.
+Name: "{autodesktop}\Servidor Gluuh";      Filename: "{app}\Servidor Gluuh.url"; IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
+Name: "{autoprograms}\Gluuh\Servidor del local"; Filename: "{app}\Servidor Gluuh.url"; IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
 
 [Run]
 ; 1. Crear el cluster de Postgres (initdb). Es lo unico que no se puede traer hecho:
@@ -221,6 +245,11 @@ var
   PagCuenta:  TInputQueryWizardPage;
   PagFiscal:  TInputQueryWizardPage;
   PagArranque: TInputOptionWizardPage;
+
+  // El territorio fiscal, en un DESPLEGABLE y no tecleando 1/2/3. Un numero a mano se
+  // equivoca: un tecnico le mete IVA a un bar canario y las facturas salen mal desde el
+  // primer dia. Con una lista de tres opciones, no hay forma de equivocarse.
+  ComboTerritorio: TNewComboBox;
 
   TenantId:   string;   // se rellena al validar el codigo
   Empresa:    string;
@@ -316,13 +345,30 @@ begin
   PagFiscal := CreateInputQueryPage(PagCuenta.ID,
     'Datos fiscales',
     'Sin esto NO se pueden emitir facturas. Los exige la AEAT.',
-    'Esta empresa todavia no los tiene puestos.' + #13#10#13#10 +
-    'Territorio: escribe 1 para Peninsula y Baleares (IVA), 2 para Canarias (IGIC), ' +
-    'o 3 para Ceuta y Melilla (IPSI).');
+    'Esta empresa todavia no los tiene puestos.');
   PagFiscal.Add('CIF / NIF:', False);
   PagFiscal.Add('Razon social:', False);
-  PagFiscal.Add('Territorio (1/2/3):', False);
-  PagFiscal.Values[2] := '1';
+
+  // El territorio, en un DESPLEGABLE. Se coloca a mano sobre la superficie de la pagina,
+  // debajo de los dos campos de texto. El `TInputQueryPage` no trae combos, asi que se
+  // añade el control encima. Las tres opciones y ninguna mas: no se puede escribir otra.
+  ComboTerritorio := TNewComboBox.Create(WizardForm);
+  ComboTerritorio.Parent := PagFiscal.Surface;
+  ComboTerritorio.Style := csDropDownList;   // solo elegir, no teclear
+  ComboTerritorio.Top := PagFiscal.Edits[1].Top + PagFiscal.Edits[1].Height + ScaleY(24);
+  ComboTerritorio.Left := PagFiscal.Edits[1].Left;
+  ComboTerritorio.Width := PagFiscal.Edits[1].Width;
+  ComboTerritorio.Items.Add('Peninsula y Baleares (IVA)');
+  ComboTerritorio.Items.Add('Canarias (IGIC)');
+  ComboTerritorio.Items.Add('Ceuta y Melilla (IPSI)');
+  ComboTerritorio.ItemIndex := 0;
+
+  with TNewStaticText.Create(WizardForm) do begin
+    Parent := PagFiscal.Surface;
+    Caption := 'Territorio fiscal:';
+    Left := ComboTerritorio.Left;
+    Top := ComboTerritorio.Top - ScaleY(16);
+  end;
 
   // ── 4 · Arranque automatico ────────────────────────────────────────────────
   PagArranque := CreateInputOptionPage(PagFiscal.ID,
@@ -545,9 +591,10 @@ begin
     // comandos (y menos mal).
     SaveStringToFile(ExpandConstant('{tmp}\pw.txt'), 'gluuh', False);
 
+    // El territorio sale del desplegable (0/1/2), no de un texto tecleado.
     Terr := 'PENINSULA_BALEARES';
-    if Trim(PagFiscal.Values[2]) = '2' then Terr := 'CANARIAS';
-    if Trim(PagFiscal.Values[2]) = '3' then Terr := 'CEUTA_MELILLA';
+    if ComboTerritorio.ItemIndex = 1 then Terr := 'CANARIAS';
+    if ComboTerritorio.ItemIndex = 2 then Terr := 'CEUTA_MELILLA';
 
     SetArrayLength(Lineas, 7);
     Lineas[0] := 'codigo=' + SoloDigitos(PagCodigo.Values[0]);
