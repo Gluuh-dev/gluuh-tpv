@@ -36,6 +36,58 @@ let ventana: BrowserWindow | null = null;
 let identidad: Identidad | null = null;
 let cola: ColaImpresion;
 
+// Espera/reconexión: el terminal puede encenderse ANTES que el servidor, o el servidor
+// reiniciarse en mitad del servicio. Sin esto, Electron enseña una página de error fea. Con
+// esto, muestra una pantalla local de "Conectando…" y entra solo cuando el nodo responde.
+let esperando = false;
+let sondeo: NodeJS.Timeout | null = null;
+
+// La ruta con la que arranca este terminal según el módulo con el que se vinculó.
+function rutaDeInicio(): string {
+  return identidad && identidad.modulo !== "TPV"
+    ? RUTA_MODULO[identidad.modulo] ?? "/inicio"
+    : "/inicio";
+}
+
+// ¿Responde el nodo? Pregunta al gateway (/nodo/estado, sin autenticación). Timeout corto:
+// solo queremos saber si HABLA.
+async function servidorVivo(): Promise<boolean> {
+  try {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 2500);
+    const r = await fetch(`${URL_BASE}/nodo/estado`, { signal: c.signal });
+    clearTimeout(t);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Entrar a la operativa (o a la pantalla del módulo). Si el nodo no está, el did-fail-load
+// de abajo nos devolverá a la pantalla de espera.
+function irAOperativa(): void {
+  esperando = false;
+  void ventana?.loadURL(`${URL_BASE}${rutaDeInicio()}`);
+}
+
+// Mostrar la pantalla de espera y sondear el nodo hasta que responda.
+function mostrarEsperando(): void {
+  if (!ventana) return;
+  if (!esperando) {
+    esperando = true;
+    void ventana.loadFile(path.join(app.getAppPath(), "esperando.html"), {
+      query: { servidor: ORIGEN },
+    });
+  }
+  if (sondeo) return; // ya estamos reintentando
+  sondeo = setInterval(async () => {
+    if (await servidorVivo()) {
+      if (sondeo) { clearInterval(sondeo); sondeo = null; }
+      irAOperativa();
+    }
+  }, 2000);
+}
+
 // Una sola instancia: un TPV por PC.
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => {
@@ -59,12 +111,18 @@ function crearVentana(): void {
       nodeIntegration: false,
     },
   });
-  // Una pantalla dedicada (cocina, kiosko, visor…) arranca en su ruta; un TPV o
-  // un equipo sin vincular abre el LANZADOR (/inicio) para elegir TPV o Ajustes.
-  const rutaInicial = identidad && identidad.modulo !== "TPV"
-    ? RUTA_MODULO[identidad.modulo] ?? "/inicio"
-    : "/inicio";
-  ventana.loadURL(`${URL_BASE}${rutaInicial}`);
+  // Carga inicial a la operativa. Si el nodo aún no está arriba, el did-fail-load de abajo
+  // nos lleva a la pantalla de espera y reintenta solo.
+  irAOperativa();
+
+  // Si no se puede cargar del nodo (apagado, reiniciándose, red caída), a la pantalla de
+  // espera. -3 (ERR_ABORTED) es una navegación normal, no un fallo; y file:// es la propia
+  // pantalla de espera: ninguno cuenta.
+  ventana.webContents.on("did-fail-load", (_e, codigo, _desc, url, esPrincipal) => {
+    if (!esPrincipal || codigo === -3) return;
+    if (url.startsWith("file:")) return;
+    mostrarEsperando();
+  });
 
   // Modo TPV: navegación solo dentro de nuestra web; lo externo, al navegador.
   ventana.webContents.on("will-navigate", (e, url) => {

@@ -6,6 +6,9 @@ directories:
 files:
   - dist/**
   - package.json
+  # Pantalla local de "Conectando…" — va dentro de la app para que cargue aunque el nodo
+  # esté apagado (main.ts la usa en did-fail-load).
+  - esperando.html
 win:
   target: nsis
   # El icono de Gluuh (morado, visible en oscuro). Sin esto, el TPV sale con el icono por

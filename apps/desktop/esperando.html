@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Conectando…</title>
+<style>
+  /* Pantalla LOCAL de espera del TPV. No la sirve el nodo: va dentro de la app, así que
+     siempre carga aunque el servidor esté apagado. El proceso principal (main.ts) sondea el
+     nodo cada 2 s y, en cuanto responde, entra solo a la operativa. */
+  *{margin:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+    background:#0C1116;
+    background-image:radial-gradient(1200px 700px at 70% 10%,#1B3350 0,transparent 60%),
+                     radial-gradient(900px 600px at 10% 90%,#14243A 0,transparent 60%);
+    color:#fff;display:grid;place-items:center;text-align:center;-webkit-user-select:none;user-select:none;
+  }
+  .caja{display:flex;flex-direction:column;align-items:center;gap:22px;max-width:460px;padding:24px}
+  .aro{width:56px;height:56px;border-radius:50%;border:4px solid rgba(255,255,255,.12);
+    border-top-color:#4CC2FF;animation:girar 1s linear infinite}
+  @keyframes girar{to{transform:rotate(360deg)}}
+  h1{font-family:"Segoe UI Variable Display","Segoe UI",sans-serif;font-size:24px;font-weight:600}
+  p{color:rgba(255,255,255,.6);font-size:15px;line-height:22px}
+  .dir{margin-top:2px;font-family:Consolas,"Cascadia Mono",monospace;font-size:14px;
+    color:rgba(255,255,255,.5);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+    border-radius:6px;padding:6px 12px}
+  .pista{color:rgba(255,255,255,.35);font-size:13px}
+  @media (prefers-reduced-motion:reduce){.aro{animation:none}}
+</style>
+</head>
+<body>
+  <div class="caja">
+    <div class="aro"></div>
+    <h1>Conectando con el servidor…</h1>
+    <p>El terminal entrará solo en cuanto el servidor de la barra esté disponible. No hace falta tocar nada.</p>
+    <div class="dir" id="dir"></div>
+    <div class="pista">Si tarda, comprueba que el servidor está encendido y en la misma red.</div>
+  </div>
+  <script>
+    // El proceso principal pasa la dirección del servidor por la query, solo para mostrarla.
+    const s = new URLSearchParams(location.search).get("servidor");
+    if (s) document.getElementById("dir").textContent = s;
+    else document.getElementById("dir").remove();
+  </script>
+</body>
+</html>
