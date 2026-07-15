@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Providers } from "./providers";
+import { TecladoEnPantalla } from "@/components/teclado-en-pantalla";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -35,6 +36,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="es" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <body>
         <Providers>{children}</Providers>
+        {/* Teclado en pantalla GLOBAL (TPV táctil sin teclado físico): flotante y arrastrable. */}
+        <TecladoEnPantalla />
       </body>
     </html>
   );
