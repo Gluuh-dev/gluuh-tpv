@@ -4,18 +4,9 @@ import { comoElLlamante, comoElServicio } from "@/app/lib/supabaseServidor";
 import { excedeLimite, ipDe } from "../limite";
 
 // Genera un código de vinculación de 6 dígitos (caduca en 10 min, un solo uso).
-// Solo PROPIETARIO/ENCARGADO (el rol viaja en el JWT vía el auth hook).
+// Solo PROPIETARIO/ENCARGADO. El rol y la empresa se leen de `app_user`, no del JWT.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function claim(token: string, nombre: string): string {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
-    return String(payload[nombre] ?? "");
-  } catch {
-    return "";
-  }
-}
 
 export async function POST(req: Request) {
   if (excedeLimite(`generar:${ipDe(req)}`, 20)) {
@@ -33,24 +24,33 @@ export async function POST(req: Request) {
   const caller = comoElLlamante(token);
   if (!caller) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
 
-  const { error: eUser } = await caller.auth.getUser();
-  if (eUser) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const { data: { user }, error: eUser } = await caller.auth.getUser();
+  if (eUser || !user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const rol = claim(token, "user_rol");
-  if (!["PROPIETARIO", "ENCARGADO"].includes(rol)) {
+  const admin = comoElServicio();
+  if (!admin) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
+
+  // El rol y la empresa se leen de `app_user` por el usuario autenticado, NO del claim del
+  // JWT. El hook `custom_access_token_hook` no está siempre activo (en la nube no lo está),
+  // y entonces `user_rol` viene vacío y esto devolvía 403 SIEMPRE: no se podía emparejar ni
+  // un terminal. Preguntando a la tabla funciona con hook y sin él, en el nodo y en la nube.
+  // (Es el mismo arreglo que ya hace el instalador del nodo.)
+  const { data: yo } = await admin
+    .from("app_user")
+    .select("tenant_id, rol")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (!yo?.tenant_id) return NextResponse.json({ error: "Sesión sin empresa" }, { status: 403 });
+  if (!["PROPIETARIO", "ENCARGADO"].includes(yo.rol ?? "")) {
     return NextResponse.json({ error: "Solo encargado o propietario" }, { status: 403 });
   }
-  const tenantId = claim(token, "tenant_id");
-  if (!tenantId) return NextResponse.json({ error: "Sesión sin empresa" }, { status: 403 });
+  const tenantId = yo.tenant_id as string;
 
   const { tipo = "TPV", modulo = "TPV", nombre = "" } = await req.json().catch(() => ({}));
 
   // Local del tenant (RLS del llamante).
   const { data: loc } = await caller.from("location").select("id").limit(1).maybeSingle();
   if (!loc) return NextResponse.json({ error: "La empresa no tiene local" }, { status: 400 });
-
-  const admin = comoElServicio();
-  if (!admin) return NextResponse.json({ error: "Servidor sin configurar" }, { status: 500 });
 
   // Límite de dispositivos de la empresa (licencia_limites.dispositivos, 0084):
   // si se alcanza, no se crean más — el técnico de Gluuh lo amplía en la consola.
