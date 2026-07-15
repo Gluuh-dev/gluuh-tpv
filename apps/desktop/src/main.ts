@@ -15,8 +15,13 @@ import { crearVisorSiHaySegundaPantalla, publicarEnVisor } from "./visor";
 // URL/IP de la web. Precedencia: config.json del terminal (editable, se mete al
 // instalar y luego en Configuración) > GLUUH_URL (env de empaquetado) > localhost.
 // Se resuelve al arrancar (whenReady), cuando ya hay userData.
+//
+// El puerto es el 54321, el del GATEWAY — lo ÚNICO que ve un TPV. Es quien le inyecta al
+// HTML la configuración del nodo (clave anon, URL interna). Apuntar al 3100 (la web cruda,
+// interna) cargaría el TPV SIN esa config: pantallas sin datos y sin poder cobrar. En un
+// terminal, config.json trae la IP del servidor (http://<ip-del-servidor>:54321).
 const normalizaUrl = (u: string) => u.trim().replace(/\/tpv\/?$/, "").replace(/\/+$/, "");
-let URL_BASE = normalizaUrl(process.env.GLUUH_URL ?? "http://localhost:3100");
+let URL_BASE = normalizaUrl(process.env.GLUUH_URL ?? "http://localhost:54321");
 let ORIGEN = new URL(URL_BASE).origin;
 
 // Ruta inicial según el módulo con el que se vinculó el terminal. Duplica el
