@@ -75,6 +75,44 @@ Opcional. Hoy la estación se asigna en el panel. Se podría dejar elegir en el 
 
 ---
 
+### 5. Pantalla de inicio del TPV personalizable (Glop)
+**Referencia:** FAQ Glop "personalizar la pantalla de inicio del TPV". Glop deja configurar:
+- **Fondo (wallpaper)** hasta 1920x1080 y **logo** hasta 110x110.
+- **Colores / skins** (esquemas predefinidos) y **tamaños de letra**.
+- Hasta **2 enlaces** personalizados en el menú principal + un **botón auxiliar** de acceso rápido.
+- **Personalización de la pantalla de ventas POR terminal** (Config → Terminales → modificar).
+- Adaptación a **tablet 10"** vía "tipo de pantalla".
+
+**Qué tenemos ya:** `tenant_branding` (logo, colores, título/subtítulo kiosko, colores de mesa) +
+tema claro/oscuro + `setting tpv.botones` (tamaño texto, columnas, foto). La web es responsive
+(tablet ✓).
+**Gaps:** enlaces personalizados + botón auxiliar en el inicio; personalización **por terminal**
+(hoy la marca es del bar entero, no por equipo). → Encaja con el **lanzador** (punto 2).
+
+### 6. Menú de Configuración estilo Glop — mapeo con lo nuestro
+El menú de config de Glop y dónde lo tenemos (casi todo existe, en el backoffice):
+
+| Glop (Configuración) | En Gluuh |
+|---|---|
+| Perfiles de Usuario | `perfil` (roles/permisos) ✅ |
+| Sedes / franquicias | `tenant`/`location` (multi-sede parcial) 🟡 |
+| Grupos de terminales | `grupo_punto_venta` ✅ |
+| Zonas de Impresión | rutas/zonas de impresión (`print_route`/`printer`) ✅ |
+| Terminales | `device` ✅ (gestión nueva de dispositivos) |
+| Salones | `room` ✅ |
+| Imágenes mesas | `restaurant_table.sprite` / plano ✅ |
+| Skins | tema + `tenant_branding` ✅ |
+| Activación puntos | módulo fidelización 🟡 |
+| Formas de Pago | `payment_method` ✅ (recién sembrado, 0106) |
+| Impuestos | `tax_rate` ✅ (global) |
+| Desglose de monedas | arqueo por denominación 🟡 (revisar) |
+| Conceptos de caja | movimientos de caja / categorías 🟡 (revisar) |
+| Mi Glop | cuenta/licencia (`tenant`/`licencia`) ✅ |
+
+**Conclusión:** la mayoría del menú de Glop **ya lo tenemos** en el backoffice. Lo que falta es
+(a) presentarlo como un **menú de config táctil accesible desde el TPV** (punto 2/3), y (b) un
+par de piezas sueltas (desglose de monedas, conceptos de caja, enlaces del inicio) — a revisar.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
