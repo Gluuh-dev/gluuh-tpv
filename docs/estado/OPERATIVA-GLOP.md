@@ -113,6 +113,39 @@ El menú de config de Glop y dónde lo tenemos (casi todo existe, en el backoffi
 (a) presentarlo como un **menú de config táctil accesible desde el TPV** (punto 2/3), y (b) un
 par de piezas sueltas (desglose de monedas, conceptos de caja, enlaces del inicio) — a revisar.
 
+### 7. Cierre diario de caja (cierre Z) desde la operativa
+**Referencia:** Glop — botón **"UTILIDADES"** (junto al teclado numérico de la pantalla de
+ventas) → **"CIERRE DE DÍA"** (2ª fila del popup) → confirmación → imprime informes.
+Si el terminal tiene **tickets/cuentas pendientes**, NO deja cerrar (avisa).
+
+**Qué tenemos:** el backend de **la jornada** ya está (`z_de_jornada`, `cerrar_jornada` con
+efectivo contado y descuadre, GLU04 si ya cerrada, cierre automático de madrugada). ✅
+**Gaps:** el **acceso desde la operativa** (menú "Utilidades" → "Cierre de día"), la **guarda
+de cuentas abiertas** antes de cerrar, y elegir qué **informes se imprimen** al cerrar.
+→ Es sobre todo UX de operativa sobre backend ya hecho.
+
+### 8. Accesibilidad / textos grandes (para problemas de vista)
+**Referencia:** Glop — "Visor total de cobro GRANDE", aumentar contraste y fuente (2 niveles),
+fuente por terminal, y opciones: ocultar barra de estado, **botones solo texto** (sin iconos),
+quitar fondo blanco de botones, mostrar/ocultar decimales. Afecta pantalla de ventas y el
+**visor de cobro** (el total que sale al cobrar).
+
+**Qué tenemos:** tema claro/oscuro + tamaño de texto (`setting tpv.botones`). 🟡
+**Gaps (valioso — dueños mayores):** **modo alto contraste**, **visor de cobro grande** (total
+enorme al cobrar), fuente **por terminal**, toggles de accesibilidad. Barato y muy agradecido.
+
+### 9. Modo DEMO / límites por licencia (modelo de negocio)
+**Referencia:** Glop demo = 500 tickets con cabecera "DEMO" (la mitad si haces cierres),
+edición de documentos desactivada, módulos bloqueados, forma de pago única. Indicador
+"versión sin licencia activa" arriba y "DEMO" impreso en cada ticket.
+
+**Qué tenemos:** `licencia_limites`, `tenant_module` (gating por módulo), `licencia_hasta`. 🟡
+**Gap:** un **modo demo/trial** real (cabecera DEMO en tickets, tope de tickets, features
+capadas) para vender. Es negocio, no operativa — para más adelante.
+
+> Nota: los artículos de la web de Glop dan **poco detalle visual** (son texto). Para el
+> aspecto (colores, tamaños, distribución) me sirven más las **capturas/vídeos** que pasas tú.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
