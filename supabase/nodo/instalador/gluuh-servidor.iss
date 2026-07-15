@@ -259,6 +259,13 @@ var
   PagFiscal:  TInputQueryWizardPage;
   PagArranque: TInputOptionWizardPage;
 
+  // El codigo de instalacion, en 5 cajitas separadas por guiones (4-4-5-4-4), como en tantos
+  // sitios: mas claro que un campo largo, salta solo a la siguiente al llenarse, y si se pega
+  // el codigo entero se reparte por las cajas. `RellenandoCodigo` evita que el reparto se
+  // llame a si mismo (cambiar el texto de una caja vuelve a disparar su OnChange).
+  CajasCodigo: array[0..4] of TNewEdit;
+  RellenandoCodigo: Boolean;
+
   // El territorio fiscal, en un DESPLEGABLE y no tecleando 1/2/3. Un numero a mano se
   // equivoca: un tecnico le mete IVA a un bar canario y las facturas salen mal desde el
   // primer dia. Con una lista de tres opciones, no hay forma de equivocarse.
@@ -332,17 +339,103 @@ begin
       Result := Result + S[i];
 end;
 
-procedure InitializeWizard();
+// Cuantos digitos lleva cada cajita: 4-4-5-4-4 = 21.
+function CapCodigo(i: Integer): Integer;
 begin
-  // ── 1 · El codigo de instalacion ───────────────────────────────────────────
+  if i = 2 then Result := 5 else Result := 4;
+end;
+
+// El codigo entero, juntando las 5 cajas (solo digitos).
+function CodigoDeCajas(): string;
+var i: Integer;
+begin
+  Result := '';
+  for i := 0 to 4 do
+    Result := Result + SoloDigitos(CajasCodigo[i].Text);
+end;
+
+// Al escribir (o pegar) en cualquier caja: se juntan todos los digitos y se reparten por las
+// cajas segun su capacidad. Asi da igual pegar el codigo entero en la primera o teclearlo
+// caja a caja. Y al terminar se pone el foco en la primera caja que aun no este llena.
+procedure CajaCodigoCambio(Sender: TObject);
+var
+  i, idx, posic: Integer;
+  todos, trozo: string;
+begin
+  if RellenandoCodigo then Exit;
+  RellenandoCodigo := True;
+
+  todos := CodigoDeCajas();
+  if Length(todos) > 21 then todos := Copy(todos, 1, 21);
+
+  posic := 1;
+  for i := 0 to 4 do
+  begin
+    trozo := Copy(todos, posic, CapCodigo(i));
+    // Solo se reescribe si cambia: si no, el cursor saltaria al principio y se escribiria al reves.
+    if CajasCodigo[i].Text <> trozo then CajasCodigo[i].Text := trozo;
+    posic := posic + CapCodigo(i);
+  end;
+
+  idx := 4;
+  for i := 0 to 4 do
+    if Length(SoloDigitos(CajasCodigo[i].Text)) < CapCodigo(i) then
+    begin
+      idx := i;
+      break;
+    end;
+  WizardForm.ActiveControl := CajasCodigo[idx];
+
+  RellenandoCodigo := False;
+end;
+
+procedure InitializeWizard();
+var
+  i, x: Integer;
+  Etiqueta, Guion, Pista: TNewStaticText;
+begin
+  // ── 1 · El codigo de instalacion, en cajitas ───────────────────────────────
   PagCodigo := CreateInputQueryPage(wpSelectDir,
     'Que bar es',
     'El codigo de instalacion que Gluuh le dio al cliente.',
-    'Son 21 digitos, con este formato:' + #13#10 +
-    '     0000-0000-00000-0000-0000' + #13#10#13#10 +
-    'Al pulsar Siguiente se comprueba contra Gluuh y se enseña el nombre de la empresa: ' +
-    'asi sabras seguro que no te has equivocado de bar.');
-  PagCodigo.Add('Codigo de instalacion:', False);
+    '');
+
+  Etiqueta := TNewStaticText.Create(WizardForm);
+  Etiqueta.Parent := PagCodigo.Surface;
+  Etiqueta.Top := ScaleY(4);
+  Etiqueta.Caption := 'Codigo de instalacion (21 digitos):';
+
+  x := 0;
+  for i := 0 to 4 do
+  begin
+    CajasCodigo[i] := TNewEdit.Create(WizardForm);
+    CajasCodigo[i].Parent := PagCodigo.Surface;
+    CajasCodigo[i].Top := ScaleY(26);
+    CajasCodigo[i].Left := x;
+    if i = 2 then CajasCodigo[i].Width := ScaleX(72) else CajasCodigo[i].Width := ScaleX(60);
+    CajasCodigo[i].Font.Name := 'Consolas';
+    CajasCodigo[i].Font.Size := 12;
+    CajasCodigo[i].OnChange := @CajaCodigoCambio;
+    x := CajasCodigo[i].Left + CajasCodigo[i].Width;
+    if i < 4 then
+    begin
+      Guion := TNewStaticText.Create(WizardForm);
+      Guion.Parent := PagCodigo.Surface;
+      Guion.Caption := '—';
+      Guion.Font.Size := 12;
+      Guion.Top := ScaleY(30);
+      Guion.Left := x + ScaleX(5);
+      x := x + ScaleX(18);
+    end;
+  end;
+
+  Pista := TNewStaticText.Create(WizardForm);
+  Pista.Parent := PagCodigo.Surface;
+  Pista.Top := ScaleY(64);
+  Pista.Width := PagCodigo.SurfaceWidth;
+  Pista.WordWrap := True;
+  Pista.Caption := 'Al pulsar Siguiente se comprueba con Gluuh y se enseña el nombre del bar: ' +
+    'asi sabras seguro que no te has equivocado.';
 
   // ── 2 · La cuenta del titular ──────────────────────────────────────────────
   PagCuenta := CreateInputQueryPage(PagCodigo.ID,
@@ -450,7 +543,7 @@ begin
   // ── 1 · Canjear el codigo ─────────────────────────────────────────────────
   if CurPageID = PagCodigo.ID then
   begin
-    Codigo := SoloDigitos(PagCodigo.Values[0]);
+    Codigo := CodigoDeCajas();
     if Length(Codigo) <> 21 then
     begin
       MsgBox('El codigo tiene que tener 21 digitos.' + #13#10#13#10 +
@@ -702,7 +795,7 @@ begin
     if ComboTerritorio.ItemIndex = 2 then Terr := 'CEUTA_MELILLA';
 
     SetArrayLength(Lineas, 7);
-    Lineas[0] := 'codigo=' + SoloDigitos(PagCodigo.Values[0]);
+    Lineas[0] := 'codigo=' + CodigoDeCajas();
     Lineas[1] := 'email=' + Trim(PagCuenta.Values[0]);
     Lineas[2] := 'password=' + PagCuenta.Values[1];
     Lineas[3] := 'cif=' + Trim(PagFiscal.Values[0]);
