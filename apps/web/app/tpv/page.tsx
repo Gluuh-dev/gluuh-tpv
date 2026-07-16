@@ -2050,13 +2050,15 @@ export default function TPV() {
   };
   // Productos de la categoría activa por la m2m (product_category); si un producto aún
   // no tiene filas m2m, cae a su category_id (categoría principal). Degrada sin la tabla.
+  // catalogoConMenus (no `prods`): así los menús-artículo (0108) salen en la rejilla
+  // dentro de su categoría "Menús". Sin m2m, un menú cae por su category_id.
   const productosCat = useMemo(
-    () => prods.filter((p) => {
+    () => catalogoConMenus.filter((p) => {
       if (!catSelEf) return false;
       const cs = prodCats[p.id];
       return cs && cs.length ? cs.includes(catSelEf) : p.category_id === catSelEf;
     }),
-    [prods, catSelEf, prodCats],
+    [catalogoConMenus, catSelEf, prodCats],
   );
   // Vista del grid: con búsqueda activa filtra TODOS los productos por nombre
   // (sin acentos), ignorando la categoría; sin búsqueda, los de la categoría.
@@ -2067,8 +2069,8 @@ export default function TPV() {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     const q = norm(busqDiferida.trim());
     if (!q) return productosCat;
-    return prods.filter((p) => norm(p.nombre).includes(q));
-  }, [busqDiferida, productosCat, prods]);
+    return catalogoConMenus.filter((p) => norm(p.nombre).includes(q));
+  }, [busqDiferida, productosCat, catalogoConMenus]);
   const buscando = busqProd.trim().length > 0;                 // input/cabecera: inmediato
   const buscandoDiferido = busqDiferida.trim().length > 0;     // grid: acompasado al filtro
   const catActual    = cats.find((c) => c.id === catSelEf);
