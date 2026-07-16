@@ -18,7 +18,7 @@ export const BRANDING_DEFAULT: Branding = {
   nombre_comercial: null,
   logo_url: null,
   logo_ticket_url: null,
-  color_primario: "#7D419E",
+  color_primario: "#572370",
   color_secundario: "#541F6E",
   kiosko_titulo: null,
   kiosko_subtitulo: null,
