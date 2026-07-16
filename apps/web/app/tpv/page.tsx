@@ -53,7 +53,7 @@ interface Ticket {
 }
 // Menú/combo del tenant, mapeado a la forma que consume MenuModal (un paso por grupo).
 interface MenuTPV {
-  id: string; nombre: string; precio: number; clase_fiscal: string;
+  id: string; nombre: string; precio: number; clase_fiscal: string; category_id: string | null;
   grupos: { id: string; nombre: string; opciones: { id: string; nombre: string }[] }[];
 }
 
@@ -450,7 +450,7 @@ export default function TPV() {
     (async () => {
       try {
         const [{ data: mm }, { data: gg }, { data: cc }] = await Promise.all([
-          sb.from("menu").select("id,nombre,precio,clase_fiscal").eq("activo", true).order("orden"),
+          sb.from("menu").select("id,nombre,precio,clase_fiscal,category_id").eq("activo", true).order("orden"),
           sb.from("menu_group").select("id,menu_id,nombre,orden").order("orden"),
           sb.from("menu_choice").select("group_id,product_id,product(nombre)"),
         ]);
@@ -458,8 +458,8 @@ export default function TPV() {
         type Choice = { group_id: string; product_id: string; product: { nombre: string } | { nombre: string }[] | null };
         const choices = (cc ?? []) as Choice[];
         const nombreDe = (pr: Choice["product"]) => (Array.isArray(pr) ? pr[0]?.nombre : pr?.nombre) ?? "Producto";
-        setMenus(((mm ?? []) as { id: string; nombre: string; precio: number; clase_fiscal: string }[]).map((m) => ({
-          id: m.id, nombre: m.nombre, precio: Number(m.precio), clase_fiscal: m.clase_fiscal,
+        setMenus(((mm ?? []) as { id: string; nombre: string; precio: number; clase_fiscal: string; category_id: string | null }[]).map((m) => ({
+          id: m.id, nombre: m.nombre, precio: Number(m.precio), clase_fiscal: m.clase_fiscal, category_id: m.category_id,
           grupos: grupos.filter((g) => g.menu_id === m.id).map((g) => ({
             id: g.id, nombre: g.nombre,
             opciones: choices.filter((c) => c.group_id === g.id).map((c) => ({ id: c.product_id, nombre: nombreDe(c.product) })),
@@ -492,7 +492,9 @@ export default function TPV() {
       ...menus.map((m) => ({
         id: m.id, nombre: m.nombre, precio: m.precio,
         tipo_impositivo: ivaAuto(m.clase_fiscal, territorio),
-        category_id: null, estacion: "COCINA", foto_url: null, agotado_hasta: null, vendido_por_peso: false,
+        // category_id del menú (0108): así sale en la rejilla dentro de su familia "Menús".
+        // Sin categoría queda fuera de la rejilla (solo llegable por "Comp. menú"), como antes.
+        category_id: m.category_id, estacion: "COCINA", foto_url: null, agotado_hasta: null, vendido_por_peso: false,
       })),
     ],
     [prods, menus, territorio],
@@ -1873,6 +1875,9 @@ export default function TPV() {
   }
   function onProdClick(p: Prod) {
     if (longPressed.current) { longPressed.current = false; return; }
+    // Menú-artículo (0108): en la rejilla es un pseudo-producto; al tocarlo se compone
+    // por pasos en el MenuModal (no se añade como línea suelta).
+    if (menuIds.has(p.id)) { const m = menus.find((x) => x.id === p.id); if (m) setMenuAbierto(m); return; }
     if (estaAgotado(p)) return;
     if (p.vendido_por_peso) { setPesoInput(""); setPesoPop(p); return; }       // por peso
     if ((formatos[p.id] ?? []).length) { setFormatoPop(p); return; }          // 1º: formato

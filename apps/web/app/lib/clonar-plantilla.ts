@@ -119,7 +119,8 @@ export async function clonarCatalogo(
   const filasMn = (menus ?? []).map((m) => {
     const id = randomUUID();
     mapM.set(m.id as string, id);
-    return { ...sinMeta(m), id, tenant_id: destino };
+    // category_id remapeada (0108): el menú cae en la categoría clonada, no en la del origen.
+    return { ...sinMeta(m), id, tenant_id: destino, category_id: remap(mapC, m.category_id) };
   });
   if (filasMn.length) await admin.from("menu").insert(filasMn);
   const mgrupos = (await admin.from("menu_group").select("*").eq("tenant_id", origen)).data as Fila[] | null;
