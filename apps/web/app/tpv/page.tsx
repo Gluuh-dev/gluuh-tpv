@@ -2442,7 +2442,8 @@ export default function TPV() {
           cuenta y el buscador del grid); se irá afinando. ── */}
       <header className="flex h-14 flex-none items-center gap-3 bg-brand px-3 text-brand-foreground">
         <div className="flex flex-none items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-white/15 text-[15px] font-bold">G</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-8 w-auto" />
           <div className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Mesa</span>
             <span className="text-sm font-semibold">{mesa?.nombre ?? llevar?.nombre ?? "—"}</span>
