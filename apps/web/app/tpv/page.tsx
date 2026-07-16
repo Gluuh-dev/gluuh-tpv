@@ -24,6 +24,7 @@ import type { CobrarOpciones, LineaPago } from "./components/CobrarModal";
 import { CabeceraCuenta } from "./components/CabeceraCuenta";
 import { ModalTPV } from "./components/ModalTPV";
 import { ClienteModal, type Cli } from "./components/ClienteModal";
+import { MesaModal } from "./components/MesaModal";
 import { BarraTotales } from "./components/BarraTotales";
 import { FilaAccionesLinea } from "./components/FilaAccionesLinea";
 import { TileProducto } from "./components/TileProducto";
@@ -2731,29 +2732,20 @@ export default function TPV() {
         />
       )}
 
-      {/* ── Modal: Pasar a mesa ── */}
+      {/* ── Modal: Pasar a mesa (fiel a docs/diseño/gluuh-mesa.html, plano real) ── */}
       {modalActivo === 'PASAR_MESA' && (
-        <ModalTPV titulo="Pasar la cuenta a…" subtitulo="Elige la mesa que recibe esta cuenta" onClose={() => setModalActivo(null)} ancho={560} alto={480}>
-          <div className="p-5">
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-              {mesas.filter((m) => !mesa || m.id !== mesa.id).map((m) => (
-                <button type="button" key={m.id} onClick={() => pasarAMesa(m)} disabled={busy}
-                  className={`flex h-16 flex-col items-center justify-center rounded-md border text-sm disabled:opacity-50 ${
-                    m.estado === "POR_COBRAR"
-                      ? "border-yellow-500 bg-yellow-500/10"
-                      : m.estado === "OCUPADA"
-                        ? "border-amber-500 bg-amber-500/10"
-                        : "border-border hover:bg-accent"
-                  }`}>
-                  <span className="font-semibold">{m.nombre}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {m.estado === "POR_COBRAR" ? "Por cobrar" : m.estado === "OCUPADA" ? "Ocupada" : "Libre"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </ModalTPV>
+        <MesaModal
+          mesas={mesas}
+          rooms={rooms}
+          totalesMesa={totalesMesa}
+          reservasPorMesa={reservasPorMesa}
+          mesaActualId={mesa?.id ?? null}
+          artics={unidades}
+          total={total}
+          busy={busy}
+          onAsignar={(m) => { void pasarAMesa(m); }}
+          onClose={() => setModalActivo(null)}
+        />
       )}
 
       {/* ── Modal: Cuentas aparcadas ── */}
