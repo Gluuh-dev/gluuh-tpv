@@ -294,6 +294,8 @@ export default function TPV() {
   const setModoZurdo = useTpvStore((s) => s.setModoZurdo);
   const pases = useTpvStore((s) => s.pases);
   const setPases = useTpvStore((s) => s.setPases);
+  const menuParte = useTpvStore((s) => s.menuParte);
+  const setMenuParte = useTpvStore((s) => s.setMenuParte);
   const comanda = useTpvStore((s) => s.comanda);
   const setComanda = useTpvStore((s) => s.setComanda);
   const descuentos = useTpvStore((s) => s.descuentos);
@@ -1945,6 +1947,8 @@ export default function TPV() {
         setInvitadas((v) => { const { [viejo]: _, ...r } = v; return inv ? { ...r, [clave]: true } : r; });
         setNotas((n) => { const { [viejo]: _, ...r } = n; return { ...r, [clave]: texto }; });
         setAnadidoPor((a) => { const { [viejo]: _, ...r } = a; return autor ? { ...r, [clave]: autor } : r; });
+        // Si la línea era parte de un menú, conserva ese vínculo en la clave nueva (sigue "(M)" y a 0 base).
+        setMenuParte((mp) => { const { [viejo]: v, ...r } = mp; return v ? { ...r, [clave]: v } : r; });
         setLineaSel(clave);
         setModProd({ p: modProd.p, fid: modProd.fid, reemplazar: clave });
       } else {
@@ -1959,14 +1963,28 @@ export default function TPV() {
     if (menus.length === 1) { setMenuAbierto(menus[0]!); return; }
     setSelectorMenus(true);
   }
-  // Añade UNA línea de menú a la comanda: clave = menu.id (pseudo-producto), precio del menú,
-  // y los platos elegidos como nota ("Bebida: Caña · Primero: …"). Usa addProd (respeta el
-  // teclado de unidades). ponytail: dos menús idénticos fusionan (la última selección pisa la
-  // nota); separar por selección si se pide.
-  function anadirMenu(m: MenuTPV, seleccion: { grupoNombre: string; opcionNombre: string }[]) {
-    const key = addProd(m.id);
-    const texto = seleccion.map((s) => `${s.grupoNombre}: ${s.opcionNombre}`).join(" · ");
-    if (texto) setNotas((n) => ({ ...n, [key]: texto }));
+  // Añade un menú a la comanda EN VARIAS LÍNEAS (estilo Glop):
+  //  · CABECERA = la línea del menú (precio del menú); product_id NULL al persistir.
+  //  · PARTES   = cada plato elegido, su PROPIA línea a 0 € (base 0 vía preciosManuales; así
+  //    los extras que se le añadan —punto de la carne, complementos— SUMAN al precio), marcada
+  //    como parte del menú (menuParte → sale con "(M)" y se borra en cascada con la cabecera).
+  function anadirMenu(m: MenuTPV, seleccion: { grupoId: string; grupoNombre: string; opcionId: string; opcionNombre: string }[]) {
+    const menuKey = addProd(m.id);
+    // Claves ÚNICAS (síncronas, sobre un snapshot vivo): dos platos iguales o uno que ya esté
+    // en carta NO fusionan. addProd ya metió la cabecera; partimos de ese estado.
+    const trabajo: Record<string, number> = { ...comandaRef.current, [menuKey]: comandaRef.current[menuKey] ?? 1 };
+    const nuevas: string[] = [];
+    for (const s of seleccion) {
+      let key = s.opcionId;
+      if (key in trabajo) { let n = 2; while (`${key}#${n}` in trabajo) n++; key = `${key}#${n}`; }
+      trabajo[key] = 1;
+      nuevas.push(key);
+    }
+    const op = operarioRef.current;
+    setComanda((c) => { const next = { ...c }; for (const k of nuevas) next[k] = 1; return next; });
+    setPreciosManuales((pm) => { const r = { ...pm }; for (const k of nuevas) r[k] = 0; return r; });
+    setMenuParte((mp) => { const r = { ...mp }; for (const k of nuevas) r[k] = menuKey; return r; });
+    if (op) setAnadidoPor((a) => { const r = { ...a }; for (const k of nuevas) r[k] = { id: op.id, nombre: op.nombre }; return r; });
     setMenuAbierto(null);
   }
   async function toggleAgotado(p: Prod, agotar: boolean) {
@@ -2415,11 +2433,16 @@ export default function TPV() {
   const anularLineaSel = () => {
     if (!lineaSel) return;
     const sel = lineaSel;
-    setComanda((c) => { const { [sel]: _, ...r } = c; return r; });
-    setDescuentos((d) => { const { [sel]: _, ...r } = d; return r; });
-    setPreciosManuales((m) => { const { [sel]: _, ...r } = m; return r; });
-    setNotas((n) => { const { [sel]: _, ...r } = n; return r; });
-    setInvitadas((v) => { const { [sel]: _, ...r } = v; return r; });
+    // Si es la CABECERA de un menú, arrastra sus partes (menuParte → sel). Si es una parte,
+    // borra solo esa. `claves` = líneas a eliminar.
+    const claves = [sel, ...Object.keys(menuParte).filter((k) => menuParte[k] === sel)];
+    const sinClaves = <T,>(o: Record<string, T>) => { const r = { ...o }; for (const k of claves) delete r[k]; return r; };
+    setComanda(sinClaves);
+    setDescuentos(sinClaves);
+    setPreciosManuales(sinClaves);
+    setNotas(sinClaves);
+    setInvitadas(sinClaves);
+    setMenuParte((mp) => { const r = sinClaves(mp); delete r[sel]; return r; });
     setLineaSel(null);
   };
   // Com. y extra: modificadores/comentarios de la línea seleccionada (re-clava al guardar).
@@ -2542,26 +2565,23 @@ export default function TPV() {
               const inv  = !!invitadas[id];
               const autor = anadidoPor[id];
               const marchado = lineasGuardadas.has(id);
-              // Línea de MENÚ: sus partes (guardadas en la nota "Grupo: Opción · …", que
-              // también viaja a cocina/BD) se pintan como sub-líneas con la etiqueta del grupo.
-              // El grupo (Primero/Segundo/…) se define SOLO en la config del menú.
-              const esMenu = menuIds.has(p.id);
-              const partesMenu = esMenu && notas[id]
-                ? notas[id]!.split(" · ").map((seg) => { const i = seg.indexOf(": "); return i >= 0 ? { grupo: seg.slice(0, i), opcion: seg.slice(i + 2) } : { grupo: "", opcion: seg }; })
-                : [];
+              // Parte de un menú (0108/Glop): línea a 0 €, sale con "(M)" y resaltada;
+              // se puede pulsar para añadirle extras (punto de la carne…) que sí suman.
+              const esParteMenu = !!menuParte[id];
               return (
                 <div
                   key={id}
                   onClick={() => onLineaTap(id)}
                   className={`flex w-full flex-col rounded-md px-2 py-1.5 text-xs transition-colors cursor-pointer ${
-                    sel ? "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_#0e8fa2]" : "hover:bg-accent"
+                    sel ? "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_#0e8fa2]"
+                      : esParteMenu ? "bg-emerald-500/5 hover:bg-emerald-500/10" : "hover:bg-accent"
                   } ${marchado ? "opacity-80" : ""}`}
                 >
                   <div className="flex w-full items-start gap-1">
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1">
                         <span className={`truncate ${marchado ? "text-muted-foreground/90 font-medium" : "font-bold text-foreground"}`}>
-                          {nombreBaseDeKey(id)}
+                          {esParteMenu && <span className="text-emerald-600 dark:text-emerald-400">(M)</span>} {nombreBaseDeKey(id)}
                         </span>
                         {marchado && (
                           <span className="inline-flex flex-none items-center rounded bg-emerald-500/10 px-1 py-0.5 text-[8px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide">
@@ -2575,9 +2595,10 @@ export default function TPV() {
                         )}
                         {multiCamarero && autor && <span title={autor.nombre} className={`flex-none rounded px-1 text-[9px] font-semibold bg-muted text-muted-foreground`}>{iniciales(autor.nombre)}</span>}
                         {inv && <span className="inline-flex flex-none items-center gap-0.5 rounded bg-emerald-500/15 px-1 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400"><IconGift size={11} /> INVITADO</span>}
-                        {(desc || pm) && (
+                        {/* Badge de precio manual/descuento; en partes de menú NO se muestra el "P:0". */}
+                        {(desc || (pm !== undefined && !esParteMenu)) && (
                           <span className={`flex-none rounded px-1 text-[10px] font-medium tabular-nums bg-muted text-muted-foreground`}>
-                            {pm ? `P:${eur(pm)}` : ""}
+                            {(pm !== undefined && !esParteMenu) ? `P:${eur(pm)}` : ""}
                             {desc ? (desc.tipo === "PCT" ? ` -${desc.valor}%` : ` -${eur(desc.valor)}`) : ""}
                           </span>
                         )}
@@ -2587,16 +2608,9 @@ export default function TPV() {
                           ↳ {ext.nombre} {ext.uds > 1 ? `x${ext.uds}` : ""} {ext.precio > 0 ? `(+${eur(ext.precio * ext.uds)})` : ""}
                         </span>
                       ))}
-                      {esMenu
-                        ? partesMenu.map((pt, idx) => (
-                            <span key={idx} className="mt-0.5 flex items-center gap-1 pl-3 text-[10px] leading-tight">
-                              {pt.grupo && <span className="flex-none rounded bg-brand/15 px-1 py-0.5 font-semibold uppercase tracking-wide text-brand">{pt.grupo}</span>}
-                              <span className="truncate text-muted-foreground">{pt.opcion}</span>
-                            </span>
-                          ))
-                        : notas[id] && (
-                            <span className="mt-0.5 block truncate text-[10px] text-amber-600 dark:text-amber-400">✎ {notas[id]}</span>
-                          )}
+                      {notas[id] && (
+                        <span className="mt-0.5 block truncate text-[10px] text-amber-600 dark:text-amber-400">✎ {notas[id]}</span>
+                      )}
                     </span>
                     <span className="w-[2.4rem] text-right font-medium tabular-nums pt-0.5">
                       {sel ? <BufferEnLinea tipo="UND" fallback={q} /> : q}

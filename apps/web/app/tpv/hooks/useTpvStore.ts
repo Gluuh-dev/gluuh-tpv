@@ -37,6 +37,9 @@ export interface TpvState {
   invitadas: Record<string, boolean>;
   anadidoPor: Record<string, OperarioInfo>;
   pases: Record<string, number>;
+  /** Línea que es PARTE de un menú → clave de la línea-cabecera del menú.
+   *  La parte se cobra a 0 (base 0 vía preciosManuales; los extras suman) y sale con "(M)". */
+  menuParte: Record<string, string>;
   lineaSel: string | null;
   
   // Context selection
@@ -72,6 +75,7 @@ export interface TpvState {
   setInvitadas: (val: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => void;
   setAnadidoPor: (val: Record<string, OperarioInfo> | ((prev: Record<string, OperarioInfo>) => Record<string, OperarioInfo>)) => void;
   setPases: (val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => void;
+  setMenuParte: (val: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
   setLineaSel: (val: string | null | ((prev: string | null) => string | null)) => void;
   
   setMesa: (val: Mesa | null | ((prev: Mesa | null) => Mesa | null)) => void;
@@ -101,8 +105,9 @@ export const useTpvStore = create<TpvState>((set) => ({
   invitadas: {},
   anadidoPor: {},
   pases: {},
+  menuParte: {},
   lineaSel: null,
-  
+
   // Context selection
   mesa: null,
   llevar: null,
@@ -129,6 +134,7 @@ export const useTpvStore = create<TpvState>((set) => ({
   setInvitadas: (val) => set((state) => ({ invitadas: typeof val === "function" ? val(state.invitadas) : val })),
   setAnadidoPor: (val) => set((state) => ({ anadidoPor: typeof val === "function" ? val(state.anadidoPor) : val })),
   setPases: (val) => set((state) => ({ pases: typeof val === "function" ? val(state.pases) : val })),
+  setMenuParte: (val) => set((state) => ({ menuParte: typeof val === "function" ? val(state.menuParte) : val })),
   setLineaSel: (val) => set((state) => ({ lineaSel: typeof val === "function" ? val(state.lineaSel) : val })),
   
   setMesa: (val) => set((state) => ({ mesa: typeof val === "function" ? val(state.mesa) : val })),
@@ -169,6 +175,7 @@ export const useTpvStore = create<TpvState>((set) => ({
     invitadas: {},
     anadidoPor: {},
     pases: {},
+    menuParte: {},
     lineaSel: null,
     cliente: null,
     comensales: 1,
