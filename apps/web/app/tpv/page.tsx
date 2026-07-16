@@ -2444,8 +2444,8 @@ export default function TPV() {
         <div className="flex flex-none items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-8 w-auto" />
-          <button type="button" onClick={() => irASalaEstable({ tipo: "room" })}
-            title="Seleccionar mesa"
+          <button type="button" onClick={onPasarMesaModal}
+            title="Asignar mesa a esta cuenta"
             className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 transition-colors hover:bg-white/25">
             <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Mesa</span>
             <span className="text-sm font-semibold">{mesa?.nombre ?? llevar?.nombre ?? "—"}</span>
