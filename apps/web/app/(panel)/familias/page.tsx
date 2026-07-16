@@ -4,7 +4,7 @@
 // buscador integrados). Degrada si faltan 0058/0061/0065.
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Plus, TriangleAlert } from "lucide-react";
+import { Layers, Plus, TriangleAlert, UtensilsCrossed } from "lucide-react";
 import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
@@ -152,6 +152,7 @@ export default function FamiliasPage() {
       <PageHeader
         title="Familias"
         description="Propiedades heredables del catálogo: los productos heredan de su familia los modificadores, el estilo y la visibilidad."
+        actions={<Button variant="outline" onClick={() => router.push("/menus")}><UtensilsCrossed className="h-4 w-4" /> Menús</Button>}
       />
 
       {sinMigracion && (

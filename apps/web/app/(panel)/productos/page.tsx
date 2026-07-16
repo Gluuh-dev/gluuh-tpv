@@ -6,7 +6,7 @@
 // con id nuevo, nombre + « - copia» y PLU vacío (único por tenant).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Package, Plus } from "lucide-react";
+import { Package, Plus, UtensilsCrossed } from "lucide-react";
 import { toast } from "@/app/lib/toast";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { TablaDatos, IrA, type ColumnaDatos } from "@/components/tabla-datos";
@@ -226,6 +226,7 @@ export default function ProductosLista() {
       <PageHeader
         title="Productos"
         description={cargando ? "Cargando la carta…" : "Artículos de la carta con su familia, categorías y precios."}
+        actions={<Button variant="outline" onClick={() => router.push("/menus")}><UtensilsCrossed className="h-4 w-4" /> Menús</Button>}
       />
 
       {!cargando && prods.length === 0 ? (
