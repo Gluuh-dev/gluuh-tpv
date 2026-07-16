@@ -2542,6 +2542,13 @@ export default function TPV() {
               const inv  = !!invitadas[id];
               const autor = anadidoPor[id];
               const marchado = lineasGuardadas.has(id);
+              // Línea de MENÚ: sus partes (guardadas en la nota "Grupo: Opción · …", que
+              // también viaja a cocina/BD) se pintan como sub-líneas con la etiqueta del grupo.
+              // El grupo (Primero/Segundo/…) se define SOLO en la config del menú.
+              const esMenu = menuIds.has(p.id);
+              const partesMenu = esMenu && notas[id]
+                ? notas[id]!.split(" · ").map((seg) => { const i = seg.indexOf(": "); return i >= 0 ? { grupo: seg.slice(0, i), opcion: seg.slice(i + 2) } : { grupo: "", opcion: seg }; })
+                : [];
               return (
                 <div
                   key={id}
@@ -2580,9 +2587,16 @@ export default function TPV() {
                           ↳ {ext.nombre} {ext.uds > 1 ? `x${ext.uds}` : ""} {ext.precio > 0 ? `(+${eur(ext.precio * ext.uds)})` : ""}
                         </span>
                       ))}
-                      {notas[id] && (
-                        <span className="mt-0.5 block truncate text-[10px] text-amber-600 dark:text-amber-400">✎ {notas[id]}</span>
-                      )}
+                      {esMenu
+                        ? partesMenu.map((pt, idx) => (
+                            <span key={idx} className="mt-0.5 flex items-center gap-1 pl-3 text-[10px] leading-tight">
+                              {pt.grupo && <span className="flex-none rounded bg-brand/15 px-1 py-0.5 font-semibold uppercase tracking-wide text-brand">{pt.grupo}</span>}
+                              <span className="truncate text-muted-foreground">{pt.opcion}</span>
+                            </span>
+                          ))
+                        : notas[id] && (
+                            <span className="mt-0.5 block truncate text-[10px] text-amber-600 dark:text-amber-400">✎ {notas[id]}</span>
+                          )}
                     </span>
                     <span className="w-[2.4rem] text-right font-medium tabular-nums pt-0.5">
                       {sel ? <BufferEnLinea tipo="UND" fallback={q} /> : q}
