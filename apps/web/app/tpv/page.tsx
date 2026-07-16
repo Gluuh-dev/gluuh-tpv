@@ -22,6 +22,7 @@ import dynamic from "next/dynamic";
 import type { SeleccionModificadores } from "./components/ModificadoresModal";
 import type { CobrarOpciones, LineaPago } from "./components/CobrarModal";
 import { CabeceraCuenta } from "./components/CabeceraCuenta";
+import { ModalTPV } from "./components/ModalTPV";
 import { BarraTotales } from "./components/BarraTotales";
 import { FilaAccionesLinea } from "./components/FilaAccionesLinea";
 import { TileProducto } from "./components/TileProducto";
@@ -2746,9 +2747,8 @@ export default function TPV() {
 
       {/* ── Modal: Cliente y comensales ── */}
       {modalActivo === 'CLIENTE' && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-3 font-semibold">Cliente y comensales</h3>
+        <ModalTPV titulo="Cliente y comensales" onClose={() => setModalActivo(null)} ancho={480} alto={560}>
+          <div className="p-5">
             {cliente && (
               <div className="mb-3 flex items-center justify-between rounded-md border border-brand bg-brand/10 px-3 py-2 text-sm">
                 <span>Asignado: <b>{cliente.nombre}</b></span>
@@ -2799,17 +2799,15 @@ export default function TPV() {
                 className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm uppercase outline-none focus:border-brand"
               />
             </div>
-            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
           </div>
-        </div>
+        </ModalTPV>
       )}
 
       {/* ── Modal: Pasar a mesa ── */}
       {modalActivo === 'PASAR_MESA' && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
-          <div className="w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-3 font-semibold">Pasar la cuenta a…</h3>
-            <div className="grid max-h-80 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-5">
+        <ModalTPV titulo="Pasar la cuenta a…" subtitulo="Elige la mesa que recibe esta cuenta" onClose={() => setModalActivo(null)} ancho={560} alto={480}>
+          <div className="p-5">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
               {mesas.filter((m) => !mesa || m.id !== mesa.id).map((m) => (
                 <button type="button" key={m.id} onClick={() => pasarAMesa(m)} disabled={busy}
                   className={`flex h-16 flex-col items-center justify-center rounded-md border text-sm disabled:opacity-50 ${
@@ -2826,17 +2824,14 @@ export default function TPV() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cancelar</button>
           </div>
-        </div>
+        </ModalTPV>
       )}
 
       {/* ── Modal: Cuentas aparcadas ── */}
       {modalActivo === 'APARCADOS' && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-3 font-semibold">Cuentas aparcadas</h3>
-            <div className="space-y-1">
+        <ModalTPV titulo="Cuentas aparcadas" onClose={() => setModalActivo(null)} ancho={420} alto={480}>
+          <div className="space-y-1 p-5">
               {aparcados.map((o) => (
                 <button type="button" key={o.id} onClick={() => recuperarAparcado(o)} className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-accent">
                   <span className="font-medium">{o.aparcado_como || `Barra ${hhmm(o.created_at)}`}</span>
@@ -2844,10 +2839,8 @@ export default function TPV() {
                 </button>
               ))}
               {aparcados.length === 0 && <p className="text-sm text-muted-foreground">No hay cuentas aparcadas.</p>}
-            </div>
-            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
           </div>
-        </div>
+        </ModalTPV>
       )}
 
       {/* ── Dividir cuenta (DividirCuentaModal): reparte líneas en documentos ── */}
