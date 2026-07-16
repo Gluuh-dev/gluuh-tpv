@@ -6,21 +6,17 @@
 // Footer: Cancelar · Quitar del ticket · Cliente nuevo · Asignar al ticket.
 // Cableado a la tabla `customer` real (RLS por tenant). Los campos tarifa/descuento del
 // mockup no existen aún en BD → se omiten (se añadirán con columnas si hacen falta).
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, X, UserPlus, Check, TriangleAlert, ArrowLeft, Keyboard, Pencil, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { eur } from "@/app/lib/money";
 import { abrirTeclado } from "@/components/teclado-en-pantalla";
 import { ModalTPV } from "./ModalTPV";
 import { useConfirmar } from "@/components/dialogo-confirmar";
+import { useClientesStore, CLI_COLS, type Cli } from "../hooks/useClientesStore";
 import { toast } from "@/app/lib/toast";
 
-export interface Cli {
-  id: string; nombre: string | null; telefono: string | null; nif: string | null; email: string | null;
-  direccion: string | null; codigo_postal: string | null; poblacion: string | null; provincia: string | null;
-  notas: string | null; consentimiento_marketing: boolean; puntos_fidelidad: number;
-}
-const COLS = "id,nombre,telefono,nif,email,direccion,codigo_postal,poblacion,provincia,notas,consentimiento_marketing,puntos_fidelidad";
+export type { Cli };
 
 const iniciales = (n: string | null) => (n ?? "?").trim().split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 // Para factura COMPLETA (F1) hacen falta NIF + dirección fiscal.
@@ -46,29 +42,34 @@ export function ClienteModal({
   const sb = supabaseBrowser();
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<"todos" | "hoy">("todos");
-  const [lista, setLista] = useState<Cli[]>([]);
   const [sel, setSel] = useState<Cli | null>(null);
   const [alta, setAlta] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM0);
-  const [cargando, setCargando] = useState(true);
   // ¿El cliente elegido tiene facturas emitidas? null = comprobando. Con facturas se bloquea
   // editar/borrar (integridad fiscal: no se cambia el titular de una factura ya emitida).
   const [facturas, setFacturas] = useState<boolean | null>(null);
-  const busca = useRef(0);
   const { confirmar, dialogo } = useConfirmar();
 
-  const cargar = useCallback(async (texto: string, f: "todos" | "hoy") => {
-    const id = ++busca.current;
-    const limpio = texto.replace(/[,()%]/g, "").trim();
-    let query = sb.from("customer").select(COLS).order("nombre").limit(60);
-    if (limpio) query = query.or(`nombre.ilike.%${limpio}%,telefono.ilike.%${limpio}%,nif.ilike.%${limpio}%,email.ilike.%${limpio}%`);
-    if (f === "hoy") { const d = new Date(); d.setHours(0, 0, 0, 0); query = query.gte("created_at", d.toISOString()); }
-    const { data } = await query;
-    if (id === busca.current) { setLista((data as Cli[]) ?? []); setCargando(false); }
-  }, [sb]);
+  // Lista PERSISTENTE (caché): no se recarga al abrir el modal; se revalida en 2º plano.
+  const clientes = useClientesStore((s) => s.clientes);
+  const cargado = useClientesStore((s) => s.cargado);
+  const cargarClientes = useClientesStore((s) => s.cargar);
+  const upsert = useClientesStore((s) => s.upsert);
+  const quitar = useClientesStore((s) => s.quitar);
+  useEffect(() => { void cargarClientes(sb); }, [cargarClientes, sb]);
 
-  useEffect(() => { void cargar(q, filtro); }, [q, filtro, cargar]);
+  // Filtrado LOCAL (sin pegarle a la BD en cada tecla): nombre/teléfono/NIF/email + "hoy".
+  const lista = useMemo(() => {
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const qq = norm(q.replace(/[,()%]/g, "").trim());
+    const iniHoy = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+    return clientes.filter((c) => {
+      if (filtro === "hoy" && new Date(c.created_at).getTime() < iniHoy) return false;
+      if (!qq) return true;
+      return norm(c.nombre ?? "").includes(qq) || norm(c.telefono ?? "").includes(qq) || norm(c.nif ?? "").includes(qq) || norm(c.email ?? "").includes(qq);
+    });
+  }, [clientes, q, filtro]);
 
   // Comprueba si el cliente elegido tiene facturas (invoice → sales_order.customer_id).
   useEffect(() => {
@@ -103,12 +104,12 @@ export function ClienteModal({
       consentimiento_marketing: form.consentimiento_marketing,
     };
     const { data, error } = editId
-      ? await sb.from("customer").update(payload).eq("id", editId).select(COLS).single()
-      : await sb.from("customer").insert(payload).select(COLS).single();
+      ? await sb.from("customer").update(payload).eq("id", editId).select(CLI_COLS).single()
+      : await sb.from("customer").insert(payload).select(CLI_COLS).single();
     if (error) { toast.error(`No se pudo guardar: ${error.message}`); return; }
+    upsert(data as Cli);                                     // caché al instante, sin recargar
     setAlta(false); setEditId(null); setForm(FORM0); setSel(data as Cli);
     toast.success(editId ? "Cliente actualizado" : "Cliente creado");
-    void cargar(q, filtro);
   }
 
   async function eliminar() {
@@ -116,8 +117,9 @@ export function ClienteModal({
     if (!(await confirmar({ titulo: `¿Eliminar a ${sel.nombre}?`, mensaje: "No se puede deshacer.", textoConfirmar: "Eliminar", peligroso: true }))) return;
     const { error } = await sb.from("customer").delete().eq("id", sel.id);
     if (error) { toast.error(`No se pudo eliminar: ${error.message}`); return; }
+    quitar(sel.id);
     toast.success("Cliente eliminado");
-    setSel(null); void cargar(q, filtro);
+    setSel(null);
   }
   const editarSel = () => { if (!sel) return; setForm(aForm(sel)); setEditId(sel.id); setAlta(true); };
 
@@ -156,8 +158,8 @@ export function ClienteModal({
               ))}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {cargando && <p className="p-4 text-center text-sm text-muted-foreground">Cargando…</p>}
-              {!cargando && lista.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Sin resultados. Usa «Cliente nuevo».</p>}
+              {!cargado && clientes.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Cargando…</p>}
+              {cargado && lista.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Sin resultados. Usa «Cliente nuevo».</p>}
               {lista.map((c) => {
                 const activo = sel?.id === c.id;
                 return (
@@ -223,7 +225,7 @@ export function ClienteModal({
               <button type="button" onClick={abrirTeclado} title="Teclado en pantalla" className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold hover:bg-accent"><Keyboard size={17} /> Teclado</button>
               {clienteActual && <button type="button" onClick={onQuitar} className="flex h-11 items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-600 hover:bg-rose-500/20"><X size={16} /> Quitar del ticket</button>}
               <div className="ml-auto flex items-center gap-2">
-                <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent"><ArrowLeft size={16} /> Cancelar</button>
+                <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent">Cancelar</button>
                 <button type="button" onClick={() => sel && onAsignar(sel)} disabled={!sel} className="flex h-11 items-center gap-2 rounded-md bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand-hover disabled:opacity-40"><Check size={17} /> Asignar al ticket</button>
               </div>
             </>

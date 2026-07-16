@@ -4,7 +4,7 @@
 // PLANO real (salas + mesas por posición), leyenda, zoom y panel "Mesa elegida". Reusa los
 // datos reales de mesas/salas del TPV; al asignar llama a pasarAMesa (misma lógica de antes).
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Minus, Plus, Info } from "lucide-react";
+import { Check, Minus, Plus, Info } from "lucide-react";
 import { eur } from "@/app/lib/money";
 import type { Mesa } from "../hooks/useTpvStore";
 import { ModalTPV } from "./ModalTPV";
@@ -135,7 +135,7 @@ export function MesaModal({
           <button type="button" onClick={primeraLibre} className="flex h-11 items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-4 text-sm font-bold text-brand hover:bg-brand/20"><Check size={17} /> Primera libre</button>
           <span className="ml-1 hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><Info size={14} /> Toca la mesa donde se sientan.</span>
           <div className="ml-auto flex items-center gap-2">
-            <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent"><ArrowLeft size={16} /> Cancelar</button>
+            <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent">Cancelar</button>
             <button type="button" onClick={() => sel && onAsignar(sel)} disabled={!sel || busy} className="flex h-11 items-center gap-2 rounded-md bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand-hover disabled:opacity-40"><Check size={17} /> Asignar</button>
           </div>
         </div>

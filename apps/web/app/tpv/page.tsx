@@ -171,11 +171,19 @@ export default function TPV() {
   const [rooms, setRooms]         = useState<Room[]>([]);
   const [reservas, setReservas]   = useState<Reserva[]>([]);
   const [elementos, setElementos] = useState<Elemento[]>([]);
-  const [vistaSala, setVistaSala] = useState<string>("");  // room id, "BARRA", "RESERVAS" o "LLEVAR"
-  // Navegación estilo Glop: false = pantalla Ticket (venta directa, por defecto al entrar);
-  // true = navegando por el rail (plano de sala, barra o para llevar).
-  const [navSala, setNavSala] = useState(true);
+  // Se recuerda la sala/vista donde estabas (room id, "BARRA", "RESERVAS", "LLEVAR").
+  const [vistaSala, setVistaSala] = useState<string>(() => (typeof window !== "undefined" && localStorage.getItem("gluuh_tpv_sala")) || "");
+  // Navegación estilo Glop: false = pantalla Ticket (venta directa); true = rail (plano/barra/…).
+  // Se recuerda entre sesiones: si saliste en Ticket, vuelves a Ticket; si en Salón/Aparcados, ahí.
+  const [navSala, setNavSala] = useState(() => typeof window === "undefined" || localStorage.getItem("gluuh_tpv_nav") !== "ticket");
   const [lineasGuardadas, setLineasGuardadas] = useState<Set<string>>(new Set());
+  // Recuerda la vista (Ticket vs Salón/Aparcados) y la sala para restaurarla al reabrir el TPV.
+  useEffect(() => {
+    try {
+      localStorage.setItem("gluuh_tpv_nav", navSala ? "salas" : "ticket");
+      if (vistaSala) localStorage.setItem("gluuh_tpv_sala", vistaSala);
+    } catch { /* sin persistencia */ }
+  }, [navSala, vistaSala]);
   // Mesa preseleccionada en el plano: 1er toque = ver cuenta; 2º toque = abrir en TPV.
   const [mesaSel, setMesaSel] = useState<Mesa | null>(null);
   const [mesaSelInfo, setMesaSelInfo] = useState<{ apertura: string; importe: number; comensales: number | null; nota?: string; lineas: { nombre: string; cantidad: number; precio: number }[] } | null>(null);
@@ -382,7 +390,7 @@ export default function TPV() {
         setCatSel(useCatalogo.getState().cats[0]?.id ?? null);
         setRooms((rms as Room[]) ?? []);
         setReservas((rsv as Reserva[]) ?? []);
-        setVistaSala((rms as Room[])?.[0]?.id ?? "");
+        setVistaSala((prev) => prev || ((rms as Room[])?.[0]?.id ?? ""));   // no pisa la sala recordada
         // Mesas + elementos pintan el plano (primera pantalla): en paralelo entre sí.
         await Promise.all([recargarMesas(), recargarElementos()]);
       } catch (e) {
