@@ -461,6 +461,38 @@ nuestro **backoffice**. La captura confirma: **Acceso a TPV** destacado + config
 > El **vídeo de YouTube no lo puedo "ver"** (WebFetch no lee vídeo). Para el aspecto, las
 > CAPTURAS como estas son lo que vale — sigue pasándolas.
 
+## Menú y comentarios/extras — detalle fino (capturas Glop)
+
+### Menú: cómo lo compone Glop
+- Modal con **lista de grupos** a la derecha (BEBIDA / PRIMEROS / SEGUNDOS / CAFÉ O POSTRE) con
+  un contador "Elegir". Al tocar un grupo → **rejilla de productos CON IMÁGENES** (igual que la
+  pantalla de ventas). Eliges → se llena la lista de "elegidos" a la izquierda (Grupo/Artículo/Uds).
+- **Qué tenemos** (`MenuModal`): todos los grupos a la vez, opciones como **botones** (sin rejilla
+  con imágenes). Funciona igual pero **se ve distinto**. → Decidir si adoptamos el estilo Glop
+  (grupo → rejilla con fotos), más visual y coherente con la venta.
+
+### ⭐ (M) en el ticket — DIFERENCIA IMPORTANTE
+- Glop mete cada componente del menú como **LÍNEA en el ticket con prefijo `(M)`**:
+  `MENU DEL DIA 10,00`, `(M) MAHOU 1/3`, `(M) REVUELTO`, `(M) ENTRECOT`. Así **cada plato se ve** y
+  puedes darle **"Com. y extra"** (poco hecho, sin salsa…) a cada uno por separado.
+- **Qué hacemos:** los platos elegidos van como **NOTA** en la línea del menú ("Bebida: Caña · …").
+- **Recomendación: adoptar el estilo Glop (líneas `(M)`)** — más claro y permite comentar cada
+  componente. Es un cambio en cómo se guardan las líneas del menú (no trivial, pero vale la pena).
+
+### Comentarios y extras (captura "ENTRECOT / CARNES")
+- Modal: **dos columnas** → izq. **Comentarios** del grupo (POCO HECHO/AL PUNTO/MUY HECHO/SIN
+  SALSA/MÁS SALSA) con checkbox; der. **Art.Extra** (PIMIENTA/ROQUEFORT/BARBACOA) con **unidades ±**.
+  Precio artículo + Total arriba. Botones **Comentario manual** (→ teclado), **Guardar** (naranja),
+  Cancelar, flechas de orden.
+- **Qué tenemos:** `ModificadoresModal` ✅ (motor de modifiers/notas). → Verificar/afinar que su
+  layout iguala ESTE (comentarios + extras con uds + comentario manual). El HTML que el cliente
+  mejore (`gluuh-comentarios-extras.html`) es la referencia.
+
+### Teclado del ticket (captura)
+Glop tiene botones **"Comp. menú"** (recomponer el menú) y **"Com. y extra"** junto al numérico,
+además de Und./Precio/Invitación/Anular línea/Utilidades/Abrir cajón/Salir. → Comparar con nuestro
+`TecladoTPV` (hoy: Und./Precio/DTO%/DTO€ + Cobrar) y ver qué botones de acción de LÍNEA añadir.
+
 ## Por analizar (manuales que el cliente irá pasando)
 - [ ] Lanzador de inicio de Glop (opciones exactas).
 - [ ] Teclado en pantalla de Glop (numérico vs completo, dónde sale).
