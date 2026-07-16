@@ -25,6 +25,7 @@ import { CabeceraCuenta } from "./components/CabeceraCuenta";
 import { ModalTPV } from "./components/ModalTPV";
 import { ClienteModal, type Cli } from "./components/ClienteModal";
 import { MesaModal } from "./components/MesaModal";
+import { DialogoConfirmar } from "@/components/dialogo-confirmar";
 import { BarraTotales } from "./components/BarraTotales";
 import { FilaAccionesLinea } from "./components/FilaAccionesLinea";
 import { TileProducto } from "./components/TileProducto";
@@ -2776,18 +2777,16 @@ export default function TPV() {
         />
       )}
 
-      {/* ── Modal: confirmar borrar cuenta ── */}
+      {/* ── Confirmar borrar cuenta ── */}
       {pedirBorrar && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setPedirBorrar(false)}>
-          <div className="w-full max-w-xs rounded-lg border border-border bg-card p-5 text-center shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 font-semibold">¿Borrar la cuenta?</h3>
-            <p className="mb-4 text-sm text-muted-foreground">Se anulará el pedido (queda registrado) y se liberará la mesa.</p>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setPedirBorrar(false)} className="btn-ghost flex-1">Cancelar</button>
-              <button type="button" onClick={borrarCuenta} disabled={busy} className="btn-primary flex-1 bg-rose-600 disabled:opacity-50">Borrar</button>
-            </div>
-          </div>
-        </div>
+        <DialogoConfirmar
+          titulo="¿Borrar la cuenta?"
+          mensaje="Se anulará el pedido (queda registrado) y se liberará la mesa."
+          textoConfirmar="Borrar"
+          peligroso
+          onConfirmar={() => { if (!busy) void borrarCuenta(); }}
+          onCancelar={() => setPedirBorrar(false)}
+        />
       )}
 
       {/* ── Popover: venta por peso (kg) ── */}

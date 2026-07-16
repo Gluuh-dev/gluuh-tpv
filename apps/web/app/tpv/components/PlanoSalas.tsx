@@ -10,6 +10,7 @@ import { RailSalas, type RailTab } from "./RailSalas";
 import { ASSETS, ASSETS_LEGACY, FORMAS_MESA, assetPorId, mesaPorCapacidad, dim, type PlanoAsset, PLANO_VER } from "../../lib/plano-assets";
 import { toast } from "@/app/lib/toast";
 import { eur } from "@/app/lib/money";
+import { useConfirmar } from "@/components/dialogo-confirmar";
 
 export interface Mesa {
   id: string;
@@ -220,6 +221,7 @@ export function PlanoSalas({
   // Selección en modo edición y overrides locales
   const [selId, setSelId] = useState<string | null>(null);
   const [selTipo, setSelTipo] = useState<"mesa" | "elem" | null>(null);
+  const { confirmar, dialogo } = useConfirmar();
   const [dimOverride, setDimOverride] = useState<Record<string, { w: number; h: number }>>({});
   const [rotOverride, setRotOverride] = useState<Record<string, number>>({});
   const resizeRef = useRef<{ id: string; sx: number; sy: number; sw: number; sh: number } | null>(null);
@@ -1077,7 +1079,8 @@ export function PlanoSalas({
   return (
     <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden select-none">
       {renderVelo()}
-      
+      {dialogo}
+
       {/* Header Fijo */}
       <header className="flex flex-none items-center justify-between border-b border-border bg-card px-4 py-2.5 shadow-sm z-30">
         <div className="flex items-center gap-3">
@@ -1533,8 +1536,8 @@ export function PlanoSalas({
                         </button>
                         <button 
                           type="button" 
-                          onClick={() => {
-                            if (libre && confirm("¿Eliminar esta mesa?")) {
+                          onClick={async () => {
+                            if (libre && await confirmar({ titulo: "¿Eliminar esta mesa?", textoConfirmar: "Eliminar", peligroso: true })) {
                               void borrarMesaId(m.id);
                               setSelId(null);
                               setSelTipo(null);
@@ -1595,8 +1598,8 @@ export function PlanoSalas({
                         </button>
                         <button 
                           type="button" 
-                          onClick={() => {
-                            if (confirm("¿Eliminar este elemento?")) {
+                          onClick={async () => {
+                            if (await confirmar({ titulo: "¿Eliminar este elemento?", textoConfirmar: "Eliminar", peligroso: true })) {
                               void borrarElemId(el.id);
                               setSelId(null);
                               setSelTipo(null);

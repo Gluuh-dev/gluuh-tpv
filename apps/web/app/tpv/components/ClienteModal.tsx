@@ -12,6 +12,7 @@ import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { eur } from "@/app/lib/money";
 import { abrirTeclado } from "@/components/teclado-en-pantalla";
 import { ModalTPV } from "./ModalTPV";
+import { useConfirmar } from "@/components/dialogo-confirmar";
 import { toast } from "@/app/lib/toast";
 
 export interface Cli {
@@ -55,6 +56,7 @@ export function ClienteModal({
   // editar/borrar (integridad fiscal: no se cambia el titular de una factura ya emitida).
   const [facturas, setFacturas] = useState<boolean | null>(null);
   const busca = useRef(0);
+  const { confirmar, dialogo } = useConfirmar();
 
   const cargar = useCallback(async (texto: string, f: "todos" | "hoy") => {
     const id = ++busca.current;
@@ -111,7 +113,7 @@ export function ClienteModal({
 
   async function eliminar() {
     if (!sel) return;
-    if (!confirm(`¿Eliminar a ${sel.nombre}? No se puede deshacer.`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar a ${sel.nombre}?`, mensaje: "No se puede deshacer.", textoConfirmar: "Eliminar", peligroso: true }))) return;
     const { error } = await sb.from("customer").delete().eq("id", sel.id);
     if (error) { toast.error(`No se pudo eliminar: ${error.message}`); return; }
     toast.success("Cliente eliminado");
@@ -122,6 +124,8 @@ export function ClienteModal({
   const sub = `${mesaNombre ?? "Barra"} · ${comensales} pax`;
 
   return (
+    <>
+    {dialogo}
     <ModalTPV
       titulo="Cliente"
       subtitulo={sub}
@@ -227,6 +231,7 @@ export function ClienteModal({
         </div>
       </div>
     </ModalTPV>
+    </>
   );
 }
 
