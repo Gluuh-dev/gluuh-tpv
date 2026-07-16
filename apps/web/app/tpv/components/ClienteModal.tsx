@@ -277,8 +277,7 @@ export function ClienteModal({
           ) : (
             <>
               <button type="button" onClick={() => { setAlta(true); setEditId(null); setSel(null); setForm(FORM0); }} className="flex h-11 items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-4 text-sm font-bold text-brand hover:bg-brand/20"><UserPlus size={17} /> Cliente nuevo</button>
-              <button type="button" onClick={abrirTeclado} title="Teclado en pantalla" className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold hover:bg-accent"><Keyboard size={17} /> Teclado</button>
-              {clienteActual && <button type="button" onClick={onQuitar} className="flex h-11 items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-600 hover:bg-rose-500/20"><X size={16} /> Quitar del ticket</button>}
+              {clienteActual &&<button type="button" onClick={onQuitar} className="flex h-11 items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-600 hover:bg-rose-500/20"><X size={16} /> Quitar del ticket</button>}
               <div className="ml-auto flex items-center gap-2">
                 <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent">Cancelar</button>
                 <button type="button" onClick={() => sel && onAsignar(sel)} disabled={!sel} className="flex h-11 items-center gap-2 rounded-md bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand-hover disabled:opacity-40"><Check size={17} /> Asignar al ticket</button>
@@ -297,48 +296,52 @@ function Ficha({ c, tarifa, empresa, st }: Readonly<{ c: Cli; tarifa: string; em
   const fac = facturable(c);
   const falta = [!c.nif && "el NIF", !(c.direccion && c.codigo_postal && c.poblacion) && "la dirección fiscal"].filter(Boolean).join(" y ");
   const deuda = Number(c.saldo);
-  // Fila SOLO si hay valor (nada de "sin descuento"/"sin poner"): la ficha queda limpia.
-  const dato = (l: string, v: React.ReactNode) => (v || v === 0) && v !== "" ? (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border-muted py-2">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</span>
-      <span className="text-right text-sm font-medium">{v}</span>
+  // Compacto (TPV): TODAS las filas; si no hay valor, sale el texto gris (placeholder).
+  const dato = (l: string, v: React.ReactNode, placeholder: string) => (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border-muted py-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{l}</span>
+      {v ? <span className="text-right text-[13px] font-semibold">{v}</span> : <span className="text-right text-[13px] italic text-muted-foreground/70">{placeholder}</span>}
     </div>
-  ) : null;
+  );
   const dirFiscal = [c.direccion, [c.codigo_postal, c.poblacion].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");
   return (
-    <div>
-      <div className="mb-3 flex items-center gap-3">
-        <span className="grid h-12 w-12 flex-none place-items-center rounded-full text-base font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
+    <div className="text-sm">
+      <div className="mb-2.5 flex items-center gap-2.5">
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-full text-sm font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-base font-bold">{c.nombre}</span>
+            <span className="truncate text-[15px] font-bold leading-tight">{c.nombre}</span>
             {empresa && <span className="flex-none rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">Empresa</span>}
           </div>
-          <div className="text-xs text-muted-foreground">{empresa ? "Empresa" : "Particular"}{st?.ultima ? ` · última visita: ${relativa(st.ultima)}` : ""}</div>
+          <div className="text-[11px] text-muted-foreground">{empresa ? "Empresa" : "Particular"}{st?.ultima ? ` · última visita: ${relativa(st.ultima)}` : ""}</div>
         </div>
       </div>
-      {/* Aviso de deuda SOLO si debe (al día → nada) */}
-      {deuda > 0 && (
-        <div className="mb-2 flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400">
-          <TriangleAlert size={14} className="mt-0.5 flex-none" /><span>Cuenta pendiente de {eur(deuda)}. Puedes cobrarla junto con este ticket.</span>
+      {/* Alergias / avisos de cocina */}
+      {c.notas && (
+        <div className="mb-2 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-500">
+          <TriangleAlert size={13} className="mt-0.5 flex-none" /><span>{c.notas}. Sale impreso en la comanda de cocina.</span>
         </div>
       )}
-      {/* Facturable → verde; si no, amber con lo que le falta */}
-      {fac ? (
-        <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check size={14} className="flex-none" /> Datos completos: se le puede hacer factura.</div>
-      ) : (
-        <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-500"><TriangleAlert size={14} className="flex-none" /> Le falta {falta} para poder hacerle factura.</div>
+      {/* Deuda (solo si debe) */}
+      {deuda > 0 && (
+        <div className="mb-2 flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-1.5 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+          <TriangleAlert size={13} className="mt-0.5 flex-none" /><span>Cuenta pendiente de {eur(deuda)}. Puedes cobrarla junto con este ticket.</span>
+        </div>
       )}
-      {dato("NIF / CIF", c.nif)}
-      {dato("Teléfono", c.telefono)}
-      {dato("Mail", c.email)}
-      {dato("Dirección", dirFiscal)}
-      {dato("Tarifa", tarifa)}
-      {Number(c.descuento_pct) > 0 && dato("Descuento", `${Number(c.descuento_pct)} %`)}
-      {deuda > 0 && dato("Cuenta", <span className="text-rose-600 dark:text-rose-400">{eur(deuda)} pendientes</span>)}
-      {dato("Alergias / avisos cocina", c.notas)}
-      {c.consentimiento_marketing && dato("Promociones", "acepta que le escribáis")}
-      {c.puntos_fidelidad > 0 && dato("Puntos fidelidad", String(c.puntos_fidelidad))}
+      {/* Facturable → verde; si no, amber */}
+      {fac ? (
+        <div className="mb-2.5 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Check size={13} className="flex-none" /> Datos completos: se le puede hacer factura.</div>
+      ) : (
+        <div className="mb-2.5 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-500"><TriangleAlert size={13} className="flex-none" /> Le falta {falta}: solo ticket, no factura.</div>
+      )}
+      {dato("NIF / CIF", c.nif, "sin poner")}
+      {dato("Teléfono", c.telefono, "sin poner")}
+      {dato("Mail", c.email, "sin poner")}
+      {dato("Dirección", dirFiscal, "sin poner")}
+      {dato("Tarifa", tarifa, "General")}
+      {dato("Descuento", Number(c.descuento_pct) > 0 ? `${Number(c.descuento_pct)} %` : null, "sin descuento")}
+      {dato("Cuenta", deuda > 0 ? <span className="text-rose-600 dark:text-rose-400">{eur(deuda)} pendientes</span> : null, "al día")}
+      {dato("Promociones", c.consentimiento_marketing ? "acepta que le escribáis" : null, "no ha dado permiso")}
     </div>
   );
 }
