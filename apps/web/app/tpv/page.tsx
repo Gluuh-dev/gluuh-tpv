@@ -23,6 +23,7 @@ import type { SeleccionModificadores } from "./components/ModificadoresModal";
 import type { CobrarOpciones, LineaPago } from "./components/CobrarModal";
 import { CabeceraCuenta } from "./components/CabeceraCuenta";
 import { ModalTPV } from "./components/ModalTPV";
+import { ClienteModal, type Cli } from "./components/ClienteModal";
 import { BarraTotales } from "./components/BarraTotales";
 import { FilaAccionesLinea } from "./components/FilaAccionesLinea";
 import { TileProducto } from "./components/TileProducto";
@@ -234,9 +235,6 @@ export default function TPV() {
   const { setSurfaceTheme } = useSurfaceTheme("tpv");   // tema propio del TPV (independiente del panel)
   const invitadas = useTpvStore((s) => s.invitadas);
   const setInvitadas = useTpvStore((s) => s.setInvitadas);
-  const [busqCliente, setBusqCliente] = useState("");
-  const [clientesEnc, setClientesEnc] = useState<{ id: string; nombre: string; telefono: string | null; nif: string | null }[]>([]);
-  const [nuevoCli, setNuevoCli] = useState({ nombre: "", telefono: "", nif: "" });
   const [pedirBorrar, setPedirBorrar] = useState(false);
   const [nuevoProd, setNuevoProd] = useState({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "" });
   const [agotarPop, setAgotarPop] = useState<Prod | null>(null);
@@ -1764,32 +1762,7 @@ export default function TPV() {
     } finally { setBusy(false); }
   }
 
-  // Buscar cliente por nombre o teléfono (saneado para el filtro .or de PostgREST).
-  async function buscarClientes(q: string) {
-    setBusqCliente(q);
-    const limpio = q.replace(/[,()%]/g, "").trim();
-    if (limpio.length < 2) { setClientesEnc([]); return; }
-    const { data } = await sb.from("customer").select("id,nombre,telefono,nif")
-      .or(`nombre.ilike.%${limpio}%,telefono.ilike.%${limpio}%,nif.ilike.%${limpio}%`).limit(8);
-    setClientesEnc((data as { id: string; nombre: string; telefono: string | null; nif: string | null }[]) ?? []);
-  }
-  function asignarCliente(c: { id: string; nombre: string; nif?: string | null }) {
-    setCliente({ id: c.id, nombre: c.nombre, nif: c.nif ?? null });
-    setModalActivo(null); setBusqCliente(""); setClientesEnc([]);
-  }
-  async function crearClienteRapido() {
-    if (!nuevoCli.nombre.trim()) return;
-    // Con NIF, /api/factura emite factura COMPLETA (F1) en vez de simplificada (F2).
-    const { data } = await sb.from("customer")
-      .insert({
-        nombre: nuevoCli.nombre.trim(),
-        telefono: nuevoCli.telefono.trim() || null,
-        nif: nuevoCli.nif.trim().toUpperCase() || null,
-      })
-      .select("id,nombre,nif").single();
-    if (data) asignarCliente(data as { id: string; nombre: string; nif: string | null });
-    setNuevoCli({ nombre: "", telefono: "", nif: "" });
-  }
+  // (Búsqueda/alta de cliente ahora viven en ClienteModal, cableados a `customer`.)
 
   function reprimirUltimo() {
     setModalActivo(null);
@@ -2745,62 +2718,17 @@ export default function TPV() {
         onModoZurdoChange={setModoZurdo}
       />
 
-      {/* ── Modal: Cliente y comensales ── */}
+      {/* ── Modal: Cliente (fiel a docs/diseño/gluuh-cliente.html) ── */}
       {modalActivo === 'CLIENTE' && (
-        <ModalTPV titulo="Cliente y comensales" onClose={() => setModalActivo(null)} ancho={480} alto={560}>
-          <div className="p-5">
-            {cliente && (
-              <div className="mb-3 flex items-center justify-between rounded-md border border-brand bg-brand/10 px-3 py-2 text-sm">
-                <span>Asignado: <b>{cliente.nombre}</b></span>
-                <button type="button" onClick={() => setCliente(null)} className="text-rose-600 hover:underline">Quitar</button>
-              </div>
-            )}
-            <div className="mb-3 flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">Comensales</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setComensales((n) => Math.max(0, n - 1))} className="h-8 w-8 rounded-md border border-border">−</button>
-                <span className="w-8 text-center tabular-nums font-semibold">{comensales}</span>
-                <button type="button" onClick={() => setComensales((n) => n + 1)} className="h-8 w-8 rounded-md border border-border">+</button>
-              </div>
-            </div>
-            <input
-              aria-label="Buscar cliente"
-              value={busqCliente}
-              onChange={(e) => buscarClientes(e.target.value)}
-              placeholder="Buscar por nombre, teléfono o NIF…"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand"
-            />
-            {clientesEnc.length > 0 && (
-              <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
-                {clientesEnc.map((c) => (
-                  <button type="button" key={c.id} onClick={() => asignarCliente(c)} className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-accent">
-                    <span className="flex items-center gap-2">
-                      {c.nombre}
-                      {/* Con NIF se le puede emitir factura completa: se marca para que el camarero lo vea. */}
-                      {c.nif && <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{c.nif}</span>}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{c.telefono ?? ""}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="mt-4 border-t border-border pt-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cliente nuevo</div>
-              <div className="flex gap-2">
-                <input aria-label="Nombre del cliente" value={nuevoCli.nombre} onChange={(e) => setNuevoCli((c) => ({ ...c, nombre: e.target.value }))} placeholder="Nombre" className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                <input aria-label="Teléfono del cliente" value={nuevoCli.telefono} onChange={(e) => setNuevoCli((c) => ({ ...c, telefono: e.target.value }))} placeholder="Teléfono" className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                <button type="button" onClick={crearClienteRapido} disabled={!nuevoCli.nombre.trim()} className="btn-primary disabled:opacity-50">Crear</button>
-              </div>
-              <input
-                aria-label="NIF del cliente"
-                value={nuevoCli.nif}
-                onChange={(e) => setNuevoCli((c) => ({ ...c, nif: e.target.value }))}
-                placeholder="NIF / CIF — necesario para factura completa"
-                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm uppercase outline-none focus:border-brand"
-              />
-            </div>
-          </div>
-        </ModalTPV>
+        <ClienteModal
+          mesaNombre={mesa?.nombre ?? llevar?.nombre ?? null}
+          comensales={comensales}
+          total={total}
+          clienteActual={cliente}
+          onAsignar={(c: Cli) => { setCliente({ id: c.id, nombre: c.nombre ?? "Cliente", telefono: c.telefono, nif: c.nif }); setModalActivo(null); }}
+          onQuitar={() => { setCliente(null); setModalActivo(null); }}
+          onClose={() => setModalActivo(null)}
+        />
       )}
 
       {/* ── Modal: Pasar a mesa ── */}
