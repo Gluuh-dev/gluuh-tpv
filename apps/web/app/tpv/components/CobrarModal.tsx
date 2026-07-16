@@ -28,6 +28,8 @@ export interface CobrarOpciones {
   propina: number;
   descuento: number;
   notas: string;
+  /** Enviar la factura al cliente (email) al cobrar. */
+  enviarFactura: boolean;
 }
 
 export interface CobrarModalProps {
@@ -77,6 +79,7 @@ export function CobrarModal({
   const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
   const [tipoDoc, setTipoDoc] = useState<string>(tiposDoc[0] ?? TIPOS_DOC_DEF[0]!);
+  const [enviarFactura, setEnviarFactura] = useState(false);
   const [zonasImpresion, setZonasImpresion] = useState(true);
   const [editandoNotas, setEditandoNotas] = useState(false);
   const [ahora] = useState(() => new Date());
@@ -158,7 +161,7 @@ export function CobrarModal({
     if (!puedeCobrar) return;
     onCobrar(
       pagos.filter((p) => p.importe > 0),
-      { imprimir, tipoDoc, propina, descuento, notas: notas.trim() },
+      { imprimir, tipoDoc, propina, descuento, notas: notas.trim(), enviarFactura },
     );
   }
 
@@ -215,6 +218,11 @@ export function CobrarModal({
               </option>
             ))}
           </select>
+        </label>
+        {/* Enviar la factura al cliente al cobrar (necesita un cliente asignado). */}
+        <label className={`flex items-center gap-1.5 ${cliente ? "" : "opacity-40"}`} title={cliente ? "Enviar la factura al cliente al cobrar" : "Asigna un cliente para poder enviarle la factura"}>
+          <input type="checkbox" checked={enviarFactura} disabled={!cliente} onChange={(e) => setEnviarFactura(e.target.checked)} className="h-4 w-4 accent-(--brand)" />
+          <span className="text-[13px] font-medium">Enviar factura</span>
         </label>
         <Dato label="Fecha" valor={ahora.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })} />
         <button
