@@ -7,7 +7,7 @@
 // Cableado a la tabla `customer` real (RLS por tenant). Los campos tarifa/descuento del
 // mockup no existen aún en BD → se omiten (se añadirán con columnas si hacen falta).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, X, UserPlus, Check, TriangleAlert, ArrowLeft, Keyboard } from "lucide-react";
+import { Search, X, UserPlus, Check, TriangleAlert, ArrowLeft, Keyboard, Pencil, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { eur } from "@/app/lib/money";
 import { abrirTeclado } from "@/components/teclado-en-pantalla";
@@ -24,6 +24,14 @@ const COLS = "id,nombre,telefono,nif,email,direccion,codigo_postal,poblacion,pro
 const iniciales = (n: string | null) => (n ?? "?").trim().split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 // Para factura COMPLETA (F1) hacen falta NIF + dirección fiscal.
 const facturable = (c: Cli) => !!(c.nif && c.direccion && c.codigo_postal && c.poblacion);
+// "Tiene datos" = algo más que el nombre. Un cliente con SOLO nombre se puede borrar; en
+// cuanto tiene datos, se edita (no se borra). Con facturas emitidas, ni editar ni borrar.
+const tieneDatos = (c: Cli) => !!(c.nif || c.email || c.direccion || c.codigo_postal || c.poblacion || c.provincia || c.notas);
+const aForm = (c: Cli) => ({
+  nombre: c.nombre ?? "", nif: c.nif ?? "", telefono: c.telefono ?? "", email: c.email ?? "",
+  direccion: c.direccion ?? "", codigo_postal: c.codigo_postal ?? "", poblacion: c.poblacion ?? "",
+  provincia: c.provincia ?? "", notas: c.notas ?? "", consentimiento_marketing: c.consentimiento_marketing,
+});
 
 const FORM0 = { nombre: "", nif: "", telefono: "", email: "", direccion: "", codigo_postal: "", poblacion: "", provincia: "", notas: "", consentimiento_marketing: false };
 
@@ -40,8 +48,12 @@ export function ClienteModal({
   const [lista, setLista] = useState<Cli[]>([]);
   const [sel, setSel] = useState<Cli | null>(null);
   const [alta, setAlta] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM0);
   const [cargando, setCargando] = useState(true);
+  // ¿El cliente elegido tiene facturas emitidas? null = comprobando. Con facturas se bloquea
+  // editar/borrar (integridad fiscal: no se cambia el titular de una factura ya emitida).
+  const [facturas, setFacturas] = useState<boolean | null>(null);
   const busca = useRef(0);
 
   const cargar = useCallback(async (texto: string, f: "todos" | "hoy") => {
@@ -56,9 +68,27 @@ export function ClienteModal({
 
   useEffect(() => { void cargar(q, filtro); }, [q, filtro, cargar]);
 
+  // Comprueba si el cliente elegido tiene facturas (invoice → sales_order.customer_id).
+  useEffect(() => {
+    if (!sel) { setFacturas(null); return; }
+    let vivo = true;
+    setFacturas(null);
+    (async () => {
+      const { data: ords } = await sb.from("sales_order").select("id").eq("customer_id", sel.id);
+      const ids = ((ords as { id: string }[] | null) ?? []).map((o) => o.id);
+      let hay = false;
+      if (ids.length) {
+        const { count } = await sb.from("invoice").select("id", { count: "exact", head: true }).in("order_id", ids);
+        hay = (count ?? 0) > 0;
+      }
+      if (vivo) setFacturas(hay);
+    })();
+    return () => { vivo = false; };
+  }, [sel, sb]);
+
   async function guardar() {
     if (!form.nombre.trim()) return;
-    const { data, error } = await sb.from("customer").insert({
+    const payload = {
       nombre: form.nombre.trim(),
       nif: form.nif.trim().toUpperCase() || null,
       telefono: form.telefono.trim() || null,
@@ -69,12 +99,25 @@ export function ClienteModal({
       provincia: form.provincia.trim() || null,
       notas: form.notas.trim() || null,
       consentimiento_marketing: form.consentimiento_marketing,
-    }).select(COLS).single();
-    if (error) { toast.error(`No se pudo crear: ${error.message}`); return; }
-    setAlta(false); setForm(FORM0); setSel(data as Cli);
-    toast.success("Cliente creado");
+    };
+    const { data, error } = editId
+      ? await sb.from("customer").update(payload).eq("id", editId).select(COLS).single()
+      : await sb.from("customer").insert(payload).select(COLS).single();
+    if (error) { toast.error(`No se pudo guardar: ${error.message}`); return; }
+    setAlta(false); setEditId(null); setForm(FORM0); setSel(data as Cli);
+    toast.success(editId ? "Cliente actualizado" : "Cliente creado");
     void cargar(q, filtro);
   }
+
+  async function eliminar() {
+    if (!sel) return;
+    if (!confirm(`¿Eliminar a ${sel.nombre}? No se puede deshacer.`)) return;
+    const { error } = await sb.from("customer").delete().eq("id", sel.id);
+    if (error) { toast.error(`No se pudo eliminar: ${error.message}`); return; }
+    toast.success("Cliente eliminado");
+    setSel(null); void cargar(q, filtro);
+  }
+  const editarSel = () => { if (!sel) return; setForm(aForm(sel)); setEditId(sel.id); setAlta(true); };
 
   const sub = `${mesaNombre ?? "Barra"} · ${comensales} pax`;
 
@@ -131,7 +174,23 @@ export function ClienteModal({
           {/* ── Panel derecho: ficha o alta ── */}
           <section className="flex min-h-0 flex-col rounded-lg border border-border bg-surface">
             <h3 className="flex flex-none items-center gap-2 border-b border-border bg-surface-2 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              {alta ? "Cliente nuevo" : "Ficha del cliente"}
+              <span>{alta ? (editId ? "Editar cliente" : "Cliente nuevo") : "Ficha del cliente"}</span>
+              {!alta && sel && (
+                <span className="ml-auto flex items-center gap-1.5">
+                  <button type="button" onClick={editarSel} disabled={facturas !== false}
+                    title={facturas === true ? "Tiene facturas emitidas: no se puede editar" : facturas === null ? "Comprobando…" : "Editar datos"}
+                    className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-semibold normal-case tracking-normal text-foreground hover:bg-accent disabled:opacity-40">
+                    <Pencil size={13} /> Editar
+                  </button>
+                  {/* Borrar SOLO si es un cliente "pelado" (solo nombre) y sin facturas. */}
+                  {!tieneDatos(sel) && facturas === false && (
+                    <button type="button" onClick={eliminar}
+                      className="flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] font-semibold normal-case tracking-normal text-rose-600 hover:bg-rose-500/20">
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  )}
+                </span>
+              )}
             </h3>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {alta ? (
@@ -151,15 +210,18 @@ export function ClienteModal({
         <div className="flex flex-none items-center gap-2 border-t border-border bg-surface px-3 py-2.5">
           {alta ? (
             <>
-              <button type="button" onClick={() => setAlta(false)} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent"><ArrowLeft size={16} /> Volver</button>
+              <button type="button" onClick={() => { setAlta(false); setEditId(null); }} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent"><ArrowLeft size={16} /> Volver</button>
               <button type="button" onClick={guardar} disabled={!form.nombre.trim()} className="ml-auto flex h-11 items-center gap-2 rounded-md bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand-hover disabled:opacity-40"><Check size={17} /> Guardar cliente</button>
             </>
           ) : (
             <>
-              <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent"><ArrowLeft size={16} /> Cancelar</button>
+              <button type="button" onClick={() => { setAlta(true); setEditId(null); setSel(null); setForm(FORM0); }} className="flex h-11 items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-4 text-sm font-bold text-brand hover:bg-brand/20"><UserPlus size={17} /> Cliente nuevo</button>
+              <button type="button" onClick={abrirTeclado} title="Teclado en pantalla" className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold hover:bg-accent"><Keyboard size={17} /> Teclado</button>
               {clienteActual && <button type="button" onClick={onQuitar} className="flex h-11 items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-600 hover:bg-rose-500/20"><X size={16} /> Quitar del ticket</button>}
-              <button type="button" onClick={() => { setAlta(true); setSel(null); setForm(FORM0); }} className="flex h-11 items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-4 text-sm font-bold text-brand hover:bg-brand/20"><UserPlus size={17} /> Cliente nuevo</button>
-              <button type="button" onClick={() => sel && onAsignar(sel)} disabled={!sel} className="ml-auto flex h-11 items-center gap-2 rounded-md bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand-hover disabled:opacity-40"><Check size={17} /> Asignar al ticket</button>
+              <div className="ml-auto flex items-center gap-2">
+                <button type="button" onClick={onClose} className="flex h-11 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-accent"><ArrowLeft size={16} /> Cancelar</button>
+                <button type="button" onClick={() => sel && onAsignar(sel)} disabled={!sel} className="flex h-11 items-center gap-2 rounded-md bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand-hover disabled:opacity-40"><Check size={17} /> Asignar al ticket</button>
+              </div>
             </>
           )}
         </div>

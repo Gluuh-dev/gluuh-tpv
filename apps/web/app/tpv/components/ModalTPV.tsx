@@ -16,9 +16,12 @@ export interface ModalTPVProps {
   /** Tamaño inicial (px). Se puede redimensionar luego con el sizer. */
   ancho?: number;
   alto?: number;
+  /** Si el clic en el fondo cierra el modal. Por defecto NO (evita cerrar sin querer un
+   *  formulario a medias): solo cierran la X o los botones del propio modal. */
+  cerrarAlTocarFondo?: boolean;
 }
 
-export function ModalTPV({ titulo, subtitulo, derecha, onClose, children, ancho = 760, alto = 560 }: Readonly<ModalTPVProps>) {
+export function ModalTPV({ titulo, subtitulo, derecha, onClose, children, ancho = 760, alto = 560, cerrarAlTocarFondo = false }: Readonly<ModalTPVProps>) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);   // null = centrado
   const [size, setSize] = useState<{ w: number; h: number }>({ w: ancho, h: alto });
   const arrastre = useRef<{ dx: number; dy: number } | null>(null);
@@ -61,10 +64,11 @@ export function ModalTPV({ titulo, subtitulo, derecha, onClose, children, ancho 
   const stop = useCallback((e: React.MouseEvent) => e.stopPropagation(), []);
 
   return (
-    // Fondo casi transparente: solo capta el clic-fuera; se sigue viendo el ticket detrás.
-    <div className="fixed inset-0 z-50 bg-black/5" onClick={onClose}>
+    // Fondo casi transparente: se sigue viendo el ticket detrás. Por defecto NO cierra al
+    // tocarlo (solo la X): así no se pierde un formulario a medias.
+    <div className="fixed inset-0 z-50 bg-black/5" onClick={cerrarAlTocarFondo ? onClose : undefined}>
       <div
-        onClick={stop}
+        onClick={cerrarAlTocarFondo ? stop : undefined}
         style={{ left, top, width: w, height: h }}
         className="absolute flex flex-col overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-2xl"
       >
