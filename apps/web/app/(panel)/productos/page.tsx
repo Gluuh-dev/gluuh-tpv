@@ -23,6 +23,7 @@ interface Prod {
   category_id: string | null; family_id: string | null; plu: string | null; codigo_barras: string | null;
   es_principal: boolean; es_anadido: boolean; estacion: string | null;
   disponible: boolean; agotado_hasta: string | null;
+  esMenu?: boolean;   // fila-menú (tabla `menu`): se edita en /menus, no en /productos/[id]
 }
 
 const TODAS = "__todas__";
@@ -58,10 +59,11 @@ export default function ProductosLista() {
     } else {
       lista = (full.data as Prod[] | null) ?? [];
     }
-    const [{ data: fam }, { data: c }, { data: pcs }] = await Promise.all([
+    const [{ data: fam }, { data: c }, { data: pcs }, { data: mn }] = await Promise.all([
       sb.from("family").select("id,nombre,color"),
-      sb.from("category").select("id,nombre").order("orden"),
+      sb.from("category").select("id,nombre,family_id").order("orden"),
       sb.from("product_category").select("product_id,category_id"),
+      sb.from("menu").select("id,nombre,precio,clase_fiscal,category_id,activo").order("orden"),
     ]);
     const mapa = new Map<string, string[]>();
     for (const pc of (pcs as { product_id: string; category_id: string }[] | null) ?? []) {
@@ -69,10 +71,19 @@ export default function ProductosLista() {
       l.push(pc.category_id);
       mapa.set(pc.product_id, l);
     }
+    // Menús como filas de artículo (0108): family_id derivada de su categoría; al abrir → /menus.
+    const catFam = new Map(((c as { id: string; family_id: string | null }[] | null) ?? []).map((x) => [x.id, x.family_id]));
+    const menuRows: Prod[] = ((mn as { id: string; nombre: string; precio: number; clase_fiscal: string | null; category_id: string | null; activo: boolean }[] | null) ?? [])
+      .map((m) => ({
+        id: m.id, nombre: m.nombre, precio: Number(m.precio), tipo_impositivo: 0, clase_fiscal: m.clase_fiscal,
+        category_id: m.category_id, family_id: m.category_id ? (catFam.get(m.category_id) ?? null) : null,
+        plu: null, codigo_barras: null, es_principal: true, es_anadido: false, estacion: null,
+        disponible: m.activo, agotado_hasta: null, esMenu: true,
+      }));
     setFamilias((fam as { id: string; nombre: string; color: string | null }[] | null) ?? []);
     setCats((c as { id: string; nombre: string }[] | null) ?? []);
     setProdCats(mapa);
-    setProds(lista);
+    setProds([...menuRows, ...lista]);
     setCargando(false);
   }, []);
 
@@ -103,12 +114,14 @@ export default function ProductosLista() {
   }, [prods, catFiltro, prodCats]);
 
   async function eliminar(p: Prod) {
-    const { error } = await supabaseBrowser().from("product").delete().eq("id", p.id);
+    const tabla = p.esMenu ? "menu" : "product";
+    const { error } = await supabaseBrowser().from(tabla).delete().eq("id", p.id);
     if (error) { toast.error("No se pudo eliminar."); return; }
     setProds((prev) => prev.filter((x) => x.id !== p.id));
   }
 
   async function duplicar(p: Prod) {
+    if (p.esMenu) { toast("Los menús se duplican desde «Menús»."); router.push("/menus"); return; }
     const sb = supabaseBrowser();
     const [{ data: t }, { data: o }] = await Promise.all([
       sb.from("tenant").select("id").limit(1).maybeSingle(),
@@ -157,6 +170,7 @@ export default function ProductosLista() {
           <span className="inline-block h-5 w-1 shrink-0 rounded-full"
             style={{ backgroundColor: (p.family_id && colorFam.get(p.family_id)) || "#cbd5e1" }} aria-hidden />
           {p.nombre}
+          {p.esMenu && <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">Menú</span>}
         </span>
       ),
     },
@@ -242,7 +256,7 @@ export default function ProductosLista() {
           filas={filtrados}
           idDe={(p) => p.id}
           onNuevo={() => router.push("/productos/nuevo")}
-          onAbrir={(p) => router.push(`/productos/${p.id}`)}
+          onAbrir={(p) => router.push(p.esMenu ? "/menus" : `/productos/${p.id}`)}
           onCopiar={duplicar}
           onEliminar={eliminar}
           filtros={filtroCategoria}
