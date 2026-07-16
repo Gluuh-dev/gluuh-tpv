@@ -10,6 +10,8 @@ autocontenido, sin CDN ni fuentes de fuera** (el nodo va offline).
 |---|---|---|---|
 | `gluuh-inicio-diseño.html` | `/inicio` — lanzador | **OSCURO** | ✅ implementado (usa Google Fonts → cambié a next/font) |
 | `gluuh-mantenimiento-articulos.html` | Config de artículos (back office / config táctil desde el TPV) | CLARO | ⏳ diseñado |
+| `gluuh-pantalla-configuracion-menu.html` | **Configuración del menú** (crear/componer: grupos + opciones) → `menu`/`menu_group`/`menu_choice` | CLARO | ⏳ diseñado |
+| `gluuh-pantalla-mantenimiento-terminales.html` | **Mantenimiento de terminales** (gestión de dispositivos: crear, credencial, zona) → `device` | CLARO | ⏳ diseñado |
 
 ## Modales (overlay sobre la pantalla de ventas del TPV)
 
@@ -22,6 +24,7 @@ autocontenido, sin CDN ni fuentes de fuera** (el nodo va offline).
 | `gluuh-modal-invitaciones-descuentos.html` | **Invitaciones + descuentos** (por línea o toda la cuenta, consumo propio) | CLARO | ⏳ diseñado |
 | `gluuh-modal-utilidades.html` | **Utilidades** (menú de herramientas del TPV) | CLARO | ⏳ diseñado |
 | `gluuh-articulo-rapido.html` | **Alta/config rápida de artículo** desde ventas | CLARO | ⏳ diseñado |
+| `gluuh-modal-menu-seleccion.html` | **Selección del menú** al vender (grupo → rejilla con fotos → elegir) → `MenuModal` (rediseñar al estilo Glop) | CLARO | ⏳ diseñado |
 
 ## Señal clara: la operativa es CLARA
 
