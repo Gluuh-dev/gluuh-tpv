@@ -237,6 +237,7 @@ export function ClienteModal({
               <span>{alta ? (editId ? "Editar cliente" : "Cliente nuevo") : "Ficha del cliente"}</span>
               {!alta && sel && (
                 <span className="ml-auto flex items-center gap-1.5">
+                  {stats[sel.id] && <span className="mr-1 text-[11px] font-semibold normal-case tracking-normal text-muted-foreground">{stats[sel.id]!.visitas} visitas</span>}
                   <button type="button" onClick={editarSel} disabled={facturas !== false}
                     title={facturas === true ? "Tiene facturas emitidas: no se puede editar" : facturas === null ? "Comprobando…" : "Editar datos"}
                     className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-semibold normal-case tracking-normal text-foreground hover:bg-accent disabled:opacity-40">
@@ -295,12 +296,14 @@ export function ClienteModal({
 function Ficha({ c, tarifa, empresa, st }: Readonly<{ c: Cli; tarifa: string; empresa: boolean; st?: { visitas: number; ultima: string | null } }>) {
   const fac = facturable(c);
   const falta = [!c.nif && "el NIF", !(c.direccion && c.codigo_postal && c.poblacion) && "la dirección fiscal"].filter(Boolean).join(" y ");
-  const dato = (l: string, v: string | null, no?: string) => (
+  const deuda = Number(c.saldo);
+  // Fila SOLO si hay valor (nada de "sin descuento"/"sin poner"): la ficha queda limpia.
+  const dato = (l: string, v: React.ReactNode) => (v || v === 0) && v !== "" ? (
     <div className="flex items-baseline justify-between gap-3 border-b border-border-muted py-2">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{l}</span>
-      <span className={`text-right text-sm ${v ? "font-medium" : "text-muted-foreground"}`}>{v || no || "—"}</span>
+      <span className="text-right text-sm font-medium">{v}</span>
     </div>
-  );
+  ) : null;
   const dirFiscal = [c.direccion, [c.codigo_postal, c.poblacion].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");
   return (
     <div>
@@ -311,24 +314,31 @@ function Ficha({ c, tarifa, empresa, st }: Readonly<{ c: Cli; tarifa: string; em
             <span className="truncate text-base font-bold">{c.nombre}</span>
             {empresa && <span className="flex-none rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">Empresa</span>}
           </div>
-          <div className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${fac ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/15 text-amber-600 dark:text-amber-500"}`}>
-            {fac ? <><Check size={11} /> Facturable</> : <><TriangleAlert size={11} /> No facturable</>}
-          </div>
+          <div className="text-xs text-muted-foreground">{empresa ? "Empresa" : "Particular"}{st?.ultima ? ` · última visita: ${relativa(st.ultima)}` : ""}</div>
         </div>
       </div>
-      {!fac && <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-500">Le falta {falta} para poder emitir factura completa.</div>}
-      {dato("NIF / CIF", c.nif, "sin poner")}
+      {/* Aviso de deuda SOLO si debe (al día → nada) */}
+      {deuda > 0 && (
+        <div className="mb-2 flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400">
+          <TriangleAlert size={14} className="mt-0.5 flex-none" /><span>Cuenta pendiente de {eur(deuda)}. Puedes cobrarla junto con este ticket.</span>
+        </div>
+      )}
+      {/* Facturable → verde; si no, amber con lo que le falta */}
+      {fac ? (
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check size={14} className="flex-none" /> Datos completos: se le puede hacer factura.</div>
+      ) : (
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-500"><TriangleAlert size={14} className="flex-none" /> Le falta {falta} para poder hacerle factura.</div>
+      )}
+      {dato("NIF / CIF", c.nif)}
       {dato("Teléfono", c.telefono)}
-      {dato("Email", c.email)}
-      {dato("Dirección fiscal", dirFiscal || null, "sin dirección")}
-      {/* Cómo se le vende */}
+      {dato("Mail", c.email)}
+      {dato("Dirección", dirFiscal)}
       {dato("Tarifa", tarifa)}
-      {dato("Descuento fijo", Number(c.descuento_pct) > 0 ? `${Number(c.descuento_pct)} %` : null, "sin descuento")}
-      {dato("Saldo / deuda", Number(c.saldo) !== 0 ? eur(Number(c.saldo)) : null, "al día")}
+      {Number(c.descuento_pct) > 0 && dato("Descuento", `${Number(c.descuento_pct)} %`)}
+      {deuda > 0 && dato("Cuenta", <span className="text-rose-600 dark:text-rose-400">{eur(deuda)} pendientes</span>)}
       {dato("Alergias / avisos cocina", c.notas)}
-      {dato("Visitas", st ? `${st.visitas} · ${relativa(st.ultima)}` : null, "sin visitas")}
-      {dato("Puntos fidelidad", c.puntos_fidelidad ? String(c.puntos_fidelidad) : null, "0")}
-      {dato("Acepta promociones (RGPD)", c.consentimiento_marketing ? "Sí" : null, "no")}
+      {c.consentimiento_marketing && dato("Promociones", "acepta que le escribáis")}
+      {c.puntos_fidelidad > 0 && dato("Puntos fidelidad", String(c.puntos_fidelidad))}
     </div>
   );
 }
