@@ -2437,6 +2437,46 @@ export default function TPV() {
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {renderVelo()}
 
+      {/* ── Navbar del TPV (morado, ancho completo). Pantalla Ticket: mesa · pax ·
+          buscador · usuario. No sustituye nada aún (coexiste con la cabecera de
+          cuenta y el buscador del grid); se irá afinando. ── */}
+      <header className="flex h-14 flex-none items-center gap-3 bg-brand px-3 text-brand-foreground">
+        <div className="flex flex-none items-center gap-2">
+          <div className="grid h-8 w-8 place-items-center rounded-md bg-white/15 text-[15px] font-bold">G</div>
+          <div className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Mesa</span>
+            <span className="text-sm font-semibold">{mesa?.nombre ?? llevar?.nombre ?? "—"}</span>
+          </div>
+          <div className="flex items-center gap-1 rounded-md bg-white/10 px-1.5 py-1">
+            <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">Pax</span>
+            <button type="button" aria-label="Menos comensales" onClick={() => setComensales((n) => Math.max(1, n - 1))}
+              className="grid h-6 w-6 place-items-center rounded bg-white/15 text-base leading-none hover:bg-white/25">−</button>
+            <span className="w-5 text-center text-sm font-semibold tabular-nums">{comensales}</span>
+            <button type="button" aria-label="Más comensales" onClick={() => setComensales((n) => n + 1)}
+              className="grid h-6 w-6 place-items-center rounded bg-white/15 text-base leading-none hover:bg-white/25">+</button>
+          </div>
+        </div>
+
+        <div className="relative min-w-0 flex-1">
+          <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-white/70" />
+          <input
+            value={busqProd}
+            onChange={(e) => setBusqProd(e.target.value)}
+            placeholder="Buscar producto o código de barras…"
+            aria-label="Buscar producto"
+            className="w-full rounded-md bg-white/15 py-2 pl-9 pr-3 text-[13px] text-brand-foreground outline-none placeholder:text-white/60 focus:bg-white/20"
+          />
+        </div>
+
+        <div className="flex flex-none items-center gap-2">
+          <div className="grid h-9 w-9 place-items-center rounded-full bg-white/20 text-xs font-bold">{iniciales(operario?.nombre ?? "")}</div>
+          <div className="leading-tight">
+            <div className="text-sm font-semibold">{operario?.nombre ?? "—"}</div>
+            <div className="text-[11px] opacity-70">{terminal}</div>
+          </div>
+        </div>
+      </header>
+
       {/* ── Cuerpo: ticket+teclado | categorías+productos (sin cabecera de ancho
           completo: el título va dentro de la columna de cuenta, como el mockup) ── */}
       <div className={`flex min-h-0 flex-1 ${modoZurdo ? "flex-row-reverse" : ""}`}>
