@@ -21,6 +21,9 @@ interface Choice { group_id: string; product_id: string }
 interface Prod { id: string; nombre: string }
 interface Cat { id: string; nombre: string; familia: string }
 
+// Grupos con que nace un menú nuevo (el caso común: menú del día). Editables después.
+const GRUPOS_DEFECTO = ["Primero", "Segundo", "Postre", "Bebida"];
+
 export default function Menus() {
   const sb = supabaseBrowser();
   const [tenantId, setTenantId] = useState("");
@@ -54,8 +57,17 @@ export default function Menus() {
   async function addMenu(e: React.FormEvent) {
     e.preventDefault();
     if (!nm.nombre.trim()) return;
-    await sb.from("menu").insert({ tenant_id: tenantId, nombre: nm.nombre.trim(), precio: Number(nm.precio) || 0, clase_fiscal: nm.clase, category_id: nm.categoryId || null, orden: menus.length });
-    setNm({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: nm.categoryId }); cargar(); toast.success("Menú creado");
+    const { data: nuevo } = await sb.from("menu")
+      .insert({ tenant_id: tenantId, nombre: nm.nombre.trim(), precio: Number(nm.precio) || 0, clase_fiscal: nm.clase, category_id: nm.categoryId || null, orden: menus.length })
+      .select("id").single();
+    // Nace con los grupos típicos (renómbralos/bórralos/añade para un menú especial).
+    if (nuevo) await sb.from("menu_group").insert(
+      GRUPOS_DEFECTO.map((nombre, orden) => ({ tenant_id: tenantId, menu_id: (nuevo as { id: string }).id, nombre, orden })));
+    setNm({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: nm.categoryId }); cargar(); toast.success("Menú creado con grupos base");
+  }
+  async function renameGrupo(id: string, nombre: string) {
+    if (!nombre.trim()) return;
+    await sb.from("menu_group").update({ nombre: nombre.trim() }).eq("id", id); cargar();
   }
   // Mueve un menú a una categoría (su familia = "Menús"). "" lo desagrupa.
   async function moverMenu(id: string, categoryId: string) {
@@ -130,16 +142,17 @@ export default function Menus() {
       {menus.map((m) => (
         <MenuCard key={m.id} menu={m} grupos={grupos.filter((g) => g.menu_id === m.id)} choices={choices} prods={prods} cats={cats}
           onMover={(cid) => moverMenu(m.id, cid)}
-          onDelMenu={() => delMenu(m.id)} onAddGrupo={addGrupo} onDelGrupo={delGrupo} onAddChoice={addChoice} onDelChoice={delChoice} />
+          onDelMenu={() => delMenu(m.id)} onAddGrupo={addGrupo} onDelGrupo={delGrupo} onRenameGrupo={renameGrupo} onAddChoice={addChoice} onDelChoice={delChoice} />
       ))}
     </div>
   );
 }
 
-function MenuCard({ menu, grupos, choices, prods, cats, onMover, onDelMenu, onAddGrupo, onDelGrupo, onAddChoice, onDelChoice }: Readonly<{
+function MenuCard({ menu, grupos, choices, prods, cats, onMover, onDelMenu, onAddGrupo, onDelGrupo, onRenameGrupo, onAddChoice, onDelChoice }: Readonly<{
   menu: Menu; grupos: Grupo[]; choices: Choice[]; prods: Prod[]; cats: Cat[];
   onMover: (categoryId: string) => void;
   onDelMenu: () => void; onAddGrupo: (menuId: string, nombre: string) => void; onDelGrupo: (id: string) => void;
+  onRenameGrupo: (id: string, nombre: string) => void;
   onAddChoice: (gid: string, pid: string) => void; onDelChoice: (gid: string, pid: string) => void;
 }>) {
   const [ng, setNg] = useState("");
@@ -168,7 +181,12 @@ function MenuCard({ menu, grupos, choices, prods, cats, onMover, onDelMenu, onAd
           return (
             <div key={g.id} className="rounded-md border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-medium">{g.nombre}</span>
+                <input
+                  defaultValue={g.nombre}
+                  onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== g.nombre) onRenameGrupo(g.id, e.target.value); }}
+                  className="w-40 rounded border border-transparent bg-transparent px-1 py-0.5 font-medium outline-none hover:border-border focus:border-brand"
+                  aria-label="Nombre del grupo"
+                />
                 <button onClick={() => onDelGrupo(g.id)} className="text-muted-foreground/60 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
