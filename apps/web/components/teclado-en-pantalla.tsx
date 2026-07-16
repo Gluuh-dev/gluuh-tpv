@@ -113,11 +113,14 @@ export function TecladoEnPantalla() {
   const intro = useCallback(() => {
     const el = enfocar();
     if (!el) return;
+    // En un textarea, Intro es salto de línea y el teclado se queda (sigues escribiendo).
     if (el instanceof HTMLTextAreaElement) { escribir("\n"); return; }
-    // En un input, Enter suele confirmar: se simula para que el formulario reaccione.
+    // En un input, Enter CONFIRMA: se simula para que el formulario reaccione y se ESCONDE
+    // el teclado (has terminado de escribir).
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
     el.form?.requestSubmit?.();
-  }, [enfocar, escribir]);
+    guardarAbierto(false);
+  }, [enfocar, escribir, guardarAbierto]);
 
   // Arrastre por la barra superior (puntero: vale ratón y táctil).
   const alBajar = (e: React.PointerEvent) => {
@@ -200,34 +203,33 @@ export function TecladoEnPantalla() {
   );
 }
 
-// ── estilos (inline para no depender de tokens y quedar autocontenido) ─────────
-const MORADO = "#572370";
+// ── estilos: SIGUEN EL TEMA del app (tokens --bg/--text/--border/--brand) → claro y oscuro ──
 const btnFlotante: React.CSSProperties = {
   position: "fixed", right: 16, bottom: 16, zIndex: 2147483000,
-  background: MORADO, color: "#fff", border: "1px solid rgba(255,255,255,.18)",
+  background: "var(--brand)", color: "#fff", border: "1px solid var(--brand-active)",
   borderRadius: 999, padding: "10px 16px", fontSize: 14, fontWeight: 600,
-  cursor: "pointer", boxShadow: "0 10px 30px -10px rgba(0,0,0,.6)",
+  cursor: "pointer", boxShadow: "0 10px 30px -10px rgba(0,0,0,.35)",
 };
 const panel: React.CSSProperties = {
   position: "fixed", zIndex: 2147483000, width: 640, maxWidth: "calc(100vw - 8px)",
-  background: "#1F1330", border: "1px solid rgba(255,255,255,.12)", borderRadius: 14,
-  boxShadow: "0 30px 80px -20px rgba(0,0,0,.8)", color: "#F6F1F9",
-  fontFamily: 'system-ui, "Segoe UI", sans-serif', userSelect: "none",
+  background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: 14,
+  boxShadow: "0 30px 80px -20px rgba(0,0,0,.35)", color: "var(--text-primary)",
+  fontFamily: 'var(--font-sans), system-ui, "Segoe UI", sans-serif', userSelect: "none",
 };
 const barra: React.CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: "8px 12px", cursor: "move", borderBottom: "1px solid rgba(255,255,255,.1)",
-  fontSize: 12, touchAction: "none",
+  padding: "8px 12px", cursor: "move", borderBottom: "1px solid var(--border-muted)",
+  fontSize: 12, color: "var(--text-secondary)", touchAction: "none",
 };
 const cerrar: React.CSSProperties = {
-  background: "transparent", border: 0, color: "#F6F1F9", fontSize: 16, cursor: "pointer", padding: "2px 8px", borderRadius: 6,
+  background: "transparent", border: 0, color: "var(--text-primary)", fontSize: 16, cursor: "pointer", padding: "2px 8px", borderRadius: 6,
 };
 const fila: React.CSSProperties = { display: "flex", gap: 6 };
 const tecla: React.CSSProperties = {
   flex: 1, minWidth: 0, height: 48, borderRadius: 9, cursor: "pointer",
-  background: "#2C1B3D", border: "1px solid rgba(255,255,255,.1)", color: "#F6F1F9",
+  background: "var(--bg-default)", border: "1px solid var(--border-default)", color: "var(--text-primary)",
   fontSize: 17, fontWeight: 500,
 };
 const teclaAncha: React.CSSProperties = { ...tecla, flex: 1.6, fontSize: 13, fontWeight: 600 };
-const teclaActiva: React.CSSProperties = { background: "#7C3D9B", borderColor: "transparent" };
-const teclaIntro: React.CSSProperties = { background: "#3FD8A4", color: "#08130E", borderColor: "transparent" };
+const teclaActiva: React.CSSProperties = { background: "var(--brand)", color: "#fff", borderColor: "transparent" };
+const teclaIntro: React.CSSProperties = { background: "var(--success)", color: "#fff", borderColor: "transparent" };
