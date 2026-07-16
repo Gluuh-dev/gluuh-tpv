@@ -1,36 +1,36 @@
 "use client";
 
-// TECLADO EN PANTALLA — global, flotante, arrastrable y COMPLETO.
+// TECLADO EN PANTALLA — global, flotante, arrastrable, estilo MÓVIL.
 //
-// Para TPV táctiles SIN teclado físico: escribir nombres de producto, precios, CIF, buscar…
-// (El `TecladoTPV` del ticket es solo el NUMÉRICO de la venta; esto es el de texto, y sale en
-// cualquier pantalla: operativa Y backoffice de config.)
+// Para TPV táctiles SIN teclado físico: escribir nombres, precios, CIF, buscar…
+// (El `TecladoTPV` del ticket es solo el NUMÉRICO de la venta; esto es el de texto.)
 //
-// Decisiones:
-//  · FLOTANTE y ARRASTRABLE, top-most, para que NO tape el campo que editas (lo apartas).
-//  · No roba el foco: las teclas hacen `preventDefault` en mousedown, así el input sigue
-//    enfocado y `execCommand('insertText')` escribe donde está el cursor y dispara los
-//    eventos que React necesita (funciona en Chromium/Edge, que es lo que corre el TPV).
-//  · Recuerda si está abierto y su posición (localStorage).
-//  · Autocontenido: sin dependencias externas ni fuentes de fuera (regla del nodo offline).
+// Comportamiento tipo móvil:
+//  · Fila NUMÉRICA siempre arriba (primera línea).
+//  · Letras por defecto; símbolos escondidos tras el botón "?123".
+//  · Mantener pulsada una vocal (o ñ/ç) → salen las variantes con TILDE.
+//  · Altura FIJA: siempre 5 filas (nº + 3 + control), no salta al cambiar de vista.
+//  · Sigue el TEMA (claro/oscuro) usando los tokens del app.
+//  · No roba el foco (mousedown preventDefault) y escribe con execCommand (React se entera).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const NUMEROS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const LETRAS: string[][] = [
-  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l", "ñ"],
   ["z", "x", "c", "v", "b", "n", "m", ",", ".", "-"],
 ];
-const ACENTOS = ["á", "é", "í", "ó", "ú", "ü", "@", "/", "_", "º"];
 const SIMBOLOS: string[][] = [
-  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
   ["@", "#", "€", "$", "%", "&", "*", "(", ")", "/"],
   ["-", "_", "+", "=", "'", '"', ":", ";", "!", "?"],
   [".", ",", "<", ">", "[", "]", "{", "}", "|", "\\"],
 ];
-
-const EDITABLES = "input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea";
+// Variantes con tilde/diéresis al mantener pulsada la tecla (estilo móvil).
+const VARIANTES: Record<string, string[]> = {
+  a: ["á", "à", "ä", "â"], e: ["é", "è", "ë", "ê"], i: ["í", "ï", "î"],
+  o: ["ó", "ò", "ö", "ô"], u: ["ú", "ü", "û"], n: ["ñ"], c: ["ç"],
+};
 
 function esEditable(el: Element | null): el is HTMLInputElement | HTMLTextAreaElement {
   if (!el) return false;
@@ -49,21 +49,22 @@ export function TecladoEnPantalla() {
   const [mays, setMays] = useState(false);
   const [simbolos, setSimbolos] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  // El último campo de texto enfocado. Se escribe sobre él aunque el foco parpadee.
+  const [popup, setPopup] = useState<{ opts: string[]; x: number; y: number } | null>(null);
+
   const objetivo = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const arrastre = useRef<{ dx: number; dy: number } | null>(null);
+  const tempLargo = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const largoDisparado = useRef(false);
 
-  // Estado persistido (solo en cliente).
   useEffect(() => {
     setMontado(true);
     try {
       setAbierto(localStorage.getItem("gluuh_teclado") === "1");
       const p = localStorage.getItem("gluuh_teclado_pos");
       if (p) setPos(JSON.parse(p));
-    } catch { /* sin persistencia, no pasa nada */ }
+    } catch { /* sin persistencia */ }
   }, []);
 
-  // Recordar el último input de texto enfocado.
   useEffect(() => {
     const alEnfocar = (e: FocusEvent) => {
       if (esEditable(e.target as Element)) objetivo.current = e.target as HTMLInputElement;
@@ -77,7 +78,6 @@ export function TecladoEnPantalla() {
     try { localStorage.setItem("gluuh_teclado", v ? "1" : "0"); } catch { /* noop */ }
   }, []);
 
-  // Asegura el foco en el último campo antes de escribir.
   const enfocar = useCallback(() => {
     const el = objetivo.current;
     if (el && document.activeElement !== el) el.focus();
@@ -86,7 +86,6 @@ export function TecladoEnPantalla() {
 
   const escribir = useCallback((ch: string) => {
     if (!enfocar()) return;
-    // execCommand respeta el cursor y dispara 'input' (React se entera). Fallback manual.
     if (!document.execCommand("insertText", false, ch)) {
       const el = objetivo.current!;
       const ini = el.selectionStart ?? el.value.length;
@@ -113,16 +112,36 @@ export function TecladoEnPantalla() {
   const intro = useCallback(() => {
     const el = enfocar();
     if (!el) return;
-    // En un textarea, Intro es salto de línea y el teclado se queda (sigues escribiendo).
     if (el instanceof HTMLTextAreaElement) { escribir("\n"); return; }
-    // En un input, Enter CONFIRMA: se simula para que el formulario reaccione y se ESCONDE
-    // el teclado (has terminado de escribir).
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
     el.form?.requestSubmit?.();
     guardarAbierto(false);
   }, [enfocar, escribir, guardarAbierto]);
 
-  // Arrastre por la barra superior (puntero: vale ratón y táctil).
+  const trans = useCallback((ch: string) => (mays && !simbolos ? ch.toUpperCase() : ch), [mays, simbolos]);
+
+  // ── Pulsación normal + mantener pulsado (acentos) ──────────────────────────
+  const alBajarTecla = (e: React.PointerEvent, ch: string) => {
+    e.preventDefault(); // no roba el foco del campo
+    largoDisparado.current = false;
+    const vars = VARIANTES[ch];
+    if (vars && !simbolos) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      tempLargo.current = setTimeout(() => {
+        largoDisparado.current = true;
+        setPopup({ opts: vars.map(trans), x: rect.left + rect.width / 2, y: rect.top });
+      }, 320);
+    }
+  };
+  const alSoltarTecla = (ch: string) => {
+    if (tempLargo.current) { clearTimeout(tempLargo.current); tempLargo.current = null; }
+    // Si NO se abrió el popup (pulsación corta), se escribe la letra base.
+    if (!largoDisparado.current) escribir(trans(ch));
+    largoDisparado.current = false;
+  };
+  const cancelarLargo = () => { if (tempLargo.current) { clearTimeout(tempLargo.current); tempLargo.current = null; } };
+
+  // ── Arrastre ───────────────────────────────────────────────────────────────
   const alBajar = (e: React.PointerEvent) => {
     const base = pos ?? { x: window.innerWidth / 2 - 320, y: window.innerHeight - 300 };
     arrastre.current = { dx: e.clientX - base.x, dy: e.clientY - base.y };
@@ -140,20 +159,11 @@ export function TecladoEnPantalla() {
   };
 
   if (!montado) return null;
-
   const noRobarFoco = (e: React.MouseEvent) => e.preventDefault();
-  const filas = simbolos ? SIMBOLOS : LETRAS;
-  const trans = (ch: string) => (mays && !simbolos ? ch.toUpperCase() : ch);
 
-  // Botón flotante para abrir/cerrar (siempre visible).
   if (!abierto) {
     return (
-      <button
-        type="button"
-        onClick={() => guardarAbierto(true)}
-        title="Teclado en pantalla"
-        style={btnFlotante}
-      >
+      <button type="button" onClick={() => guardarAbierto(true)} title="Teclado en pantalla" style={btnFlotante}>
         ⌨ Teclado
       </button>
     );
@@ -161,49 +171,63 @@ export function TecladoEnPantalla() {
 
   const x = pos?.x ?? Math.max(4, window.innerWidth / 2 - 320);
   const y = pos?.y ?? window.innerHeight - 300;
+  const filasLetras = simbolos ? SIMBOLOS : LETRAS;
+
+  // Tecla de carácter: mantener pulsado (acentos) en letras; toque normal en el resto.
+  const teclaChar = (ch: string) => (
+    <button
+      key={ch} type="button" style={tecla}
+      onMouseDown={noRobarFoco}
+      onPointerDown={(e) => alBajarTecla(e, ch)}
+      onPointerUp={() => alSoltarTecla(ch)}
+      onPointerLeave={cancelarLargo}
+      onPointerCancel={cancelarLargo}
+    >
+      {trans(ch)}
+    </button>
+  );
 
   return (
     <div style={{ ...panel, left: x, top: y }} role="group" aria-label="Teclado en pantalla">
-      {/* Barra: arrastrar + cerrar */}
-      <div
-        style={barra}
-        onPointerDown={alBajar}
-        onPointerMove={alMover}
-        onPointerUp={alSoltar}
-      >
-        <span style={{ opacity: 0.7 }}>⌨ Teclado — arrástrame si tapo el campo</span>
+      <div style={barra} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar}>
+        <span style={{ opacity: 0.8 }}>⌨ Teclado — arrástrame si tapo el campo</span>
         <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
       </div>
 
-      <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-        {!simbolos && (
-          <div style={fila}>
-            {ACENTOS.map((ch) => (
-              <button key={ch} type="button" onMouseDown={noRobarFoco} onClick={() => escribir(trans(ch))} style={tecla}>{trans(ch)}</button>
-            ))}
-          </div>
-        )}
-        {filas.map((f, i) => (
-          <div key={i} style={fila}>
-            {f.map((ch) => (
-              <button key={ch} type="button" onMouseDown={noRobarFoco} onClick={() => escribir(trans(ch))} style={tecla}>{trans(ch)}</button>
-            ))}
-          </div>
+      <div style={teclas}>
+        {/* Fila numérica: SIEMPRE la primera línea */}
+        <div style={fila}>{NUMEROS.map(teclaChar)}</div>
+        {/* Letras o símbolos (3 filas → altura constante) */}
+        {filasLetras.map((f, i) => (
+          <div key={i} style={fila}>{f.map(teclaChar)}</div>
         ))}
         {/* Fila de control */}
         <div style={fila}>
-          <button type="button" onMouseDown={noRobarFoco} onClick={() => setMays((v) => !v)} style={{ ...teclaAncha, ...(mays ? teclaActiva : {}) }}>⇧ Mayús</button>
-          <button type="button" onMouseDown={noRobarFoco} onClick={() => setSimbolos((v) => !v)} style={{ ...teclaAncha, ...(simbolos ? teclaActiva : {}) }}>{simbolos ? "ABC" : "?123"}</button>
+          <button type="button" onMouseDown={noRobarFoco} onClick={() => setMays((v) => !v)} style={{ ...teclaAncha, ...(mays && !simbolos ? teclaActiva : {}) }} disabled={simbolos}>⇧ Mayús</button>
+          <button type="button" onMouseDown={noRobarFoco} onClick={() => setSimbolos((v) => !v)} style={{ ...teclaAncha, ...(simbolos ? teclaActiva : {}) }}>{simbolos ? "ABC" : "?#$"}</button>
           <button type="button" onMouseDown={noRobarFoco} onClick={() => escribir(" ")} style={{ ...tecla, flex: 3 }}>espacio</button>
           <button type="button" onMouseDown={noRobarFoco} onClick={borrar} style={teclaAncha}>← Borrar</button>
           <button type="button" onMouseDown={noRobarFoco} onClick={intro} style={{ ...teclaAncha, ...teclaIntro }}>Intro ⏎</button>
         </div>
       </div>
+
+      {/* Popup de acentos al mantener pulsado (estilo móvil) */}
+      {popup && (
+        <>
+          <div onPointerDown={() => setPopup(null)} style={velo} />
+          <div style={{ ...acentos, left: popup.x, top: popup.y }}>
+            {popup.opts.map((op) => (
+              <button key={op} type="button" onMouseDown={noRobarFoco}
+                onClick={() => { escribir(op); setPopup(null); }} style={teclaAcento}>{op}</button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-// ── estilos: SIGUEN EL TEMA del app (tokens --bg/--text/--border/--brand) → claro y oscuro ──
+// ── estilos: SIGUEN EL TEMA (tokens --bg/--text/--border/--brand) → claro y oscuro ──
 const btnFlotante: React.CSSProperties = {
   position: "fixed", right: 16, bottom: 16, zIndex: 2147483000,
   background: "var(--brand)", color: "#fff", border: "1px solid var(--brand-active)",
@@ -224,12 +248,24 @@ const barra: React.CSSProperties = {
 const cerrar: React.CSSProperties = {
   background: "transparent", border: 0, color: "var(--text-primary)", fontSize: 16, cursor: "pointer", padding: "2px 8px", borderRadius: 6,
 };
-const fila: React.CSSProperties = { display: "flex", gap: 6 };
+// Altura FIJA: 5 filas de 48px + 4 gaps de 6px + padding → no cambia entre letras y símbolos.
+const teclas: React.CSSProperties = { padding: 8, display: "flex", flexDirection: "column", gap: 6, height: 8 + 5 * 48 + 4 * 6 + 8 };
+const fila: React.CSSProperties = { display: "flex", gap: 6, flex: 1 };
 const tecla: React.CSSProperties = {
-  flex: 1, minWidth: 0, height: 48, borderRadius: 9, cursor: "pointer",
+  flex: 1, minWidth: 0, borderRadius: 9, cursor: "pointer",
   background: "var(--bg-default)", border: "1px solid var(--border-default)", color: "var(--text-primary)",
-  fontSize: 17, fontWeight: 500,
+  fontSize: 17, fontWeight: 500, touchAction: "none",
 };
 const teclaAncha: React.CSSProperties = { ...tecla, flex: 1.6, fontSize: 13, fontWeight: 600 };
 const teclaActiva: React.CSSProperties = { background: "var(--brand)", color: "#fff", borderColor: "transparent" };
 const teclaIntro: React.CSSProperties = { background: "var(--success)", color: "#fff", borderColor: "transparent" };
+const velo: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 2147483001 };
+const acentos: React.CSSProperties = {
+  position: "fixed", zIndex: 2147483002, transform: "translate(-50%, calc(-100% - 6px))",
+  display: "flex", gap: 4, padding: 4, borderRadius: 10,
+  background: "var(--bg-surface)", border: "1px solid var(--border-strong)", boxShadow: "0 12px 30px -8px rgba(0,0,0,.4)",
+};
+const teclaAcento: React.CSSProperties = {
+  minWidth: 44, height: 48, borderRadius: 8, cursor: "pointer", fontSize: 20, fontWeight: 600,
+  background: "var(--bg-default)", border: "1px solid var(--border-default)", color: "var(--text-primary)",
+};
