@@ -1944,13 +1944,11 @@ export default function TPV() {
       const autor = anadidoPor[viejo];
 
       setComanda((c) => {
-        const next = { ...c };
-        if (viejo !== clave) {
-          delete next[viejo];
-          next[clave] = qty;
-        } else {
-          next[clave] = qty;
-        }
+        if (viejo === clave) return { ...c, [clave]: qty };
+        // Editar una línea es una ACTUALIZACIÓN: se sustituye la clave EN SU SITIO (mismo
+        // orden), no se borra y re-inserta al final (eso sacaba las partes de menú de su sitio).
+        const next: Record<string, number> = {};
+        for (const [k, v] of Object.entries(c)) next[k === viejo ? clave : k] = k === viejo ? qty : v;
         return next;
       });
 
@@ -2477,26 +2475,6 @@ export default function TPV() {
   };
   // Atribución visible solo si hay MÁS de un camarero en la cuenta (marca sutil por línea).
   const multiCamarero = new Set(Object.keys(comanda).map((k) => anadidoPor[k]?.id).filter(Boolean)).size > 1;
-  // Orden de pintado: cada PARTE de menú va SIEMPRE justo debajo de su cabecera, aunque al
-  // editarla (añadir extra) su clave se haya reinsertado al final del objeto comanda.
-  const ordenComanda = (() => {
-    const claves = Object.keys(comanda);
-    const partesDe = new Map<string, string[]>();
-    for (const k of claves) {
-      const padre = menuParte[k];
-      if (padre) { const l = partesDe.get(padre) ?? []; l.push(k); partesDe.set(padre, l); }
-    }
-    const orden: string[] = [];
-    for (const k of claves) {
-      if (menuParte[k]) continue;               // las partes se colocan tras su cabecera
-      orden.push(k);
-      const partes = partesDe.get(k);
-      if (partes) orden.push(...partes);
-    }
-    // Partes huérfanas (cabecera inexistente): al final, para no perderlas.
-    for (const k of claves) if (menuParte[k] && !orden.includes(k)) orden.push(k);
-    return orden;
-  })();
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -2597,8 +2575,7 @@ export default function TPV() {
                 <span className="w-[4.8rem] text-right">Total</span>
               </div>
             )}
-            {ordenComanda.map((id) => {
-              const q    = comanda[id]!;
+            {Object.entries(comanda).map(([id, q]) => {
               const p    = prodDeKey(id);
               if (!p) return null;
               const pe   = precioEfectivo(id);
