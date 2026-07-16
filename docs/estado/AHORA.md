@@ -141,7 +141,10 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0109`.**
+**Siguiente número libre: `0110`.**
+
+- `0109` — ficha de cliente "Cómo se le vende": `customer.tarifa_id` (FK a `tarifa`),
+  `descuento_pct` y `saldo` (deuda, para el filtro "Con deuda").
 
 - `0108` — el menú es un ARTÍCULO más: `menu.category_id` (FK a `category`, `on delete set null`).
   Así los menús caen en una familia/categoría "Menús" y salen en la rejilla del TPV como un

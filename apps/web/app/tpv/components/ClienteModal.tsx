@@ -19,6 +19,13 @@ import { toast } from "@/app/lib/toast";
 export type { Cli };
 
 const iniciales = (n: string | null) => (n ?? "?").trim().split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+// Color del avatar derivado del NOMBRE (como el mockup): mismo nombre → siempre mismo color.
+function colorAvatar(n: string | null): React.CSSProperties {
+  const s = n ?? "?";
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return { backgroundColor: `hsl(${h} 60% 50% / .18)`, color: `hsl(${h} 55% 42%)` };
+}
 // Para factura COMPLETA (F1) hacen falta NIF + dirección fiscal.
 const facturable = (c: Cli) => !!(c.nif && c.direccion && c.codigo_postal && c.poblacion);
 // "Tiene datos" = algo más que el nombre. Un cliente con SOLO nombre se puede borrar; en
@@ -28,9 +35,10 @@ const aForm = (c: Cli) => ({
   nombre: c.nombre ?? "", nif: c.nif ?? "", telefono: c.telefono ?? "", email: c.email ?? "",
   direccion: c.direccion ?? "", codigo_postal: c.codigo_postal ?? "", poblacion: c.poblacion ?? "",
   provincia: c.provincia ?? "", notas: c.notas ?? "", consentimiento_marketing: c.consentimiento_marketing,
+  tarifa_id: c.tarifa_id ?? "", descuento_pct: String(c.descuento_pct ?? 0),
 });
 
-const FORM0 = { nombre: "", nif: "", telefono: "", email: "", direccion: "", codigo_postal: "", poblacion: "", provincia: "", notas: "", consentimiento_marketing: false };
+const FORM0 = { nombre: "", nif: "", telefono: "", email: "", direccion: "", codigo_postal: "", poblacion: "", provincia: "", notas: "", consentimiento_marketing: false, tarifa_id: "", descuento_pct: "0" };
 
 export function ClienteModal({
   mesaNombre, comensales, total, clienteActual, onAsignar, onQuitar, onClose,
@@ -41,7 +49,8 @@ export function ClienteModal({
 }>) {
   const sb = supabaseBrowser();
   const [q, setQ] = useState("");
-  const [filtro, setFiltro] = useState<"todos" | "hoy">("todos");
+  const [filtro, setFiltro] = useState<"todos" | "hoy" | "deuda">("todos");
+  const [tarifas, setTarifas] = useState<{ id: string; nombre: string }[]>([]);
   const [sel, setSel] = useState<Cli | null>(null);
   const [alta, setAlta] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -58,6 +67,8 @@ export function ClienteModal({
   const upsert = useClientesStore((s) => s.upsert);
   const quitar = useClientesStore((s) => s.quitar);
   useEffect(() => { void cargarClientes(sb); }, [cargarClientes, sb]);
+  useEffect(() => { sb.from("tarifa").select("id,nombre").order("nombre").then(({ data }) => setTarifas((data as { id: string; nombre: string }[]) ?? [])); }, [sb]);
+  const tarifaNombre = (id: string | null) => (id ? tarifas.find((t) => t.id === id)?.nombre : null) ?? "General";
 
   // Filtrado LOCAL (sin pegarle a la BD en cada tecla): nombre/teléfono/NIF/email + "hoy".
   const lista = useMemo(() => {
@@ -66,6 +77,7 @@ export function ClienteModal({
     const iniHoy = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
     return clientes.filter((c) => {
       if (filtro === "hoy" && new Date(c.created_at).getTime() < iniHoy) return false;
+      if (filtro === "deuda" && !(Number(c.saldo) > 0)) return false;
       if (!qq) return true;
       return norm(c.nombre ?? "").includes(qq) || norm(c.telefono ?? "").includes(qq) || norm(c.nif ?? "").includes(qq) || norm(c.email ?? "").includes(qq);
     });
@@ -102,6 +114,8 @@ export function ClienteModal({
       provincia: form.provincia.trim() || null,
       notas: form.notas.trim() || null,
       consentimiento_marketing: form.consentimiento_marketing,
+      tarifa_id: form.tarifa_id || null,
+      descuento_pct: Number(String(form.descuento_pct).replace(",", ".")) || 0,
     };
     const { data, error } = editId
       ? await sb.from("customer").update(payload).eq("id", editId).select(CLI_COLS).single()
@@ -152,7 +166,7 @@ export function ClienteModal({
                 className="grid h-11 w-11 flex-none place-items-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent"><Keyboard size={18} /></button>
             </div>
             <div className="flex flex-none gap-1.5 p-2">
-              {([["todos", "Todos"], ["hoy", "Hoy"]] as const).map(([v, l]) => (
+              {([["todos", "Todos"], ["hoy", "Hoy"], ["deuda", "Con deuda"]] as const).map(([v, l]) => (
                 <button key={v} type="button" onClick={() => setFiltro(v)} aria-pressed={filtro === v}
                   className={`h-9 rounded-md border px-3 text-xs font-bold ${filtro === v ? "border-brand bg-brand text-brand-foreground" : "border-border bg-background text-muted-foreground hover:bg-accent"}`}>{l}</button>
               ))}
@@ -165,11 +179,12 @@ export function ClienteModal({
                 return (
                   <button type="button" key={c.id} onClick={() => { setSel(c); setAlta(false); }}
                     className={`flex w-full items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors ${activo ? "bg-brand/10" : "hover:bg-accent"}`}>
-                    <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-brand/15 text-xs font-bold text-brand">{iniciales(c.nombre)}</span>
+                    <span className="grid h-9 w-9 flex-none place-items-center rounded-full text-xs font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold">{c.nombre}</span>
                       <span className="block truncate text-[11px] text-muted-foreground">{c.telefono ?? "sin teléfono"}{c.nif ? ` · ${c.nif}` : " · sin NIF"}</span>
                     </span>
+                    {Number(c.saldo) > 0 && <span title="Debe" className="flex-none rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold text-rose-600 dark:text-rose-400">{eur(Number(c.saldo))}</span>}
                     {facturable(c) && <span title="Facturable" className="flex-none rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">FACT.</span>}
                   </button>
                 );
@@ -200,9 +215,9 @@ export function ClienteModal({
             </h3>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {alta ? (
-                <Alta form={form} setForm={setForm} />
+                <Alta form={form} setForm={setForm} tarifas={tarifas} />
               ) : sel ? (
-                <Ficha c={sel} />
+                <Ficha c={sel} tarifa={tarifaNombre(sel.tarifa_id)} />
               ) : (
                 <div className="grid h-full place-items-center text-center text-sm text-muted-foreground">
                   <div><b className="mb-1 block text-foreground">Ningún cliente elegido</b>Toca uno de la lista para ver su ficha, o crea uno nuevo.</div>
@@ -238,7 +253,7 @@ export function ClienteModal({
 }
 
 // ── Ficha (solo lectura) del cliente elegido ──
-function Ficha({ c }: Readonly<{ c: Cli }>) {
+function Ficha({ c, tarifa }: Readonly<{ c: Cli; tarifa: string }>) {
   const fac = facturable(c);
   const falta = [!c.nif && "el NIF", !(c.direccion && c.codigo_postal && c.poblacion) && "la dirección fiscal"].filter(Boolean).join(" y ");
   const dato = (l: string, v: string | null, no?: string) => (
@@ -251,7 +266,7 @@ function Ficha({ c }: Readonly<{ c: Cli }>) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-3">
-        <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-brand/15 text-base font-bold text-brand">{iniciales(c.nombre)}</span>
+        <span className="grid h-12 w-12 flex-none place-items-center rounded-full text-base font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
         <div className="min-w-0">
           <div className="truncate text-base font-bold">{c.nombre}</div>
           <div className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${fac ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/15 text-amber-600 dark:text-amber-500"}`}>
@@ -264,15 +279,19 @@ function Ficha({ c }: Readonly<{ c: Cli }>) {
       {dato("Teléfono", c.telefono)}
       {dato("Email", c.email)}
       {dato("Dirección fiscal", dirFiscal || null, "sin dirección")}
-      {dato("Notas", c.notas)}
+      {/* Cómo se le vende */}
+      {dato("Tarifa", tarifa)}
+      {dato("Descuento fijo", Number(c.descuento_pct) > 0 ? `${Number(c.descuento_pct)} %` : null, "sin descuento")}
+      {dato("Saldo / deuda", Number(c.saldo) !== 0 ? eur(Number(c.saldo)) : null, "al día")}
+      {dato("Alergias / avisos cocina", c.notas)}
       {dato("Puntos fidelidad", c.puntos_fidelidad ? String(c.puntos_fidelidad) : null, "0")}
-      {dato("Marketing (RGPD)", c.consentimiento_marketing ? "Sí, consiente" : null, "no consiente")}
+      {dato("Acepta promociones (RGPD)", c.consentimiento_marketing ? "Sí" : null, "no")}
     </div>
   );
 }
 
-// ── Alta de cliente nuevo ──
-function Alta({ form, setForm }: Readonly<{ form: typeof FORM0; setForm: React.Dispatch<React.SetStateAction<typeof FORM0>> }>) {
+// ── Alta / edición de cliente ──
+function Alta({ form, setForm, tarifas }: Readonly<{ form: typeof FORM0; setForm: React.Dispatch<React.SetStateAction<typeof FORM0>>; tarifas: { id: string; nombre: string }[] }>) {
   const campo = (k: keyof typeof FORM0, label: string, opts?: { placeholder?: string; upper?: boolean; wide?: boolean }) => (
     <label className={`flex flex-col gap-1 ${opts?.wide ? "col-span-2" : ""}`}>
       <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -280,8 +299,10 @@ function Alta({ form, setForm }: Readonly<{ form: typeof FORM0; setForm: React.D
         placeholder={opts?.placeholder} className={`h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand ${opts?.upper ? "uppercase" : ""}`} />
     </label>
   );
+  const tit = "col-span-2 mt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground";
   return (
     <div className="grid grid-cols-2 gap-3">
+      <div className={tit}>Datos</div>
       {campo("nombre", "Nombre / Razón social", { placeholder: "Nombre", wide: true })}
       {campo("nif", "NIF / CIF", { upper: true })}
       {campo("telefono", "Teléfono")}
@@ -290,14 +311,30 @@ function Alta({ form, setForm }: Readonly<{ form: typeof FORM0; setForm: React.D
       {campo("codigo_postal", "C. Postal")}
       {campo("poblacion", "Población")}
       {campo("provincia", "Provincia", { wide: true })}
-      <label className="col-span-2 flex flex-col gap-1">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Notas</span>
-        <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} rows={2}
-          placeholder="Alergias, preferencias…" className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
+
+      {/* Cómo se le vende */}
+      <div className={tit}>Cómo se le vende</div>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Tarifa</span>
+        <select value={form.tarifa_id} onChange={(e) => setForm((f) => ({ ...f, tarifa_id: e.target.value }))}
+          className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand">
+          <option value="">General</option>
+          {tarifas.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+        </select>
       </label>
-      <label className="col-span-2 flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={form.consentimiento_marketing} onChange={(e) => setForm((f) => ({ ...f, consentimiento_marketing: e.target.checked }))} className="h-4 w-4 accent-[var(--brand)]" />
-        Consiente marketing (RGPD)
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Descuento fijo %</span>
+        <input value={form.descuento_pct} inputMode="decimal" onChange={(e) => setForm((f) => ({ ...f, descuento_pct: e.target.value }))}
+          className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand" />
+      </label>
+      <label className="col-span-2 flex flex-col gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Alergias y avisos para cocina</span>
+        <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} rows={2}
+          placeholder="Ej.: celíaco, alérgico a los frutos secos" className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
+      </label>
+      <label className="col-span-2 flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm">
+        <input type="checkbox" checked={form.consentimiento_marketing} onChange={(e) => setForm((f) => ({ ...f, consentimiento_marketing: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-(--brand)" />
+        <span><b>Acepta recibir promociones</b><br /><span className="text-xs text-muted-foreground">Sin esta casilla marcada no se le puede escribir. Lo dice el RGPD.</span></span>
       </label>
     </div>
   );

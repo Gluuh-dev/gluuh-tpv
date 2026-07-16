@@ -9,8 +9,9 @@ export interface Cli {
   id: string; nombre: string | null; telefono: string | null; nif: string | null; email: string | null;
   direccion: string | null; codigo_postal: string | null; poblacion: string | null; provincia: string | null;
   notas: string | null; consentimiento_marketing: boolean; puntos_fidelidad: number; created_at: string;
+  tarifa_id: string | null; descuento_pct: number; saldo: number;
 }
-export const CLI_COLS = "id,nombre,telefono,nif,email,direccion,codigo_postal,poblacion,provincia,notas,consentimiento_marketing,puntos_fidelidad,created_at";
+export const CLI_COLS = "id,nombre,telefono,nif,email,direccion,codigo_postal,poblacion,provincia,notas,consentimiento_marketing,puntos_fidelidad,created_at,tarifa_id,descuento_pct,saldo";
 
 interface ClientesState {
   clientes: Cli[];
