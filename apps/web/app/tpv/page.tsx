@@ -60,6 +60,17 @@ interface MenuTPV {
 /* ─── Helpers ─── */
 // Iniciales del camarero para la marca sutil de atribución por línea.
 const iniciales = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("");
+// Pase (orden de cocina) según el nombre del grupo del menú: Primero→1 … Postre→4, Bebida→5.
+// Grupos con nombre libre (menú especial) → sin pase (undefined).
+function paseDeGrupo(nombre: string): number | undefined {
+  const n = nombre.trim().toLowerCase();
+  if (/postre/.test(n)) return 4;
+  if (/bebid/.test(n)) return 5;
+  if (/^1|prim/.test(n)) return 1;
+  if (/^2|segu/.test(n)) return 2;
+  if (/^3|terc/.test(n)) return 3;
+  return undefined;
+}
 const TERR: Record<string, string> = {
   PENINSULA_BALEARES: "PENINSULA_BALEARES", CANARIAS: "CANARIAS",
   CEUTA_MELILLA: "CEUTA_MELILLA", FORAL_PV: "PENINSULA_BALEARES", FORAL_NAVARRA: "PENINSULA_BALEARES",
@@ -1066,7 +1077,9 @@ export default function TPV() {
       notas: [invitadas[l.id] ? "Invitación" : null, notas[l.id]?.trim() || null].filter(Boolean).join(" · ") || null,
       estacion: l.estacion,
       user_id: anadidoPor[l.id]?.id ?? operario?.id ?? userId,   // atribución por línea (col. user_id, mig. 0059)
-      modificadores: { key: l.id },
+      // menuParte: si la línea es parte de un menú, guarda a qué cabecera pertenece (para
+      // reconstruir el "(M)" y la cascada al recargar la cuenta).
+      modificadores: menuParte[l.id] ? { key: l.id, menuParte: menuParte[l.id] } : { key: l.id },
       pase: pases[l.id] || null,
     }));
     const totalRedondeado = Math.round(total * 100) / 100;
@@ -1575,7 +1588,7 @@ export default function TPV() {
         const out: { product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: number; notas: string | null; estacion: string; modificadores: any }[] = [];
         for (const a of asign) {
           const m = meta[a.id]; if (!m) continue;
-          out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion, modificadores: { key: a.id } });
+          out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion, modificadores: menuParte[a.id] ? { key: a.id, menuParte: menuParte[a.id] } : { key: a.id } });
         }
         return out;
       };
@@ -1949,6 +1962,8 @@ export default function TPV() {
         setAnadidoPor((a) => { const { [viejo]: _, ...r } = a; return autor ? { ...r, [clave]: autor } : r; });
         // Si la línea era parte de un menú, conserva ese vínculo en la clave nueva (sigue "(M)" y a 0 base).
         setMenuParte((mp) => { const { [viejo]: v, ...r } = mp; return v ? { ...r, [clave]: v } : r; });
+        // El pase (orden de cocina) también viaja a la clave nueva (no se pierde al añadir extras).
+        setPases((ps) => { const { [viejo]: v, ...r } = ps; return v ? { ...r, [clave]: v } : r; });
         setLineaSel(clave);
         setModProd({ p: modProd.p, fid: modProd.fid, reemplazar: clave });
       } else {
@@ -1985,6 +2000,13 @@ export default function TPV() {
     setPreciosManuales((pm) => { const r = { ...pm }; for (const k of nuevas) r[k] = 0; return r; });
     setMenuParte((mp) => { const r = { ...mp }; for (const k of nuevas) r[k] = menuKey; return r; });
     if (op) setAnadidoPor((a) => { const r = { ...a }; for (const k of nuevas) r[k] = { id: op.id, nombre: op.nombre }; return r; });
+    // Pase (orden de cocina) AUTOMÁTICO desde el grupo del menú: Primero→1º … Postre→Postre,
+    // Bebida→Bebida. No se toca por línea (el grupo del menú manda). Grupos raros: sin pase.
+    setPases((ps) => {
+      const r = { ...ps };
+      seleccion.forEach((s, i) => { const pv = paseDeGrupo(s.grupoNombre); if (pv) r[nuevas[i]!] = pv; });
+      return r;
+    });
     setMenuAbierto(null);
   }
   async function toggleAgotado(p: Prod, agotar: boolean) {
@@ -2621,7 +2643,8 @@ export default function TPV() {
                     <span className={`w-[4.8rem] text-right font-semibold tabular-nums pt-0.5 ${inv ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{inv ? "Inv." : eur(pe * q)}</span>
                   </div>
 
-                  {sel && (
+                  {/* Selector de pase: NO en partes de menú — su pase lo fija el grupo del menú. */}
+                  {sel && !esParteMenu && (
                     <div className="mt-2 flex items-center gap-1 border-t border-border/40 pt-1.5" onClick={(e) => e.stopPropagation()}>
                       <span className="text-[9px] text-muted-foreground mr-1">Pase:</span>
                       {[
