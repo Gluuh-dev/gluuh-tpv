@@ -152,7 +152,7 @@ export default function FamiliasPage() {
       <PageHeader
         title="Familias"
         description="Propiedades heredables del catálogo: los productos heredan de su familia los modificadores, el estilo y la visibilidad."
-        actions={<Button variant="outline" onClick={() => router.push("/menus")}><UtensilsCrossed className="h-4 w-4" /> Menús</Button>}
+        actions={<Button onClick={() => router.push("/menus")}><UtensilsCrossed className="h-4 w-4" /> Menús</Button>}
       />
 
       {sinMigracion && (

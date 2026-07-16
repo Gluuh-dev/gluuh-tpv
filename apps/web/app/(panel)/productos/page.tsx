@@ -226,7 +226,7 @@ export default function ProductosLista() {
       <PageHeader
         title="Productos"
         description={cargando ? "Cargando la carta…" : "Artículos de la carta con su familia, categorías y precios."}
-        actions={<Button variant="outline" onClick={() => router.push("/menus")}><UtensilsCrossed className="h-4 w-4" /> Menús</Button>}
+        actions={<Button onClick={() => router.push("/menus")}><UtensilsCrossed className="h-4 w-4" /> Menús</Button>}
       />
 
       {!cargando && prods.length === 0 ? (
