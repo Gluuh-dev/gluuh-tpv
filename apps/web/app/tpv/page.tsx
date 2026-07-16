@@ -2643,44 +2643,8 @@ export default function TPV() {
                     <span className={`w-[4.8rem] text-right font-semibold tabular-nums pt-0.5 ${inv ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{inv ? "Inv." : eur(pe * q)}</span>
                   </div>
 
-                  {/* Selector de pase: NO en partes de menú — su pase lo fija el grupo del menú. */}
-                  {sel && !esParteMenu && (
-                    <div className="mt-2 flex items-center gap-1 border-t border-border/40 pt-1.5" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-[9px] text-muted-foreground mr-1">Pase:</span>
-                      {[
-                        { val: 1, label: "1º" },
-                        { val: 2, label: "2º" },
-                        { val: 3, label: "3º" },
-                        { val: 4, label: "Postre" },
-                        { val: 5, label: "Bebida" },
-                      ].map((pOpt) => {
-                        const isCurrent = (pases[id] || 0) === pOpt.val;
-                        return (
-                          <button
-                            key={pOpt.val}
-                            type="button"
-                            onClick={() => setPases((prev) => ({ ...prev, [id]: pOpt.val }))}
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold border transition-all ${
-                              isCurrent
-                                ? "bg-brand text-brand-foreground border-brand"
-                                : "bg-background text-muted-foreground border-border hover:bg-accent"
-                            }`}
-                          >
-                            {pOpt.label}
-                          </button>
-                        );
-                      })}
-                      {(pases[id] || 0) > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setPases((prev) => { const { [id]: _, ...r } = prev; return r; })}
-                          className="rounded px-1.5 py-0.5 text-[9px] font-bold border border-rose-500/20 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
-                        >
-                          Limpiar
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* (Selector de pase por línea retirado: en menú lo fija el grupo; en carta
+                      normal no se usa el pase manual.) */}
                 </div>
               );
             })}
