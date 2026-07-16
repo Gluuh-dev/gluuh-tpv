@@ -15,16 +15,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// Distribución tipo SwiftKey: nº arriba; Mayús/Borrar en los extremos de la fila zxcv; la
+// coma a la izquierda del espacio y el punto a la derecha (en la fila de control); el guion
+// vive en los símbolos.
 const NUMEROS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const LETRAS: string[][] = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l", "ñ"],
-  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "-"],
+  ["z", "x", "c", "v", "b", "n", "m"],
 ];
 const SIMBOLOS: string[][] = [
   ["@", "#", "€", "$", "%", "&", "*", "(", ")", "/"],
   ["-", "_", "+", "=", "'", '"', ":", ";", "!", "?"],
-  [".", ",", "<", ">", "[", "]", "{", "}", "|", "\\"],
+  ["<", ">", "[", "]", "{", "}", "|", "\\"],
 ];
 // Variantes con tilde/diéresis al mantener pulsada la tecla (estilo móvil).
 const VARIANTES: Record<string, string[]> = {
@@ -59,7 +62,7 @@ export function TecladoEnPantalla() {
   useEffect(() => {
     setMontado(true);
     try {
-      setAbierto(localStorage.getItem("gluuh_teclado") === "1");
+      // El teclado arranca SIEMPRE cerrado (se abre a demanda); solo se recuerda su posición.
       const p = localStorage.getItem("gluuh_teclado_pos");
       if (p) setPos(JSON.parse(p));
     } catch { /* sin persistencia */ }
@@ -73,10 +76,21 @@ export function TecladoEnPantalla() {
     return () => document.removeEventListener("focusin", alEnfocar);
   }, []);
 
-  const guardarAbierto = useCallback((v: boolean) => {
-    setAbierto(v);
-    try { localStorage.setItem("gluuh_teclado", v ? "1" : "0"); } catch { /* noop */ }
-  }, []);
+  const guardarAbierto = useCallback((v: boolean) => setAbierto(v), []);
+
+  // Se abre/cierra por EVENTO. Cada modal/página que necesite escribir en táctil pone un
+  // <BotonTeclado/> (o llama a abrirTeclado()). Así el teclado NO sale sobreexpuesto en todas
+  // las pantallas: solo cuando se pide.
+  useEffect(() => {
+    const abrir = () => guardarAbierto(true);
+    const cerrar = () => guardarAbierto(false);
+    window.addEventListener("gluuh:abrir-teclado", abrir);
+    window.addEventListener("gluuh:cerrar-teclado", cerrar);
+    return () => {
+      window.removeEventListener("gluuh:abrir-teclado", abrir);
+      window.removeEventListener("gluuh:cerrar-teclado", cerrar);
+    };
+  }, [guardarAbierto]);
 
   const enfocar = useCallback(() => {
     const el = objetivo.current;
@@ -161,13 +175,9 @@ export function TecladoEnPantalla() {
   if (!montado) return null;
   const noRobarFoco = (e: React.MouseEvent) => e.preventDefault();
 
-  if (!abierto) {
-    return (
-      <button type="button" onClick={() => guardarAbierto(true)} title="Teclado en pantalla" style={btnFlotante}>
-        ⌨ Teclado
-      </button>
-    );
-  }
+  // NO sale sobreexpuesto: si no está abierto, no pinta nada. Lo abre un <BotonTeclado/> de
+  // cada modal/página que lo necesite (evento "gluuh:abrir-teclado").
+  if (!abierto) return null;
 
   const x = pos?.x ?? Math.max(4, window.innerWidth / 2 - 320);
   const y = pos?.y ?? window.innerHeight - 300;
@@ -197,17 +207,24 @@ export function TecladoEnPantalla() {
       <div style={teclas}>
         {/* Fila numérica: SIEMPRE la primera línea */}
         <div style={fila}>{NUMEROS.map(teclaChar)}</div>
-        {/* Letras o símbolos (3 filas → altura constante) */}
-        {filasLetras.map((f, i) => (
-          <div key={i} style={fila}>{f.map(teclaChar)}</div>
-        ))}
-        {/* Fila de control */}
+        {/* Filas 1 y 2 (letras o símbolos) */}
+        <div style={fila}>{filasLetras[0].map(teclaChar)}</div>
+        <div style={fila}>{filasLetras[1].map(teclaChar)}</div>
+        {/* Fila 3: [Mayús] + (zxcv / símbolos) + [Borrar] — extremos, como SwiftKey */}
         <div style={fila}>
-          <button type="button" onMouseDown={noRobarFoco} onClick={() => setMays((v) => !v)} style={{ ...teclaAncha, ...(mays && !simbolos ? teclaActiva : {}) }} disabled={simbolos}>⇧ Mayús</button>
+          {!simbolos && (
+            <button type="button" onMouseDown={noRobarFoco} onClick={() => setMays((v) => !v)} style={{ ...teclaAncha, ...(mays ? teclaActiva : {}) }} aria-label="Mayúsculas">⇧</button>
+          )}
+          {filasLetras[2].map(teclaChar)}
+          <button type="button" onMouseDown={noRobarFoco} onClick={borrar} style={teclaAncha} aria-label="Borrar">⌫</button>
+        </div>
+        {/* Fila de control: ?#$ · coma · espacio · punto · Intro */}
+        <div style={fila}>
           <button type="button" onMouseDown={noRobarFoco} onClick={() => setSimbolos((v) => !v)} style={{ ...teclaAncha, ...(simbolos ? teclaActiva : {}) }}>{simbolos ? "ABC" : "?#$"}</button>
-          <button type="button" onMouseDown={noRobarFoco} onClick={() => escribir(" ")} style={{ ...tecla, flex: 3 }}>espacio</button>
-          <button type="button" onMouseDown={noRobarFoco} onClick={borrar} style={teclaAncha}>← Borrar</button>
-          <button type="button" onMouseDown={noRobarFoco} onClick={intro} style={{ ...teclaAncha, ...teclaIntro }}>Intro ⏎</button>
+          {teclaChar(",")}
+          <button type="button" onMouseDown={noRobarFoco} onClick={() => escribir(" ")} style={{ ...tecla, flex: 4 }}>espacio</button>
+          {teclaChar(".")}
+          <button type="button" onMouseDown={noRobarFoco} onClick={intro} style={{ ...teclaAncha, ...teclaIntro }} aria-label="Intro">⏎</button>
         </div>
       </div>
 
@@ -227,12 +244,27 @@ export function TecladoEnPantalla() {
   );
 }
 
+/** Abre el teclado en pantalla desde cualquier sitio (lo escucha <TecladoEnPantalla/>). */
+export function abrirTeclado() {
+  window.dispatchEvent(new Event("gluuh:abrir-teclado"));
+}
+
+/** Botón "Teclado" para poner DENTRO de cada modal/página que necesite escribir en táctil.
+ *  No sale sobreexpuesto en todas las pantallas: solo donde lo coloques. */
+export function BotonTeclado({ style, children }: Readonly<{ style?: React.CSSProperties; children?: React.ReactNode }>) {
+  return (
+    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={abrirTeclado}
+      title="Mostrar teclado en pantalla" style={{ ...btnTeclado, ...style }}>
+      {children ?? "⌨ Teclado"}
+    </button>
+  );
+}
+
 // ── estilos: SIGUEN EL TEMA (tokens --bg/--text/--border/--brand) → claro y oscuro ──
-const btnFlotante: React.CSSProperties = {
-  position: "fixed", right: 16, bottom: 16, zIndex: 2147483000,
-  background: "var(--brand)", color: "#fff", border: "1px solid var(--brand-active)",
-  borderRadius: 999, padding: "10px 16px", fontSize: 14, fontWeight: 600,
-  cursor: "pointer", boxShadow: "0 10px 30px -10px rgba(0,0,0,.35)",
+const btnTeclado: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 6,
+  background: "var(--bg-surface)", color: "var(--text-primary)", border: "1px solid var(--border-default)",
+  borderRadius: 8, padding: "8px 12px", fontSize: 14, fontWeight: 600, cursor: "pointer",
 };
 const panel: React.CSSProperties = {
   position: "fixed", zIndex: 2147483000, width: 640, maxWidth: "calc(100vw - 8px)",
