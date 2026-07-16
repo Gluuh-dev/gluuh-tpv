@@ -141,7 +141,9 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0110`.**
+**Siguiente número libre: `0111`.**
+
+- `0110` — `clientes_stats()`: visitas y última visita por cliente (lista del TPV).
 
 - `0109` — ficha de cliente "Cómo se le vende": `customer.tarifa_id` (FK a `tarifa`),
   `descuento_pct` y `saldo` (deuda, para el filtro "Con deuda").

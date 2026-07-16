@@ -28,6 +28,24 @@ function colorAvatar(n: string | null): React.CSSProperties {
 }
 // Para factura COMPLETA (F1) hacen falta NIF + dirección fiscal.
 const facturable = (c: Cli) => !!(c.nif && c.direccion && c.codigo_postal && c.poblacion);
+// ¿Es empresa? Se DEDUCE del CIF (empieza por letra de sociedad) o del nombre (S.L., Bar…).
+// No hay columna: en España el CIF de empresa empieza por A-H/J/N/P-W; DNI = 8 díg.+letra, NIE = X/Y/Z.
+function esEmpresa(c: Cli): boolean {
+  const nif = (c.nif ?? "").trim().toUpperCase();
+  if (/^[ABCDEFGHJNPQRSUVW]\d/.test(nif)) return true;
+  return /\b(S\.?\s?L|S\.?\s?A|S\.?\s?C|C\.?\s?B|BAR|RESTAURANTE|CAFETER|HOTEL|PEÑA|COMUNIDAD|ASOC|CLUB)\b/i.test(c.nombre ?? "");
+}
+// Fecha relativa corta ("Hoy" · "Ayer" · "Hace N días" · "Hace N sem." · "dd/mm/aa").
+function relativa(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso), ahora = new Date();
+  const dias = Math.floor((new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000);
+  if (dias <= 0) return "Hoy";
+  if (dias === 1) return "Ayer";
+  if (dias < 7) return `Hace ${dias} días`;
+  if (dias < 30) return `Hace ${Math.floor(dias / 7)} sem.`;
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
 // "Tiene datos" = algo más que el nombre. Un cliente con SOLO nombre se puede borrar; en
 // cuanto tiene datos, se edita (no se borra). Con facturas emitidas, ni editar ni borrar.
 const tieneDatos = (c: Cli) => !!(c.nif || c.email || c.direccion || c.codigo_postal || c.poblacion || c.provincia || c.notas);
@@ -51,6 +69,7 @@ export function ClienteModal({
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<"todos" | "hoy" | "deuda">("todos");
   const [tarifas, setTarifas] = useState<{ id: string; nombre: string }[]>([]);
+  const [stats, setStats] = useState<Record<string, { visitas: number; ultima: string | null }>>({});
   const [sel, setSel] = useState<Cli | null>(null);
   const [alta, setAlta] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -68,6 +87,13 @@ export function ClienteModal({
   const quitar = useClientesStore((s) => s.quitar);
   useEffect(() => { void cargarClientes(sb); }, [cargarClientes, sb]);
   useEffect(() => { sb.from("tarifa").select("id,nombre").order("nombre").then(({ data }) => setTarifas((data as { id: string; nombre: string }[]) ?? [])); }, [sb]);
+  useEffect(() => {
+    sb.rpc("clientes_stats").then(({ data }) => {
+      const m: Record<string, { visitas: number; ultima: string | null }> = {};
+      for (const r of (data as { customer_id: string; visitas: number; ultima: string | null }[] | null) ?? []) m[r.customer_id] = { visitas: Number(r.visitas), ultima: r.ultima };
+      setStats(m);
+    });
+  }, [sb]);
   const tarifaNombre = (id: string | null) => (id ? tarifas.find((t) => t.id === id)?.nombre : null) ?? "General";
 
   // Filtrado LOCAL (sin pegarle a la BD en cada tecla): nombre/teléfono/NIF/email + "hoy".
@@ -145,13 +171,13 @@ export function ClienteModal({
     <ModalTPV
       titulo="Cliente"
       subtitulo={sub}
-      ancho={920}
-      alto={640}
+      ancho={1160}
+      alto={760}
       onClose={onClose}
       derecha={<div className="text-right"><div className="text-[9px] font-bold uppercase tracking-wider text-white/70">Ticket</div><b className="text-lg tabular-nums">{eur(total)}</b></div>}
     >
       <div className="flex h-full min-h-0 flex-col">
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-[1.4fr_1fr] gap-3 p-3">
           {/* ── Panel izquierdo: buscar + filtros + resultados ── */}
           <section className="flex min-h-0 flex-col rounded-lg border border-border bg-surface">
             <div className="flex flex-none items-center gap-2 border-b border-border p-2">
@@ -176,16 +202,29 @@ export function ClienteModal({
               {cargado && lista.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Sin resultados. Usa «Cliente nuevo».</p>}
               {lista.map((c) => {
                 const activo = sel?.id === c.id;
+                const st = stats[c.id];
+                const emp = esEmpresa(c);
                 return (
                   <button type="button" key={c.id} onClick={() => { setSel(c); setAlta(false); }}
                     className={`flex w-full items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors ${activo ? "bg-brand/10" : "hover:bg-accent"}`}>
-                    <span className="grid h-9 w-9 flex-none place-items-center rounded-full text-xs font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
+                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full text-xs font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{c.nombre}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">{c.telefono ?? "sin teléfono"}{c.nif ? ` · ${c.nif}` : " · sin NIF"}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-bold">{c.nombre}</span>
+                        {emp && <span className="flex-none rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">Empresa</span>}
+                        {c.notas && <span title={c.notas} className="flex-none rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-500">Alergias</span>}
+                      </span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {c.telefono ?? "sin teléfono"} · {c.nif || "sin NIF"}{st ? ` · ${st.visitas} visita${st.visitas === 1 ? "" : "s"} · ${relativa(st.ultima)}` : ""}
+                      </span>
                     </span>
-                    {Number(c.saldo) > 0 && <span title="Debe" className="flex-none rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold text-rose-600 dark:text-rose-400">{eur(Number(c.saldo))}</span>}
-                    {facturable(c) && <span title="Facturable" className="flex-none rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">FACT.</span>}
+                    <span className="flex-none text-right">
+                      <span className="block text-xs font-bold">{tarifaNombre(c.tarifa_id)}</span>
+                      {Number(c.descuento_pct) > 0 && <span className="block text-[11px] font-bold text-emerald-600 dark:text-emerald-400">−{Number(c.descuento_pct)}%</span>}
+                    </span>
+                    {Number(c.saldo) > 0
+                      ? <span title="Debe" className="flex-none rounded bg-rose-500/15 px-1.5 py-1 text-[10px] font-bold text-rose-600 dark:text-rose-400">DEBE {eur(Number(c.saldo))}</span>
+                      : facturable(c) && <span title="Facturable" className="flex-none rounded bg-emerald-500/15 px-1.5 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">FACTURA</span>}
                   </button>
                 );
               })}
@@ -217,7 +256,7 @@ export function ClienteModal({
               {alta ? (
                 <Alta form={form} setForm={setForm} tarifas={tarifas} />
               ) : sel ? (
-                <Ficha c={sel} tarifa={tarifaNombre(sel.tarifa_id)} />
+                <Ficha c={sel} tarifa={tarifaNombre(sel.tarifa_id)} empresa={esEmpresa(sel)} st={stats[sel.id]} />
               ) : (
                 <div className="grid h-full place-items-center text-center text-sm text-muted-foreground">
                   <div><b className="mb-1 block text-foreground">Ningún cliente elegido</b>Toca uno de la lista para ver su ficha, o crea uno nuevo.</div>
@@ -253,7 +292,7 @@ export function ClienteModal({
 }
 
 // ── Ficha (solo lectura) del cliente elegido ──
-function Ficha({ c, tarifa }: Readonly<{ c: Cli; tarifa: string }>) {
+function Ficha({ c, tarifa, empresa, st }: Readonly<{ c: Cli; tarifa: string; empresa: boolean; st?: { visitas: number; ultima: string | null } }>) {
   const fac = facturable(c);
   const falta = [!c.nif && "el NIF", !(c.direccion && c.codigo_postal && c.poblacion) && "la dirección fiscal"].filter(Boolean).join(" y ");
   const dato = (l: string, v: string | null, no?: string) => (
@@ -268,7 +307,10 @@ function Ficha({ c, tarifa }: Readonly<{ c: Cli; tarifa: string }>) {
       <div className="mb-3 flex items-center gap-3">
         <span className="grid h-12 w-12 flex-none place-items-center rounded-full text-base font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
         <div className="min-w-0">
-          <div className="truncate text-base font-bold">{c.nombre}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-base font-bold">{c.nombre}</span>
+            {empresa && <span className="flex-none rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">Empresa</span>}
+          </div>
           <div className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${fac ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/15 text-amber-600 dark:text-amber-500"}`}>
             {fac ? <><Check size={11} /> Facturable</> : <><TriangleAlert size={11} /> No facturable</>}
           </div>
@@ -284,6 +326,7 @@ function Ficha({ c, tarifa }: Readonly<{ c: Cli; tarifa: string }>) {
       {dato("Descuento fijo", Number(c.descuento_pct) > 0 ? `${Number(c.descuento_pct)} %` : null, "sin descuento")}
       {dato("Saldo / deuda", Number(c.saldo) !== 0 ? eur(Number(c.saldo)) : null, "al día")}
       {dato("Alergias / avisos cocina", c.notas)}
+      {dato("Visitas", st ? `${st.visitas} · ${relativa(st.ultima)}` : null, "sin visitas")}
       {dato("Puntos fidelidad", c.puntos_fidelidad ? String(c.puntos_fidelidad) : null, "0")}
       {dato("Acepta promociones (RGPD)", c.consentimiento_marketing ? "Sí" : null, "no")}
     </div>
