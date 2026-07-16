@@ -2594,16 +2594,18 @@ export default function TPV() {
                 <div
                   key={id}
                   onClick={() => onLineaTap(id)}
-                  className={`flex w-full flex-col rounded-md px-2 py-1.5 text-xs transition-colors cursor-pointer ${
-                    sel ? "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_#0e8fa2]"
-                      : esParteMenu ? "bg-emerald-500/5 hover:bg-emerald-500/10" : "hover:bg-accent"
-                  } ${marchado ? "opacity-80" : ""}`}
+                  className={`flex w-full flex-col rounded-md py-1.5 text-xs transition-colors cursor-pointer ${
+                    sel ? "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_#0e8fa2]" : "hover:bg-accent"
+                  } ${marchado ? "opacity-80" : ""} ${esParteMenu ? "pl-5 pr-2" : "px-2"}`}
                 >
                   <div className="flex w-full items-start gap-1">
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1">
-                        <span className={`truncate ${marchado ? "text-muted-foreground/90 font-medium" : "font-bold text-foreground"}`}>
-                          {esParteMenu && <span className="text-emerald-600 dark:text-emerald-400">(M)</span>} {nombreBaseDeKey(id)}
+                        <span className={`truncate ${
+                          esParteMenu ? "text-[11px] font-medium text-muted-foreground"
+                            : marchado ? "text-muted-foreground/90 font-medium" : "font-bold text-foreground"
+                        }`}>
+                          {esParteMenu && <span className="font-semibold">(M)</span>} {nombreBaseDeKey(id)}
                         </span>
                         {marchado && (
                           <span className="inline-flex flex-none items-center rounded bg-emerald-500/10 px-1 py-0.5 text-[8px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide">
@@ -2625,9 +2627,11 @@ export default function TPV() {
                           </span>
                         )}
                       </span>
-                      {extraIngredientesDetallados(id).map((ext, idx) => (
+                      {/* Solo EXTRAS con precio como sub-línea "↳ (+€)". Los comentarios sin coste
+                          (Sin gluten, Al punto…) NO se repiten aquí: ya salen en la nota "✎" de abajo. */}
+                      {extraIngredientesDetallados(id).filter((ext) => ext.precio > 0).map((ext, idx) => (
                         <span key={idx} className="mt-0.5 block pl-3 text-[10px] text-muted-foreground/75 font-medium leading-tight">
-                          ↳ {ext.nombre} {ext.uds > 1 ? `x${ext.uds}` : ""} {ext.precio > 0 ? `(+${eur(ext.precio * ext.uds)})` : ""}
+                          ↳ {ext.nombre} {ext.uds > 1 ? `x${ext.uds}` : ""} (+{eur(ext.precio * ext.uds)})
                         </span>
                       ))}
                       {notas[id] && (
