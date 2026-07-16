@@ -2444,10 +2444,12 @@ export default function TPV() {
         <div className="flex flex-none items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-8 w-auto" />
-          <div className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5">
+          <button type="button" onClick={() => irASalaEstable({ tipo: "room" })}
+            title="Seleccionar mesa"
+            className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 transition-colors hover:bg-white/25">
             <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Mesa</span>
             <span className="text-sm font-semibold">{mesa?.nombre ?? llevar?.nombre ?? "—"}</span>
-          </div>
+          </button>
           <div className="flex items-center gap-1 rounded-md bg-white/10 px-1.5 py-1">
             <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">Pax</span>
             <button type="button" aria-label="Menos comensales" onClick={() => setComensales((n) => Math.max(1, n - 1))}
