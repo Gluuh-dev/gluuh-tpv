@@ -10,6 +10,7 @@ import { Fingerprint, Lock, ShieldCheck } from "lucide-react";
 import { getSetting, setSetting } from "../../lib/settings";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
 import { ClaveTecnicaCard } from "@/components/zona-tecnica";
+import { SesionesCuentaCard, MfaTotpCard } from "@/components/seguridad-cuenta";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,10 @@ export default function Seguridad() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cuenta (F2): sesiones abiertas + verificación en dos pasos */}
+      <SesionesCuentaCard />
+      <MfaTotpCard />
 
       {/* Zona técnica (clave del instalador) */}
       <ClaveTecnicaCard />

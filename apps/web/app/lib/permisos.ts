@@ -78,11 +78,18 @@ export function permite(permisos: MapaPermisos | null | undefined, id: string): 
 export const permisoZona = (navId: string) => `panel.${navId}`;
 
 /** Perfiles recomendados listos para clonar/ajustar (mejor que empezar de cero).
- *  Se siembran al crear la empresa y con el botón de /perfiles. */
+ *  Se siembran al crear la empresa y con el botón de /perfiles.
+ *
+ *  MATERIALIZADOS (F1, 0112/0113): desde el switch fail-closed del servidor,
+ *  una clave AUSENTE es DENEGADA en `operario_permite()`. Por eso cada perfil
+ *  declara TODAS las claves del catálogo en explícito — `{}` ya no significa
+ *  «todo permitido» y no debe volver a sembrarse así. */
 export interface PerfilRecomendado { nombre: string; descripcion: string; permisos: MapaPermisos }
+const TODO_PERMITIDO: MapaPermisos = Object.fromEntries(IDS_PERMISOS.map((id) => [id, true]));
+const salvo = (deniega: string[]): MapaPermisos => ({ ...TODO_PERMITIDO, ...Object.fromEntries(deniega.map((d) => [d, false])) });
 export const PERFILES_RECOMENDADOS: PerfilRecomendado[] = [
-  { nombre: "Administrador", descripcion: "Acceso total al panel y al TPV.", permisos: {} },
-  { nombre: "Encargado", descripcion: "Todo menos la zona técnica del instalador.", permisos: { tecnica: false } },
-  { nombre: "Camarero", descripcion: "Solo operativa (TPV); sin backoffice.", permisos: { "panel.admin": false, "panel.compras": false, "panel.herramientas": false, "panel.informes": false } },
-  { nombre: "Informes", descripcion: "Solo la sección de Informes.", permisos: { "panel.operativa": false, "panel.admin": false, "panel.compras": false, "panel.herramientas": false } },
+  { nombre: "Administrador", descripcion: "Acceso total al panel y al TPV.", permisos: { ...TODO_PERMITIDO } },
+  { nombre: "Encargado", descripcion: "Todo menos la zona técnica del instalador.", permisos: salvo(["tecnica"]) },
+  { nombre: "Camarero", descripcion: "Solo operativa (TPV); sin backoffice.", permisos: salvo(["panel.admin", "panel.compras", "panel.herramientas", "panel.informes"]) },
+  { nombre: "Informes", descripcion: "Solo la sección de Informes.", permisos: salvo(["panel.operativa", "panel.admin", "panel.compras", "panel.herramientas"]) },
 ];

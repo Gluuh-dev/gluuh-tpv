@@ -2,7 +2,7 @@
 // (tabla tenant_module, migración 0035). Sin fila = activo por defecto.
 // Diseño: docs/implementacion/04-modulos-y-emparejado.md.
 import { useEffect, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 import { supabaseBrowser } from "./supabaseBrowser";
 
 export interface DefModulo {
@@ -110,7 +110,7 @@ export function configCon<T extends Record<string, unknown>>(
 
 /** Config guardada del módulo ({} si no hay fila, la tabla no existe o falla la red). */
 export async function leerConfigModulo(
-  sb: SupabaseClient,
+  sb: GluuhSupabaseClient,
   modulo: Modulo,
 ): Promise<Record<string, unknown>> {
   try {
@@ -132,7 +132,7 @@ export async function leerConfigModulo(
  * `activo` se conserva; si no existe, se crea con el default (activo).
  */
 export async function guardarConfigModulo(
-  sb: SupabaseClient,
+  sb: GluuhSupabaseClient,
   tenantId: string,
   modulo: Modulo,
   config: Record<string, unknown>,
@@ -165,7 +165,7 @@ export function licenciaVigente(hasta: string | null): boolean {
  * en todos esos casos se degrada a "sin gating por licencia".
  */
 export async function leerLicencia(
-  sb: SupabaseClient,
+  sb: GluuhSupabaseClient,
 ): Promise<{ hasta: string | null; modulos: string[] }> {
   try {
     const { data, error } = await sb

@@ -19,6 +19,7 @@
 import pg from "pg";
 import { cabeceras, credenciales } from "./nube.mjs";
 import { NO_BAJAR, SOLO_AL_PROVISIONAR, leerEsquema, meterFilas } from "./espejo.mjs";
+import { despuesDePk } from "./cursores.mjs";
 
 // El nodo se identifica como SU bar y la RLS lo acota a él. NUNCA lleva la clave maestra
 // de la plataforma: en el mini-PC de un cliente, esa clave sería la llave de los datos de
@@ -79,9 +80,22 @@ for (const tabla of esquema.orden) {
   else if (columnas.has("tenant_id")) filtro = `tenant_id=eq.${tenantId}`;
   // Sin tenant_id ni ser `tenant` → catálogo global (tipos de IVA, alérgenos…): entero.
 
-  let filas;
+  // PAGINADO hasta agotar (F8.1, plans/022): el `limit=5000` de antes cortaba en
+  // silencio — un bar con 6.000 clientes se instalaba "bien" con 5.000, y nadie
+  // se enteraba hasta que faltaba uno. Orden estable por PK y páginas de 1000.
+  const pk = esquema.pkDe.get(tabla);
+  let filas = [];
   try {
-    filas = await nube(`${tabla}?select=*${filtro ? `&${filtro}` : ""}&limit=5000`);
+    let ultima = null;
+    for (;;) {
+      let ruta = `${tabla}?select=*${filtro ? `&${filtro}` : ""}` +
+        `&order=${pk.map((c) => `${c}.asc`).join(",")}&limit=1000`;
+      if (ultima) ruta += `&${despuesDePk(pk, ultima)}`;
+      const pagina = await nube(ruta);
+      filas.push(...pagina);
+      if (pagina.length < 1000) break;
+      ultima = pagina[pagina.length - 1];
+    }
   } catch (e) {
     // Una tabla que en la nube no existe (o no deja leer) no puede tumbar la instalación.
     console.warn(`  ${tabla.padEnd(26)} se salta (${e.message.slice(0, 60)})`);

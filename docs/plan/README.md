@@ -34,6 +34,10 @@
 | [08-checklist-maestro-100.md](08-checklist-maestro-100.md) | ★ Lista maestra de TODO (módulos, funciones, mejoras) con estado ✅/🟡/❌ — la "definición de completo al 100%" |
 | [09-orden-de-implementacion.md](09-orden-de-implementacion.md) | ★★ PLAN OPERATIVO (07-07): bloques A-F en orden — remates de identidad, publicar en Cloudflare, impresión multi-barra, acabados, NODO LOCAL y VERIFACTU al final. Abrir por la mañana y trabajar de arriba abajo |
 | [10-arquitectura-nodo-local-y-nube.md](10-arquitectura-nodo-local-y-nube.md) | ★ ARQUITECTURA DEFINITIVA (12-07): nodo local = fuente de verdad operativa (sin internet); nube = espejo + módulo de pago (ver/editar desde casa, backup remoto, multi-local). Sync partido por clase de dato. **Actualiza el doc 06.** Se ejecuta en la guía de implementación 16 |
+| [11-decisiones-del-nodo.md](11-decisiones-del-nodo.md) | Decisiones cerradas del nodo local, provisión, actualización y recuperación |
+| [12-auditoria-nodo-mejoras.md](12-auditoria-nodo-mejoras.md) | Auditoría específica del nodo y catálogo de mejoras |
+| [13-flujo-alta-instalacion-y-accesos.md](13-flujo-alta-instalacion-y-accesos.md) | Origen de las decisiones de alta, instalación e identidades; queda complementado por el plan 14 |
+| [14-plan-definitivo-reparacion-identidad-seguridad.md](14-plan-definitivo-reparacion-identidad-seguridad.md) | ★★★ PLAN CANÓNICO APROBADO (17-07): F0–F8, identidad global, nodo, dispositivos, seguridad, dinero, fiscalidad, sync y puertas de aceptación. Guía ejecutable: [`implementacion/19`](../implementacion/19-plan-maestro-reparacion-f0-f8.md) |
 
 ## Documentos relacionados
 

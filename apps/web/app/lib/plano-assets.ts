@@ -60,7 +60,11 @@ export const ASSETS: PlanoAsset[] = [
   { id: "muro-madera", file: "muro-madera.svg", nombre: "Muro madera", tipo: "separador", w: 500, h: 80 },
   { id: "muro-negro", file: "muro-negro.svg", nombre: "Muro negro", tipo: "separador", w: 500, h: 80 },
   { id: "separador", file: "separador.svg", nombre: "Línea fina", tipo: "separador", w: 944.05, h: 39.17 },
-  { id: "toldo", file: "toldo.svg", nombre: "Toldo divisor", tipo: "separador", w: 500, h: 150 },
+  // El id `toldo` conserva compatibilidad con planos existentes; ahora usa el
+  // faldón repetible para poder alargarse sin deformar las ondas inferiores.
+  { id: "toldo", file: "toldo-divisor-morado.svg", nombre: "Toldo divisor morado", tipo: "separador", w: 600, h: 110 },
+  { id: "toldo-divisor-verde", file: "toldo-divisor-verde.svg", nombre: "Toldo divisor verde", tipo: "separador", w: 600, h: 110 },
+  { id: "toldo-divisor-rojo", file: "toldo-divisor-rojo.svg", nombre: "Toldo divisor rojo", tipo: "separador", w: 600, h: 110 },
   { id: "puerta", file: "puerta.svg", nombre: "Puerta", tipo: "abertura", w: 800, h: 433 },
   { id: "entrada", file: "entrada.svg", nombre: "Entrada", tipo: "abertura", w: 700, h: 467 },
   // ── Legacy (solo para resolver planos ya guardados; no salen en la paleta) ──

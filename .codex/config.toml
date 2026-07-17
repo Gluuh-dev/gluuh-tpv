@@ -1,0 +1,10 @@
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+[mcp_servers.stripe]
+url = "https://mcp.stripe.com/"
+
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp?project_ref=gxcqihslbicrszgzudjs"
+
+[mcp_servers.supabase.tools.execute_sql]
+approval_mode = "approve"

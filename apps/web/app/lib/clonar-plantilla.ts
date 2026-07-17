@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient, TablaPublica } from "@gluuh/supabase";
 import { randomUUID } from "node:crypto";
 
 // Clona el CATÁLOGO de un tenant plantilla a una empresa nueva (consola de
@@ -16,7 +16,7 @@ const remap = (m: Map<string, string>, id: unknown): string | null =>
   typeof id === "string" ? (m.get(id) ?? null) : null;
 
 export async function clonarCatalogo(
-  admin: SupabaseClient,
+  admin: GluuhSupabaseClient,
   origen: string,
   destino: string,
 ): Promise<void> {
@@ -142,8 +142,8 @@ export async function clonarCatalogo(
 // Clona filas sueltas de una tabla (sin FKs a remapear): impuestos, formas de
 // pago, plantillas de ticket… Cambia solo el tenant_id.
 export async function clonarTabla(
-  admin: SupabaseClient,
-  tabla: string,
+  admin: GluuhSupabaseClient,
+  tabla: TablaPublica,
   origen: string,
   destino: string,
 ): Promise<void> {

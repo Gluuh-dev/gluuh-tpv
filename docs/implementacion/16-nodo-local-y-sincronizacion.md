@@ -1,5 +1,11 @@
 # 16 — Nodo local y sincronización con la nube
 
+> **Encaje vigente:** esta guía aporta detalle técnico, pero su ejecución queda
+> subordinada a F3, F5 y F7 del
+> [plan maestro F0–F8](19-plan-maestro-reparacion-f0-f8.md). No se aplica LWW a
+> identidad, permisos, dinero ni fiscalidad, y ningún endpoint puede confirmar una
+> operación que no haya persistido.
+
 **Objetivo:** ejecutar la arquitectura de
 [`docs/plan/10-arquitectura-nodo-local-y-nube.md`](../plan/10-arquitectura-nodo-local-y-nube.md):
 un **nodo principal** (mini-PC) que es la fuente de verdad operativa del local y

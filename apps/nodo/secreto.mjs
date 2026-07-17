@@ -44,6 +44,28 @@ export function firmar(rol, secreto = secretoDelNodo()) {
 }
 
 /**
+ * Verifica un token firmado por ESTE nodo (F5, plans/023). Devuelve el payload
+ * o null si la firma no cuadra o está caducado. Es la contraparte de `firmar()`:
+ * con esto media/gateway pueden exigir "un token de este bar" sin depender de
+ * PostgREST.
+ */
+export function verificar(token, secreto = secretoDelNodo()) {
+  try {
+    const [cab, cue, firma] = String(token ?? "").split(".");
+    if (!cab || !cue || !firma) return null;
+    const esperada = crypto.createHmac("sha256", secreto).update(`${cab}.${cue}`).digest("base64url");
+    const a = Buffer.from(firma);
+    const b = Buffer.from(esperada);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    const payload = JSON.parse(Buffer.from(cue, "base64url").toString("utf8"));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * La URL REAL de Supabase. Hace falta aunque no haya internet: es la que se guarda en la
  * base de datos al subir una foto (la canónica). El dato que se sincroniza no puede
  * llevar dentro una dirección de la red local del bar. Ver `urlFoto` y `subirMedia`.

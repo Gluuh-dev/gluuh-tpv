@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 
 /**
  * Passkeys (WebAuthn) sobre Supabase Auth (beta). La API experimental aún no está
@@ -11,11 +11,11 @@ export function passkeysSoportadas(): boolean {
 }
 
 /** Registra una passkey para el usuario con sesión iniciada. */
-export async function registrarPasskey(sb: SupabaseClient) {
+export async function registrarPasskey(sb: GluuhSupabaseClient) {
   return await (sb.auth as unknown as { registerPasskey: () => Promise<{ data: unknown; error: { message: string } | null }> }).registerPasskey();
 }
 
 /** Inicia sesión con una passkey (huella / Face ID / Windows Hello). */
-export async function entrarConPasskey(sb: SupabaseClient) {
+export async function entrarConPasskey(sb: GluuhSupabaseClient) {
   return await (sb.auth as unknown as { signInWithPasskey: () => Promise<{ data: unknown; error: { message: string } | null }> }).signInWithPasskey();
 }

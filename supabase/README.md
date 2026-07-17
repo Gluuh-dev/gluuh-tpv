@@ -15,16 +15,26 @@
 
 ## Aplicar el esquema
 
-```bash
-# Opción A — Supabase CLI
-supabase init           # si aún no está iniciado
-supabase db push        # aplica supabase/migrations/0001_init.sql
+**`supabase/migrations/*.sql` es el esquema canónico** (decisión 12-07-2026;
+`apps/api/db/schema.sql` es solo documentación histórica y NO se sincroniza).
+Una migración nueva = reservar el siguiente número en `docs/estado/AHORA.md`
+**antes** de escribir el fichero. Leer la skill `gluuh-base-datos` primero.
 
-# Opción B — psql directo
-psql "$DATABASE_URL" -f supabase/migrations/0001_init.sql
+## Tipos generados (contrato del esquema)
+
+`supabase/types/database.types.ts` se genera desde la **base viva** del proyecto
+autorizado (`gxcqihslbicrszgzudjs`) y es el contrato que compila el código
+(`GluuhContractDatabase` en `packages/supabase`). No se edita a mano.
+
+```bash
+pnpm tipos:generar    # regenera (UTF-8 sin BOM, LF, reemplazo atómico)
+pnpm tipos:check      # gate de drift: falla si nube ≠ fichero versionado
+pnpm contrato:check   # sin red: los .from()/.rpc() literales existen en el contrato
 ```
 
-> `supabase/migrations/0001_init.sql` es **espejo** de `apps/api/db/schema.sql`. Mantenlos sincronizados (o elige uno como canónico cuando se adopte el CLI).
+Los dos primeros requieren `SUPABASE_ACCESS_TOKEN` (solo lectura); sin él salen
+con código 2 y el gate queda en manual. **Toda migración termina regenerando los
+tipos** y dejando `contrato:check` en verde.
 
 ## RLS con Supabase (detalle importante)
 

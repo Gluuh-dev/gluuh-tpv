@@ -41,6 +41,9 @@ export interface PreviewTicketDto {
   numSerieFactura: string;
   fechaExpedicion: string; // dd-mm-aaaa
   fechaHoraHusoGenRegistro: string; // ISO 8601 con huso
+  /** F1 = completa · F2 = simplificada. La huella y el XML DEBEN llevar el mismo
+   *  tipo que la factura persistida (plans/020); antes iba "F2" fijo. */
+  tipoFactura?: "F1" | "F2";
   huellaRegistroAnterior?: string;
   registroAnterior?: RegistroAnteriorDto;
   entorno?: EntornoAEAT;
@@ -60,7 +63,7 @@ export class FiscalService {
           idEmisorFactura: dto.nif,
           numSerieFactura: dto.numSerieFactura,
           fechaExpedicionFactura: dto.fechaExpedicion,
-          tipoFactura: "F2",
+          tipoFactura: dto.tipoFactura ?? "F2",
           cuotaTotal: formatImporte(impuestos.cuotaTotal),
           importeTotal: formatImporte(impuestos.importeTotal),
           fechaHoraHusoGenRegistro: dto.fechaHoraHusoGenRegistro,
@@ -110,7 +113,7 @@ export class FiscalService {
       numSerieFactura: dto.numSerieFactura,
       fechaExpedicionFactura: dto.fechaExpedicion,
       nombreRazonEmisor: dto.nombreRazonEmisor ?? "Emisor",
-      tipoFactura: "F2",
+      tipoFactura: dto.tipoFactura ?? "F2",
       descripcionOperacion: "Servicio de restauración",
       detalles: detallesDesdeImpuestos(impuestos),
       cuotaTotal: formatImporte(impuestos.cuotaTotal),

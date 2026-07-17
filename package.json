@@ -13,6 +13,9 @@
     "lint": "eslint .",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
+    "tipos:generar": "node scripts/generar-tipos-supabase.mjs",
+    "tipos:check": "node scripts/generar-tipos-supabase.mjs --check",
+    "contrato:check": "node scripts/verificar-contrato-supabase.mjs",
     "core:demo": "pnpm --filter @gluuh/core demo",
     "core:test": "pnpm --filter @gluuh/core test",
     "cf:build": "pnpm --filter @gluuh/core build && pnpm --filter @gluuh/web exec opennextjs-cloudflare build",
@@ -25,6 +28,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.7.0",
     "pg": "^8.21.0",
+    "supabase": "2.101.0",
     "turbo": "^2.9.18",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.63.0"

@@ -23,6 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
 import { cabeceras, credenciales } from "./nube.mjs";
+import { cursorLeer, cursorGuardar, despuesDe, despuesDePk } from "./cursores.mjs";
 import {
   NO_BAJAR, NO_SUBIR_COLUMNAS, clavePk, fechasLocales, leerEsquema, meterFilas,
 } from "./espejo.mjs";
@@ -150,10 +151,8 @@ const TABLAS = [
 
 const LOTE = 200;
 
-// Cuántas filas se piden de una tabla de la nube para compararla con la del bar. Si una
-// tabla llegara a este tope, la lista podría venir CORTADA — y lo que faltara parecería
-// borrado. Cuando pasa, no se borra nada y se dice por el log (`propagarBorrados`).
-const TOPE = 5000;
+// (El antiguo TOPE de 5000 filas por foto murió con F7: la foto ahora se pagina
+// hasta agotar — ver `fotoNube` y su cinturón FOTO_MAX.)
 
 const bd = new pg.Pool({ connectionString: BD });
 
@@ -391,6 +390,43 @@ function instante(t) {
   return ms;
 }
 
+// ── CURSOR COMPUESTO (F7, plans/021): (updated_at, clave primaria) ───────────
+//
+// Una marca de agua de SOLO fecha pierde filas de dos maneras que no avisan:
+//   · 2.501 filas con el MISMO updated_at (un backfill, un import): la página
+//     corta el grupo por la mitad y el `gt.fecha` del pase siguiente se salta
+//     el resto PARA SIEMPRE;
+//   · un `limit=1000` sin más páginas: lo que no cupo, no existe.
+// El cursor guarda (fecha, pk) y las páginas se piden "después de ESTA fila",
+// hasta agotar. La marca se persiste como JSON; las antiguas (solo fecha) se
+// entienden igual.
+
+// Los helpers puros del cursor viven en cursores.mjs (probables sin nodo).
+
+const PAGINA = 1000;
+// Cinturón: si una tabla supera esto, algo raro pasa (o es enorme de verdad);
+// se corta el pase y NO se propagan borrados. ponytail: subirlo si algún bar
+// legítimo lo alcanza.
+const FOTO_MAX = 200_000;
+
+/** La foto COMPLETA de la nube (pk + updated_at), paginada hasta agotar. */
+async function fotoNube(tabla, pk, filtro) {
+  const filas = [];
+  let ultima = null;
+  for (;;) {
+    let url = `${NUBE}/rest/v1/${tabla}?select=${pk.join(",")},updated_at&${filtro}` +
+      `&order=${pk.map((c) => `${c}.asc`).join(",")}&limit=${PAGINA}`;
+    if (ultima) url += `&${despuesDePk(pk, ultima)}`;
+    const pagina = await fetch(url, { headers: cab })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!pagina) return null;                     // sin línea: pase siguiente
+    filas.push(...pagina);
+    if (pagina.length < PAGINA) return filas;     // agotada: foto completa
+    if (filas.length >= FOTO_MAX) return null;    // cinturón
+    ultima = pagina[pagina.length - 1];
+  }
+}
+
 /** Las tablas del catálogo: las que saben cuándo se tocaron. */
 const tablasDeCatalogo = (esquema) =>
   esquema.orden.filter((tabla) => {
@@ -440,50 +476,111 @@ async function sincronizarTablaDeCatalogo(tenantId, esquema, tabla) {
   // para saber qué se ha borrado.
   const mias = await fechasLocales(bd, esquema, tabla, tenantId);
 
-  const suyas = await fetch(
-    `${NUBE}/rest/v1/${tabla}?select=${pk.join(",")},updated_at&${filtro}&limit=${TOPE}`,
-    { headers: cab },
-  ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  if (!suyas) return cuenta;   // sin línea: ya se hará en el pase siguiente
+  // La foto COMPLETA, paginada hasta agotar (F7): con el `limit` de antes, una
+  // carta grande venía cortada y lo que no cupo parecía borrado o nunca bajaba.
+  const suyas = await fotoNube(tabla, pk, filtro);
+  if (!suyas) return cuenta;   // sin línea (o cinturón FOTO_MAX): pase siguiente
 
   const enLaNube = new Map(suyas.map((f) => [clavePk(pk, f), f.updated_at]));
 
+  // ── LÁPIDAS (F7.3, migración 0120): las bajas tienen FECHA ──────────────────
+  //
+  // Sin esto, un nodo restaurado de un backup antiguo re-SUBÍA lo borrado
+  // (la fila no está en la foto → parece nueva del bar → sube = resurrección).
+  // Se leen las lápidas nuevas desde la marca `tumba:` y:
+  //   · una fila local más VIEJA que su lápida se borra aquí;
+  //   · y jamás se sube (el filtro de subida las respeta);
+  //   · una fila local más NUEVA que su lápida gana (LWW): se queda y sube.
+  // Si la nube aún no tiene 0120, el fetch falla y todo sigue como antes.
+  const tumbas = new Map();   // clave → { t: fecha de la baja, clave: jsonb }
+  let ultimaTumba = null;
+  {
+    let cur = cursorLeer(await marcaDeAgua(`tumba:${tabla}`));
+    for (;;) {
+      const url = `${NUBE}/rest/v1/tombstone_sync?select=id,clave,updated_at` +
+        `&tabla=eq.${tabla}&tenant_id=eq.${tenantId}&${despuesDe(["id"], cur)}` +
+        `&order=updated_at.asc,id.asc&limit=${PAGINA}`;
+      const pagina = await fetch(url, { headers: cab })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (!pagina || !pagina.length) break;
+      for (const tumba of pagina) {
+        tumbas.set(pk.map((c) => tumba.clave?.[c]).join(""), { t: tumba.updated_at, clave: tumba.clave });
+      }
+      ultimaTumba = pagina[pagina.length - 1];
+      if (pagina.length < PAGINA) break;
+      cur = { t: ultimaTumba.updated_at, k: [ultimaTumba.id] };
+    }
+  }
+  for (const [clave, tumba] of tumbas) {
+    const mia = mias.get(clave);
+    if (mia && instante(mia.updated_at) <= instante(tumba.t)) {
+      await bd.query(
+        `delete from public."${tabla}" where ${pk.map((k, i) => `"${k}" = $${i + 1}`).join(" and ")}`,
+        pk.map((k) => tumba.clave[k]),
+      );
+      mias.delete(clave);
+      cuenta.borradas++;
+    }
+  }
+
   // ── BAJA: lo que la nube tiene más nuevo ────────────────────────────────────
   //
-  // El delta (por `updated_at`) sirve para pedir SÓLO las filas cambiadas con todas sus
-  // columnas. La foto de arriba dice qué cambió; ésta trae el contenido.
-  const desdeBaja = await marcaDeAgua(`baja:${tabla}`);
-  const deLaNube = await fetch(
-    `${NUBE}/rest/v1/${tabla}?select=*&${filtro}&updated_at=gt.${encodeURIComponent(desdeBaja)}&limit=1000`,
-    { headers: cab },
-  ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  if (!deLaNube) return cuenta;
+  // El delta trae SOLO lo cambiado, con todas sus columnas, por CURSOR COMPUESTO
+  // (updated_at, pk) y en páginas hasta agotar. Cada página se APLICA y después
+  // avanza el cursor (checkpoint por página): un corte a mitad reanuda desde la
+  // última página aplicada, reaplicando como mucho una página (los upserts son
+  // idempotentes) — nunca saltándose filas.
+  let curBaja = cursorLeer(await marcaDeAgua(`baja:${tabla}`));
+  for (;;) {
+    const url = `${NUBE}/rest/v1/${tabla}?select=*&${filtro}&${despuesDe(pk, curBaja)}` +
+      `&order=updated_at.asc,${pk.map((c) => `${c}.asc`).join(",")}&limit=${PAGINA}`;
+    const pagina = await fetch(url, { headers: cab })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!pagina) return cuenta;                  // sin línea a mitad: el cursor queda donde iba
+    if (!pagina.length) break;
 
-  const aBajar = deLaNube.filter((f) => {
-    const mia = mias.get(clavePk(pk, f));
-    return !mia || instante(mia.updated_at) < instante(f.updated_at);   // gana el reciente
-  });
-
-  if (aBajar.length) {
-    // Con los triggers PUESTOS: `set_updated_at` respeta la fecha que trae la fila (0101),
-    // así que la fecha no se corre — y el aviso de realtime salta solo, o sea que el TPV
-    // repinta el precio nuevo sin que nadie recargue nada.
-    await meterFilas(bd, esquema, tabla, aBajar);
-    cuenta.bajadas = aBajar.length;
+    const aBajar = pagina.filter((f) => {
+      const mia = mias.get(clavePk(pk, f));
+      return !mia || instante(mia.updated_at) < instante(f.updated_at);   // gana el reciente
+    });
+    if (aBajar.length) {
+      // Con los triggers PUESTOS: `set_updated_at` respeta la fecha que trae la fila (0101),
+      // así que la fecha no se corre — y el aviso de realtime salta solo, o sea que el TPV
+      // repinta el precio nuevo sin que nadie recargue nada.
+      await meterFilas(bd, esquema, tabla, aBajar);
+      cuenta.bajadas += aBajar.length;
+    }
+    // Checkpoint: la ÚLTIMA fila leída de la página (aplicada o descartada por
+    // ser más vieja que la local — en ambos casos está resuelta).
+    curBaja = { t: pagina[pagina.length - 1].updated_at, k: pk.map((c) => pagina[pagina.length - 1][c]) };
+    await anotarMarca(`baja:${tabla}`, cursorGuardar(pagina[pagina.length - 1], pk));
+    if (pagina.length < PAGINA) break;
   }
 
   // ── SUBE: lo que el dueño ha cambiado EN LA BARRA, sin internet ─────────────
   //
   // La marca `sube:` sólo sirve para no releer el catálogo entero de la base cada cinco
   // minutos. Quién gana NO lo decide ella: lo decide la comparación con la nube.
-  const desdeSube = await marcaDeAgua(`sube:${tabla}`);
+  // Cursor (updated_at, pk) también aquí: un lote local con TODAS las filas al
+  // mismo microsegundo (un import, un backfill) ya no puede quedar a medias.
+  const curSube = cursorLeer(await marcaDeAgua(`sube:${tabla}`));
+  const pkCols = pk.map((c) => `"${c}"`).join(", ");
+  const condicionSube = curSube.k
+    ? `(updated_at > $2::timestamptz or (updated_at = $2::timestamptz and (${pkCols}) > (${curSube.k.map((_, i) => `$${i + 3}`).join(", ")})))`
+    : `updated_at > $2::timestamptz`;
   const delBar = tabla === "tenant" ? [] : (await bd.query(
-    `select * from public."${tabla}" where tenant_id = $1 and updated_at > $2 order by updated_at`,
-    [tenantId, desdeSube],
+    `select * from public."${tabla}" where tenant_id = $1 and ${condicionSube}
+      order by updated_at, ${pkCols}`,
+    [tenantId, curSube.t, ...(curSube.k ?? [])],
   )).rows;
 
   const aSubir = delBar.filter((f) => {
-    const suya = enLaNube.get(clavePk(pk, f));
+    const clave = clavePk(pk, f);
+    // La baja gana a la fila más vieja: lo borrado con lápida posterior NO se
+    // sube (resurrección por backup antiguo, muerta aquí).
+    const tumba = tumbas.get(clave);
+    if (tumba && instante(f.updated_at) <= instante(tumba.t)) return false;
+    const suya = enLaNube.get(clave);
     // Misma fecha = ya están en sintonía (la fila bajó de la nube y no se ha tocado aquí).
     return !suya || instante(f.updated_at) > instante(suya);
   });
@@ -499,23 +596,24 @@ async function sincronizarTablaDeCatalogo(tenantId, esquema, tabla) {
     cuenta.subidas = aSubir.length;
   }
 
-  // Las marcas avanzan con TODO lo leído, no sólo con lo aplicado.
+  // La marca avanza con TODO lo leído, no sólo con lo aplicado.
   //
   // ⚠ Y eso descansa en un invariante que hay que respetar si se toca esto: **cada fila de
   // `delBar` queda resuelta en este pase**. O sube, o ya estaba en sintonía, o la nube la
   // tiene más nueva y baja (y si baja es que está en el delta, porque su fecha es posterior
-  // a la marca `baja:`). Si alguien añade un «esta fila me la salto», la marca pasará por
+  // al cursor `baja:`). Si alguien añade un «esta fila me la salto», la marca pasará por
   // encima de ella y **ese cambio del bar no subirá jamás**. Sin error, sin rastro: el
   // dueño cambia un precio en la barra y no llega nunca a la nube.
-  if (deLaNube.length) {
-    const ultima = deLaNube.reduce((a, b) => (instante(a.updated_at) >= instante(b.updated_at) ? a : b));
-    await anotarMarca(`baja:${tabla}`, ultima.updated_at);
-  }
   if (delBar.length) {
-    await anotarMarca(`sube:${tabla}`, delBar[delBar.length - 1].updated_at);
+    await anotarMarca(`sube:${tabla}`, cursorGuardar(delBar[delBar.length - 1], pk));
+  }
+  // La marca de lápidas avanza al FINAL: si el pase muere antes, el siguiente
+  // relee las mismas (borrar dos veces es idempotente; filtrar dos veces, gratis).
+  if (ultimaTumba) {
+    await anotarMarca(`tumba:${tabla}`, JSON.stringify({ t: ultimaTumba.updated_at, k: [ultimaTumba.id] }));
   }
 
-  cuenta.borradas = await propagarBorrados(tabla, pk, mias, enLaNube, suyas.length, subidas);
+  cuenta.borradas += await propagarBorrados(tabla, pk, mias, enLaNube, suyas.length, subidas);
   return cuenta;
 }
 
@@ -538,10 +636,12 @@ function limpiarParaLaNube(fila) {
  * RLS devuelve `[]` con un 200 tan tranquila. De ahí los tres cerrojos.
  */
 async function propagarBorrados(tabla, pk, mias, enLaNube, cuantasAllí, subidas) {
-  // CERROJO 1 — la lista viene llena hasta el borde: puede estar CORTADA, y todo lo que
-  // faltara se borraría aquí. No se toca nada, y se dice.
-  if (cuantasAllí >= TOPE) {
-    console.warn(`  ${tabla}: la nube devuelve ${TOPE}+ filas; no se propagan borrados.`);
+  // CERROJO 1 — la foto viene paginada hasta agotar (F7), así que solo puede
+  // estar cortada si tocó el cinturón FOTO_MAX (y entonces `fotoNube` devolvió
+  // null y ni llegamos aquí). Este cerrojo queda de RED por si alguien vuelve a
+  // meter un tope: una foto al borde del cinturón no borra nada.
+  if (cuantasAllí >= FOTO_MAX) {
+    console.warn(`  ${tabla}: la foto llegó al cinturón (${FOTO_MAX}); no se propagan borrados.`);
     return 0;
   }
 

@@ -7,10 +7,12 @@ Marca ✅ lo que ya has probado y ✔️/❌ si va bien o no.
 
 Arranca: `pnpm --filter @gluuh/web dev` → http://localhost:3100 → login `admin@gluuh.com`.
 
-- [ ] **Teclado en pantalla** — botón **"⌨ Teclado"** abajo a la derecha (en cualquier
-  pantalla). Ábrelo, toca un campo de texto y escribe; prueba **Mayús**, **?123** (símbolos),
-  **acentos** (á é í…), **arrástralo** por la barra de arriba, y **ciérralo**. Debe recordar
-  si estaba abierto y dónde.
+- [ ] **Teclado en pantalla** — YA **no** hay botón flotante en todas las pantallas. Sale
+  con un botón **"⌨ Teclado"** que se pone **dentro de cada modal/página** que lo necesite
+  (aún por cablear). Layout tipo **móvil/SwiftKey**: fila numérica arriba, **⇧** y **⌫** en
+  los extremos de la fila `zxcv`, **coma** a la izquierda del espacio y **punto** a la derecha,
+  **?#$** para símbolos (con el guion), **acentos** al mantener pulsada una vocal, **Intro**
+  esconde el teclado. Arrástralo por la barra (recuerda la posición, no si estaba abierto).
 - [ ] **Lanzador `/inicio`** — al entrar: tema **CLARO**, por **tiles**, **morado `#572370`**,
   hero **TPV**, chip del terminal (punto verde), reloj, saludo por hora, botón **Salir**.
 - [ ] **Morado nuevo `#572370`** en todo el app (botones, acentos) — en **claro Y oscuro**.

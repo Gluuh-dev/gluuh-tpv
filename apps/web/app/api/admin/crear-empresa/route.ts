@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { GluuhContractDatabase, GluuhSupabaseClient, TablaPublica } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
 import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
 import { hostPlataforma } from "@/app/lib/plataforma";
 import { clonarCatalogo, clonarTabla } from "@/app/lib/clonar-plantilla";
 
 // Grupos que se pueden importar de la plantilla al alta, y su tabla/acción.
-const TABLA_GRUPO: Record<string, string> = { impuestos: "tax_rate", formas_pago: "payment_method", tickets: "plantilla_ticket" };
+const TABLA_GRUPO: Partial<Record<string, TablaPublica>> = { impuestos: "tax_rate", formas_pago: "payment_method", tickets: "plantilla_ticket" };
 
 // Alta de empresa COMPLETA en un paso. SOLO el técnico de Gluuh (es_admin_plataforma).
 // Decisiones guía 15 §12: el cliente NO tiene email de login — se le genera un
@@ -39,7 +40,7 @@ const emailCuenta = (usr: string) => `${usr}@cuentas.gluuh.local`;
 const conValor = (o: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== ""));
 
-type Admin = SupabaseClient;
+type Admin = GluuhSupabaseClient;
 
 // Aprovisionamiento tras el alta, una vez existe el tenant. Best-effort deliberado:
 // la empresa queda creada aunque falle una pieza (se puede rehacer desde /admin).
@@ -71,12 +72,13 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   const { error: eClave } = await admin.rpc("admin_establecer_clave_tecnica", { p_tenant: tid, p_clave: claveTecnica });
   if (eClave) claveTecnica = null; // la clave se podrá fijar después
 
-  // Siempre: perfiles recomendados + usuarios base (tecnico/1212, admin/1111,
-  // camarero/2222, camarera/3333).
+  // Siempre: perfiles recomendados. Los OPERARIOS ya NO se siembran (F4.4, plan
+  // docs/plan/14): tecnico/1212, admin/1111, camarero/2222… eran credenciales
+  // CONOCIDAS iguales en todos los clientes. El personal se da de alta desde el
+  // panel (Usuarios y PIN) o por invitación; el PIN temporal se ve una vez.
   await admin.from("perfil").insert(
     PERFILES_RECOMENDADOS.map((r) => ({ tenant_id: tid, nombre: r.nombre, descripcion: r.descripcion, permisos: r.permisos })),
   );
-  await admin.rpc("admin_sembrar_operarios_defecto", { p_tenant: tid });
   await admin.rpc("admin_sembrar_ejemplo", { p_tenant: tid });
 
   // Clonado desde la PLANTILLA BASE de lo marcado en el alta.
@@ -89,8 +91,10 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   // recién creado no puede cobrar (la pantalla de cobro sin métodos).
   await admin.rpc("admin_sembrar_formas_pago", { p_tenant: tid });
 
-  // Terminal por defecto (tpv1 / 121212) para poder conectar un TPV nada más instalar (0107).
-  await admin.rpc("admin_sembrar_terminal_defecto", { p_tenant: tid });
+  // La semilla de terminal por defecto (0107, tpv1/121212) está RETIRADA: dependía de la
+  // credencial por terminal de 0105 (diseño rechazado, plan docs/plan/14) y su RPC en la
+  // nube referencia columnas inexistentes — fallaba siempre y el error se descartaba.
+  // El alta vigente de terminales es el código efímero de emparejado (/conectar).
 
   return { codigoInstalacion, claveTecnica };
 }
@@ -106,7 +110,10 @@ async function clonarDesdePlantilla(admin: Admin, tid: string, grupos: string[])
   for (const g of grupos) {
     try {
       if (g === "catalogo") await clonarCatalogo(admin, origen, tid);
-      else if (TABLA_GRUPO[g]) await clonarTabla(admin, TABLA_GRUPO[g], origen, tid);
+      else {
+        const tabla = TABLA_GRUPO[g];
+        if (tabla) await clonarTabla(admin, tabla, origen, tid);
+      }
     } catch { /* grupo omitido; la empresa queda igualmente creada */ }
   }
 }
@@ -117,7 +124,7 @@ export async function POST(req: Request) {
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const caller = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+  const caller = createClient<GluuhContractDatabase>(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },
   });
@@ -130,7 +137,7 @@ export async function POST(req: Request) {
   const usr = normalizarUsuario(String(usuario || empresa));
   if (usr.length < 3) return NextResponse.json({ error: "El usuario debe tener al menos 3 letras o números" }, { status: 400 });
 
-  const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+  const admin = createClient<GluuhContractDatabase>(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
   const passwordInicial = legible(10);
   const { data, error } = await admin.auth.admin.createUser({
     email: emailCuenta(usr),

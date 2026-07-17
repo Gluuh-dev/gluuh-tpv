@@ -1,6 +1,6 @@
 # Planes de implementación
 
-Índice generado por la skill `improve`. Dos tandas:
+Índice generado por la skill `improve`. Tres tandas:
 
 - **001–009** — auditoría del 2026-06-15 (commit `09857da`). Todas DONE; notas abajo.
 - **010–015** — auditoría del 2026-07-11 (commit `9c959d1` + árbol de trabajo),
@@ -9,9 +9,75 @@
   Selección hecha en modo autónomo: los 6 hallazgos con más palanca
   (impacto ÷ esfuerzo, ponderado por confianza); el resto queda documentado en
   las secciones de abajo para no re-auditar.
+- **016–026** — auditoría integral del 2026-07-17, planificada sobre `4d11ee5`.
+  Selección: todos los hallazgos confirmados con impacto de seguridad, dinero,
+  fiscalidad, pérdida de datos, operación o coste estructural. No aplica cambios:
+  esta tanda es el mapa ejecutable de reparación.
 
 Cada ejecutor: lee el plan completo antes de empezar, respeta sus "Condiciones
 de STOP" y actualiza tu fila al terminar.
+
+## Orden de ejecución y estado — tanda 2026-07-17
+
+| Plan | Título | Prioridad | Esfuerzo | Depende de | Estado |
+|------|--------|-----------|----------|------------|--------|
+| 016 | Verificar esquema vivo y activar tipos Supabase | P0 | M | — | TODO |
+| 017 | Cerrar RPC privilegiadas y contexto tenant | P0 | M | 016 | TODO |
+| 018 | Convertir RBAC/panel a fail-closed | P0 | M–L | 016; coordinar 017 | TODO |
+| 019 | Venta atómica, idempotente y server-authoritative | P0 | L | 016, 018 | TODO |
+| 023 | Cerrar superficie LAN, diagnósticos y media | P0 | M–L | 017 | TODO |
+| 020 | Emisión fiscal, huella y outbox AEAT | P0 | L | 019 | TODO |
+| 021 | Reparar sync, cursores y falso ACK | P0 | L | 016, 019 | TODO |
+| 024 | Identidad de dispositivo y mínimo IPC | P0 | L | 017, 018, 023 | TODO |
+| 022 | Provisionado, updater y cola de impresión durables | P1 | L | 021 | TODO |
+| 025 | Gates CI y pruebas adversariales | P1 | M–L | 017, 018, 019, 021, 023 | TODO |
+| 026 | Coste del panel y deuda estructural | P2 | L | 019, 020, 025 | TODO |
+
+### Ruta crítica y paralelismo seguro
+
+- Ruta principal: **016 → 017 → 018 → 019 → 020**. Es la secuencia que pasa de
+  verdad del esquema a identidad, autorización, dinero y finalmente fiscalidad.
+- Tras 017 puede arrancar 023 en paralelo con 018, siempre que no editen la misma
+  migración de credenciales. 024 espera a que ambas fronteras queden definidas.
+- Tras 019, 020 y 021 pueden desarrollarse en paralelo: 020 es fiscal; 021 es
+  transporte/sync. 022 espera al protocolo de 021.
+- 025 empieza preparando harness/baseline, pero no se marca DONE hasta incorporar
+  las regresiones de sus dependencias. 026 es deliberadamente el último.
+- Cada ejecución crea rama `codex/NNN-slug`, reserva migración en `AHORA.md` cuando
+  corresponda y comprueba rutas sucias antes de tocar nada.
+
+### Reconciliación con planes y decisiones anteriores
+
+- El plan 013 resolvió sustitución atómica de líneas en una **cuenta existente**.
+  El 019 no lo duplica: cubre alta nueva, pagos, autoridad de precios y cierre de
+  escrituras directas, que siguen fuera de aquella RPC.
+- La antigua conclusión genérica “RLS floja” continúa rechazada. 017/018 se apoyan
+  en fallos específicos verificados: funciones `SECURITY DEFINER`, grants y defaults
+  permisivos; no proponen rehacer toda la RLS.
+- El `/sync/upload` stub ya figuraba como dirección pendiente. 021 lo convierte en
+  una decisión verificable: implementación durable o 501; nunca ACK ficticio.
+- `apps/api/db/schema.sql` no se sincroniza. La fuente canónica sigue siendo
+  `supabase/migrations`; 016 contrasta contra la BD viva y tipos generados.
+- Los cambios visuales/TPV ya presentes en el working tree pertenecen al usuario.
+  019 y 026 incluyen STOP para no mezclarlos.
+
+### Hallazgos considerados y no convertidos en reparación
+
+- Cleanup de Realtime: los subscriptions revisados sí devuelven cleanup; no se
+  confirmó fuga genérica.
+- “Todas las tablas carecen de RLS”: falso; el problema confirmado es puntual.
+- Mantener un espejo manual en `apps/api/db/schema.sql`: rechazado por decisión
+  vigente del repositorio.
+- Migración masiva del panel a Server Components o activar React Compiler: sin
+  medición y con demasiado alcance; 026 exige perfil antes de decidir.
+- PowerSync como solución obligatoria: no consta activo. 021 exige primero elegir
+  un write-path y deshabilitar cualquier falso éxito.
+
+### Condición global de despliegue
+
+Ningún plan puede escribir en otra base: solo Supabase `gxcqihslbicrszgzudjs` y
+el Postgres del nodo `.nodo/pgdata`, puerto **55432**, base **gluuh**. Los planes
+016 y preflights usan MCP en lectura; toda migración requiere reserva y revisión.
 
 ## Orden de ejecución y estado — tanda 2026-07-11
 

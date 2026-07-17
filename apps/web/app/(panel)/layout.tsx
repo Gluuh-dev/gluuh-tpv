@@ -16,14 +16,25 @@ import { CommandPalette } from "@/components/command-palette";
 
 interface SessionInfo { empresa: string; email: string; nombre: string; rol: Rol; permisos: MapaPermisos; licenciaHasta: string | null }
 
+// Bootstrap FAIL-CLOSED (F1, plan 018): ante error o identidad incompleta el
+// panel NO asume PROPIETARIO ni permisos vacíos — muestra el estado y no monta
+// contenido privilegiado. La autoridad real es el servidor/RLS; esto evita que
+// la UI enseñe (y dispare) mutaciones que no corresponden.
+type Bootstrap =
+  | { fase: "cargando" }
+  | { fase: "error" }               // fallo de red/consulta: recuperable
+  | { fase: "incompleta" }          // sesión válida pero sin identidad utilizable
+  | { fase: "ok"; info: SessionInfo };
+
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [info, setInfo] = useState<SessionInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [boot, setBoot] = useState<Bootstrap>({ fase: "cargando" });
+  const [reintento, setReintento] = useState(0);
   const [entrada, setEntrada] = useState("inicio");
   const [modulosOff, setModulosOff] = useState<Set<string>>(new Set());
   const { railOpen, menuOpen, toggleRail, toggleMenu, setMenuOpen } = useUI();
+  const info = boot.fase === "ok" ? boot.info : null;
 
   useEffect(() => {
     modulosInactivos().then(setModulosOff).catch(() => setModulosOff(new Set()));
@@ -32,22 +43,39 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sb = supabaseBrowser();
     (async () => {
-      const { data: { session } } = await sb.auth.getSession();
+      setBoot({ fase: "cargando" });
+      const { data: { session }, error: eSesion } = await sb.auth.getSession();
+      if (eSesion) { setBoot({ fase: "error" }); return; }
       if (!session) { router.replace("/login"); return; }
       // Cuenta recién entregada (alta de Gluuh): obliga a crear su contraseña.
       if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
       // tenant y app_user en paralelo: un round-trip menos en CADA carga del panel.
-      // En vivo: el usuario hereda los permisos de su perfil (perfil_id); sin
-      // perfil = acceso completo. Editar el perfil se refleja al recargar.
-      const [{ data: t }, { data: u }] = await Promise.all([
+      const [rt, ru] = await Promise.all([
         sb.from("tenant").select("nombre,licencia_hasta").limit(1).maybeSingle(),
         sb.from("app_user").select("nombre,rol,perfil(permisos)").eq("auth_user_id", session.user.id).maybeSingle(),
       ]);
-      const perfilRel = (u as { perfil?: { permisos?: MapaPermisos } | null } | null)?.perfil;
-      setInfo({ empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "", nombre: u?.nombre ?? "", rol: (u?.rol as Rol) ?? "PROPIETARIO", permisos: perfilRel?.permisos ?? {}, licenciaHasta: (t as { licencia_hasta?: string | null } | null)?.licencia_hasta ?? null });
-      setLoading(false);
-    })();
-  }, [router]);
+      // Error de consulta ≠ identidad ausente: lo primero se reintenta, lo
+      // segundo se deniega. Nunca se cae a PROPIETARIO/{}.
+      if (rt.error || ru.error) { setBoot({ fase: "error" }); return; }
+      const u = ru.data as { nombre?: string; rol?: string; perfil?: { permisos?: MapaPermisos } | null } | null;
+      const rol = u?.rol as Rol | undefined;
+      if (!u || !rol) { setBoot({ fase: "incompleta" }); return; }
+      // Un no-propietario sin perfil no hereda "todo permitido": identidad
+      // incompleta hasta que el administrador le asigne perfil (backfill 0112).
+      const permisos = u.perfil?.permisos;
+      // (rol viene de la BD; ADMIN_PLATAFORMA no está en el tipo Rol del menú)
+      if (rol !== "PROPIETARIO" && (rol as string) !== "ADMIN_PLATAFORMA" && !permisos) { setBoot({ fase: "incompleta" }); return; }
+      const t = rt.data as { nombre?: string; licencia_hasta?: string | null } | null;
+      setBoot({
+        fase: "ok",
+        info: {
+          empresa: t?.nombre ?? "Mi empresa", email: session.user.email ?? "",
+          nombre: u.nombre ?? "", rol, permisos: permisos ?? {},
+          licenciaHasta: t?.licencia_hasta ?? null,
+        },
+      });
+    })().catch(() => setBoot({ fase: "error" }));
+  }, [router, reintento]);
 
   useEffect(() => {
     const e = NAV.find((n) => n.index === pathname || n.sections.some((sec) => sec.items.some((i) => i.href === pathname)));
@@ -55,8 +83,9 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const nav = useMemo(() => {
-    const rol = info?.rol ?? "PROPIETARIO";
-    const permisos = info?.permisos ?? {};
+    if (!info) return []; // sin identidad no hay menú (fail-closed)
+    const rol = info.rol;
+    const permisos = info.permisos;
     return NAV
       // El perfil puede ocultar zonas del menú (permiso panel.<id>); Inicio y Ayuda
       // siempre visibles y el PROPIETARIO lo ve todo (para no autobloquearse).
@@ -122,7 +151,35 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     if (e.index) router.push(e.index);
   }
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-background text-(--text-muted)">Cargando…</div>;
+  if (boot.fase === "cargando") return <div className="grid min-h-screen place-items-center bg-background text-(--text-muted)">Cargando…</div>;
+
+  if (boot.fase === "error") return (
+    <div className="grid min-h-screen place-items-center bg-background">
+      <div className="max-w-sm rounded-lg border border-border bg-surface p-6 text-center">
+        <h1 className="text-[16px] font-semibold">No se pudo cargar tu sesión</h1>
+        <p className="mt-1 text-[12.5px] text-(--text-secondary)">Fallo de conexión al comprobar tu identidad. No se ha abierto el panel por seguridad.</p>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button onClick={() => setReintento((n) => n + 1)}>Reintentar</Button>
+          <Button variant="outline" onClick={() => router.replace("/login")}>Volver a entrar</Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (boot.fase === "incompleta") return (
+    <div className="grid min-h-screen place-items-center bg-background">
+      <div className="max-w-sm rounded-lg border border-border bg-surface p-6 text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface-muted">
+          <ShieldAlert className="h-5 w-5 text-(--text-muted)" aria-hidden />
+        </div>
+        <h1 className="mt-3 text-[16px] font-semibold">Identidad incompleta</h1>
+        <p className="mt-1 text-[12.5px] text-(--text-secondary)">Tu sesión es válida pero tu usuario no tiene empresa o perfil asignado. Pide al administrador que complete tu alta.</p>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button variant="outline" onClick={async () => { await supabaseBrowser().auth.signOut(); router.replace("/login"); }}>Cerrar sesión</Button>
+        </div>
+      </div>
+    </div>
+  );
 
   const verSubmenu = menuOpen && activa && !activa.direct;
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { GluuhContractDatabase, GluuhSupabaseClient } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
 import { hostPlataforma } from "@/app/lib/plataforma";
 
@@ -21,7 +22,7 @@ const sumarMeses = (desde: Date, n: number) => { const d = new Date(desde); d.se
 
 // La cuenta de EMPRESA de un tenant: el app_user con email (sintético
 // @cuentas.gluuh.local) y auth_user_id — los operarios tienen email null.
-async function cuentaEmpresa(admin: SupabaseClient, tid: string): Promise<string | null> {
+async function cuentaEmpresa(admin: GluuhSupabaseClient, tid: string): Promise<string | null> {
   const { data } = await admin
     .from("app_user")
     .select("auth_user_id")
@@ -33,7 +34,7 @@ async function cuentaEmpresa(admin: SupabaseClient, tid: string): Promise<string
   return (data as { auth_user_id: string } | null)?.auth_user_id ?? null;
 }
 
-async function resetPassword(admin: SupabaseClient, tid: string) {
+async function resetPassword(admin: GluuhSupabaseClient, tid: string) {
   const authId = await cuentaEmpresa(admin, tid);
   if (!authId) return NextResponse.json({ error: "Esta empresa no tiene cuenta de acceso con contraseña." }, { status: 404 });
   const nueva = legible(10);
@@ -44,7 +45,7 @@ async function resetPassword(admin: SupabaseClient, tid: string) {
   return NextResponse.json({ ok: true, passwordInicial: nueva });
 }
 
-async function renovarLicencia(admin: SupabaseClient, tid: string, meses: unknown, modulos: unknown) {
+async function renovarLicencia(admin: GluuhSupabaseClient, tid: string, meses: unknown, modulos: unknown) {
   const m = Number(meses);
   if (!Number.isInteger(m) || m <= 0) return NextResponse.json({ error: "Duración no válida" }, { status: 400 });
   const d = new Date(); d.setMonth(d.getMonth() + m);
@@ -55,7 +56,7 @@ async function renovarLicencia(admin: SupabaseClient, tid: string, meses: unknow
   return NextResponse.json({ ok: true, licenciaHasta: hasta });
 }
 
-async function regenerarCodigo(admin: SupabaseClient, tid: string) {
+async function regenerarCodigo(admin: GluuhSupabaseClient, tid: string) {
   for (let i = 0; i < 3; i++) {
     const cod = generarCodigoInstalacion();
     const { error } = await admin.from("tenant").update({ codigo_instalacion: cod }).eq("id", tid);
@@ -66,14 +67,14 @@ async function regenerarCodigo(admin: SupabaseClient, tid: string) {
 
 // Suspender / reactivar (tenant.activo). Suspendida = no entran operarios ni se
 // activan instalaciones nuevas (RLS/login lo comprueban).
-async function suspender(admin: SupabaseClient, tid: string, activo: unknown) {
+async function suspender(admin: GluuhSupabaseClient, tid: string, activo: unknown) {
   const { error } = await admin.from("tenant").update({ activo: !!activo }).eq("id", tid);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, activo: !!activo });
 }
 
 // Límites de la empresa (licencia_limites jsonb). 0/vacío = sin límite.
-async function limites(admin: SupabaseClient, tid: string, dispositivos: unknown, usuarios: unknown) {
+async function limites(admin: GluuhSupabaseClient, tid: string, dispositivos: unknown, usuarios: unknown) {
   const lim: { dispositivos?: number; usuarios?: number } = {};
   if (Number.isInteger(dispositivos) && (dispositivos as number) > 0) lim.dispositivos = dispositivos as number;
   if (Number.isInteger(usuarios) && (usuarios as number) > 0) lim.usuarios = usuarios as number;
@@ -83,7 +84,7 @@ async function limites(admin: SupabaseClient, tid: string, dispositivos: unknown
 }
 
 // Editar datos de la empresa (tenant + su local).
-async function editar(admin: SupabaseClient, tid: string, d: Record<string, unknown>) {
+async function editar(admin: GluuhSupabaseClient, tid: string, d: Record<string, unknown>) {
   const t = conValor({ nombre: d.nombre, cif: d.cif, email_admin: d.emailContacto });
   if (Object.keys(t).length) await admin.from("tenant").update(t).eq("id", tid);
   const l = conValor({ direccion: d.direccion, poblacion: d.poblacion, provincia: d.provincia, codigo_postal: d.codigoPostal, telefono: d.telefono, cif: d.cif });
@@ -92,7 +93,7 @@ async function editar(admin: SupabaseClient, tid: string, d: Record<string, unkn
 }
 
 // Configuración de pago (ciclo, forma, precio, próximo pago).
-async function configPago(admin: SupabaseClient, tid: string, d: Record<string, unknown>) {
+async function configPago(admin: GluuhSupabaseClient, tid: string, d: Record<string, unknown>) {
   const precio = Number(d.precio);
   const { error } = await admin.from("tenant").update({
     ciclo_pago: (d.ciclo as string) || null,
@@ -105,7 +106,7 @@ async function configPago(admin: SupabaseClient, tid: string, d: Record<string, 
 }
 
 // Registrar un pago recibido de la empresa y avanzar el próximo pago según el ciclo.
-async function registrarPago(admin: SupabaseClient, tid: string, d: Record<string, unknown>) {
+async function registrarPago(admin: GluuhSupabaseClient, tid: string, d: Record<string, unknown>) {
   const importe = Number(d.importe);
   if (!Number.isFinite(importe) || importe <= 0) return NextResponse.json({ error: "Importe no válido" }, { status: 400 });
   const { data: t } = await admin.from("tenant").select("ciclo_pago, proximo_pago").eq("id", tid).maybeSingle();
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const caller = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+  const caller = createClient<GluuhContractDatabase>(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },
   });
@@ -141,7 +142,7 @@ export async function POST(req: Request) {
   const { accion, tenantId, meses, modulos, activo, dispositivos, usuarios } = body;
   if (!tenantId) return NextResponse.json({ error: "Falta la empresa" }, { status: 400 });
 
-  const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+  const admin = createClient<GluuhContractDatabase>(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
   switch (accion) {
     case "reset-password": return resetPassword(admin, tenantId);
     case "renovar-licencia": return renovarLicencia(admin, tenantId, meses, modulos);

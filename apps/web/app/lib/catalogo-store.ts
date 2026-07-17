@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 
 // Tipos del catálogo (compartidos por TPV, kiosko, KDS…).
 export interface Family { id: string; nombre: string; color: string }
@@ -32,7 +32,7 @@ interface CatalogoState {
   horariosCat: Record<string, FranjaHorario[]>;
   modById: Record<string, ModOpcion>;
   /** Carga el catálogo. Cache en memoria + localStorage; solo fetchea la 1ª vez (o con force). */
-  cargar: (sb: SupabaseClient, opts?: { force?: boolean }) => Promise<void>;
+  cargar: (sb: GluuhSupabaseClient, opts?: { force?: boolean }) => Promise<void>;
   setProds: (p: Prod[]) => void;
   setCats: (updater: (prev: Cat[]) => Cat[]) => void;
 }

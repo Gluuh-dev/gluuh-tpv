@@ -33,12 +33,26 @@ export default function CambiarPassword() {
     if (p1 !== p2) { setError("Las contraseñas no coinciden."); return; }
     setCargando(true);
     setError("");
-    const { error } = await supabaseBrowser().auth.updateUser({
-      password: p1,
-      data: { debe_cambiar_password: false },
-    });
+    // El cambio lo hace el SERVIDOR (F2): la bandera debe_cambiar_password ya no
+    // la limpia el propio cliente — solo se limpia si la contraseña cambió.
+    const sb = supabaseBrowser();
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch("/api/cuenta/cambiar-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+      body: JSON.stringify({ password: p1 }),
+    }).catch(() => null);
     setCargando(false);
-    if (error) { setError(traducirErrorAuth(error.message)); return; }
+    if (!res?.ok) {
+      const j = await res?.json().catch(() => null);
+      setError(traducirErrorAuth(j?.error ?? "No se pudo guardar la contraseña."));
+      return;
+    }
+    // Cambiar la contraseña cierra TODAS las demás sesiones (F2 2.3): si alguien
+    // tenía la cuenta abierta con la clave vieja, se queda fuera.
+    await sb.auth.signOut({ scope: "others" }).catch(() => { /* mejor esfuerzo */ });
+    // Refrescar la sesión para que la metadata limpia llegue al cliente.
+    await sb.auth.refreshSession();
     router.replace("/dashboard");
   }
 

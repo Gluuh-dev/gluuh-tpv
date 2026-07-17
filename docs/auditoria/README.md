@@ -58,7 +58,7 @@ En esta sesión no hubo herramientas Supabase MCP cargadas. El fichero `.mcp.jso
 
 1. Leer los hallazgos `AUD-001`–`AUD-010`.
 2. Confirmar en metadatos de Supabase el estado de `0105`, grants efectivos y objetos RLS.
-3. Autorizar, si procede, únicamente la **Fase 1 — Seguridad y aislamiento** del roadmap.
+3. Ejecutar el [plan definitivo F0–F8](../plan/14-plan-definitivo-reparacion-identidad-seguridad.md), aprobado el 17-07-2026.
 4. No activar `VERIFACTU_ACTIVO`, `/fiscal/enviar` ni `@gluuh/sync` antes de cumplir sus puertas de aceptación.
 
 ## Límites de la auditoría

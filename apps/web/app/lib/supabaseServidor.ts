@@ -26,7 +26,8 @@
 //  cliente no pueda pagar.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { GluuhContractDatabase, GluuhSupabaseClient } from "@gluuh/supabase";
 
 /** ¿Corremos DENTRO del servidor de un bar? Lo pone `apps/nodo/web.mjs`. */
 export const enNodo = (): boolean => process.env.NODO_LOCAL === "1";
@@ -55,7 +56,7 @@ export function origenDeDatos(): { url: string; clave: string } {
  * La RLS sigue mandando: pide un pedido de otra empresa y no existe para él. Es lo que hay
  * que usar en todo lo que toque datos de un bar — nunca la clave de servicio.
  */
-export function comoElLlamante(token: string): SupabaseClient | null {
+export function comoElLlamante(token: string): GluuhSupabaseClient | null {
   const { url, clave } = origenDeDatos();
   if (!url || !clave) {
     console.error(
@@ -65,7 +66,7 @@ export function comoElLlamante(token: string): SupabaseClient | null {
     );
     return null;
   }
-  return createClient(url, clave, {
+  return createClient<GluuhContractDatabase>(url, clave, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },
   });
@@ -82,15 +83,15 @@ export function comoElLlamante(token: string): SupabaseClient | null {
 export const claveDeServicio = (): string | undefined =>
   enNodo() ? process.env.NODO_CLAVE_SERVICIO : process.env.SUPABASE_SECRET_KEY;
 
-export function comoElServicio(): SupabaseClient | null {
+export function comoElServicio(): GluuhSupabaseClient | null {
   const { url } = origenDeDatos();
   const secreto = claveDeServicio();
   if (!url || !secreto) return null;
-  return createClient(url, secreto, { auth: { persistSession: false } });
+  return createClient<GluuhContractDatabase>(url, secreto, { auth: { persistSession: false } });
 }
 
 /** ¿Quién llama? `null` si el token no vale. */
-export async function quienLlama(req: Request): Promise<{ supa: SupabaseClient; userId: string } | null> {
+export async function quienLlama(req: Request): Promise<{ supa: GluuhSupabaseClient; userId: string } | null> {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
 

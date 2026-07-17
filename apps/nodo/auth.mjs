@@ -171,45 +171,8 @@ async function entrar(cuerpo) {
   return duenyo ? emitirSesion(duenyo) : null;
 }
 
-// ── Entrar como DISPOSITIVO (el terminal, capa 1) ─────────────────────────────
-//
-// El TPV/comandera se identifica con SU usuario+contraseña (migración 0105), distinta del
-// PIN del camarero. Esto NO abre sesión de datos ni es un `app_user`: solo dice QUÉ terminal
-// es (para el enrutado de impresión, la estación, y —más adelante— el candado de superficie).
-// Encima sigue yendo el PIN del camarero, que es quien abre la sesión de verdad.
-//
-// Devuelve un token de dispositivo largo (365 días): el terminal lo guarda ("recordar") y ya
-// no vuelve a pedir la credencial hasta que se desvincule.
-const DISPOSITIVO_DIAS = 365;
-async function entrarDispositivo(cuerpo) {
-  const usuario = String(cuerpo.usuario ?? "").trim();
-  const clave = String(cuerpo.clave ?? cuerpo.password ?? "");
-  if (!usuario || !clave) return null;
-
-  // El bcrypt lo comprueba Postgres (verificar_clave_dispositivo), no nosotros.
-  const { rows: [d] } = await bd.query(
-    "select * from public.verificar_clave_dispositivo($1, $2)",
-    [usuario, clave],
-  );
-  if (!d) return null;
-
-  // Marca "en línea" desde ya (lo mismo que el heartbeat del panel).
-  await bd.query("select public.device_heartbeat($1, null)", [d.device_id]).catch(() => {});
-
-  const ahora = Math.floor(Date.now() / 1000);
-  const token = firmar({
-    sub: d.device_id,
-    role: "device",
-    device_id: d.device_id,
-    tenant_id: d.tenant_id,
-    modulo: d.modulo,
-    tipo: d.tipo,
-    estacion: d.estacion ?? null,
-    iat: ahora,
-    exp: ahora + DISPOSITIVO_DIAS * 24 * 3600,
-  });
-  return { ok: true, token, device_id: d.device_id, nombre: d.nombre, modulo: d.modulo, tipo: d.tipo, estacion: d.estacion ?? null };
-}
+// El flujo de 0105 se retiró: el dispositivo se empareja mediante el código
+// efímero que canjea el servidor web en /api/dispositivos/canjear.
 
 // ── Renovar ──────────────────────────────────────────────────────────────────
 async function renovar(cuerpo) {
@@ -269,12 +232,10 @@ const servidor = http.createServer(async (req, res) => {
       return sesion ? json(res, 200, sesion) : malas(res);
     }
 
-    // Login del TERMINAL (usuario+contraseña del dispositivo). Distinto de /token, que es
-    // para empleados. Sin autenticación previa: la credencial del terminal ES la puerta.
+    // Compatibilidad explícita: el endpoint antiguo falla cerrado y no consulta
+    // objetos ausentes de la base viva.
     if (ruta === "/dispositivo" && req.method === "POST") {
-      const cuerpo = await leerCuerpo(req);
-      const r = await entrarDispositivo(cuerpo);
-      return r ? json(res, 200, r) : json(res, 401, { error: "Usuario o contraseña del terminal incorrectos" });
+      return json(res, 410, { error: "Flujo retirado; usa un código de emparejado de seis dígitos" });
     }
 
     if (ruta === "/user" && req.method === "GET") {

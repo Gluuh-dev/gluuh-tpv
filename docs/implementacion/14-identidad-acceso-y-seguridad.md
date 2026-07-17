@@ -1,5 +1,12 @@
 # 14 · Seguridad, identidad y acceso del TPV
 
+> ⚠️ **DOCUMENTO HISTÓRICO, NO EJECUTAR COMO PLAN VIGENTE.** Conserva la fotografía
+> del sistema del 07-07-2026, pero quedan rechazados el login de terminal por
+> usuario/contraseña, las cuentas sintéticas y las semillas conocidas como
+> `Técnico/1212` o `admin/1111`. Las decisiones canónicas están en el
+> [plan definitivo](../plan/14-plan-definitivo-reparacion-identidad-seguridad.md) y su
+> [guía ejecutable F0–F8](19-plan-maestro-reparacion-f0-f8.md).
+
 Documento **maestro** de seguridad: la **Parte A** describe **cómo funciona HOY**
 (verificado contra el código el 07-07-2026); la **Parte B** son las **decisiones y
 el plan de mejoras**. Decisión vigente: lo avanzado de identidad/acceso se

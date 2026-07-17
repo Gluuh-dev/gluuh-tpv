@@ -30,8 +30,9 @@ const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/glu
 const bd = new pg.Client({ connectionString: BD });
 await bd.connect();
 
-/** La hora del cierre de respaldo, por local. Se configura en `setting`; por defecto, 6. */
-async function horaDeRespaldo(locationId) {
+/** La hora del cierre de respaldo. Se configura en `setting`; por defecto, 6.
+ *  (Los callers pasan el local; se usará cuando `setting` se lea por local.) */
+async function horaDeRespaldo() {
   const { rows } = await bd.query(
     "select valor from public.setting where clave = 'jornada_cierre_hora' limit 1",
   ).catch(() => ({ rows: [] }));

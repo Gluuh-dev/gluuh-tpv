@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import type { GluuhContractDatabase } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
 import { hostPlataforma } from "@/app/lib/plataforma";
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const caller = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+  const caller = createClient<GluuhContractDatabase>(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },
   });
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   }
   const mods: string[] = Array.isArray(modulos) ? modulos.filter((m) => typeof m === "string") : [];
 
-  const admin = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+  const admin = createClient<GluuhContractDatabase>(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
   const codigo = generarCodigo();
   const { error } = await admin.rpc("admin_generar_licencia", {
     p_tenant: tenantId,

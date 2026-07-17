@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 import { comoElLlamante } from "@/app/lib/supabaseServidor";
 import {
   calcularImpuestosIncluidos,
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     if (!cliente) return NextResponse.json({ ok: false, error: "Servidor sin configurar" }, { status: 500 });
     // Con tipo, no `const supa = ...` a secas: las funciones de más abajo (que se declaran
     // antes de esta comprobación, por el hoisting) no verían el estrechamiento.
-    const supa: SupabaseClient = cliente;
+    const supa: GluuhSupabaseClient = cliente;
 
     // ── 2. Cuerpo de la petición ─────────────────────────────────────────────
     const body = (await req.json()) as FacturaDto;
@@ -148,11 +148,16 @@ export async function POST(req: Request) {
     // local; en producción se debería calcular con la zona horaria del local.
     const fechaHoraHuso = new Date().toISOString();
 
-    // ── 6. Primera tentativa de inserción ────────────────────────────────────
+    // ── 6. Una tentativa de emisión = UNA transacción (RPC 0118) ─────────────
+    // Factura + desglose + evento outbox entran JUNTOS o no entra nada: se acabó
+    // la factura sin impuestos con el error en un console.error. El envío AEAT
+    // solo se encola con el flag encendido (apagado por defecto, plans/020).
+    const encolarAeat = process.env.VERIFACTU_ENVIO === "1";
+
     async function intentarInsertar(
       numero: number,
       huellaAnterior: string,
-    ): Promise<{ data: { id: string } | null; error: unknown; numSerieFactura: string; huella: string; qrUrl: string; qrDataUrl: string }> {
+    ): Promise<{ resultado: string; invoiceId: string | null; numSerieFactura: string; huella: string; qrUrl: string; qrDataUrl: string }> {
       const numSerieFactura = `${serie}-${new Date().getFullYear()}-${numero}`;
 
       const cadena = encadenarRegistros(
@@ -161,7 +166,10 @@ export async function POST(req: Request) {
             idEmisorFactura: nif,
             numSerieFactura,
             fechaExpedicionFactura: fecha,
-            tipoFactura: "F2",
+            // El MISMO F1/F2 que se persiste: la huella iba SIEMPRE como "F2",
+            // así que la cadena de una factura completa no cuadraba con lo
+            // guardado (plans/020). Huella, XML y fila ya cuentan lo mismo.
+            tipoFactura: dest.tipoFactura,
             cuotaTotal: formatImporte(impuestos.cuotaTotal),
             importeTotal: formatImporte(impuestos.importeTotal),
             fechaHoraHusoGenRegistro: fechaHoraHuso,
@@ -181,9 +189,8 @@ export async function POST(req: Request) {
       const qrUrl = construirUrlQR(qrInput);
       const qrDataUrl = await generarQrVerifactuDataUrl(qrInput, { width: 200 });
 
-      const { data, error } = await supa
-        .from("invoice")
-        .insert({
+      const { data, error } = await supa.rpc("emitir_factura_fiscal", {
+        p_factura: {
           tenant_id: tenantId,
           location_id: locationId,
           order_id: body.orderId,
@@ -205,12 +212,20 @@ export async function POST(req: Request) {
           huella_anterior: huellaAnterior || null,
           qr_url: qrUrl,
           fecha_hora_huso: fechaHoraHuso,
-          estado_aeat: "NO_ENVIADA",
-        })
-        .select("id")
-        .single();
-
-      return { data: data as { id: string } | null, error, numSerieFactura, huella: registro.huella, qrUrl, qrDataUrl };
+        },
+        p_lineas: impuestos.desglose.map((d) => ({ tipo: d.tipo, base: d.base, cuota: d.cuota })),
+        p_encolar: encolarAeat,
+      });
+      if (error) throw new Error(error.message);
+      const r = (Array.isArray(data) ? data[0] : null) as { resultado: string; invoice_id: string | null } | null;
+      return {
+        resultado: r?.resultado ?? "ERROR",
+        invoiceId: r?.invoice_id ?? null,
+        numSerieFactura,
+        huella: registro.huella,
+        qrUrl,
+        qrDataUrl,
+      };
     }
 
     // ── 6-bis. LA CARRERA POR EL NÚMERO DE FACTURA ───────────────────────────
@@ -230,15 +245,6 @@ export async function POST(req: Request) {
     //
     // (Y la colisión se detecta por el CÓDIGO 23505, no buscando la palabra "unique" en el
     // texto del error: ese texto lo escribe Postgres y puede venir traducido.)
-    const esColision = (e: unknown): boolean => {
-      if (typeof e !== "object" || e === null) return false;
-      const code = "code" in e ? String((e as { code: unknown }).code) : "";
-      if (code === "23505") return true;
-      // Cinturón y tirantes: PostgREST podría no propagar el código en algún camino.
-      const msg = "message" in e ? String((e as { message: unknown }).message) : "";
-      return msg.includes("23505") || msg.includes("duplicate key");
-    };
-
     const INTENTOS = 6;
     let numero = 0;
     let huellaAnterior = "";
@@ -247,43 +253,37 @@ export async function POST(req: Request) {
     for (let i = 0; i < INTENTOS; i++) {
       ({ numero, huellaAnterior } = await obtenerSiguienteNumero());
       result = await intentarInsertar(numero, huellaAnterior);
-      if (!result.error || !esColision(result.error)) break;
+      if (result.resultado !== "COLISION") break;
 
       // Una espera corta y DESIGUAL entre intentos. Si los dos reintentaran a la vez y con
       // el mismo ritmo, volverían a chocar en la misma milésima, una y otra vez.
       await new Promise((r) => setTimeout(r, 15 * (i + 1) + Math.random() * 25));
     }
 
-    if (result.error || !result.data) {
-      const msg = typeof result.error === "object" && result.error !== null && "message" in result.error
-        ? String((result.error as { message: string }).message)
-        : "Error insertando factura";
-      return NextResponse.json({ ok: false, error: msg }, { status: 200 });
+    if (result.resultado === "NO_AUTORIZADO") {
+      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 403 });
     }
-
-    const invoiceId = result.data.id;
-
-    // ── 7. Líneas de impuesto ────────────────────────────────────────────────
-    // El error SE COMPROBA: iba sin comprobar y la tabla `invoice_tax_line` ni
-    // siquiera existía en la BD (la declara 0022, que nunca se aplicó; la crea
-    // 0096). Resultado: cada factura se habría guardado SIN su desglose fiscal y
-    // en silencio en cuanto se activara VERIFACTU. Que no vuelva a pasar callando.
-    if (impuestos.desglose.length > 0) {
-      const { error: errTax } = await supa.from("invoice_tax_line").insert(
-        impuestos.desglose.map((d) => ({
-          tenant_id: tenantId,
-          invoice_id: invoiceId,
-          tipo: d.tipo,
-          base: d.base,
-          cuota: d.cuota,
-        })),
-      );
-      if (errTax) {
-        console.error(
-          `[/api/factura] La factura ${result.numSerieFactura} se emitió SIN su desglose ` +
-            `de impuestos (invoice_tax_line): ${errTax.message}. ¿Está aplicada la migración 0096?`,
-        );
-      }
+    // Idempotencia (0118): el pedido YA tenía factura — un reintento tras un
+    // timeout devuelve ESA, no consume otro número ni fabrica otra huella.
+    if (result.resultado === "EXISTE" && result.invoiceId) {
+      const { data: previa } = await supa
+        .from("invoice")
+        .select("num_serie_factura,huella,qr_url")
+        .eq("id", result.invoiceId)
+        .maybeSingle();
+      const p = previa as { num_serie_factura: string; huella: string; qr_url: string } | null;
+      return NextResponse.json({
+        ok: true,
+        yaEmitida: true,
+        numSerieFactura: p?.num_serie_factura ?? "",
+        huella: p?.huella ?? "",
+        qrUrl: p?.qr_url ?? "",
+        leyenda: LEYENDA_VERIFACTU,
+        impuestos,
+      });
+    }
+    if (result.resultado !== "OK" || !result.invoiceId) {
+      return NextResponse.json({ ok: false, error: "No se pudo emitir la factura (numeración en conflicto persistente)" }, { status: 200 });
     }
 
     // ── 8. Respuesta (valores REALMENTE insertados, coherentes también tras reintento) ──

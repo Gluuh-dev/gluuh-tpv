@@ -43,10 +43,16 @@ export default function Login() {
   }, []);
 
   // Tras iniciar sesión: las cuentas de empresa recién creadas (alta de Gluuh,
-  // metadata debe_cambiar_password) pasan primero por /cambiar-password.
+  // metadata debe_cambiar_password) pasan primero por /cambiar-password. Después
+  // se fija el CONTEXTO de la sesión (empresa/local, F1): con una membresía se
+  // activa sola; con varias se elige en /elegir-empresa.
   async function irTrasLogin() {
-    const { data: { user } } = await supabaseBrowser().auth.getUser();
+    const sb = supabaseBrowser();
+    const { data: { user } } = await sb.auth.getUser();
     if (user?.user_metadata?.debe_cambiar_password) { window.location.href = "/cambiar-password"; return; }
+    const { resolverContextoTrasLogin } = await import("../lib/contexto");
+    const destino = await resolverContextoTrasLogin(sb);
+    if (destino) { window.location.href = destino; return; }
     window.location.href = window.gluuh ? "/inicio" : "/dashboard";
   }
 

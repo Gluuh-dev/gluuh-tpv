@@ -2,7 +2,7 @@
 // recibe cada estación según la zona (room) de la mesa, y encola print_job en la
 // cola compartida — así una comandera móvil (sin impresora propia) hace que la
 // comanda salga en la barra/cocina correcta.
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 
 export interface RutaImpresion { estacion: string; room_id: string | null; printer_id: string }
 export interface ImpresoraRef { id: string; rol: string; activa: boolean }
@@ -88,7 +88,7 @@ function formatearComanda(contexto: string, operario: string | undefined, lineas
  * grupo (mejor imprimir lo que se pueda que romper el cobro).
  */
 export async function encolarComandas(
-  sb: SupabaseClient,
+  sb: GluuhSupabaseClient,
   args: { contexto: string; roomId: string | null; operario?: string; grupos: GrupoComanda[] },
 ): Promise<number> {
   const grupos = args.grupos.filter((g) => g.lineas.length > 0);

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 import { config } from "./config";
 
 export interface Branding {
@@ -27,7 +27,7 @@ export const BRANDING_DEFAULT: Branding = {
 };
 
 /** Lee la marca de la empresa de la sesión (RLS); cae a valores por defecto. */
-export async function leerBranding(sb: SupabaseClient): Promise<Branding> {
+export async function leerBranding(sb: GluuhSupabaseClient): Promise<Branding> {
   const { data } = await sb
     .from("tenant_branding")
     .select("nombre_comercial,logo_url,logo_ticket_url,color_primario,color_secundario,kiosko_titulo,kiosko_subtitulo,mesa_color,silla_color")
@@ -73,7 +73,7 @@ async function reducirImagen(file: File, maxLado = 1024): Promise<File> {
  *  canónica. Ver el porqué abajo, en subirMedia.
  */
 export async function subirMedia(
-  sb: SupabaseClient,
+  sb: GluuhSupabaseClient,
   tenantId: string,
   file: File,
   carpeta: string

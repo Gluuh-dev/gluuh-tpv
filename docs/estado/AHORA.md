@@ -51,6 +51,7 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 
 | quién | qué | ficheros |
 |---|---|---|
+| Codex + Claude (chat) | **F0 ENTREGADA · F1/F2 núcleo APLICADO EN LA NUBE** (17-07, autorizado): 0111–0115 aplicadas por MCP, tipos regenerados, espejos de transición retirados, smoke verde. Pendiente: aplicar la tanda **en el nodo** cuando se levante + prueba adversarial; F1 contract (1.5) tras canary; F2 restos (MFA, revocar sesiones, temporal cifrada, provisional offline). Seguimiento: `docs/estado/REPARACION-F0-F8.md` | `supabase/migrations/0111–0115`, `supabase/types/`, `apps/web/app/(panel)/layout.tsx`, `login`, `elegir-empresa`, `invitacion/`, `api/invitaciones|cuenta`, `lib/contexto.ts`, `packages/supabase`, `scripts/` |
 
 ### ⚠️ Auditoría técnica del 17-07 — implementación pendiente de autorización
 
@@ -151,7 +152,60 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0111`.**
+**Siguiente número libre: `0121`.**
+
+- `0120` — **APLICADA EN LA NUBE por MCP el 17-07** (F7.3): `tombstones_sync` — cada
+  DELETE de catálogo deja lápida con fecha (trigger en **60 tablas**, humo verde). El
+  sincronizador las respeta: fila local más vieja que su lápida se borra y NO se sube
+  (la resurrección por backup antiguo está muerta); fila local más nueva gana (LWW).
+  Marca `tumba:` por tabla con el mismo cursor compuesto. ⚠ En el NODO el trigger llega
+  al aplicar 0120 allí — hasta entonces las bajas del bar no dejan lápida propia.
+
+- `0119` — **APLICADA EN LA NUBE por MCP el 17-07** (F6): `cobro_atomico_y_outbox_worker` —
+  RPC `cobrar_cuenta` (candado + validación de suma en servidor + pagos + COBRADA en una
+  transacción; humo en vivo: suma-mal rechazada, pago mixto con propina OK, doble cobro
+  de otro terminal → YA_COBRADA, reintento con mismo client_id → OK sin duplicar) y
+  `outbox_tomar`/`outbox_resolver` (lease `skip locked` del worker AEAT).
+  **El TPV aún NO la llama** (tpv/page.tsx en otra sesión): adoptarla al integrar.
+  Worker en `apps/api` (`OutboxWorker`): apagado salvo `OUTBOX_AEAT=1`; verifica que la
+  huella recalculada desde el snapshot == la almacenada ANTES de enviar; nunca marca
+  ACEPTADA sin acuse. Política propina/redondeo codificada = la actual (puerta 6 abierta).
+
+- `0118` — **APLICADA EN LA NUBE por MCP el 17-07** (F6): `emision_fiscal_atomica` —
+  RPC `emitir_factura_fiscal` (factura + desglose + outbox en UNA transacción;
+  humo en vivo: OK con desglose atómico, número pisado → COLISION limpia),
+  unicidad `(tenant, order_id)` y `fiscal_outbox` (AEAT durable; **encolado apagado**:
+  se enciende con `VERIFACTU_ENVIO=1` y aún NO hay worker). `/api/factura` ahora
+  encadena la huella con el F1/F2 REAL (antes siempre F2) y un reintento tras
+  timeout devuelve la factura existente en vez de emitir otra.
+
+- `0117` — **APLICADA EN LA NUBE por MCP el 17-07** (F4): `emparejado_v2_y_operario` —
+  credencial de dispositivo rotatoria/revocable (humo verificado: rotación v1→v2 OK,
+  reuso del hash viejo rechazado), sesión de operario por terminal, bloqueo de PIN
+  por TERMINAL (`validar_pin_terminal`; la firma vieja `validar_pin` pasa por el canal
+  "sin terminal" — **los TPV deben pasar su `device_id` al adoptarla**), retirada de
+  `admin_sembrar_terminal_defecto` y fin de la semilla de operarios conocidos
+  (`crear-empresa` ya no llama a `admin_sembrar_operarios_defecto`; la función se
+  retira en F4.4 final). Canje v2: access 12 h + refresh rotatorio; legacy JWT
+  acortado a 30 días. Rutas nuevas: `/api/dispositivos/renovar` y `/revocar`.
+
+- `0116` — **APLICADA EN LA NUBE 17-07** (F3, la ejecutó el usuario a mano):
+  `orden_instalacion_y_nodo` — orden por local (hash del código, 30 días, reserva 24 h,
+  un solo uso) + `nodo_instancia` + canje atómico `canjear_orden_instalacion`.
+  Humo verificado en vivo: canje OK crea nodo, segundo canje INVALIDA; datos de humo
+  borrados. Tipos regenerados (91 tablas / 49 RPC) y espejos de transición retirados.
+  El flujo legacy `tenant.codigo_instalacion` sigue como compat hasta F3.4.
+  **⚠ Nodo local: 0111–0116 sin aplicar allí** (aplicar al levantarlo).
+
+- `0111`–`0115` — **APLICADAS EN LA NUBE por MCP el 17-07** (F1/F2, autorizado por el
+  usuario): `0111_identidad_global_expand`, `0112_identidad_global_backfill` (2 cuentas,
+  4 perfiles creados/materializados, 4 asignaciones, ledger verde),
+  `0113_identidad_fail_closed` (current_tenant_id/operario_permite v2, contexto por
+  sesión), `0114_endurecer_rpc_privilegiadas` (jornada/heartbeat con guardia de tenant,
+  anon revocado), `0115_invitaciones_y_alta_titular`. Tipos regenerados (89 tablas /
+  48 RPC), smoke fail-closed verde, advisors sin críticos.
+  **⚠ EN EL NODO NO ESTÁN APLICADAS**: cuando se levante, aplicar 0111–0115 y correr
+  `apps/nodo/pruebas/prueba-identidad-fail-closed.mjs`.
 
 - `0110` — `clientes_stats()`: visitas y última visita por cliente (lista del TPV).
 
@@ -162,13 +216,17 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
   Así los menús caen en una familia/categoría "Menús" y salen en la rejilla del TPV como un
   producto (al tocarlo abre el MenuModal). El clonado de plantilla remapea `category_id`.
 
-- `0107` — terminal por defecto al crear empresa (`admin_sembrar_terminal_defecto`):
-  un TPV `tpv1`/`121212` listo para conectar. Ojo sync: verificar que `device.clave_hash`
-  baja al nodo.
+- `0107` — terminal por defecto al crear empresa. **Parte credencial RECHAZADA**: la
+  función viva en la nube está ROTA (referencia objetos de `0105` que no existen),
+  nunca sembró un terminal y el caller descartaba el error. Llamada eliminada de
+  `crear-empresa` el 17-07; la función se retira de la nube en F4.
 
-- `0105` — credencial propia por terminal (`device.usuario`/`clave_hash` + RPCs
-  `fijar_clave_dispositivo`/`verificar_clave_dispositivo`). Base del rediseño de conexión
-  del TPV (IP + usuario/contraseña por terminal). Aplicada en nube y nodo.
+- `0105` — credencial usuario/contraseña por terminal. **DISEÑO RECHAZADO (plan
+  `docs/plan/14`) y NO aplicada en la nube** (verificado por MCP el 17-07: 0 columnas,
+  0 RPC — la nota anterior "aplicada en nube y nodo" era falsa para la nube). El código
+  ya no la llama (flujo retirado; `/dispositivo` del nodo responde 410). Puede seguir
+  aplicada en nodos existentes: su retirada allí es F4 (entrega 4.4), con migración
+  nueva e idempotente. **No aplicar jamás.** Ver `docs/auditoria/08-baseline-esquema-2026-07-17.md`.
 - `0106` — semilla de formas de pago (`admin_sembrar_formas_pago`): Efectivo/Tarjeta/Bizum
   al crear empresa, SIEMPRE, sin depender de la plantilla. La llama `api/admin/crear-empresa`.
 *(Cógelo, **súbelo aquí primero**, y luego escribe el fichero. Si dos sesiones escriben una

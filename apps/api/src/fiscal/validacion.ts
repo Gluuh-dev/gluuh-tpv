@@ -38,5 +38,8 @@ export function validarPreviewDto(dto: unknown): string | null {
   if (typeof d.fechaHoraHusoGenRegistro !== "string" || !d.fechaHoraHusoGenRegistro.trim()) {
     return "fechaHoraHusoGenRegistro: requerido";
   }
+  if (d.tipoFactura !== undefined && d.tipoFactura !== "F1" && d.tipoFactura !== "F2") {
+    return "tipoFactura: F1 o F2";
+  }
   return null;
 }

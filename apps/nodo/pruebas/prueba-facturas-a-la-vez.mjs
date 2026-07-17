@@ -23,7 +23,6 @@
 //
 //   node apps/nodo/pruebas/prueba-facturas-a-la-vez.mjs
 
-import pg from "pg";
 import { NODO, conectar, barDePrueba, borrarBar, conSesion } from "./ayuda.mjs";
 
 const CUANTAS = 6;

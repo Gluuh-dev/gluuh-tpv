@@ -11,10 +11,11 @@
 // dentro de un servicio de Windows que no puede caerse.
 
 import http from "node:http";
+import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { estado } from "./estado.mjs";
-import { firmar, urlNube } from "./secreto.mjs";
+import { firmar, verificar, urlNube } from "./secreto.mjs";
 
 const PUERTO = Number(process.env.NODO_PUERTO ?? 54321);
 const RAIZ = path.resolve(".");
@@ -100,12 +101,44 @@ const CONFIG_DEL_BAR = {
 const SCRIPT_CONFIG =
   `<script>window.__GLUUH__=JSON.parse(${JSON.stringify(JSON.stringify(CONFIG_DEL_BAR))})</script>`;
 
+// ── ¿La petición trae un token firmado por ESTE nodo? (F5, plans/023) ────────
+// Vale cualquier token del bar (los emite auth.mjs / firmar()): la barrera es
+// "eres de esta instalación", no un rol concreto. Un portátil ajeno enchufado a
+// la LAN no tiene ninguno.
+function conTokenDelNodo(req) {
+  const cab = req.headers.authorization ?? "";
+  return verificar(cab.replace(/^Bearer\s+/i, "")) !== null;
+}
+
+/** La versión instalada, para el health público (sin tocar la BD). */
+function versionNodo() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(RAIZ, "apps", "nodo", "version.json"), "utf8")).version ?? "?";
+  } catch { return "?"; }
+}
+
 const servidor = http.createServer(async (req, res) => {
+  // Health MÍNIMO y público: vivo + versión. Es todo lo que un terminal necesita
+  // para descubrir el nodo. Nada de recuentos ni de rutas de disco (F5).
+  if (req.url.startsWith("/nodo/health")) {
+    res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
+    res.end(JSON.stringify({ ok: true, nodo: true, version: versionNodo() }));
+    return;
+  }
+
   // El panel del servidor: qué hay levantado, qué lleva creado, cuánto ocupa.
+  // DETALLADO ⇒ ya no es anónimo (F5, plans/023): o estás EN el servidor
+  // (consola local / app de escritorio) o traes un token de esta instalación.
+  // Una LAN comprometida no hace reconocimiento del nodo gratis.
   if (req.url.startsWith("/nodo/estado")) {
+    if (!esLocal(req) && !conTokenDelNodo(req)) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Identifícate: el estado detallado no es público. Usa /nodo/health para el latido." }));
+      return;
+    }
     try {
       const datos = await estado();
-      res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
+      res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(datos));
     } catch (e) {
       res.writeHead(500, { "content-type": "application/json" });
@@ -116,11 +149,27 @@ const servidor = http.createServer(async (req, res) => {
 
   // Acciones del panel del servidor: reiniciar, buscar actualización. Sólo desde el propio
   // ordenador (el acceso directo del escritorio), nunca desde un TPV de la barra.
+  // Además (F5): solo POST y con Origin propio — una web maliciosa abierta EN el
+  // servidor no puede disparar un reinicio por CSRF (su Origin la delata).
   if (req.url.startsWith("/nodo/accion/")) {
     const que = req.url.split("/nodo/accion/")[1]?.split("?")[0];
     if (!esLocal(req)) {
       res.writeHead(403, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "Sólo desde el ordenador del servidor." }));
+      return;
+    }
+    if (req.method !== "POST") {
+      res.writeHead(405, { "content-type": "application/json", allow: "POST" });
+      res.end(JSON.stringify({ error: "Las acciones van por POST." }));
+      return;
+    }
+    const origen = req.headers.origin;
+    const propio = !origen
+      || origen.startsWith("http://localhost") || origen.startsWith("http://127.0.0.1")
+      || origen === `http://${req.headers.host}`;
+    if (!propio) {
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Origen no permitido." }));
       return;
     }
     const accion = ACCIONES[que];

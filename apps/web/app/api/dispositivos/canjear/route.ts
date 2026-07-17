@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { SignJWT } from "jose";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { comoElServicio } from "@/app/lib/supabaseServidor";
 import { excedeLimite, ipDe } from "../limite";
 
@@ -52,12 +53,35 @@ export async function POST(req: Request) {
   if (!dev) return NextResponse.json({ error: "Código no válido o caducado" }, { status: 404 });
 
   const modulo = dev.modulo ?? "TPV";
+  // Legacy (compat clientes actuales): JWT firmado con el secreto compartido,
+  // ACORTADO de 365 a 30 días — no es revocable, así que su vida es el daño.
+  // Se retira en F4.4 cuando todos los clientes usen access+refresh.
   const token = await new SignJWT({ tenant_id: dev.tenant_id, device_id: dev.id, modulo })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("365d")
+    .setExpirationTime("30d")
+    .sign(new TextEncoder().encode(secreto));
+
+  // Credencial v2 (0117): access CORTO (12 h) + refresh ROTATORIO cuyo hash vive
+  // en la base — revocable de verdad. El refresh solo viaja aquí y al rotar.
+  const refresh = randomBytes(32).toString("base64url");
+  const { error: eCred } = await admin.rpc("emitir_credencial_dispositivo", {
+    p_device: dev.id,
+    p_refresh_hash: createHash("sha256").update(refresh).digest("hex"),
+  });
+  const access = await new SignJWT({ tenant_id: dev.tenant_id, device_id: dev.id, modulo, v: 2 })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setJti(randomUUID())
+    .setExpirationTime("12h")
     .sign(new TextEncoder().encode(secreto));
 
   // `estacion` (0068): la partida propia del monitor KDS; null = la global.
-  return NextResponse.json({ ok: true, device_id: dev.id, nombre: dev.nombre, modulo, estacion: dev.estacion ?? null, token });
+  return NextResponse.json({
+    ok: true, device_id: dev.id, nombre: dev.nombre, modulo, estacion: dev.estacion ?? null,
+    token,
+    // v2 (los clientes nuevos guardan `refresh` en safeStorage y renuevan en
+    // /api/dispositivos/renovar; si emitir falló, siguen con el legacy).
+    ...(eCred ? {} : { access, refresh, access_expira_horas: 12 }),
+  });
 }

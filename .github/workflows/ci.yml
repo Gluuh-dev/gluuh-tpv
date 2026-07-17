@@ -4,7 +4,7 @@ on:
     branches: [main]
   pull_request:
 jobs:
-  build:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,8 +17,44 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Lint REAL desde el 12-07 (antes `turbo run lint` solo ejecutaba `echo`s).
-      # Va primero: es lo más rápido y falla antes de gastar 5 min compilando.
+      # Baseline honesto desde el 17-07: 0 errores; los warnings solo pueden bajar.
       - run: pnpm lint
+      # ── Gates del programa F0–F8 (plans/016 y 025) ──────────────────────────
+      # Contrato del esquema (sin red): todo .from()/.rpc() literal del código
+      # existe en los tipos generados; codificación UTF-8 sin BOM/nulos.
+      - name: Contrato de esquema
+        run: pnpm contrato:check
+      # Cursores compuestos del sync (F7): prueba PURA — 2.501 filas con el
+      # mismo updated_at no pueden perderse en un borde de página.
+      - name: Cursores de sincronización
+        run: node apps/nodo/pruebas/prueba-cursores.mjs
+      # Migraciones: números únicos (dos sesiones escribiendo la misma NNNN se
+      # mezclan en git y se aplican en un orden que nadie decidió — TRAMPAS).
+      - name: Numeración de migraciones única
+        run: |
+          dup=$(ls supabase/migrations | grep -oE '^[0-9]{4}' | sort | uniq -d)
+          if [ -n "$dup" ]; then echo "Número de migración duplicado: $dup"; exit 1; fi
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # Windows: donde vive el nodo de verdad (PS 5.1, BOM, paths con backslash).
+  # Cubre lo que Ubuntu no puede: encoding, separadores y el runtime real del bar.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Contrato de esquema (encoding en Windows)
+        run: pnpm contrato:check
+      - name: Cursores de sincronización
+        run: node apps/nodo/pruebas/prueba-cursores.mjs
+      - run: pnpm typecheck
+      - run: pnpm test

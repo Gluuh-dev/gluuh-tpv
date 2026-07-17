@@ -1,5 +1,11 @@
 # 15 — Instalación, despliegue y licencia (análisis exhaustivo)
 
+> ⚠️ **DOCUMENTO DE CONTEXTO.** El inventario físico y varios GAP siguen siendo
+> útiles, pero las decisiones de identidad, código de instalación, nodo, licencia,
+> soporte y recuperación han sido sustituidas por el
+> [plan definitivo](../plan/14-plan-definitivo-reparacion-identidad-seguridad.md) y las
+> fases F2–F5 de la [guía ejecutable](19-plan-maestro-reparacion-f0-f8.md).
+
 **Fecha:** 07-07-2026 · **Estado:** análisis + plan de cambios.
 **Referencia visual:** pantalla "Acerca de…" de Ágora 8.2.5 (licencia Professional
 con código, "Suscripción activa", resumen de módulos con Ilimitado/nº, ID de

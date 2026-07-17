@@ -14,7 +14,8 @@
 //
 //  Antes esto estaba copiado en 5 sitios, cada uno con su propio debounce a mano.
 // ─────────────────────────────────────────────────────────────────────────────
-import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 import { config, esNodo } from "./config";
 
 export type EventoCambio = "*" | "INSERT" | "UPDATE" | "DELETE";
@@ -78,7 +79,7 @@ function escucharPorSse(opts: OpcionesEscucha, avisar: (c: Cambio) => void): () 
   return () => fuente.close();
 }
 
-export function escucharCambios(sb: SupabaseClient, opts: OpcionesEscucha): () => void {
+export function escucharCambios(sb: GluuhSupabaseClient, opts: OpcionesEscucha): () => void {
   const { nombre, tablas, evento = "*", debounceMs = 0, onCambio } = opts;
 
   let temporizador: ReturnType<typeof setTimeout> | null = null;

@@ -24,7 +24,7 @@
 //   node apps/nodo/pruebas/prueba-dos-camareros.mjs
 
 import pg from "pg";
-import { NODO, ANON, conectar, barDePrueba, borrarBar, conSesion } from "./ayuda.mjs";
+import { NODO, conectar, barDePrueba, borrarBar, conSesion } from "./ayuda.mjs";
 
 pg.types.setTypeParser(1184, (v) => v);
 

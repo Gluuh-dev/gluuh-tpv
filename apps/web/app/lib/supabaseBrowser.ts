@@ -1,12 +1,13 @@
 "use client";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { GluuhContractDatabase, GluuhSupabaseClient } from "@gluuh/supabase";
 import { config } from "./config";
 
 // Cliente de Supabase para el NAVEGADOR (clave publishable, segura para el cliente).
 // La RLS protege los datos: cada usuario solo ve los de su empresa.
-let _client: SupabaseClient | null = null;
+let _client: GluuhSupabaseClient | null = null;
 
-export function supabaseBrowser(): SupabaseClient {
+export function supabaseBrowser(): GluuhSupabaseClient {
   if (!_client) {
     // Persistencia explícita de la sesión (localStorage) + refresco automático,
     // para que el login se mantenga entre recargas. `experimental.passkey`
@@ -35,7 +36,7 @@ export function supabaseBrowser(): SupabaseClient {
       );
     }
 
-    _client = createClient(
+    _client = createClient<GluuhContractDatabase>(
       url || "https://placeholder.invalid",
       key || "placeholder",
       opts,

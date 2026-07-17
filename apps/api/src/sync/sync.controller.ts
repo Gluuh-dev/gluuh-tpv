@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, NotImplementedException, Post } from "@nestjs/common";
 
 interface SyncOp {
   op: string; // PUT | PATCH | DELETE
@@ -25,9 +25,16 @@ interface UploadDto {
 @Controller("sync")
 export class SyncController {
   @Post("upload")
-  upload(@Body() dto: UploadDto) {
+  upload(@Body() dto: UploadDto): never {
     const ops = dto?.ops ?? [];
-    // TODO: aplicar realmente. Por ahora solo acusamos recibo.
-    return { recibidos: ops.length, estado: "ok" };
+    // F7 entrega 7.1 (plans/021): este endpoint devolvía `estado: "ok"` SIN
+    // PERSISTIR NADA. Un conector que confiara en ese acuse vaciaba su cola y
+    // las operaciones del bar desaparecían en silencio — pérdida de datos pura.
+    // Hasta que exista el write-path real (validación, idempotencia, aplicación
+    // transaccional), la respuesta honesta es 501: el conector conserva su cola
+    // y reintenta. NUNCA volver a acusar recibo de lo que no se guardó.
+    throw new NotImplementedException(
+      `sync/upload no implementado: ${ops.length} operación(es) NO persistidas; conserva tu cola y reintenta`,
+    );
   }
 }

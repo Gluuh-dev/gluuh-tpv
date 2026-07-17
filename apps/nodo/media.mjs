@@ -11,12 +11,17 @@
 
 import http from "node:http";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import pg from "pg";
+import { verificar } from "./secreto.mjs";
 
 const PUERTO = Number(process.env.NODO_MEDIA_PUERTO ?? 55436);
 const RAIZ = path.resolve(process.env.NODO_MEDIA_DIR ?? ".nodo/media");
 const BD = process.env.NODO_BD ?? "postgres://postgres:gluuh@127.0.0.1:55432/gluuh";
+// Tope de subida (F5): una foto de carta redimensionada ronda los cientos de KB;
+// 15 MB deja margen a un vídeo corto sin permitir agotar el disco del mini-PC.
+const MAX_BYTES = 15 * 1024 * 1024;
 
 fs.mkdirSync(RAIZ, { recursive: true });
 
@@ -63,6 +68,17 @@ const servidor = http.createServer(async (req, res) => {
 
   // ── Guardar (el dueño cambia una foto sin internet) ───────────────────────
   if (req.method === "POST" && url.pathname.startsWith("/object/media/")) {
+    // F5 (plans/023): escribir en el disco del nodo YA NO es anónimo. Hace falta
+    // un token firmado por esta instalación (el que lleva cualquier sesión del
+    // bar); un portátil ajeno en la LAN no lo tiene. Servir (GET) sigue público
+    // por diseño: es la carta.
+    const token = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    if (!verificar(token)) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Identifícate para subir ficheros al nodo" }));
+      return;
+    }
+
     const rel = url.pathname.slice("/object/media/".length);
     const fichero = rutaSegura(rel);
     if (!fichero) {
@@ -70,11 +86,44 @@ const servidor = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "ruta inválida" }));
       return;
     }
+    // Solo formatos de carta (la extensión decide el content-type al servir;
+    // un .exe o un .html aquí no pintan nada).
+    if (!TIPOS[path.extname(fichero).toLowerCase()]) {
+      res.writeHead(415, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "formato no admitido" }));
+      return;
+    }
 
+    // Tope de tamaño DURANTE el streaming: un body gigante se corta en cuanto
+    // pasa del límite, no cuando ya se comió la RAM del mini-PC.
     const trozos = [];
-    for await (const t of req) trozos.push(t);
+    let bytes = 0;
+    let excedido = false;
+    for await (const t of req) {
+      bytes += t.length;
+      if (bytes > MAX_BYTES) { excedido = true; break; }
+      trozos.push(t);
+    }
+    if (excedido) {
+      res.writeHead(413, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: `demasiado grande (máx ${MAX_BYTES / 1024 / 1024} MB)` }));
+      req.destroy();
+      return;
+    }
+
+    // Escritura ATÓMICA (temporal + rename): un corte a mitad no deja una foto
+    // corrupta con el nombre bueno servida a todos los TPV.
     fs.mkdirSync(path.dirname(fichero), { recursive: true });
-    fs.writeFileSync(fichero, Buffer.concat(trozos));
+    const temporal = `${fichero}.${crypto.randomUUID()}.tmp`;
+    try {
+      fs.writeFileSync(temporal, Buffer.concat(trozos));
+      fs.renameSync(temporal, fichero);
+    } catch (e) {
+      fs.rmSync(temporal, { force: true });
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: e.message }));
+      return;
+    }
 
     // A la cola: cuando haya internet, esta foto sube a Supabase (que es el archivo
     // de verdad — el disco de un mini-PC en una barra no es sitio para el único
