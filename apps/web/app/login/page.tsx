@@ -40,6 +40,10 @@ export default function Login() {
     try { const e = localStorage.getItem("gluuh:email"); if (e) setEmail(e); else setRecordar(false); } catch { /* sin almacenamiento */ }
     const i = leerInstalacion();
     if (i && !plataforma) { setInstalacion(i); setModo("usuario"); }
+    // En el TPV (app de escritorio) o servido por el NODO, el login natural es
+    // USUARIO+clave del bar — el email es para el dueño desde casa. Se
+    // preselecciona la pestaña para no pedir "tantos datos" en la barra.
+    if (!plataforma && (window.gluuh || window.__GLUUH__?.nodo)) setModo("usuario");
   }, []);
 
   // Tras iniciar sesión: las cuentas de empresa recién creadas (alta de Gluuh,

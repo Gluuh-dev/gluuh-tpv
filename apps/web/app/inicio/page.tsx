@@ -36,11 +36,18 @@ export default function Inicio() {
     const sb = supabaseBrowser();
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
-      const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
-      setEmpresa(t?.nombre ?? "");
+      // Un terminal EMPAREJADO no necesita sesión para ver el lanzador: el
+      // emparejado identifica al EQUIPO. La sesión (una vez, usuario+clave con
+      // "recordar") se pide al entrar en TPV/Configuración; los trabajadores
+      // después solo teclean su PIN. Sin emparejar y sin sesión → /login.
+      const emparejado = Boolean(window.gluuh?.device);
+      if (!session && !emparejado) { router.replace("/login"); return; }
+      if (session) {
+        const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
+        setEmpresa(t?.nombre ?? "");
+        setNombre((session.user?.user_metadata?.nombre as string) ?? session.user?.email?.split("@")[0] ?? "");
+      }
       setTerminal(window.gluuh?.device?.nombre ?? "");
-      setNombre((session.user?.user_metadata?.nombre as string) ?? session.user?.email?.split("@")[0] ?? "");
       setListo(true);
     })();
   }, [router]);
