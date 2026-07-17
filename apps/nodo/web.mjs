@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { firmar, urlNube } from "./secreto.mjs";
+import { firmar, secretoDelNodo, urlNube } from "./secreto.mjs";
 
 const RAIZ = path.resolve(".");
 const WEB = path.join(RAIZ, "apps", "web");
@@ -46,6 +46,11 @@ const entorno = {
   NODO_CLAVE_SERVICIO: firmar("service_role"),
   NODO_URL_NUBE: urlNube(),
   NODO_URL_INTERNA: "http://127.0.0.1:54321",   // las rutas de servidor hablan por loopback
+  // El canje de terminales (/api/dispositivos/canjear|renovar) firma los tokens
+  // de dispositivo con EL SECRETO DE ESTE NODO: así el gateway y media pueden
+  // verificarlos con `verificar()` (F5) sin secretos compartidos entre bares.
+  // Sin esto, la pantalla de emparejado decía "Falta DEVICE_JWT_SECRET".
+  DEVICE_JWT_SECRET: secretoDelNodo(),
 };
 
 // ── Arrancar Next ────────────────────────────────────────────────────────────
