@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld("gluuh", {
   publicarTicketVisor: (datos: unknown) => ipcRenderer.send("gluuh:visor", datos),
   guardarBackup: (nombreCarpeta: string, ficheros: unknown) =>
     ipcRenderer.invoke("gluuh:guardar-backup", nombreCarpeta, ficheros),
+  // F4.3: el MAIN canjea el token del terminal (que la web nunca ve) por una
+  // sesión de datos; la web solo recibe la sesión resultante.
+  sesionTerminal: () => ipcRenderer.invoke("gluuh:sesion-terminal"),
   leerConfigTerminal: () => ipcRenderer.invoke("gluuh:leer-config"),
   guardarConfigTerminal: (cfg: unknown) => ipcRenderer.invoke("gluuh:guardar-config", cfg),
   // Primer arranque: la pantalla local manda IP + código efímero del terminal;

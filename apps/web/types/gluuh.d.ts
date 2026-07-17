@@ -34,6 +34,10 @@ interface GluuhDesktop {
     nombreCarpeta: string,
     ficheros: { nombre: string; contenido: string; base64?: boolean }[],
   ): Promise<{ ok: boolean; ruta?: string; error?: string }>;
+  /** F4.3: canjea la credencial del TERMINAL por una sesión de datos del bar
+   *  (sub = device, sin app_user: lo sensible queda denegado hasta el PIN).
+   *  `null` si el equipo no está emparejado o el nodo la rechaza. */
+  sesionTerminal(): Promise<{ access_token: string; refresh_token: string } | null>;
   /** Lee la config local del terminal (config.json). */
   leerConfigTerminal(): Promise<GluuhConfigTerminal>;
   /** Guarda la config local del terminal; si cambia `servidor`, recarga la app. */

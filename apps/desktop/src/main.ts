@@ -202,6 +202,25 @@ app.whenReady().then(() => {
     return { ok: true };
   });
   ipcMain.on("gluuh:visor", (_e, datos: unknown) => publicarEnVisor(datos));
+  // F4.3: sesión de datos POR LA CREDENCIAL DEL TERMINAL. El token del
+  // dispositivo vive en el MAIN (device.json) y no se expone al DOM: aquí se
+  // canjea contra el auth del nodo y a la web solo le llega la sesión. Sin
+  // emparejar (o si el nodo lo rechaza: terminal desvinculado), null — y la
+  // web cae al login normal.
+  ipcMain.handle("gluuh:sesion-terminal", async () => {
+    if (!identidad?.token) return null;
+    try {
+      const r = await fetch(`${ORIGEN}/auth/v1/dispositivo`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: identidad.token }),
+      });
+      if (!r.ok) return null;
+      return (await r.json()) as unknown;
+    } catch {
+      return null;
+    }
+  });
   ipcMain.handle("gluuh:guardar-backup", (_e, nombreCarpeta: string, ficheros: FicheroBackup[]) => {
     const destino = leerConfig(userData).backup?.destino ?? "";
     return guardarBackupEnDisco(destino, nombreCarpeta, ficheros);

@@ -171,8 +171,60 @@ async function entrar(cuerpo) {
   return duenyo ? emitirSesion(duenyo) : null;
 }
 
-// El flujo de 0105 se retiró: el dispositivo se empareja mediante el código
-// efímero que canjea el servidor web en /api/dispositivos/canjear.
+// El flujo de 0105 (usuario+contraseña por terminal) se retiró. Lo que hay ahora
+// (F4.3): el TERMINAL canjea su TOKEN de dispositivo (el que recibió al
+// emparejar, firmado por este nodo) por una SESIÓN DE DATOS del bar.
+//
+// La sesión lleva `sub = device_id` y `tenant_id`: la RLS resuelve el bar por el
+// claim, y como ese sub NO es ningún app_user, `operario_permite()` devuelve
+// false para TODO — el terminal puede pintar la carta y las mesas, pero cada
+// acción sensible exige el PIN de un trabajador. El aparato es la capa 1; la
+// persona, la 2. Cero contraseñas en el arranque del TPV.
+const DISPOSITIVO_SESION_SEG = 7 * 24 * 3600;   // el terminal re-canjea al abrir la app
+async function sesionDeDispositivo(cuerpo) {
+  const claims = comprobar(cuerpo.token);
+  if (!claims || !claims.device_id || !claims.tenant_id) return null;
+
+  // El terminal tiene que seguir EXISTIENDO y VINCULADO: desvincular un TPV
+  // desde el panel corta las sesiones nuevas aunque su token aún no caducara.
+  const { rows: [d] } = await bd.query(
+    "select id, tenant_id, nombre, modulo, estacion from public.device where id = $1 and tenant_id = $2 and vinculado_at is not null",
+    [claims.device_id, claims.tenant_id],
+  );
+  if (!d) return null;
+
+  const ahora = Math.floor(Date.now() / 1000);
+  const access = firmar({
+    sub: d.id,                      // auth.uid() = el TERMINAL (no un app_user)
+    aud: "authenticated",
+    role: "authenticated",
+    tenant_id: d.tenant_id,         // la RLS resuelve el bar por este claim
+    device_id: d.id,                // 0114: el heartbeat solo puede latir por sí mismo
+    user_rol: null,
+    is_platform_admin: false,
+    iat: ahora,
+    exp: ahora + DISPOSITIVO_SESION_SEG,
+  });
+  return {
+    access_token: access,
+    token_type: "bearer",
+    expires_in: DISPOSITIVO_SESION_SEG,
+    expires_at: ahora + DISPOSITIVO_SESION_SEG,
+    // Sin refresco: el terminal vuelve a canjear su token al abrir la app (lo
+    // hace el proceso main de Electron, no la web). Guion "x" porque
+    // supabase-js exige un refresh_token no vacío para aceptar setSession.
+    refresh_token: "x",
+    user: {
+      id: d.id,
+      aud: "authenticated",
+      role: "authenticated",
+      email: "",
+      app_metadata: { provider: "nodo-dispositivo" },
+      user_metadata: { nombre: d.nombre, tenant_id: d.tenant_id, modulo: d.modulo, dispositivo: true },
+      created_at: new Date().toISOString(),
+    },
+  };
+}
 
 // ── Renovar ──────────────────────────────────────────────────────────────────
 async function renovar(cuerpo) {
@@ -235,7 +287,13 @@ const servidor = http.createServer(async (req, res) => {
     // Compatibilidad explícita: el endpoint antiguo falla cerrado y no consulta
     // objetos ausentes de la base viva.
     if (ruta === "/dispositivo" && req.method === "POST") {
-      return json(res, 410, { error: "Flujo retirado; usa un código de emparejado de seis dígitos" });
+      // F4.3: el terminal canjea SU token de emparejado por una sesión de datos
+      // del bar (sin app_user: lo sensible queda denegado hasta el PIN).
+      const cuerpo = await leerCuerpo(req);
+      const sesion = await sesionDeDispositivo(cuerpo);
+      return sesion
+        ? json(res, 200, sesion)
+        : json(res, 401, { error: "Terminal no vinculado o token inválido; vuelve a emparejar" });
     }
 
     if (ruta === "/user" && req.method === "GET") {

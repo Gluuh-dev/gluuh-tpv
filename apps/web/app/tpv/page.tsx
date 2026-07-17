@@ -369,8 +369,12 @@ export default function TPV() {
       if (!session) { router.replace("/login"); return; }
       // Cuenta de empresa recién entregada: primero crea su contraseña.
       if (session.user.user_metadata?.debe_cambiar_password) { router.replace("/cambiar-password"); return; }
-      // Operario activo desde localStorage (persiste hasta "Salir") + lista de operarios
-      try { const raw = localStorage.getItem("gluuh_operario"); if (raw) setOperario(JSON.parse(raw)); } catch { /* ignore */ }
+      // ENTRAR AL TPV SIEMPRE PREGUNTA QUIÉN ERES (F4.3): el emparejado
+      // identifica al EQUIPO; la persona se identifica con su PIN cada vez que
+      // se entra a la pantalla de venta. Antes el operario se restauraba de
+      // localStorage y el terminal "abría como el último" — el titular vendía
+      // sin saberlo con la atribución de otro. El PIN son dos segundos.
+      try { localStorage.removeItem("gluuh_operario"); } catch { /* ignore */ }
       try {
         const [ops, marcaV, loc, u, tn, , rms, rsv] = await Promise.all([
           sb.rpc("listar_operarios").then((r) => r.data),
@@ -1680,29 +1684,65 @@ export default function TPV() {
     } finally { setBusy(false); }
   }
 
-  // Cobrar UNA cuenta del reparto por productos: la mandamos como doc 1 (se queda en el
-  // pedido origen, id conocido) y el resto va a Barra; luego abrimos la pantalla de cobro
-  // con esa cuenta cargada. `docs[0]` es SIEMPRE la cuenta a cobrar; el resto incluye las
-  // demás cuentas y lo no asignado (para no perder ninguna línea del ticket).
-  async function cobrarCuentaDividida(docs: { lineas: { id: string; uds: number }[] }[]) {
-    const clean = docs.filter((d) => d.lineas.length);
-    if (!clean.length) return;
+  // Cobrar por ARTÍCULOS: las líneas elegidas SALEN de la mesa a un sub-pedido propio
+  // (RPC separar_cuenta, atómica y no fiscal), que se carga como cuenta de barra y se
+  // cobra por el camino normal (con su factura). El resto se queda en la mesa.
+  // Decisión: docs/plan/dividir-cuenta-y-ciclo.md §6.2.
+  async function cobrarArticulos(sel: { id: string; uds: number }[]) {
+    const pedir = sel.filter((s) => s.uds > 0);
+    if (!pedir.length) return;
     setModalActivo(null);
     setBusy(true);
     try {
-      // El doc 1 se queda en el pedido origen: necesitamos que exista y su id.
-      let origen = ordenAbiertaId;
-      if (!origen) origen = await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
-      if (!origen) { toast.error("No se pudo preparar la cuenta para cobrar."); return; }
+      // Para carvar de la mesa, su pedido tiene que estar persistido (id conocido).
+      let mesaOrderId = ordenAbiertaId;
+      if (!mesaOrderId) mesaOrderId = await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
+      if (!mesaOrderId) { toast.error("No se pudo preparar la cuenta."); return; }
 
-      if (clean.length > 1) {
-        const { ok } = await ejecutarDivision(origen, clean);
-        if (!ok) return;
-        await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
+      const meta: Record<string, ReturnType<typeof lineasComanda>[number]> = {};
+      for (const l of lineasComanda()) meta[l.id] = l;
+      const lineasSub = pedir
+        .map((s) => {
+          const m = meta[s.id]; if (!m) return null;
+          return {
+            product_id: m.productId, nombre: m.nombre, cantidad: s.uds,
+            precio_unitario: invitadas[s.id] ? 0 : m.precio, tipo_impositivo: m.tipo,
+            notas: notas[s.id]?.trim() || null, estacion: m.estacion,
+            modificadores: menuParte[s.id] ? { key: s.id, menuParte: menuParte[s.id] } : { key: s.id },
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      if (!lineasSub.length) { toast.error("No hay artículos válidos para cobrar."); return; }
+
+      const campos = {
+        etiqueta: `${mesa?.nombre ?? "Cuenta"} · parte`,
+        tipo_operacion: tipoOperacion,
+        motivo_no_venta: tipoOperacion === "INVITACION" ? "Invitación" : tipoOperacion === "AUTOCONSUMO" ? "Consumo propio" : null,
+        comensales: comensales || null,
+        customer_id: cliente?.id ?? null,
+        cliente_nombre: llevar?.nombre ?? cliente?.nombre ?? null,
+        cliente_telefono: llevar?.telefono ?? null,
+      };
+
+      const { data: subId, error } = await sb.rpc("separar_cuenta", {
+        p_mesa_order: mesaOrderId,
+        p_location: locationId,
+        p_user: operario?.id ?? userId,
+        p_campos: campos,
+        p_lineas: lineasSub,
+      });
+      if (error || !subId) {
+        console.error("separar_cuenta falló:", error);
+        toast.error(`No se pudieron separar los artículos: ${error?.message ?? "sin id"}`);
+        return;
       }
-      // Recoge la cuenta a cobrar (doc 1, ya en `origen`) con su versión fresca y cobra.
-      await tomarCuenta(origen);
-      await cargarLineas(origen);
+
+      await Promise.all([recargarMesas(), recargarAparcados()]);
+      // El sub-pedido es de barra (sin mesa): cargarlo como tal para que el cobro NO libere
+      // la mesa original (que se queda con el resto). Al confirmar sale con su factura.
+      setMesa(null); setLlevar(null); setBarra(true);
+      await tomarCuenta(subId as string);
+      await cargarLineas(subId as string);
       setModalActivo("COBRAR");
     } finally { setBusy(false); }
   }
@@ -2837,7 +2877,7 @@ export default function TPV() {
           comensales={comensales}
           contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra"}
           onAceptarProductos={dividirAceptar}
-          onCobrarCuenta={cobrarCuentaDividida}
+          onCobrarCuenta={cobrarArticulos}
           onImprimirParte={imprimirParteProforma}
           onCobrar={() => { setModalActivo('COBRAR'); }}
           onCancelar={() => setModalActivo(null)}

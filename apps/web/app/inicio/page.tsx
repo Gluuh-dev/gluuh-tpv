@@ -35,17 +35,26 @@ export default function Inicio() {
   useEffect(() => {
     const sb = supabaseBrowser();
     (async () => {
-      const { data: { session } } = await sb.auth.getSession();
-      // Un terminal EMPAREJADO no necesita sesión para ver el lanzador: el
-      // emparejado identifica al EQUIPO. La sesión (una vez, usuario+clave con
-      // "recordar") se pide al entrar en TPV/Configuración; los trabajadores
-      // después solo teclean su PIN. Sin emparejar y sin sesión → /login.
+      let { data: { session } } = await sb.auth.getSession();
+      // F4.3 — CERO LOGINS EN EL TERMINAL: si está emparejado y no hay sesión,
+      // la CREDENCIAL DEL DISPOSITIVO se canjea sola por la sesión de datos
+      // (el main de Electron guarda el token; la web solo recibe la sesión).
+      // Esa sesión no es ninguna persona: todo lo sensible queda denegado
+      // hasta que un trabajador teclee su PIN dentro del TPV.
       const emparejado = Boolean(window.gluuh?.device);
+      if (!session && emparejado && window.gluuh?.sesionTerminal) {
+        const s = await window.gluuh.sesionTerminal().catch(() => null);
+        if (s) {
+          await sb.auth.setSession(s).catch(() => null);
+          session = (await sb.auth.getSession()).data.session;
+        }
+      }
       if (!session && !emparejado) { router.replace("/login"); return; }
       if (session) {
         const { data: t } = await sb.from("tenant").select("nombre").limit(1).maybeSingle();
         setEmpresa(t?.nombre ?? "");
-        setNombre((session.user?.user_metadata?.nombre as string) ?? session.user?.email?.split("@")[0] ?? "");
+        const meta = session.user?.user_metadata as { nombre?: string; dispositivo?: boolean } | undefined;
+        setNombre(meta?.dispositivo ? "" : (meta?.nombre ?? session.user?.email?.split("@")[0] ?? ""));
       }
       setTerminal(window.gluuh?.device?.nombre ?? "");
       setListo(true);
@@ -111,7 +120,17 @@ export default function Inicio() {
             <span style={go}>Entrar <span aria-hidden>→</span></span>
           </button>
 
-          <button type="button" onClick={() => router.push("/dashboard")} style={tile}>
+          <button
+            type="button"
+            onClick={async () => {
+              // Configuración exige una PERSONA con permisos: si la sesión es la
+              // del terminal (dispositivo), se piden credenciales de encargado.
+              const { data: { session } } = await supabaseBrowser().auth.getSession();
+              const esDispositivo = Boolean((session?.user?.user_metadata as { dispositivo?: boolean } | undefined)?.dispositivo);
+              router.push(!session || esDispositivo ? "/login" : "/dashboard");
+            }}
+            style={tile}
+          >
             <span style={{ ...plate, background: "linear-gradient(150deg,#EBD7F7,#B98BD6)" }}><Engranaje color={GLUUH} /></span>
             <h3 style={tituloTile}>Configuración</h3>
             <p style={pTile}>Carta, empleados, informes y ajustes del negocio.</p>
