@@ -29,6 +29,11 @@ param(
   [string]$Raiz = (Resolve-Path "$PSScriptRoot\..\.."),
   [string]$Nube = "https://gxcqihslbicrszgzudjs.supabase.co",
   [string]$AnonKey,                      # la publishable de la nube (sb_publishable_...)
+  # La web de la plataforma: por aqui se canjea la ORDEN DE INSTALACION (F3,
+  # migracion 0116) — un solo uso, ligada a un LOCAL, con reserva de 24 h que
+  # permite reanudar si la instalacion se corta. Si no responde, se cae al
+  # canje legacy (codigo eterno de la empresa) contra Supabase directamente.
+  [string]$AppUrl = "https://app.gluuh.com",
 
   # ── LAS RESPUESTAS, YA RECOGIDAS ───────────────────────────────────────────
   #
@@ -160,28 +165,71 @@ while (-not $tenantId) {
   }
   $norm = "{0}-{1}-{2}-{3}-{4}" -f $codigo.Substring(0,4), $codigo.Substring(4,4), $codigo.Substring(8,5), $codigo.Substring(13,4), $codigo.Substring(17,4)
 
+  # ── EL INTENTO (F3, 0116): la reserva de 24 h que permite REANUDAR ─────────
+  #
+  # Se persiste un identificador de ESTE intento de instalacion. Si el proceso
+  # se corta a mitad (luz, red, tecnico), volver a ejecutar el instalador con el
+  # MISMO codigo retoma la reserva en vez de encontrarsela "ocupada por otro".
+  # Un equipo DISTINTO con el mismo codigo, en cambio, se lleva el 409.
+  $intentoFichero = Join-Path $env:TEMP "gluuh-instalacion-intento.txt"
+  if (Test-Path $intentoFichero) {
+    $intento = (Get-Content $intentoFichero -Raw).Trim()
+  } else {
+    $intento = [guid]::NewGuid().ToString()
+    $intento | Out-File $intentoFichero -Encoding ascii
+  }
+  # La identidad de ESTE nodo (F3 entrega 3.2): un fingerprint estable que la
+  # nube registra en `nodo_instancia` al canjear. (El par de claves criptografico
+  # completo llega con el canje v2 del nodo; este fingerprint ya permite
+  # inventariar y REVOCAR esta instalacion sin tocar otros locales.)
+  $fingerprint = [guid]::NewGuid().ToString()
+  $versionNodo = "?"
+  $versionJson = Join-Path $Raiz "apps\nodo\version.json"
+  if (Test-Path $versionJson) {
+    try { $versionNodo = (Get-Content $versionJson -Raw | ConvertFrom-Json).version } catch { }
+  }
+
+  # ── CANJE, en dos escalones ────────────────────────────────────────────────
+  #
+  #  1º  La ORDEN DE INSTALACION (0116), via app.gluuh.com: un solo uso real,
+  #      ligada a un LOCAL, caduca a los 30 dias, y registra la instancia del
+  #      nodo (revocable desde el panel). Es el camino de los codigos nuevos.
+  #  2º  Si la web no responde (o el codigo es de la generacion anterior), la
+  #      RPC `empresa_por_codigo` (0104) contra Supabase: el codigo eterno de
+  #      la empresa. NO se consulta la tabla `tenant` a pelo: somos anonimos y
+  #      la RLS devolveria cero filas con un 200 tan tranquila (ya paso; y
+  #      abrirla al anonimo enseñaria la lista de clientes a cualquiera).
+  $t = $null
+  $nodoId = $null
   try {
-    # CANJEAR el codigo (RPC `empresa_por_codigo`, migracion 0104). NO se consulta la tabla
-    # `tenant` directamente: aqui todavia no hay sesion, o sea que somos ANONIMOS, y la RLS
-    # de `tenant` es `id = current_tenant_id()`. Un anonimo no tiene empresa, asi que
-    # devolvia CERO FILAS con un 200 tan tranquila.
-    #
-    # Traduccion: el instalador respondia "Ese codigo no es valido" SIEMPRE, con cualquier
-    # codigo. No se podia instalar ni un bar. Y no lo sabia nadie porque este script nunca
-    # se habia ejecutado.
-    #
-    # Tampoco se arregla abriendo `tenant` al anonimo: eso enseñaria la lista de TODOS
-    # nuestros clientes a cualquiera que tenga la clave publica (que va dentro de cualquier
-    # navegador que abra app.gluuh.com). El codigo de 21 digitos ES la credencial: se canjea
-    # por SU empresa y por ninguna mas.
-    $cab = @{ apikey = $AnonKey; authorization = "Bearer $AnonKey" }
-    $cuerpo = @{ p_codigo = $norm } | ConvertTo-Json
-    $t = Invoke-RestMethod "$Nube/rest/v1/rpc/empresa_por_codigo" -Method Post `
-         -Headers $cab -ContentType "application/json" -Body $cuerpo -TimeoutSec 15
+    $cuerpoOrden = @{ codigo = $norm; intento = $intento; fingerprint = $fingerprint;
+                      version = $versionNodo; plataforma = "windows" } | ConvertTo-Json
+    $r = Invoke-RestMethod "$AppUrl/api/instalacion/activar" -Method Post `
+         -ContentType "application/json" -Body $cuerpoOrden -TimeoutSec 20
+    if ($r.ok) {
+      $t = @(@{ id = $r.tenant_id; nombre = $r.empresa; activo = $true })
+      if ($r.nodo_id) { $nodoId = $r.nodo_id }
+    }
   } catch {
-    Mal "No hay conexion con Gluuh. La instalacion necesita internet UNA vez."
-    Mal $_.Exception.Message
-    Fallo
+    # 410 = caducado, 409 = reservado por OTRO equipo: mensajes claros y parar.
+    $st = 0
+    if ($_.Exception.Response) { $st = [int]$_.Exception.Response.StatusCode }
+    if ($st -eq 410) { Mal "El codigo ha CADUCADO. Pide uno nuevo a Gluuh."; Fallo }
+    if ($st -eq 409) { Mal "OTRO equipo esta instalando con este codigo. Si fue un intento tuyo fallido, espera unos minutos o pide un codigo nuevo."; Fallo }
+    # Cualquier otra cosa (web caida, DNS): se prueba el canje legacy.
+  }
+
+  if (-not $t) {
+    try {
+      $cab = @{ apikey = $AnonKey; authorization = "Bearer $AnonKey" }
+      $cuerpo = @{ p_codigo = $norm } | ConvertTo-Json
+      $t = Invoke-RestMethod "$Nube/rest/v1/rpc/empresa_por_codigo" -Method Post `
+           -Headers $cab -ContentType "application/json" -Body $cuerpo -TimeoutSec 15
+    } catch {
+      Mal "No hay conexion con Gluuh. La instalacion necesita internet UNA vez."
+      Mal $_.Exception.Message
+      Fallo
+    }
   }
 
   if (-not $t -or $t.Count -eq 0) {
@@ -384,11 +432,17 @@ server-host = "127.0.0.1"
 "@ | Out-File "$nodo\postgrest.conf" -Encoding ascii
 
 # El secreto del nodo, para que los servicios que firman tokens usen el mismo.
-"NODO_JWT_SECRETO=$jwtSecreto" | Out-File "$nodo\nodo.env" -Encoding ascii
+# Y la IDENTIDAD de esta instalacion (F3, 0116): el fingerprint que la nube tiene
+# registrado en `nodo_instancia` (y su id, si el canje fue por orden) — es lo que
+# permite revocar ESTE nodo desde el panel sin tocar ningun otro local.
+$lineasEnv = @("NODO_JWT_SECRETO=$jwtSecreto", "NODO_FINGERPRINT=$fingerprint")
+if ($nodoId) { $lineasEnv += "NODO_ID=$nodoId" }
+$lineasEnv -join "`r`n" | Out-File "$nodo\nodo.env" -Encoding ascii
 
 Bien "Claves generadas (unicas de este bar)"
 
-Progreso "Creando la base de datos del bar (104 migraciones)..."
+$nMigraciones = (Get-ChildItem "$Raiz\supabase\migrations\*.sql").Count
+Progreso "Creando la base de datos del bar ($nMigraciones migraciones)..."
 Write-Host "   Preparando la base de datos..." -ForegroundColor DarkGray
 & "$PSScriptRoot\instalar-nodo.ps1" -Recrear -JwtSecreto $jwtSecreto -PgClave $pgClave |
   Out-File "$nodo\tmp\instalacion.log" -Encoding utf8
@@ -527,6 +581,11 @@ Write-Host "        $url" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "    Queda escrito en INSTALACION.txt" -ForegroundColor DarkGray
 Write-Host ""
+
+# La instalacion TERMINO: el intento de la orden ya no hace falta (la reserva se
+# consumio al canjear). Si quedara, una REINSTALACION futura intentaria reanudar
+# una orden ya gastada en vez de pedir el codigo nuevo.
+Remove-Item (Join-Path $env:TEMP "gluuh-instalacion-intento.txt") -Force -ErrorAction SilentlyContinue
 
 # Y el sentinela: le dice al asistente que todo fue bien y ya puede cerrar la pantalla de
 # instalacion. Sin esto se quedaria esperando eternamente.

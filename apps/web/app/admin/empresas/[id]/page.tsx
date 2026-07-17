@@ -36,6 +36,10 @@ export default function FichaEmpresa() {
   const [cargando, setCargando] = useState(true);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; x: string } | null>(null);
   const [lim, setLim] = useState<{ dispositivos: string; usuarios: string }>({ dispositivos: "", usuarios: "" });
+  // Orden de instalación (F3, 0116): el código en claro solo existe en esta
+  // respuesta — se enseña una vez y no se vuelve a poder consultar (en BD vive
+  // su hash). Un solo uso, ligada al local, caduca a los 30 días.
+  const [orden, setOrden] = useState<string | null>(null);
 
   async function cargar() {
     const sb = supabaseBrowser();
@@ -56,6 +60,20 @@ export default function FichaEmpresa() {
     const r = await accionEmpresa(emp?.id ?? id, a, extra);
     setMsg({ t: r.ok ? "ok" : "err", x: r.msg });
     if (r.ok) cargar();
+  }
+
+  async function emitirOrden() {
+    setMsg(null);
+    const { data: { session } } = await supabaseBrowser().auth.getSession();
+    const res = await fetch("/api/admin/orden-instalacion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+      body: JSON.stringify({ tenant_id: emp?.id }),
+    }).catch(() => null);
+    const j = await res?.json().catch(() => null);
+    if (!res?.ok) { setMsg({ t: "err", x: j?.error ?? "No se pudo emitir la orden" }); return; }
+    setOrden(j.codigo as string);
+    setMsg({ t: "ok", x: "Orden emitida: UN solo uso, caduca en 30 días. Cópiala ahora — no se puede volver a consultar." });
   }
 
   if (cargando) return <div className="grid h-64 place-items-center text-muted-foreground">Cargando…</div>;
@@ -99,8 +117,15 @@ export default function FichaEmpresa() {
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => accion("reset-password")}>Resetear password</Button>
               <Button size="sm" variant="outline" onClick={() => accion("regenerar-codigo")}><RefreshCw className="h-3.5 w-3.5" /> Nuevo código</Button>
+              <Button size="sm" onClick={emitirOrden}>Emitir orden de instalación</Button>
             </div>
           </div>
+          {orden && (
+            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Orden de instalación (un solo uso · 30 días · solo se muestra ahora)</div>
+              <div className="select-all font-mono text-lg font-semibold tracking-wider">{orden}</div>
+            </div>
+          )}
           {emp.email_admin && <p className="text-[12px] text-muted-foreground">Contacto: {emp.email_admin}</p>}
 
           {/* Límites: 0/vacío = sin límite. El uso actual se ve arriba. */}
