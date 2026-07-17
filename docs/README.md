@@ -4,7 +4,7 @@
 > **Alcance:** Web (backoffice + TPV en navegador) · App de escritorio Windows (TPV de barra) · App Android e iOS (comanderas) · Backend SaaS multi‑tenant en la nube.
 > **Mercado objetivo:** España (con especial atención a Canarias / IGIC, dado el origen del proyecto en La Palma) y, en una segunda fase, resto de la UE.
 > **Marca:** **Gluuh** (marca paraguas, ya registrada). **Este producto: Gluuh TPV.** Familia con **Gluuh Campo** (análisis de facturas del campo).
-> **Fecha de la documentación:** junio de 2026 (índice actualizado el 06-07-2026).
+> **Fecha de la documentación:** junio de 2026 (índice actualizado el 17-07-2026).
 
 ---
 
@@ -63,6 +63,7 @@ Todo vive en carpetas; en la raíz solo queda este índice.
 | [`especificaciones/`](especificaciones/) | Especificaciones de construcción: páginas y campos, mapa Ágora, guía de diseño, elementos del plano | Referencia estable |
 | [`referencia/`](referencia/) | Guía de construcción de junio: áreas 01–08, **configurador de Ágora campo a campo** (`09-referencia-configurador-agora/`), modelo de datos objetivo (`diseno/`), infraestructura y mejoras | Referencia estable |
 | [`sesiones/`](sesiones/) | Registro cronológico de cambios, implementaciones y mejoras por sesión de trabajo (traspasos) | Vivo — ver skill `gluuh-registro` |
+| [`auditoria/`](auditoria/) | Auditoría técnica integral del 17-07-2026: arquitectura actual/objetivo, Supabase/RLS, hallazgos y roadmap incremental | Diagnóstico vigente; implementación no iniciada |
 
 ---
 
@@ -205,6 +206,7 @@ En el código, el scope de paquetes es **`@gluuh/*`** y los identificadores **`c
 | `referencia/` (junio) | ✅ Referencia estable (Ágora, modelo de datos objetivo, plan F0–F8) |
 | `plan/` + `implementacion/` | ★ Plan vigente — se actualiza al implementar |
 | `sesiones/` | Vivo — una entrada por sesión de trabajo |
+| `auditoria/` | ✅ Diagnóstico integral redactado el 17-07-2026; hallazgos aún abiertos |
 | Especificación XSD Verifactu final | ⚠️ Reconfirmar contra el portal AEAT antes de cerrar desarrollo |
 
 > Toda la investigación está fechada en **junio de 2026** con fuentes citadas en cada documento. Las cifras de precios de competidores y comisiones son orientativas y deben reconfirmarse antes de cualquier decisión contractual.

@@ -1,6 +1,6 @@
 # AHORA — por dónde vamos
 
-> **Actualizado:** 14-07-2026 · rama `nodo-local`
+> **Actualizado:** 17-07-2026 · rama `nodo-local`
 > Léelo entero antes de tocar nada. Si terminas algo, **actualiza este fichero y haz push**.
 
 ## Qué es esto en cinco líneas
@@ -51,7 +51,17 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 
 | quién | qué | ficheros |
 |---|---|---|
-| — | — | — |
+
+### ⚠️ Auditoría técnica del 17-07 — implementación pendiente de autorización
+
+Diagnóstico completo en [`docs/auditoria/`](../auditoria/README.md). Antes de ampliar/refactorizar:
+
+1. Verificar por MCP read-only el drift de `0105` y los grants/RLS efectivos.
+2. Cerrar las RPC de jornada/heartbeat y el RBAC fail-open.
+3. Hacer transaccional e idempotente venta/pago/factura antes de activar VERIFACTU.
+4. Corregir cursores de sync y superficies LAN del nodo antes del primer bar comercial.
+
+No se aplicó ninguna migración ni se reservó número; `0111` sigue libre.
 
 ---
 
