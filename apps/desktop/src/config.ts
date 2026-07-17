@@ -12,6 +12,10 @@ export interface ConfigTerminal {
   servidor?: string;
   /** Impresora ESC/POS; sin ella la impresión cae a window.print() en la web. */
   impresora?: ConfigImpresora;
+  /** ¿Este TPV tiene pantalla de cara al CLIENTE? Solo entonces se abre el
+   *  visor en el segundo monitor. Por defecto NO: un segundo monitor no
+   *  significa visor (en un despacho es simplemente otro monitor). */
+  visor?: boolean;
   backup?: {
     /** Hora local "HH:MM" del volcado diario. */
     hora?: string;

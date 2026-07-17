@@ -28,7 +28,10 @@ nsis:
   deleteAppDataOnUninstall: false
   # Accesos directos con el nombre bonito, en escritorio y menu inicio.
   shortcutName: Gluuh TPV
-  createDesktopShortcut: true
+  # `always`: el acceso directo del escritorio se crea SIEMPRE — también al
+  # reinstalar/actualizar (con `true`, si el usuario lo borró una vez, no vuelve;
+  # y en un TPV de barra el acceso directo ES la forma de abrir la app).
+  createDesktopShortcut: always
   createStartMenuShortcut: true
 # Auto-update vía GitHub Releases. Ajustar owner/repo al publicar la primera release.
 publish:

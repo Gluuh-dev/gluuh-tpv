@@ -267,8 +267,12 @@ app.whenReady().then(() => {
 
   // ── Ventanas ────────────────────────────────────────────────────────────
   crearVentana();
-  crearVisorSiHaySegundaPantalla(URL_BASE);
-  screen.on("display-added", () => crearVisorSiHaySegundaPantalla(URL_BASE));
+  // El visor del cliente SOLO si este TPV lo tiene configurado (config.visor):
+  // un segundo monitor no significa visor — en un despacho es otro monitor y el
+  // "¡Bienvenido!" a pantalla completa sobraba.
+  const conVisor = () => leerConfig(userData).visor === true;
+  if (conVisor()) crearVisorSiHaySegundaPantalla(URL_BASE);
+  screen.on("display-added", () => { if (conVisor()) crearVisorSiHaySegundaPantalla(URL_BASE); });
 
   // ── Arranque con Windows + updater + backup diario ──────────────────────
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true });
