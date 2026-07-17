@@ -5,6 +5,7 @@
 // Guía: docs/implementacion/03-app-escritorio-electron.md
 import { app, BrowserWindow, ipcMain, screen, shell } from "electron";
 import path from "node:path";
+import fs from "node:fs";
 import type { PrintJob } from "@gluuh/hardware";
 import { crearPlanificadorDiario, guardarBackupEnDisco, type FicheroBackup } from "./backup";
 import { leerConfig, guardarConfig, type ConfigTerminal } from "./config";
@@ -31,6 +32,27 @@ const RUTA_MODULO: Record<string, string> = {
   TPV: "/tpv", COMANDERA: "/comandera", COCINA: "/cocina", PANTALLA: "/pantalla",
   KIOSKO: "/kiosko", CARTELERIA: "/ofertas", VISOR: "/visor",
 };
+
+// userData = %APPDATA%\Gluuh TPV, y NO %APPDATA%\@gluuh\desktop (lo que sale del
+// name del package.json). Instalar-TPV.ps1 y la documentación apuntan a
+// "Gluuh TPV" — y sin esta línea la config del instalador quedaba en una
+// carpeta que la app jamás leía (el fallo exacto que su comentario advertía).
+app.setName("Gluuh TPV");
+// Migración: si ya había datos en la carpeta antigua (@gluuh/desktop) y la
+// nueva está vacía, se copian device.json y config.json — el terminal no
+// pierde su emparejado por el renombrado.
+try {
+  const nueva = app.getPath("userData");
+  const vieja = path.join(app.getPath("appData"), "@gluuh", "desktop");
+  for (const f of ["device.json", "config.json"]) {
+    const de = path.join(vieja, f);
+    const a = path.join(nueva, f);
+    if (fs.existsSync(de) && !fs.existsSync(a)) {
+      fs.mkdirSync(nueva, { recursive: true });
+      fs.copyFileSync(de, a);
+    }
+  }
+} catch { /* mejor esfuerzo: sin datos viejos no hay nada que migrar */ }
 
 let ventana: BrowserWindow | null = null;
 let identidad: Identidad | null = null;
