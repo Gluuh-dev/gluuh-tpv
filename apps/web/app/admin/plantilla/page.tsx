@@ -9,6 +9,7 @@ import { LayoutTemplate, ExternalLink } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import type { TablaPublica } from "@gluuh/supabase";
 
 interface Resumen { nombre: string; productos: number; familias: number; impuestos: number; formas: number; tickets: number }
 
@@ -21,7 +22,7 @@ export default function Plantilla() {
       const { data: pl } = await sb.from("tenant").select("id,nombre").eq("es_plantilla", true).maybeSingle();
       const t = pl as { id: string; nombre: string } | null;
       if (!t) { setR({ nombre: "—", productos: 0, familias: 0, impuestos: 0, formas: 0, tickets: 0 }); return; }
-      const cnt = async (tabla: string) =>
+      const cnt = async (tabla: TablaPublica) =>
         (await sb.from(tabla).select("id", { count: "exact", head: true }).eq("tenant_id", t.id)).count ?? 0;
       setR({
         nombre: t.nombre,

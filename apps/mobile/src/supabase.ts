@@ -1,10 +1,11 @@
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import type { GluuhContractDatabase } from "@gluuh/supabase";
 
 // Cliente de Supabase para React Native (sesión persistida en AsyncStorage).
 // Mismo backend que la web: login de empresa + PIN de empleado + datos por RLS.
-export const supabase = createClient(
+export const supabase = createClient<GluuhContractDatabase>(
   process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
   {

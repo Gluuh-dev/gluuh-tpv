@@ -93,27 +93,23 @@ const DEFECTOS_CONFIG = {
 type ModuloConfigurable = keyof typeof DEFECTOS_CONFIG;
 const esConfigurable = (m: Modulo): m is ModuloConfigurable => m in DEFECTOS_CONFIG;
 
-// Tipos de terminal que se dan de alta con CREDENCIAL propia (usuario+contraseña, 0105). El
-// TPV y la comandera son los interactivos; la cocina (KDS) también puede ir por app.
+// Tipos de terminal emparejables. El usuario/contraseña reutilizable de 0105 está
+// rechazado; cada equipo consume un código efímero de seis dígitos.
 const TIPOS_TERMINAL = [
   { v: "TPV", label: "TPV (punto de venta)", tipo: "TPV", modulo: "TPV" },
   { v: "COMANDERA", label: "Comandera", tipo: "COMANDERA", modulo: "COMANDERA" },
   { v: "COCINA", label: "Pantalla de cocina (KDS)", tipo: "KDS", modulo: "COCINA" },
 ] as const;
 
-// Alta de un terminal con su usuario+contraseña. A diferencia del código de 6 dígitos (de un
-// solo uso), esta credencial es REUTILIZABLE: se mete en el primer arranque del equipo y, si
-// se reinstala, se vuelve a meter la misma sin generar nada nuevo. Encima va el PIN del camarero.
 function CrearTerminal({ onCreado }: { onCreado: () => void | Promise<void> }) {
   const [tipoSel, setTipoSel] = useState<string>("TPV");
   const [nombre, setNombre] = useState("");
-  const [usuario, setUsuario] = useState("");
-  const [clave, setClave] = useState("");
+  const [codigo, setCodigo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function crear() {
-    if (!nombre.trim() || !usuario.trim() || !clave) {
-      toast.error("Rellena nombre, usuario y contraseña.");
+    if (!nombre.trim()) {
+      toast.error("Escribe un nombre para el terminal.");
       return;
     }
     const t = TIPOS_TERMINAL.find((x) => x.v === tipoSel) ?? TIPOS_TERMINAL[0];
@@ -124,12 +120,13 @@ function CrearTerminal({ onCreado }: { onCreado: () => void | Promise<void> }) {
       const res = await fetch("/api/dispositivos/generar", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ tipo: t.tipo, modulo: t.modulo, nombre: nombre.trim(), usuario: usuario.trim(), clave }),
+        body: JSON.stringify({ tipo: t.tipo, modulo: t.modulo, nombre: nombre.trim() }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = (await res.json()) as { ok?: boolean; error?: string; codigo?: string };
       if (!res.ok || !j.ok) { toast.error(j.error ?? "No se pudo crear el terminal."); return; }
-      toast.success(`Terminal "${nombre.trim()}" creado. En el equipo: mete la IP del servidor y esta credencial.`);
-      setNombre(""); setUsuario(""); setClave("");
+      setCodigo(j.codigo ?? null);
+      toast.success(`Terminal "${nombre.trim()}" creado. El código caduca en 10 minutos.`);
+      setNombre("");
       await onCreado();
     } finally { setBusy(false); }
   }
@@ -137,11 +134,10 @@ function CrearTerminal({ onCreado }: { onCreado: () => void | Promise<void> }) {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Nuevo terminal (usuario y contraseña)</CardTitle>
+        <CardTitle>Nuevo terminal</CardTitle>
         <CardDescription>
-          Crea un TPV o comandera con su propia credencial. En el equipo se introduce una vez
-          (IP del servidor + este usuario y contraseña) y queda recordado. Encima, cada camarero
-          entra con su PIN.
+          Crea el equipo y genera un código de seis dígitos, válido durante diez minutos y de un solo uso.
+          En el terminal se introduce la dirección del nodo y este código; después, cada operario entra con su PIN.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -158,14 +154,12 @@ function CrearTerminal({ onCreado }: { onCreado: () => void | Promise<void> }) {
           <Label>Nombre</Label>
           <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="TPV Barra" />
         </div>
-        <div className="grid gap-1.5">
-          <Label>Usuario del terminal</Label>
-          <Input value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="tpv-barra" autoComplete="off" spellCheck={false} />
-        </div>
-        <div className="grid gap-1.5">
-          <Label>Contraseña</Label>
-          <Input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="new-password" />
-        </div>
+        {codigo && (
+          <div className="sm:col-span-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+            <p className="text-xs text-muted-foreground">Código de emparejado (un uso, 10 minutos)</p>
+            <p className="mt-1 font-mono text-2xl font-semibold tracking-[0.3em]">{codigo}</p>
+          </div>
+        )}
         <div className="sm:col-span-2">
           <Button onClick={crear} disabled={busy}>{busy ? "Creando…" : "Crear terminal"}</Button>
         </div>

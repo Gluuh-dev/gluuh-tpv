@@ -74,7 +74,7 @@ function irAOperativa(): void {
 // el primer arranque de todos, cuando aún no se ha configurado nada).
 let huboServidor = false;
 
-// Primer arranque: pantalla LOCAL de conexión (IP + usuario + contraseña del terminal). Va
+// Primer arranque: pantalla LOCAL de conexión (IP + código efímero de emparejado). Va
 // dentro de la app porque el nodo aún no se conoce. Se enseña cuando no hay identidad guardada.
 // Si ya conocíamos un servidor y ahora mismo no responde, se avisa en la propia pantalla.
 async function mostrarConexion(): Promise<void> {
@@ -224,9 +224,9 @@ app.whenReady().then(() => {
     }
   });
 
-  // Primer arranque: login del TERMINAL (IP + usuario + contraseña). El fetch va por el main
+  // Primer arranque: canje del código efímero del TERMINAL. El fetch va por el main
   // (no el renderer) para no chocar con CORS desde un file://.
-  ipcMain.handle("gluuh:conectar-terminal", async (_e, datos: { servidor: string; usuario: string; clave: string; recordar?: boolean }) => {
+  ipcMain.handle("gluuh:conectar-terminal", async (_e, datos: { servidor: string; codigo: string; recordar?: boolean }) => {
     const base = normalizaUrl(datos.servidor ?? "");
     if (!base) return { error: "Falta la dirección del servidor." };
     let origen: string;
@@ -236,18 +236,21 @@ app.whenReady().then(() => {
     try {
       const c = new AbortController();
       const t = setTimeout(() => c.abort(), 8000);
-      r = await fetch(`${base}/auth/v1/dispositivo`, {
+      r = await fetch(`${base}/api/dispositivos/canjear`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ usuario: datos.usuario, clave: datos.clave }),
+        body: JSON.stringify({ codigo: datos.codigo }),
         signal: c.signal,
       });
       clearTimeout(t);
     } catch {
       return { error: "No se pudo contactar con el servidor. Comprueba la dirección y la red." };
     }
-    if (r.status === 401) return { error: "Usuario o contraseña del terminal incorrectos." };
-    if (!r.ok) return { error: "El servidor rechazó la conexión." };
+    if (r.status === 404) return { error: "El código no es válido, ya se usó o ha caducado." };
+    if (!r.ok) {
+      const detalle = (await r.json().catch(() => null)) as { error?: string } | null;
+      return { error: detalle?.error ?? "El servidor rechazó la conexión." };
+    }
 
     const j = (await r.json()) as { device_id: string; nombre: string; modulo: string; token: string };
     // La dirección del servidor se guarda siempre (para reintentos y para prerrellenar).

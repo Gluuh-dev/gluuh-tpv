@@ -25,6 +25,8 @@ import { CabeceraCuenta } from "./components/CabeceraCuenta";
 import { ModalTPV } from "./components/ModalTPV";
 import { ClienteModal, type Cli } from "./components/ClienteModal";
 import { MesaModal } from "./components/MesaModal";
+import { UtilidadesModal } from "./components/UtilidadesModal";
+import { InvitacionesModal } from "./components/InvitacionesModal";
 import { DialogoConfirmar } from "@/components/dialogo-confirmar";
 import { BarraTotales } from "./components/BarraTotales";
 import { FilaAccionesLinea } from "./components/FilaAccionesLinea";
@@ -1572,6 +1574,23 @@ export default function TPV() {
     void cobrar(filas, { abrirCajon, imprimir: opts.imprimir });
   }
 
+  // Justificante (proforma) de una parte/importe al dividir: documento NO fiscal
+  // con lo que le toca pagar a esa persona. Reutiliza la impresión del ticket.
+  function imprimirParteProforma(etiqueta: string, importe: number) {
+    const ctx = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra";
+    const doc: TicketImpresion = {
+      local: locInfo,
+      contexto: `${ctx} · ${etiqueta}`,
+      operario: operario?.nombre,
+      lineas: [{ cantidad: 1, nombre: "A pagar", importe }],
+      desglose: [],
+      total: importe,
+      proforma: true,
+      esPrueba: !VERIFACTU_ACTIVO,
+    };
+    void imprimirTicket(doc, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
+  }
+
   // Dividir cuenta (DividirCuentaModal): un sales_order por documento. El doc 1 se
   // queda en el pedido/mesa original; el resto se abren como cuentas de barra
   // aparcadas ("Mesa X (2)"…), cobrables por separado desde «Barra» (guía 12 §6).
@@ -2746,6 +2765,7 @@ export default function TPV() {
         <MesaModal
           mesas={mesas}
           rooms={rooms}
+          elementos={elementos}
           totalesMesa={totalesMesa}
           reservasPorMesa={reservasPorMesa}
           mesaActualId={mesa?.id ?? null}
@@ -2772,14 +2792,17 @@ export default function TPV() {
         </ModalTPV>
       )}
 
-      {/* ── Dividir cuenta (DividirCuentaModal): reparte líneas en documentos ── */}
+      {/* ── Dividir cuenta (DividirCuentaModal): por productos → documentos fiscales
+             separados (RPC); por partes/importe → justificante proforma + cobro único ── */}
       {modalActivo === 'DIVIDIR' && (
         <DividirCuentaModal
           lineas={lineasComanda().map((l) => ({ id: l.id, nombre: l.nombre, uds: l.cantidad, precio: l.precio }))}
           total={total}
           comensales={comensales}
-          onAceptar={dividirAceptar}
-          onCobrarTodos={() => { setModalActivo('COBRAR'); }}
+          contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra"}
+          onAceptarProductos={dividirAceptar}
+          onImprimirParte={imprimirParteProforma}
+          onCobrar={() => { setModalActivo('COBRAR'); }}
           onCancelar={() => setModalActivo(null)}
           onAbrirCajon={abrirCajonManual}
         />
@@ -2820,38 +2843,17 @@ export default function TPV() {
 
       {/* ── Modal: Invitaciones en ticket (marca qué líneas invitar) ── */}
       {modalActivo === 'INVITAR' && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
-          <div className="w-full max-w-md rounded-lg border border-border bg-card shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h3 className="flex items-center gap-2 font-semibold"><IconGift size={18} className="text-emerald-600 dark:text-emerald-400" /> Invitaciones en ticket</h3>
-              <span className="text-xs text-muted-foreground">Marca lo que invitas</span>
-            </div>
-            <div className="max-h-[55vh] overflow-y-auto p-2">
-              {unidades === 0 && <p className="p-4 text-center text-sm text-muted-foreground">No hay líneas en el ticket.</p>}
-              {Object.entries(comanda).map(([id, q]) => {
-                const p = prodDeKey(id); if (!p) return null;
-                const inv = !!invitadas[id];
-                return (
-                  <button type="button" key={id} onClick={() => setInvitadas((v) => ({ ...v, [id]: !v[id] }))}
-                    className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors ${inv ? "bg-emerald-500/10" : "hover:bg-accent"}`}>
-                    <span className={`grid h-5 w-5 flex-none place-items-center rounded border text-xs leading-none ${inv ? "border-emerald-500 bg-emerald-500 text-white" : "border-border"}`}>{inv ? "✓" : ""}</span>
-                    <span className="min-w-0 flex-1 truncate">{nombreDeKey(id)}</span>
-                    <span className="w-7 text-right tabular-nums text-muted-foreground">{q}</span>
-                    <span className={`w-16 text-right tabular-nums ${inv ? "text-emerald-600 line-through opacity-70" : ""}`}>{eur(precioEfectivo(id) * q)}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2 border-t border-border px-3 py-2">
-              <span className="text-xs text-muted-foreground">Invitado:{" "}
-                <b className="text-emerald-600 dark:text-emerald-400">{eur(Object.entries(comanda).reduce((s, [id, q]) => s + (invitadas[id] ? precioEfectivo(id) * q : 0), 0))}</b>
-              </span>
-              <button type="button" onClick={() => setInvitadas(Object.fromEntries(Object.keys(comanda).map((k) => [k, true])))} className="btn-ghost ml-auto text-xs">Invitar todo</button>
-              <button type="button" onClick={() => setInvitadas({})} className="btn-ghost text-xs">Quitar</button>
-              <button type="button" onClick={() => setModalActivo(null)} className="btn-primary text-sm">Hecho</button>
-            </div>
-          </div>
-        </div>
+        <InvitacionesModal
+          lineas={Object.entries(comanda).flatMap(([id, cantidad]) => {
+            const producto = prodDeKey(id);
+            return producto ? [{ id, nombre: nombreDeKey(id), unidades: cantidad, importe: precioEfectivo(id) * cantidad }] : [];
+          })}
+          invitadas={invitadas}
+          onCambiar={(id) => setInvitadas((actuales) => ({ ...actuales, [id]: !actuales[id] }))}
+          onInvitarTodo={() => setInvitadas(Object.fromEntries(Object.keys(comanda).map((id) => [id, true])))}
+          onQuitarTodo={() => setInvitadas({})}
+          onClose={() => setModalActivo(null)}
+        />
       )}
 
       {/* ── Modificadores (ModificadoresModal): comentarios + extras + nota ── */}
@@ -3037,26 +3039,21 @@ export default function TPV() {
 
       {/* ── Modal: Utilidades ── */}
       {modalActivo === 'UTILIDADES' && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
-          <div className="w-full max-w-xs rounded-lg border border-border bg-card p-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-3 font-semibold">Utilidades</h3>
-            <div className="space-y-1.5">
-              {window.gluuh && (
-                <button type="button" onClick={() => { setModalActivo(null); abrirCajonManual(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Abrir cajón</button>
-              )}
-              <button type="button" onClick={reprimirUltimo} disabled={!ultimoDoc} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-40">Reimprimir último ticket</button>
-              {/* CERRAR DÍA. Sólo el que puede cobrar: cerrar el día congela el Z de la
-                  noche, y eso no lo hace un camarero de paso. */}
-              {puede("cobrar") && (
-                <button type="button" onClick={abrirCierreDelDia} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm font-medium hover:bg-accent">Cerrar día (Z)</button>
-              )}
-              <button type="button" onClick={() => { setModalActivo(null); router.push("/modulos"); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">Módulos y pantallas</button>
-              <button type="button" onClick={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm hover:bg-accent">{resolvedTheme === "dark" ? "Modo claro ☀️" : "Modo oscuro 🌙"}</button>
-              <button type="button" onClick={() => { setModalActivo(null); salirOperario(); }} className="w-full rounded-md border border-border px-3 py-2.5 text-left text-sm text-rose-600 hover:bg-accent">Salir del operario</button>
-            </div>
-            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-3 w-full">Cerrar</button>
-          </div>
-        </div>
+        <UtilidadesModal
+          hayUltimoDocumento={!!ultimoDoc}
+          puedeCobrar={puede("cobrar")}
+          puedeAbrirCajon={!!window.gluuh && puede("abrir_cajon")}
+          temaOscuro={resolvedTheme === "dark"}
+          onAbrirCajon={() => { setModalActivo(null); abrirCajonManual(); }}
+          onReimprimir={reprimirUltimo}
+          onCerrarDia={abrirCierreDelDia}
+          onModulos={() => { setModalActivo(null); router.push("/modulos"); }}
+          onCambiarTema={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          onSalir={() => { setModalActivo(null); salirOperario(); }}
+          onNuevoArticulo={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "" }); setModalActivo('NUEVO_PROD'); }}
+          onInvitacion={() => setModalActivo('INVITAR')}
+          onClose={() => setModalActivo(null)}
+        />
       )}
 
       {/* ── Cobrar (CobrarModal): pago mixto, propina, descuento, F10/F11/F12 ── */}

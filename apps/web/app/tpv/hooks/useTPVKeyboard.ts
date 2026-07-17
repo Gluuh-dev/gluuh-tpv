@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 
 export interface UseTPVKeyboardProps {
-  sb: SupabaseClient;
+  sb: GluuhSupabaseClient;
   operario: { id: string; nombre: string } | null;
   bloqueado: boolean;
   loginOperario: (u: { id: string; nombre: string }) => void;

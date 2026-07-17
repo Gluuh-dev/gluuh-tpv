@@ -177,7 +177,7 @@ export function ClienteModal({
       derecha={<div className="text-right"><div className="text-[9px] font-bold uppercase tracking-wider text-white/70">Ticket</div><b className="text-lg tabular-nums">{eur(total)}</b></div>}
     >
       <div className="flex h-full min-h-0 flex-col">
-        <div className="grid min-h-0 flex-1 grid-cols-[1.4fr_1fr] gap-3 p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-[1fr_372px] gap-2 p-2">
           {/* ── Panel izquierdo: buscar + filtros + resultados ── */}
           <section className="flex min-h-0 flex-col rounded-lg border border-border bg-surface">
             <div className="flex flex-none items-center gap-2 border-b border-border p-2">
@@ -206,25 +206,25 @@ export function ClienteModal({
                 const emp = esEmpresa(c);
                 return (
                   <button type="button" key={c.id} onClick={() => { setSel(c); setAlta(false); }}
-                    className={`flex w-full items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors ${activo ? "bg-brand/10" : "hover:bg-accent"}`}>
-                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full text-xs font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
+                    className={`flex w-full items-center gap-2.5 border-b border-border px-2.5 py-1.5 text-left transition-colors ${activo ? "bg-brand/10 shadow-[inset_3px_0_0_var(--brand)]" : "hover:bg-accent"}`}>
+                    <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-xs font-bold" style={colorAvatar(c.nombre)}>{iniciales(c.nombre)}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-bold">{c.nombre}</span>
-                        {emp && <span className="flex-none rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">Empresa</span>}
-                        {c.notas && <span title={c.notas} className="flex-none rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-500">Alergias</span>}
+                        <span className="truncate text-[13.5px] font-bold">{c.nombre}</span>
+                        {emp && <span className="flex-none rounded-sm bg-sky-500/15 px-1 py-px text-[8.5px] font-bold uppercase tracking-wide text-sky-600 dark:text-sky-400">Empresa</span>}
+                        {c.notas && <span title={c.notas} className="flex-none rounded-sm bg-amber-500/15 px-1 py-px text-[8.5px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-500">Alergias</span>}
                       </span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
+                      <span className="mt-px block truncate text-[10.5px] font-medium text-muted-foreground">
                         {c.telefono ?? "sin teléfono"} · {c.nif || "sin NIF"}{st ? ` · ${st.visitas} visita${st.visitas === 1 ? "" : "s"} · ${relativa(st.ultima)}` : ""}
                       </span>
                     </span>
                     <span className="flex-none text-right">
-                      <span className="block text-xs font-bold">{tarifaNombre(c.tarifa_id)}</span>
-                      {Number(c.descuento_pct) > 0 && <span className="block text-[11px] font-bold text-emerald-600 dark:text-emerald-400">−{Number(c.descuento_pct)}%</span>}
+                      <span className="block text-[12.5px] font-bold">{tarifaNombre(c.tarifa_id)}</span>
+                      {Number(c.descuento_pct) > 0 && <span className="block text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400">−{Number(c.descuento_pct)}%</span>}
                     </span>
                     {Number(c.saldo) > 0
-                      ? <span title="Debe" className="flex-none rounded bg-rose-500/15 px-1.5 py-1 text-[10px] font-bold text-rose-600 dark:text-rose-400">DEBE {eur(Number(c.saldo))}</span>
-                      : facturable(c) && <span title="Facturable" className="flex-none rounded bg-emerald-500/15 px-1.5 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">FACTURA</span>}
+                      ? <span title="Debe" className="flex-none rounded-sm bg-rose-500/15 px-1 py-0.5 text-[8.5px] font-bold text-rose-600 dark:text-rose-400">DEBE {eur(Number(c.saldo))}</span>
+                      : facturable(c) && <span title="Facturable" className="flex-none rounded-sm bg-emerald-500/15 px-1 py-0.5 text-[8.5px] font-bold text-emerald-600 dark:text-emerald-400">FACTURA</span>}
                   </button>
                 );
               })}
@@ -298,9 +298,9 @@ function Ficha({ c, tarifa, empresa, st }: Readonly<{ c: Cli; tarifa: string; em
   const deuda = Number(c.saldo);
   // Compacto (TPV): TODAS las filas; si no hay valor, sale el texto gris (placeholder).
   const dato = (l: string, v: React.ReactNode, placeholder: string) => (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border-muted py-1.5">
-      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{l}</span>
-      {v ? <span className="text-right text-[13px] font-semibold">{v}</span> : <span className="text-right text-[13px] italic text-muted-foreground/70">{placeholder}</span>}
+    <div className="flex items-baseline gap-2.5 border-b border-border-muted py-1.5 text-[12.5px]">
+      <span className="w-[84px] flex-none text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">{l}</span>
+      {v ? <span className="flex-1 font-bold">{v}</span> : <span className="flex-1 italic text-muted-foreground/70">{placeholder}</span>}
     </div>
   );
   const dirFiscal = [c.direccion, [c.codigo_postal, c.poblacion].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");

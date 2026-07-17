@@ -13,11 +13,12 @@ import { BuscarAnadir } from "@/components/buscar-anadir";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { TablaPublica } from "@gluuh/supabase";
 
 type Nivel = "familia" | "categoria";
 interface Grupo { id: string; nombre: string }
 
-const TABLA: Record<Nivel, string> = { familia: "family_grupo_pv", categoria: "category_grupo_pv" };
+const TABLA: Record<Nivel, TablaPublica> = { familia: "family_grupo_pv", categoria: "category_grupo_pv" };
 const CAMPO: Record<Nivel, string> = { familia: "family_id", categoria: "category_id" };
 
 export function GruposPuntoVenta({ nivel, refId }: Readonly<{ nivel: Nivel; refId: string }>) {

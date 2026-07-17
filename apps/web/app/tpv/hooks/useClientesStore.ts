@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GluuhSupabaseClient } from "@gluuh/supabase";
 
 // Caché en memoria de los clientes (tabla `customer`). La lista PERSISTE entre aperturas del
 // modal (no se recarga desde cero cada vez): la primera vez se descarga y las siguientes se
@@ -18,7 +18,7 @@ interface ClientesState {
   cargado: boolean;
   cargando: boolean;
   /** Descarga la lista. La 1ª vez marca `cargando` (spinner); después revalida en silencio. */
-  cargar: (sb: SupabaseClient, opts?: { force?: boolean }) => Promise<void>;
+  cargar: (sb: GluuhSupabaseClient, opts?: { force?: boolean }) => Promise<void>;
   upsert: (c: Cli) => void;
   quitar: (id: string) => void;
 }

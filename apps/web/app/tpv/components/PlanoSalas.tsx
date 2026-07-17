@@ -106,56 +106,14 @@ export interface PlanoSalasProps {
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
-/* ── Paleta del plano (columnas `color` de las migraciones 0092/0093) ─────────
-   Sirve para agrupar mesas/objetos por zona o uso (reservado, VIP, terraza…),
-   como en Ágora. `null` = color por defecto del sprite.
-   Pocos tonos y bien diferenciados: en una pantalla táctil, 20 colores parecidos
-   ni se distinguen ni se aciertan con el dedo. */
-const COLORES_PLANO: { color: string | null; nombre: string }[] = [
-  { color: null,      nombre: "Por defecto" },
-  { color: "#8a5a2b", nombre: "Madera" },
-  { color: "#2563eb", nombre: "Azul" },
-  { color: "#16a34a", nombre: "Verde" },
-  { color: "#dc2626", nombre: "Rojo" },
-  { color: "#9333ea", nombre: "Morado" },
-  { color: "#0891b2", nombre: "Turquesa" },
-  { color: "#475569", nombre: "Gris" },
-];
+type PestanaPaleta = "MESAS" | "ESTRUCTURA" | "DECORACION";
 
-/** Fila de muestras de color del editor de plano. Táctil: 28 px de lado. */
-function SelectorColor({ valor, onElegir }: Readonly<{ valor: string | null | undefined; onElegir: (c: string | null) => void }>) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs font-semibold text-muted-foreground">Color:</span>
-      <div className="flex items-center gap-1">
-        {COLORES_PLANO.map((c) => {
-          const activo = (valor ?? null) === c.color;
-          return (
-            <button
-              key={c.nombre}
-              type="button"
-              title={c.nombre}
-              aria-label={c.nombre}
-              aria-pressed={activo}
-              onClick={() => onElegir(c.color)}
-              className={`h-7 w-7 flex-none rounded-md border-2 transition-transform active:scale-90 ${
-                activo ? "border-brand scale-110" : "border-border hover:scale-105"
-              }`}
-              style={c.color
-                ? { background: c.color }
-                // "Por defecto" = damero, para que se lea como "sin color propio"
-                : {
-                    backgroundImage:
-                      "linear-gradient(45deg,#94a3b8 25%,transparent 25%,transparent 75%,#94a3b8 75%),linear-gradient(45deg,#94a3b8 25%,#e2e8f0 25%,#e2e8f0 75%,#94a3b8 75%)",
-                    backgroundSize: "8px 8px",
-                    backgroundPosition: "0 0,4px 4px",
-                  }}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
+function esEstructuralElemento(e: Pick<Elemento, "tipo" | "icono">): boolean {
+  return e.tipo === "BARRA" || e.tipo === "PARED" || /^(barra|muro|separador|toldo)/i.test(e.icono ?? "");
+}
+
+function esAssetEstructural(a: PlanoAsset): boolean {
+  return a.tipo === "barra" || a.id === "toldo" || a.id === "separador" || a.id.startsWith("muro") || a.tipo === "abertura";
 }
 
 export function PlanoSalas({
@@ -214,7 +172,7 @@ export function PlanoSalas({
   const [capMesa, setCapMesa] = useState(4);
   const [elemEdit, setElemEdit] = useState<Elemento | null>(null);
   const [paletaAbierta, setPaletaAbierta] = useState(true);
-  const [paletaTab, setPaletaTab] = useState<"MESAS" | "OBJETOS">("MESAS");
+  const [paletaTab, setPaletaTab] = useState<PestanaPaleta>("MESAS");
   const [arrastrando, setArrastrando] = useState(false);
   const [sobrePapel, setSobrePapel] = useState(false);
   
@@ -303,7 +261,7 @@ export function PlanoSalas({
           const m = mesas.find(x => x.id === selId);
           if (m) {
             const currentRot = rotOverride[selId] ?? m.rotacion ?? 0;
-            const newRot = (currentRot + 45) % 360;
+            const newRot = (currentRot + 90) % 360;
             setRotOverride((prev) => ({ ...prev, [selId]: newRot }));
             void guardarRotMesa(selId, newRot);
           }
@@ -311,7 +269,7 @@ export function PlanoSalas({
           const e = elementos.find(x => x.id === selId);
           if (e) {
             const currentRot = rotOverride[selId] ?? e.rotacion ?? 0;
-            const newRot = (currentRot + 45) % 360;
+            const newRot = (currentRot + 90) % 360;
             setRotOverride((prev) => ({ ...prev, [selId]: newRot }));
             void guardarRotElem(selId, newRot);
           }
@@ -444,6 +402,18 @@ export function PlanoSalas({
     await recargarElementos();
   }
 
+  function cambiarLongitudElemento(e: Elemento, longitud: number) {
+    const actual = dimOverride[e.id] ?? { w: e.ancho, h: e.alto };
+    const horizontal = actual.w >= actual.h;
+    const largoActual = horizontal ? actual.w : actual.h;
+    const grosorActual = horizontal ? actual.h : actual.w;
+    const largo = Math.max(40, Math.round(longitud / 5) * 5);
+    const grosor = Math.max(8, grosorActual);
+    const siguiente = horizontal ? { w: largo, h: grosor } : { w: grosor, h: largo };
+    setDimOverride((prev) => ({ ...prev, [e.id]: siguiente }));
+    void guardarDimElem(e.id, siguiente);
+  }
+
   async function guardarRotElem(id: string, rot: number) {
     await sb.from("plano_elemento").update({ rotacion: rot }).eq("id", id);
     await recargarElementos();
@@ -459,36 +429,16 @@ export function PlanoSalas({
       const m = mesas.find((z) => z.id === id);
       if (!m) return;
       const currentRot = rotOverride[id] ?? m.rotacion ?? 0;
-      const newRot = (currentRot + 45) % 360;
+      const newRot = (currentRot + 90) % 360;
       setRotOverride((prev) => ({ ...prev, [id]: newRot }));
       void guardarRotMesa(id, newRot);
     } else {
       const el = elementos.find((z) => z.id === id);
       if (!el) return;
       const currentRot = rotOverride[id] ?? el.rotacion ?? 0;
-      const newRot = (currentRot + 45) % 360;
+      const newRot = (currentRot + 90) % 360;
       setRotOverride((prev) => ({ ...prev, [id]: newRot }));
       void guardarRotElem(id, newRot);
-    }
-  }
-
-  async function guardarColorMesa(id: string, color: string | null) {
-    setMesas((prev) => prev.map((m) => m.id === id ? { ...m, color } : m));
-    const res = await sb.from("restaurant_table").update({ color }).eq("id", id);
-    if (res.error) {
-      console.warn("La columna color no existe en la base de datos, usando fallback local.");
-    } else {
-      await recargarMesas();
-    }
-  }
-
-  async function guardarColorElem(id: string, color: string | null) {
-    setElementos((prev) => prev.map((e) => e.id === id ? { ...e, color } : e));
-    const res = await sb.from("plano_elemento").update({ color }).eq("id", id);
-    if (res.error) {
-      console.warn("La columna color no existe en la base de datos de elementos, usando fallback local.");
-    } else {
-      await recargarElementos();
     }
   }
 
@@ -593,7 +543,7 @@ export function PlanoSalas({
 
   async function rotarMesaEdit() {
     if (!mesaEdit) return;
-    const rot = ((mesaEdit.rotacion || 0) + 45) % 360;
+    const rot = ((mesaEdit.rotacion || 0) + 90) % 360;
     setMesaEdit({ ...mesaEdit, rotacion: rot });
     await sb.from("restaurant_table").update({ rotacion: rot }).eq("id", mesaEdit.id);
     await recargarMesas();
@@ -638,7 +588,7 @@ export function PlanoSalas({
 
   async function rotarElemEdit() {
     if (!elemEdit) return;
-    const rot = ((elemEdit.rotacion || 0) + 45) % 360;
+    const rot = ((elemEdit.rotacion || 0) + 90) % 360;
     setElemEdit({ ...elemEdit, rotacion: rot });
     await sb.from("plano_elemento").update({ rotacion: rot }).eq("id", elemEdit.id);
     await recargarElementos();
@@ -734,6 +684,7 @@ export function PlanoSalas({
     const ph = dimOverride[e.id]?.h ?? e.alto;
     const prot = rotOverride[e.id] ?? e.rotacion ?? 0;
     const isSel = selId === e.id;
+    const estructural = esEstructuralElemento(e);
     
     let zIndex = 5;
     if (e.icono?.startsWith("suelo:")) {
@@ -763,7 +714,6 @@ export function PlanoSalas({
       inner = (
         <PlanoSvg 
           file={a.file} 
-          style={{ "--mesa-fill": e.color || undefined } as React.CSSProperties} 
           className="pointer-events-none block h-full w-full select-none" 
         />
       );
@@ -800,8 +750,16 @@ export function PlanoSalas({
           dr.moved = true;
           
           const snap = (v: number) => Math.max(0, Math.round(v / 5) * 5);
-          const nx = Math.max(0, Math.min(800 - pw, snap(dr.ox + dx)));
-          const ny = Math.max(0, Math.min(600 - ph, snap(dr.oy + dy)));
+          // El CSS rota en torno al centro. Limitar por `pw`/`ph` sin rotar
+          // hacía que un muro vertical siguiera reservando todo su largo en el
+          // eje X y no pudiera llegar al borde derecho.
+          const angulo = (prot * Math.PI) / 180;
+          const anchoVisible = Math.abs(pw * Math.cos(angulo)) + Math.abs(ph * Math.sin(angulo));
+          const altoVisible = Math.abs(pw * Math.sin(angulo)) + Math.abs(ph * Math.cos(angulo));
+          const desplazaX = (pw - anchoVisible) / 2;
+          const desplazaY = (ph - altoVisible) / 2;
+          const nx = Math.max(-desplazaX, Math.min(800 - anchoVisible - desplazaX, snap(dr.ox + dx)));
+          const ny = Math.max(-desplazaY, Math.min(600 - altoVisible - desplazaY, snap(dr.oy + dy)));
           
           const node = ev.currentTarget;
           node.style.left = `${nx}px`;
@@ -834,8 +792,8 @@ export function PlanoSalas({
         }}
       >
         {inner}
-        {/* Puntos/tirador para redimensionar con captura local súper fluida y tamaño reducido */}
-        {isSel && (
+        {/* Solo barras, muros y toldos se estiran; plantas y decoración conservan su forma. */}
+        {isSel && estructural && (
           <span 
             onPointerDown={(ev) => {
               ev.stopPropagation();
@@ -852,10 +810,15 @@ export function PlanoSalas({
                 const scale = planoScale || 1;
                 const dx = (ev.clientX - r.sx) / scale;
                 const dy = (ev.clientY - r.sy) / scale;
-                const w = Math.max(20, r.sw + dx);
-                const h = Math.max(20, r.sh + dy);
-                const snap = (v: number) => Math.max(20, Math.round(v / 5) * 5);
-                setDimOverride((prev) => ({ ...prev, [r.id]: { w: snap(w), h: snap(h) } }));
+                const angulo = (prot * Math.PI) / 180;
+                const dxLocal = dx * Math.cos(angulo) + dy * Math.sin(angulo);
+                const dyLocal = -dx * Math.sin(angulo) + dy * Math.cos(angulo);
+                const horizontal = r.sw >= r.sh;
+                const largoInicial = horizontal ? r.sw : r.sh;
+                const grosorInicial = horizontal ? r.sh : r.sw;
+                const largo = Math.max(40, Math.round((largoInicial + (horizontal ? dxLocal : dyLocal)) / 5) * 5);
+                const grosor = Math.max(8, grosorInicial);
+                setDimOverride((prev) => ({ ...prev, [r.id]: horizontal ? { w: largo, h: grosor } : { w: grosor, h: largo } }));
               }
             }}
             onPointerUp={(ev) => {
@@ -896,14 +859,14 @@ export function PlanoSalas({
 
     // Colores táctiles mejorados
     const fill = editandoPlano 
-      ? (isSel ? "#60a5fa" : (m.color || "#8a5a2b")) 
+      ? (isSel ? "#60a5fa" : "#8a5a2b") 
       : seleccionada 
         ? "#3b82f6" 
         : porCobrar
           ? "#eab308"
           : ocupada 
             ? "#f59e0b" 
-            : (m.color || (reservada ? "#38bdf8" : "#8a5a2b"));
+            : (reservada ? "#38bdf8" : "#8a5a2b");
 
     // Clases dinámicas premium (sin box-shadows en el contenedor para evitar recuadros opacos)
     const shadowClass = seleccionada 
@@ -986,7 +949,7 @@ export function PlanoSalas({
           style={{ 
             transform: prot ? `rotate(${prot}deg)` : undefined, 
             "--mesa-fill": fill,
-            "--highlight-fill": (seleccionada || ocupada || reservada || !!m.color || (editandoPlano && isSel)) ? fill : undefined
+            "--highlight-fill": (seleccionada || ocupada || reservada || (editandoPlano && isSel)) ? fill : undefined
           } as React.CSSProperties} 
           className="pointer-events-none block h-full w-full" 
         />
@@ -1117,19 +1080,19 @@ export function PlanoSalas({
         {/* Editor/Paleta lateral izquierda (solo modo edición) */}
         {editandoPlano && (
           paletaAbierta ? (
-            <aside className="flex w-52 flex-none flex-col border-r border-border bg-card shadow-lg z-20 transition-all duration-300">
-              <div className="flex items-center border-b border-border">
-                {(["MESAS", "OBJETOS"] as const).map((t) => (
+            <aside className="flex w-64 flex-none flex-col border-r border-border bg-card shadow-lg z-20 transition-all duration-300">
+              <div className="grid grid-cols-[1fr_1fr_1fr_32px] items-stretch border-b border-border">
+                {(["MESAS", "ESTRUCTURA", "DECORACION"] as const).map((t) => (
                   <button 
                     type="button" 
                     key={t} 
                     onClick={() => setPaletaTab(t)}
-                    className={`flex-1 py-3 text-xs font-bold tracking-wider uppercase ${paletaTab === t ? "border-b-2 border-brand text-brand bg-brand/5" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`min-w-0 px-1 py-2.5 text-center text-[10px] font-bold leading-tight tracking-wide uppercase ${paletaTab === t ? "border-b-2 border-brand text-brand bg-brand/5" : "text-muted-foreground hover:text-foreground"}`}
                   >
-                    {t === "MESAS" ? "Mesas" : "Objetos"}
+                    {t === "MESAS" ? "Mesas" : t === "ESTRUCTURA" ? <>Estructu<br />ra</> : <>Decora<br />ción</>}
                   </button>
                 ))}
-                <button type="button" onClick={() => setPaletaAbierta(false)} className="px-3 py-2 text-muted-foreground hover:text-foreground font-bold" title="Ocultar">‹</button>
+                <button type="button" onClick={() => setPaletaAbierta(false)} className="text-lg text-muted-foreground hover:text-foreground font-bold" title="Ocultar">‹</button>
               </div>
               
               <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto p-3 bg-muted/5">
@@ -1145,14 +1108,17 @@ export function PlanoSalas({
                         <span className="text-[9px] font-bold leading-tight">{f.nombre}</span>
                       </button>
                     ))
-                  : ASSETS.filter((a: PlanoAsset) => (a.tipo === "barra" || a.tipo === "planta" || a.tipo === "separador" || a.tipo === "abertura") && !ASSETS_LEGACY.has(a.id)).map((a: PlanoAsset) => (
+                  : ASSETS.filter((a: PlanoAsset) => {
+                      if (ASSETS_LEGACY.has(a.id)) return false;
+                      return paletaTab === "ESTRUCTURA" ? esAssetEstructural(a) : a.tipo === "planta";
+                    }).map((a: PlanoAsset) => (
                       <button 
                         type="button" 
                         key={a.id} 
                         onClick={() => anadirElemento(a)}
                         className="flex flex-col items-center gap-1.5 rounded-lg border border-border bg-background p-2.5 text-center hover:border-brand/50 hover:bg-brand/5 active:scale-95 transition-all shadow-sm"
                       >
-                        <img src={`/plano/${a.file}?v=${PLANO_VER}`} alt="" className="h-10 w-10 object-contain filter drop-shadow-sm" />
+                        <img src={`/plano/${a.file}?v=${PLANO_VER}`} alt="" className={paletaTab === "ESTRUCTURA" ? "h-10 w-full object-contain" : "h-10 w-10 object-contain"} />
                         <span className="text-[9px] font-bold leading-tight">{a.nombre}</span>
                       </button>
                     ))}
@@ -1512,10 +1478,6 @@ export function PlanoSalas({
                           <button type="button" onClick={() => setCapacidad(m.id, (m.capacidad || 4) + 1)} className="h-6 w-6 rounded border border-border bg-background font-bold text-xs flex items-center justify-center text-foreground">+</button>
                         </div>
 
-                        {/* Color de la mesa (0092). La BD y el pintado ya estaban;
-                            faltaba justo esto: la forma de elegirlo. */}
-                        <SelectorColor valor={m.color} onElegir={(c) => void guardarColorMesa(m.id, c)} />
-
                         <button
                           type="button"
                           onClick={() => rotarSeleccionado(m.id, "mesa")}
@@ -1556,38 +1518,24 @@ export function PlanoSalas({
                     if (!el) return null;
                     const pw = dimOverride[el.id]?.w ?? el.ancho;
                     const ph = dimOverride[el.id]?.h ?? el.alto;
+                    const estructural = esEstructuralElemento(el);
+                    const longitud = pw >= ph ? pw : ph;
                     return (
                       <div className="flex flex-wrap items-center gap-3 bg-card border border-border rounded-lg px-3 py-1.5 shadow-sm text-sm">
                         <span className="font-extrabold text-xs text-brand uppercase tracking-wide">{el.etiqueta || "Elemento"}</span>
+                        {estructural ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-muted-foreground">Ancho:</span>
+                          <span className="text-xs font-semibold text-muted-foreground">Longitud:</span>
                           <input 
                             type="number" 
-                            value={pw} 
+                            value={longitud} 
                             onChange={(ev) => {
-                              const val = Math.max(20, Number(ev.target.value) || 20);
-                              setDimOverride((prev) => ({ ...prev, [el.id]: { w: val, h: ph } }));
-                              void guardarDimElem(el.id, { w: val, h: ph });
+                              cambiarLongitudElemento(el, Number(ev.target.value) || 40);
                             }}
                             className="w-16 rounded border border-border bg-background px-1.5 py-0.5 text-center font-semibold outline-none text-xs text-foreground"
                           />
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-muted-foreground">Alto:</span>
-                          <input 
-                            type="number" 
-                            value={ph} 
-                            onChange={(ev) => {
-                              const val = Math.max(20, Number(ev.target.value) || 20);
-                              setDimOverride((prev) => ({ ...prev, [el.id]: { w: pw, h: val } }));
-                              void guardarDimElem(el.id, { w: pw, h: val });
-                            }}
-                            className="w-16 rounded border border-border bg-background px-1.5 py-0.5 text-center font-semibold outline-none text-xs text-foreground"
-                          />
-                        </div>
-
-                        {/* Color del objeto (0093): mismo caso que las mesas. */}
-                        <SelectorColor valor={el.color} onElegir={(c) => void guardarColorElem(el.id, c)} />
+                        ) : <span className="text-xs font-semibold text-muted-foreground">Tamaño fijo</span>}
 
                         <button
                           type="button"
@@ -1732,7 +1680,7 @@ export function PlanoSalas({
               </div>
               
               <button type="button" onClick={rotarMesaEdit} className="mt-3 w-full rounded-lg border border-border py-2 text-xs font-semibold hover:bg-accent flex items-center justify-center gap-1.5">
-                <RotateCw size={14} /> Girar 45°
+                <RotateCw size={14} /> Girar 90°
               </button>
 
               <div className="mt-5 flex gap-2 border-t border-border pt-4">

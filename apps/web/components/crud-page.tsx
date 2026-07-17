@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import type { TablaPublica } from "@gluuh/supabase";
 
 export type CrudRow = Record<string, unknown>;
 export interface CrudField {
@@ -32,7 +33,7 @@ export interface CrudColumn {
   badge?: boolean;
 }
 export interface CrudConfig {
-  table: string; titulo: string; descripcion: string; singular: string; nuevo?: string;
+  table: TablaPublica; titulo: string; descripcion: string; singular: string; nuevo?: string;
   fields: CrudField[]; columns: CrudColumn[];
 }
 type Row = CrudRow;
