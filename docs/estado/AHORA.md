@@ -152,7 +152,14 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0121`.**
+**Siguiente número libre: `0123`.**
+
+- `0122` — **ESCRITA 17-07, NO APLICAR HASTA CANARY** (F1.5 contract): retira las
+  unicidades globales de `app_user` y crea la unicidad cuenta+tenant. Condiciones de
+  aplicación DENTRO del fichero (canary F1 + sesiones renovadas). Puerta 8 aplica.
+- `0121` — **RESERVADA 17-07 (F5.3, sesión chat)**: `sesion_soporte_y_break_glass` —
+  sesiones de soporte con consentimiento del titular, break-glass con MFA+motivo (máx
+  2 h, sin autorrenovación) y auditoría en `evento_seguridad`.
 
 - `0120` — **APLICADA EN LA NUBE por MCP el 17-07** (F7.3): `tombstones_sync` — cada
   DELETE de catálogo deja lápida con fecha (trigger en **60 tablas**, humo verde). El

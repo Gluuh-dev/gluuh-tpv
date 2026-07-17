@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHash, randomInt } from "node:crypto";
-import { hostPlataforma } from "@/app/lib/plataforma";
+import { hostPlataforma, mfaPlataformaInsuficiente } from "@/app/lib/plataforma";
 import { quienLlama, comoElServicio } from "@/app/lib/supabaseServidor";
 
 // Emitir una ORDEN DE INSTALACIÓN (F3 entrega 3.1, migración 0116). Solo personal
@@ -15,6 +15,9 @@ const generarCodigo = () => `${dig(4)}-${dig(4)}-${dig(5)}-${dig(4)}-${dig(4)}`;
 
 export async function POST(req: Request) {
   if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
+  if (mfaPlataformaInsuficiente((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""))) {
+    return NextResponse.json({ error: "Esta acción requiere verificación en dos pasos (MFA)" }, { status: 403 });
+  }
   const llamante = await quienLlama(req);
   if (!llamante) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 

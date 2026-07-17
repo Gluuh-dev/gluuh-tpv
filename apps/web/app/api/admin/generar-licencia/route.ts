@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { GluuhContractDatabase } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
-import { hostPlataforma } from "@/app/lib/plataforma";
+import { hostPlataforma, mfaPlataformaInsuficiente } from "@/app/lib/plataforma";
 
 // Emite un código de licencia para una empresa. SOLO el administrador de
 // plataforma (Gluuh): se verifica al llamante con su token (es_admin_plataforma)
@@ -18,6 +18,7 @@ const generarCodigo = () => `GLUH-${grupo()}-${grupo()}-${grupo()}`;
 export async function POST(req: Request) {
   if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (mfaPlataformaInsuficiente(token)) return NextResponse.json({ error: "Esta acción requiere verificación en dos pasos (MFA)" }, { status: 403 });
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

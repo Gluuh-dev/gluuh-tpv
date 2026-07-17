@@ -14,8 +14,9 @@
 // reparto por importe tocan fiscalidad (solo imprimen proforma); el cobro fiscal
 // vive fuera (CobrarModal / RPC). Skill: gluuh-ux-operativa.
 import { useMemo, useState } from "react";
-import { Users, ListTree, Coins, Printer, Plus, Minus, Delete, X, ArrowRight } from "lucide-react";
+import { Users, ListTree, Coins, Printer, Delete, X } from "lucide-react";
 import { eur } from "@/app/lib/money";
+import { ModalTPV } from "./ModalTPV";
 
 export interface LineaTicket {
   id: string;
@@ -212,27 +213,15 @@ export function DividirCuentaModal({
   const cuentasConLineas = cuentas.filter((c) => Object.keys(c).length > 0).length;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-background text-foreground"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Dividir cuenta"
+    <ModalTPV
+      titulo="Dividir cuenta"
+      subtitulo={`${contexto ?? ""}${comensales ? ` · ${comensales} comensales` : ""}`.replace(/^ · /, "")}
+      ancho={1200}
+      alto={820}
+      onClose={onCancelar}
+      derecha={<div className="text-right"><div className="text-[9px] font-bold uppercase tracking-wider text-white/70">Total</div><b className="text-lg tabular-nums">{eur(total)}</b></div>}
     >
-      {/* ═════ Cabecera ═════ */}
-      <header className="flex flex-none items-center justify-between gap-4 border-b border-border bg-brand px-5 py-3 text-white">
-        <div>
-          <h2 className="text-xl font-bold">Dividir cuenta</h2>
-          {contexto && <p className="text-xs text-white/70">{contexto}{comensales ? ` · ${comensales} comensales` : ""}</p>}
-        </div>
-        <div className="ml-auto text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-white/60">Total del ticket</div>
-          <div className="text-2xl font-bold tabular-nums">{eur(total)}</div>
-        </div>
-        <button type="button" onClick={onCancelar} aria-label="Cerrar" className="grid h-11 w-11 flex-none place-items-center rounded-lg transition-colors hover:bg-white/15 active:bg-white/25">
-          <X size={22} />
-        </button>
-      </header>
-
+      <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
       {/* ═════ Pestañas de modo ═════ */}
       <div className="flex flex-none items-center gap-2 border-b border-border bg-surface px-3 py-2" role="tablist">
         {([
@@ -473,6 +462,7 @@ export function DividirCuentaModal({
           </button>
         )}
       </footer>
-    </div>
+      </div>
+    </ModalTPV>
   );
 }

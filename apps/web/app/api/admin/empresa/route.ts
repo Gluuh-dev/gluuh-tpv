@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { GluuhContractDatabase, GluuhSupabaseClient } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
-import { hostPlataforma } from "@/app/lib/plataforma";
+import { hostPlataforma, mfaPlataformaInsuficiente } from "@/app/lib/plataforma";
 
 // Gestión de una empresa ya creada. SOLO el técnico de Gluuh (es_admin_plataforma).
 // Acciones de soporte remoto (sin tocar la BD a mano): resetear la password del
@@ -127,6 +127,7 @@ async function registrarPago(admin: GluuhSupabaseClient, tid: string, d: Record<
 export async function POST(req: Request) {
   if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (mfaPlataformaInsuficiente(token)) return NextResponse.json({ error: "Esta acción requiere verificación en dos pasos (MFA)" }, { status: 403 });
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

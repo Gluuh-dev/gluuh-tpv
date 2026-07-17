@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { GluuhContractDatabase, GluuhSupabaseClient, TablaPublica } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
 import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
-import { hostPlataforma } from "@/app/lib/plataforma";
+import { hostPlataforma, mfaPlataformaInsuficiente } from "@/app/lib/plataforma";
 import { clonarCatalogo, clonarTabla } from "@/app/lib/clonar-plantilla";
 
 // Grupos que se pueden importar de la plantilla al alta, y su tabla/acción.
@@ -121,6 +121,7 @@ async function clonarDesdePlantilla(admin: Admin, tid: string, grupos: string[])
 export async function POST(req: Request) {
   if (!hostPlataforma(req.headers.get("host"))) return new NextResponse(null, { status: 404 });
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (mfaPlataformaInsuficiente(token)) return NextResponse.json({ error: "Esta acción requiere verificación en dos pasos (MFA)" }, { status: 403 });
   if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

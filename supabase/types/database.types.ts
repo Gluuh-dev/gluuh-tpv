@@ -4176,6 +4176,70 @@ export type Database = {
           },
         ]
       }
+      sesion_soporte: {
+        Row: {
+          aprobada_por: string | null
+          created_at: string
+          cuenta_soporte: string
+          desde: string
+          estado: string
+          hasta: string
+          id: string
+          motivo: string
+          revocada_at: string | null
+          tenant_id: string
+          tipo: string
+        }
+        Insert: {
+          aprobada_por?: string | null
+          created_at?: string
+          cuenta_soporte: string
+          desde?: string
+          estado?: string
+          hasta: string
+          id?: string
+          motivo: string
+          revocada_at?: string | null
+          tenant_id: string
+          tipo?: string
+        }
+        Update: {
+          aprobada_por?: string | null
+          created_at?: string
+          cuenta_soporte?: string
+          desde?: string
+          estado?: string
+          hasta?: string
+          id?: string
+          motivo?: string
+          revocada_at?: string | null
+          tenant_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sesion_soporte_aprobada_por_fkey"
+            columns: ["aprobada_por"]
+            isOneToOne: false
+            referencedRelation: "cuenta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sesion_soporte_cuenta_soporte_fkey"
+            columns: ["cuenta_soporte"]
+            isOneToOne: false
+            referencedRelation: "cuenta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sesion_soporte_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       setting: {
         Row: {
           device_id: string | null
@@ -4888,6 +4952,15 @@ export type Database = {
     }
     Functions: {
       _exigir_tenant: { Args: { v_tenant: string }; Returns: undefined }
+      abrir_sesion_soporte: {
+        Args: {
+          p_minutos?: number
+          p_motivo: string
+          p_tenant: string
+          p_tipo?: string
+        }
+        Returns: string
+      }
       activar_licencia: { Args: { p_codigo: string }; Returns: Json }
       admin_dispositivos_empresa: {
         Args: { p_tenant: string }
@@ -4976,6 +5049,7 @@ export type Database = {
           ultima_venta: string
         }[]
       }
+      aprobar_sesion_soporte: { Args: { p_sesion: string }; Returns: undefined }
       asignar_pulsera: {
         Args: { p_codigo: string; p_user_id: string }
         Returns: undefined
@@ -5203,6 +5277,7 @@ export type Database = {
         Returns: number
       }
       revocar_sesion: { Args: { p_session: string }; Returns: undefined }
+      revocar_sesion_soporte: { Args: { p_sesion: string }; Returns: undefined }
       setting_get: {
         Args: { p_device_id?: string; p_key: string; p_location_id?: string }
         Returns: Json
@@ -5232,6 +5307,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      soporte_vigente: { Args: { p_tenant: string }; Returns: boolean }
       traspasar_lineas: {
         Args: {
           p_destino_mesa: string
