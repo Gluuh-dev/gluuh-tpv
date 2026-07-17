@@ -53,16 +53,14 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 |---|---|---|
 | Codex + Claude (chat) | **F0 ENTREGADA · F1/F2 núcleo APLICADO EN LA NUBE** (17-07, autorizado): 0111–0115 aplicadas por MCP, tipos regenerados, espejos de transición retirados, smoke verde. Pendiente: aplicar la tanda **en el nodo** cuando se levante + prueba adversarial; F1 contract (1.5) tras canary; F2 restos (MFA, revocar sesiones, temporal cifrada, provisional offline). Seguimiento: `docs/estado/REPARACION-F0-F8.md` | `supabase/migrations/0111–0115`, `supabase/types/`, `apps/web/app/(panel)/layout.tsx`, `login`, `elegir-empresa`, `invitacion/`, `api/invitaciones|cuenta`, `lib/contexto.ts`, `packages/supabase`, `scripts/` |
 
-### ⚠️ Auditoría técnica del 17-07 — implementación pendiente de autorización
+### ✅ Auditoría técnica del 17-07 — EJECUTADA en su núcleo (mismo día)
 
-Diagnóstico completo en [`docs/auditoria/`](../auditoria/README.md). Antes de ampliar/refactorizar:
-
-1. Verificar por MCP read-only el drift de `0105` y los grants/RLS efectivos.
-2. Cerrar las RPC de jornada/heartbeat y el RBAC fail-open.
-3. Hacer transaccional e idempotente venta/pago/factura antes de activar VERIFACTU.
-4. Corregir cursores de sync y superficies LAN del nodo antes del primer bar comercial.
-
-No se aplicó ninguna migración ni se reservó número; `0111` sigue libre.
+Diagnóstico en [`docs/auditoria/`](../auditoria/README.md); ejecución y estado por fase
+en [`REPARACION-F0-F8.md`](REPARACION-F0-F8.md). Los cuatro puntos se hicieron:
+drift de `0105` verificado y clasificado, jornada/heartbeat y RBAC fail-closed
+(0113/0114), cobro y emisión fiscal atómicos e idempotentes (0118/0119), cursores
+compuestos + tombstones y superficie LAN cerrada. Migraciones `0111`–`0121` aplicadas
+en la nube (0122 escrita, espera canary).
 
 ---
 
@@ -152,7 +150,12 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0123`.**
+**Siguiente número libre: `0124`.**
+
+- `0123` — **RESERVADA + APLICADA 17-07 (sesión chat, dividir cuenta)**:
+  `cuenta_parte` — persiste la división de una cuenta (partes IGUAL/IMPORTE/PRODUCTOS,
+  importe, líneas jsonb, cobrada/payment) para que reaparezca al volver a la mesa.
+  Diseño: `docs/plan/dividir-cuenta-y-ciclo.md`.
 
 - `0122` — **ESCRITA 17-07, NO APLICAR HASTA CANARY** (F1.5 contract): retira las
   unicidades globales de `app_user` y crea la unicidad cuenta+tenant. Condiciones de

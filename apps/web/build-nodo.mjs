@@ -69,9 +69,22 @@ function aplanarStandalone() {
     catch { return false; }
   };
   let n = 0;
+  // Un STUB es lo que deja el tracer de Next con pnpm: un symlink, o una carpeta
+  // con SOLO el package.json y sin el código. Si se respeta ("ya existe"), el
+  // paquete queda pelado y Next muere al arrancar con MODULE_NOT_FOUND — en el
+  // bar, no aquí. Un paquete real siempre tiene más de una entrada.
+  const esStub = (p) => {
+    try {
+      if (fs.lstatSync(p).isSymbolicLink()) return true;
+      return fs.readdirSync(p).length <= 1;
+    } catch { return true; }
+  };
   const hoist = (nombre, origen) => {
     const destino = path.join(saNM, nombre);
-    if (fs.existsSync(destino)) return;            // el primero con ese nombre gana
+    if (fs.existsSync(destino)) {
+      if (!esStub(destino)) return;                // real: el primero gana
+      fs.rmSync(destino, { recursive: true, force: true });  // stub: se pisa
+    }
     fs.mkdirSync(path.dirname(destino), { recursive: true });
     fs.cpSync(origen, destino, { recursive: true, dereference: true });
     n++;
