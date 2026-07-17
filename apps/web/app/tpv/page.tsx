@@ -879,7 +879,7 @@ export default function TPV() {
   // estación × zona → impresora, y la despacha un Desktop (guía 15 §6.1).
   function imprimirComandas() {
     if (typeof window === "undefined") return;
-    const contexto = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra";
+    const contexto = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Aparcado";
     const grupos = (["COCINA", "BARRA", "CAMARERO"] as const).map((estacion) => ({
       estacion,
       lineas: lineasComanda()
@@ -1406,7 +1406,7 @@ export default function TPV() {
           imprimirComandas();
         } else if (orderId) {
           // Ticket directo → cuenta abierta de barra (aparcada), recuperable desde «Barra».
-          const etiqueta = alias.trim() || cliente?.nombre || `Barra ${new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`;
+          const etiqueta = alias.trim() || cliente?.nombre || `Aparcado ${new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`;
           await sb.from("sales_order").update({ aparcado_como: etiqueta, table_id: null }).eq("id", orderId);
         }
         await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
@@ -1577,7 +1577,7 @@ export default function TPV() {
   // Justificante (proforma) de una parte/importe al dividir: documento NO fiscal
   // con lo que le toca pagar a esa persona. Reutiliza la impresión del ticket.
   function imprimirParteProforma(etiqueta: string, importe: number) {
-    const ctx = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra";
+    const ctx = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Aparcado";
     const doc: TicketImpresion = {
       local: locInfo,
       contexto: `${ctx} · ${etiqueta}`,
@@ -1591,83 +1591,119 @@ export default function TPV() {
     void imprimirTicket(doc, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
   }
 
-  // Dividir cuenta (DividirCuentaModal): un sales_order por documento. El doc 1 se
-  // queda en el pedido/mesa original; el resto se abren como cuentas de barra
-  // aparcadas ("Mesa X (2)"…), cobrables por separado desde «Barra» (guía 12 §6).
+  // Núcleo de la división (compartido por "dividir" y "cobrar cuenta"). Doc 1 → pedido
+  // `origen` (o uno nuevo si es null); resto → cuentas de barra aparcadas ("Mesa X (2)"…).
+  // División ATÓMICA (RPC 0095) con degradación comprobada. Devuelve { ok, baseId } donde
+  // baseId es el id del doc 1 (null si la RPC lo creó de cero por no haber `origen`).
+  async function ejecutarDivision(
+    origen: string | null,
+    clean: { lineas: { id: string; uds: number }[] }[],
+  ): Promise<{ ok: boolean; baseId: string | null }> {
+    const meta: Record<string, ReturnType<typeof lineasComanda>[number]> = {};
+    for (const l of lineasComanda()) meta[l.id] = l;
+    const camposCuenta = {
+      tipo_operacion: tipoOperacion,
+      motivo_no_venta: tipoOperacion === "INVITACION" ? "Invitación" : tipoOperacion === "AUTOCONSUMO" ? "Consumo propio" : null,
+      comensales: comensales || null,
+      customer_id: cliente?.id ?? null,
+      cliente_nombre: llevar?.nombre ?? cliente?.nombre ?? null,
+      cliente_telefono: llevar?.telefono ?? null,
+    };
+    const totalDe = (asign: { id: string; uds: number }[]) =>
+      Math.round(asign.reduce((s, a) => s + (invitadas[a.id] ? 0 : (meta[a.id]?.precio ?? 0)) * a.uds, 0) * 100) / 100;
+    const filasDe = (asign: { id: string; uds: number }[]) => {
+      const out: { product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: number; notas: string | null; estacion: string; modificadores: any }[] = [];
+      for (const a of asign) {
+        const m = meta[a.id]; if (!m) continue;
+        out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion, modificadores: menuParte[a.id] ? { key: a.id, menuParte: menuParte[a.id] } : { key: a.id } });
+      }
+      return out;
+    };
+
+    const etiquetaBase = mesa?.nombre ?? llevar?.nombre ?? "Ticket";
+    const docsRpc = clean.map((d) => ({ total: totalDe(d.lineas), lineas: filasDe(d.lineas) }));
+    const { error: rpcErr } = await sb.rpc("dividir_cuenta", {
+      p_origen: origen,
+      p_location: locationId,
+      p_mesa: mesa?.id ?? null,
+      p_user: operario?.id ?? userId,
+      p_etiqueta_base: etiquetaBase,
+      p_campos: camposCuenta,
+      p_docs: docsRpc,
+    });
+    if (!rpcErr) return { ok: true, baseId: origen };
+
+    // Degradación (0095 sin aplicar): camino antiguo, ahora COMPROBANDO cada insert.
+    const doc0 = clean[0]!;
+    let baseId = origen;
+    if (baseId) {
+      await sb.from("sales_order").update({ estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), ...camposCuenta }).eq("id", baseId);
+      await sb.from("order_line").delete().eq("order_id", baseId);
+    } else {
+      const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), client_id: crypto.randomUUID(), ...camposCuenta }).select("id").single();
+      baseId = (data as { id: string } | null)?.id ?? null;
+    }
+    if (!baseId) { toast.error("No se pudo dividir la cuenta. Nada se ha modificado."); return { ok: false, baseId: null }; }
+    const f0 = filasDe(doc0.lineas);
+    if (f0.length) {
+      const { error } = await sb.from("order_line").insert(f0.map((l) => ({ order_id: baseId, ...l })));
+      if (error) { toast.error("La división falló al guardar el primer documento."); return { ok: false, baseId: null }; }
+    }
+    for (let i = 1; i < clean.length; i++) {
+      const { data, error } = await sb.from("sales_order").insert({ location_id: locationId, table_id: null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(clean[i]!.lineas), client_id: crypto.randomUUID(), aparcado_como: `${etiquetaBase} (${i + 1})`, ...camposCuenta }).select("id").single();
+      const nid = (data as { id: string } | null)?.id;
+      if (error || !nid) { toast.error(`No se pudo crear el documento ${i + 1}. Revisa la cuenta.`); return { ok: false, baseId: null }; }
+      const fl = filasDe(clean[i]!.lineas);
+      if (fl.length) {
+        const { error: e2 } = await sb.from("order_line").insert(fl.map((l) => ({ order_id: nid, ...l })));
+        if (e2) { toast.error(`El documento ${i + 1} quedó sin líneas. Revísalo.`); return { ok: false, baseId: null }; }
+      }
+    }
+    if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
+    return { ok: true, baseId };
+  }
+
+  // Dividir cuenta (footer "Dividir en N tickets"): parte en N documentos y DEJA al
+  // operario en «Barra», con los tickets a la vista para cobrarlos por separado.
   async function dividirAceptar(docs: { lineas: { id: string; uds: number }[] }[]) {
     setModalActivo(null);
     const clean = docs.filter((d) => d.lineas.length);
     if (clean.length <= 1) { reset(); return; }   // sin reparto real: no se divide
     setBusy(true);
     try {
-      const meta: Record<string, ReturnType<typeof lineasComanda>[number]> = {};
-      for (const l of lineasComanda()) meta[l.id] = l;
-      const camposCuenta = {
-        tipo_operacion: tipoOperacion,
-        motivo_no_venta: tipoOperacion === "INVITACION" ? "Invitación" : tipoOperacion === "AUTOCONSUMO" ? "Consumo propio" : null,
-        comensales: comensales || null,
-        customer_id: cliente?.id ?? null,
-        cliente_nombre: llevar?.nombre ?? cliente?.nombre ?? null,
-        cliente_telefono: llevar?.telefono ?? null,
-      };
-      const totalDe = (asign: { id: string; uds: number }[]) =>
-        Math.round(asign.reduce((s, a) => s + (invitadas[a.id] ? 0 : (meta[a.id]?.precio ?? 0)) * a.uds, 0) * 100) / 100;
-      const filasDe = (asign: { id: string; uds: number }[]) => {
-        const out: { product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: number; notas: string | null; estacion: string; modificadores: any }[] = [];
-        for (const a of asign) {
-          const m = meta[a.id]; if (!m) continue;
-          out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion, modificadores: menuParte[a.id] ? { key: a.id, menuParte: menuParte[a.id] } : { key: a.id } });
-        }
-        return out;
-      };
-
-      // División ATÓMICA (RPC 0095): antes los inserts de los documentos 2.. no se
-      // comprobaban → si uno fallaba, ESA parte de la cuenta desaparecía en silencio.
-      const etiquetaBase = mesa?.nombre ?? llevar?.nombre ?? "Ticket";
-      const docsRpc = clean.map((d) => ({ total: totalDe(d.lineas), lineas: filasDe(d.lineas) }));
-      const { error: rpcErr } = await sb.rpc("dividir_cuenta", {
-        p_origen: ordenAbiertaId,
-        p_location: locationId,
-        p_mesa: mesa?.id ?? null,
-        p_user: operario?.id ?? userId,
-        p_etiqueta_base: etiquetaBase,
-        p_campos: camposCuenta,
-        p_docs: docsRpc,
-      });
-
-      if (rpcErr) {
-        // Degradación (0095 sin aplicar): camino antiguo, ahora COMPROBANDO cada insert.
-        const doc0 = clean[0]!;
-        let baseId = ordenAbiertaId;
-        if (baseId) {
-          await sb.from("sales_order").update({ estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), ...camposCuenta }).eq("id", baseId);
-          await sb.from("order_line").delete().eq("order_id", baseId);
-        } else {
-          const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), client_id: crypto.randomUUID(), ...camposCuenta }).select("id").single();
-          baseId = (data as { id: string } | null)?.id ?? null;
-        }
-        if (!baseId) { toast.error("No se pudo dividir la cuenta. Nada se ha modificado."); return; }
-        const f0 = filasDe(doc0.lineas);
-        if (f0.length) {
-          const { error } = await sb.from("order_line").insert(f0.map((l) => ({ order_id: baseId, ...l })));
-          if (error) { toast.error("La división falló al guardar el primer documento."); return; }
-        }
-        for (let i = 1; i < clean.length; i++) {
-          const { data, error } = await sb.from("sales_order").insert({ location_id: locationId, table_id: null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(clean[i]!.lineas), client_id: crypto.randomUUID(), aparcado_como: `${etiquetaBase} (${i + 1})`, ...camposCuenta }).select("id").single();
-          const nid = (data as { id: string } | null)?.id;
-          if (error || !nid) { toast.error(`No se pudo crear el documento ${i + 1}. Revisa la cuenta.`); return; }
-          const fl = filasDe(clean[i]!.lineas);
-          if (fl.length) {
-            const { error: e2 } = await sb.from("order_line").insert(fl.map((l) => ({ order_id: nid, ...l })));
-            if (e2) { toast.error(`El documento ${i + 1} quedó sin líneas. Revísalo.`); return; }
-          }
-        }
-        if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
-      }
-
+      const { ok } = await ejecutarDivision(ordenAbiertaId, clean);
+      if (!ok) return;
       await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
       reset();
+      setNavSala(true); setVistaSala("BARRA");   // quedarse en Barra con los tickets divididos
       toast.success(`Cuenta dividida en ${clean.length} documentos`);
+    } finally { setBusy(false); }
+  }
+
+  // Cobrar UNA cuenta del reparto por productos: la mandamos como doc 1 (se queda en el
+  // pedido origen, id conocido) y el resto va a Barra; luego abrimos la pantalla de cobro
+  // con esa cuenta cargada. `docs[0]` es SIEMPRE la cuenta a cobrar; el resto incluye las
+  // demás cuentas y lo no asignado (para no perder ninguna línea del ticket).
+  async function cobrarCuentaDividida(docs: { lineas: { id: string; uds: number }[] }[]) {
+    const clean = docs.filter((d) => d.lineas.length);
+    if (!clean.length) return;
+    setModalActivo(null);
+    setBusy(true);
+    try {
+      // El doc 1 se queda en el pedido origen: necesitamos que exista y su id.
+      let origen = ordenAbiertaId;
+      if (!origen) origen = await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
+      if (!origen) { toast.error("No se pudo preparar la cuenta para cobrar."); return; }
+
+      if (clean.length > 1) {
+        const { ok } = await ejecutarDivision(origen, clean);
+        if (!ok) return;
+        await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
+      }
+      // Recoge la cuenta a cobrar (doc 1, ya en `origen`) con su versión fresca y cobra.
+      await tomarCuenta(origen);
+      await cargarLineas(origen);
+      setModalActivo("COBRAR");
     } finally { setBusy(false); }
   }
 
@@ -2801,6 +2837,7 @@ export default function TPV() {
           comensales={comensales}
           contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra"}
           onAceptarProductos={dividirAceptar}
+          onCobrarCuenta={cobrarCuentaDividida}
           onImprimirParte={imprimirParteProforma}
           onCobrar={() => { setModalActivo('COBRAR'); }}
           onCancelar={() => setModalActivo(null)}

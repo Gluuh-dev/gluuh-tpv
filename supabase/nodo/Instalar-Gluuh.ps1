@@ -464,6 +464,43 @@ $filas = (Select-String -Path "$nodo\tmp\provision.log" -Pattern "filas bajadas"
 if (-not $filas) { $filas = "Bar descargado" }
 Bien $filas
 
+# ── EL PRIMER TPV, LISTO PARA EMPAREJAR ──────────────────────────────────────
+#
+# Plan 14 F3: se crea "TPV 1" PENDIENTE de emparejado — nunca un usuario tpv1
+# con contrasena conocida. El codigo de 6 digitos es de UN uso y sale impreso
+# en la hoja de entrega; el tecnico lo teclea en el terminal y listo.
+#
+# Y si el bar llego SIN NINGUN usuario (empresa recien creada: ya no se
+# siembran tecnico/1212 ni camareros de ejemplo), se crea UN titular con clave
+# y PIN ALEATORIOS de esta instalacion, impresos UNA vez aqui. Un bar con sus
+# usuarios de la nube no se toca.
+$codigoTpv = '{0:D6}' -f (Get-Random -Minimum 100000 -Maximum 1000000)
+$alfaClave = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+$claveTitular = -join (1..8 | ForEach-Object { $alfaClave[(Get-Random -Maximum $alfaClave.Length)] })
+$pinTitular = '{0:D4}' -f (Get-Random -Minimum 1000 -Maximum 10000)
+
+$semillaSql = @"
+set search_path = public, extensions;
+insert into public.device (tenant_id, location_id, tipo, modulo, nombre, codigo_vinculacion, codigo_expira)
+select '$tenantId', l.id, 'TPV', 'TPV', 'TPV 1', '$codigoTpv', now() + interval '24 hours'
+  from public.location l where l.tenant_id = '$tenantId'
+ order by l.created_at limit 1
+on conflict do nothing;
+insert into public.app_user (tenant_id, nombre, rol, activo, usr_app, clave_hash, pin_hash)
+select '$tenantId', 'Titular', 'PROPIETARIO', true, 'admin',
+       crypt('$claveTitular', gen_salt('bf')), crypt('$pinTitular', gen_salt('bf'))
+ where not exists (select 1 from public.app_user where tenant_id = '$tenantId');
+"@
+$semillaSql | Out-File "$nodo\tmp\semilla-tpv.sql" -Encoding ascii
+$env:PGPASSWORD = $pgClave
+$semillaSalida = & "$nodo\pgsql\bin\psql.exe" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -q `
+  -c "\set ON_ERROR_STOP on" -f "$nodo\tmp\semilla-tpv.sql" 2>&1
+Remove-Item "$nodo\tmp\semilla-tpv.sql" -Force -ErrorAction SilentlyContinue
+# Solo se ensenan las credenciales del titular si DE VERDAD se creo (bar nuevo).
+$titularSembrado = ((& "$nodo\pgsql\bin\psql.exe" -h 127.0.0.1 -p 55432 -U postgres -d gluuh -t -A `
+  -c "select count(*) from public.app_user where tenant_id = '$tenantId' and usr_app = 'admin' and nombre = 'Titular'") -join '').Trim() -eq '1'
+Bien "TPV 1 creado, pendiente de emparejar (codigo en la hoja)"
+
 Progreso "Bajando las fotos de la carta..."
 Write-Host "   Bajando las fotos de la carta..." -ForegroundColor DarkGray
 node "$Raiz\apps\nodo\descargar-imagenes.mjs" | Out-File "$nodo\tmp\imagenes.log" -Encoding utf8
@@ -557,6 +594,20 @@ DIRECCION DEL SERVIDOR (esto es lo que hay que poner en cada TPV):
 CLAVE DE ACCESO DE LOS TPV (unica de este bar):
 
     $anon
+
+PRIMER TPV ("TPV 1"), listo para emparejar:
+
+    Codigo de emparejado:  $codigoTpv
+    (Un solo uso, caduca en 24 horas. Se teclea en la pantalla "Conectar este
+     terminal" del TPV. Para mas terminales: panel > Puntos de venta > Vincular.)
+$(if ($titularSembrado) { @"
+
+ACCESO DEL TITULAR (bar nuevo; unico de esta instalacion — GUARDA ESTA HOJA):
+
+    Panel del bar:  usuario  admin
+                    clave    $claveTitular
+    PIN en el TPV:  $pinTitular
+"@ })
 
 IMPORTANTE
 - Este ordenador tiene que quedarse ENCENDIDO. Es donde estan los datos.

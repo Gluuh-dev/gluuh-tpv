@@ -34,6 +34,9 @@ export interface DividirCuentaModalProps {
   contexto?: string;
   /** Reparto POR PRODUCTOS: crea un documento fiscal por cuenta (RPC). */
   onAceptarProductos(docs: { lineas: { id: string; uds: number }[] }[]): void;
+  /** Cobrar UNA cuenta ya: `docs[0]` es la cuenta a cobrar; el resto (otras cuentas +
+   *  lo no asignado) se aparca en Barra. Abre la pantalla de cobro con esa cuenta. */
+  onCobrarCuenta(docs: { lineas: { id: string; uds: number }[] }[]): void;
   /** Imprime un justificante (proforma) con un importe a pagar. */
   onImprimirParte(etiqueta: string, importe: number): void;
   /** Cobro real de toda la cuenta (una factura) — abre el CobrarModal. */
@@ -59,6 +62,7 @@ export function DividirCuentaModal({
   comensales,
   contexto,
   onAceptarProductos,
+  onCobrarCuenta,
   onImprimirParte,
   onCobrar,
   onCancelar,
@@ -156,6 +160,21 @@ export function DividirCuentaModal({
     if (cuentas.length >= 8) return;
     setCtAct(cuentas.length); // la nueva: índice = longitud actual
     setCuentas((prev) => [...prev, {}]);
+  }
+
+  // Cobrar la cuenta ACTIVA ya: va como doc 1; detrás, las demás cuentas y lo que quede
+  // sin asignar (para no perder líneas del ticket al partir). Abre el cobro con esa cuenta.
+  function cobrarCuentaActiva() {
+    const target = cuentas[ctAct];
+    if (!target || Object.keys(target).length === 0) return;
+    const restante: Record<string, number> = {};
+    for (const l of sinAsignar) restante[l.id] = l.restantes;
+    const grupos = [target, ...cuentas.filter((c, i) => i !== ctAct && Object.keys(c).length > 0)];
+    if (Object.keys(restante).length) grupos.push(restante);
+    const docs = grupos
+      .map((c) => ({ lineas: Object.entries(c).filter(([, u]) => u > 0).map(([id, u]) => ({ id, uds: u })) }))
+      .filter((d) => d.lineas.length > 0);
+    onCobrarCuenta(docs);
   }
 
   // Documentos a emitir: cada cuenta con líneas → un documento fiscal.
@@ -364,6 +383,7 @@ export function DividirCuentaModal({
                 <div className="mr-auto"><small className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total de la cuenta {ctAct + 1}</small><b className="text-lg font-extrabold tabular-nums">{eur(totalCuenta(cuentas[ctAct] ?? {}))}</b></div>
                 <button type="button" onClick={vaciarCuenta} disabled={!Object.keys(cuentas[ctAct] ?? {}).length} className="min-h-11 rounded-md border border-border bg-card px-3 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98] disabled:opacity-40">Devolver todo</button>
                 <button type="button" onClick={() => onImprimirParte(`Cuenta ${ctAct + 1}`, totalCuenta(cuentas[ctAct] ?? {}))} disabled={!Object.keys(cuentas[ctAct] ?? {}).length} className="flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold transition-all hover:bg-accent active:scale-[.98] disabled:opacity-40"><Printer size={15} /> Imprimir</button>
+                <button type="button" onClick={cobrarCuentaActiva} disabled={!Object.keys(cuentas[ctAct] ?? {}).length} className="min-h-11 rounded-md bg-warning px-4 text-sm font-bold text-white shadow-sm transition-all hover:brightness-105 active:scale-[.98] disabled:bg-surface disabled:text-muted-foreground disabled:shadow-none">Cobrar cuenta {ctAct + 1}</button>
               </div>
             </div>
           </div>

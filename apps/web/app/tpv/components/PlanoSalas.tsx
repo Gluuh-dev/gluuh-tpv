@@ -1161,7 +1161,7 @@ export function PlanoSalas({
                         onClick={() => recuperarAparcado(o)}
                         className="flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-brand/40 hover:shadow-md active:scale-98"
                       >
-                        <div className="bg-brand px-2 py-1.5 text-center text-xs font-extrabold text-brand-foreground truncate">{o.aparcado_como || `Barra ${hhmm(o.created_at)}`}</div>
+                        <div className="bg-brand px-2 py-1.5 text-center text-xs font-extrabold text-brand-foreground truncate">{o.aparcado_como || `Aparcado ${hhmm(o.created_at)}`}</div>
                         <div className="flex-1 p-3">
                           <div className="mb-1.5 flex gap-1 border-b border-border pb-1 text-[9px] font-bold uppercase text-muted-foreground">
                             <span className="flex-1">Artículo</span><span className="w-8 text-right">Uds</span><span className="w-12 text-right">Total</span>
