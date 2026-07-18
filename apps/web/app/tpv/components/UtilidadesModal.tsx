@@ -49,6 +49,8 @@ interface Props {
   onReimprimir: () => void;
   onCerrarDia: () => void;
   onResumenCaja: () => void;
+  onCobrosPendientes: () => void;
+  onAgenda: () => void;
   onModulos: () => void;
   onCambiarTema: () => void;
   onSalir: () => void;
@@ -68,6 +70,8 @@ export function UtilidadesModal({
   onReimprimir,
   onCerrarDia,
   onResumenCaja,
+  onCobrosPendientes,
+  onAgenda,
   onModulos,
   onCambiarTema,
   onSalir,
@@ -86,11 +90,11 @@ export function UtilidadesModal({
     { id: "cerrar-dia", etiqueta: "Cerrar turno / día", icono: ArchiveRestore, tono: "caja", accion: onCerrarDia, deshabilitada: !puedeCobrar },
     { id: "resumen-caja", etiqueta: "Resumen de caja", icono: CircleDollarSign, tono: "caja", accion: onResumenCaja },
     { id: "cashlogy", etiqueta: "Opciones CashLogy", icono: Settings2, deshabilitada: true },
-    { id: "agenda", etiqueta: "Agenda", icono: CalendarDays, deshabilitada: true },
+    { id: "agenda", etiqueta: "Agenda", icono: CalendarDays, accion: onAgenda },
     { id: "tarifa", etiqueta: "Selección de tarifa", icono: Tag, deshabilitada: true },
     { id: "empleados", etiqueta: "Empleados", icono: ContactRound, accion: () => { window.location.assign("/tpv/config/empleados"); } },
     { id: "presencia", etiqueta: "Control de presencia", icono: ContactRound, deshabilitada: true },
-    { id: "cobros-pendientes", etiqueta: "Cobros pendientes", icono: CircleDollarSign, deshabilitada: true },
+    { id: "cobros-pendientes", etiqueta: "Cobros pendientes", icono: CircleDollarSign, tono: "caja", accion: onCobrosPendientes },
     { id: "safepay", etiqueta: "Opciones SafePay", icono: Settings2, deshabilitada: true },
     { id: "nuevo-articulo", etiqueta: "Nuevo artículo", icono: PackagePlus, accion: onNuevoArticulo },
     { id: "cambiar-usuario", etiqueta: "Cambiar de usuario", icono: LogOut, tono: "alerta", accion: onSalir },

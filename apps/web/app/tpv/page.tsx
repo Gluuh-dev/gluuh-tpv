@@ -258,7 +258,8 @@ export default function TPV() {
   // Total provisional del cobro optimista de una aparcada (hasta que cargan las líneas).
   const [totalCobroPrevio, setTotalCobroPrevio] = useState<number | null>(null);
   const [ultimoDoc, setUltimoDoc] = useState<TicketImpresion | null>(null);
-  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | 'RESUMEN_CAJA' | null>(null);
+  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | 'RESUMEN_CAJA' | 'COBROS_PEND' | null>(null);
+  const [cobrosPend, setCobrosPend] = useState<{ id: string; table_id: string | null; cliente_nombre: string | null; cliente_telefono: string | null; aparcado_como: string | null; total: number; created_at: string }[]>([]);
   // El Z de la jornada en curso, tal como está AHORA MISMO. Se pide al abrir el cierre.
   const [cierre, setCierre] = useState<{ jornada: { id: string; numero: number; abierta_en: string }; z: Z } | null>(null);
   const { resolvedTheme } = useTheme();
@@ -1949,6 +1950,35 @@ export default function TPV() {
     setAparcadosLineas(map);
   }
 
+  // Cobros pendientes (Utilidades): las cuentas con la cuenta YA IMPRESA y esperando
+  // pago (estado POR_COBRAR) — mesas, barra y para-llevar en una sola lista. Solo
+  // lectura; al tocar una, se abre su cuenta para cobrarla. NO incluye las abiertas
+  // aún sin pedir la cuenta (esas se ven en el plano / en Barra).
+  async function recargarCobrosPendientes() {
+    const { data } = await sb.from("sales_order")
+      .select("id,table_id,cliente_nombre,cliente_telefono,aparcado_como,total,created_at")
+      .eq("estado", "POR_COBRAR").order("created_at", { ascending: false });
+    setCobrosPend((data as typeof cobrosPend) ?? []);
+  }
+
+  function etiquetaCobroPendiente(o: (typeof cobrosPend)[number]): string {
+    if (o.table_id) return mesas.find((m) => m.id === o.table_id)?.nombre ?? "Mesa";
+    if (o.cliente_nombre) return `Para llevar · ${o.cliente_nombre}`;
+    return o.aparcado_como || `Barra ${hhmm(o.created_at)}`;
+  }
+
+  function abrirCobroPendiente(o: (typeof cobrosPend)[number]) {
+    setModalActivo(null);
+    if (o.table_id) {
+      const m = mesas.find((x) => x.id === o.table_id);
+      if (m) void abrirMesa(m);
+    } else if (o.cliente_nombre) {
+      void abrirLlevar({ id: o.id, cliente_nombre: o.cliente_nombre, cliente_telefono: o.cliente_telefono });
+    } else {
+      void recuperarAparcado({ id: o.id });
+    }
+  }
+
   // Aparcar: guarda la cuenta con una etiqueta y dispara la comanda (como Glop).
   async function aparcar() {
     if (busy) return;
@@ -3111,6 +3141,20 @@ export default function TPV() {
         </ModalTPV>
       )}
 
+      {modalActivo === 'COBROS_PEND' && (
+        <ModalTPV titulo="Cobros pendientes" onClose={() => setModalActivo(null)} ancho={420} alto={480}>
+          <div className="space-y-1 p-5">
+              {cobrosPend.map((o) => (
+                <button type="button" key={o.id} onClick={() => abrirCobroPendiente(o)} className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-accent">
+                  <span className="font-medium">{etiquetaCobroPendiente(o)}</span>
+                  <span className="tabular-nums text-muted-foreground">{eur(Number(o.total))}</span>
+                </button>
+              ))}
+              {cobrosPend.length === 0 && <p className="text-sm text-muted-foreground">No hay cuentas con la cuenta pedida y sin cobrar.</p>}
+          </div>
+        </ModalTPV>
+      )}
+
       {/* ── Dividir cuenta (DividirCuentaModal): por productos → documentos fiscales
              separados (RPC); por partes/importe → justificante proforma + cobro único ── */}
       {modalActivo === 'DIVIDIR' && (
@@ -3440,6 +3484,8 @@ export default function TPV() {
           onReimprimir={reprimirUltimo}
           onCerrarDia={abrirCierreDelDia}
           onResumenCaja={abrirResumenCaja}
+          onCobrosPendientes={() => { void recargarCobrosPendientes(); setModalActivo('COBROS_PEND'); }}
+          onAgenda={() => { setModalActivo(null); void onReservasEstable(); }}
           onModulos={() => { setModalActivo(null); router.push("/modulos"); }}
           onCambiarTema={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")}
           onSalir={() => { setModalActivo(null); salirOperario(); }}
