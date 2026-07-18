@@ -9,6 +9,12 @@ import { imprimirTicket, imprimirComanda, resolverImpresora, formatearTicket, gu
 import { encolarComandas } from "../lib/print-routing";
 import { claveBase, claveDeLinea, claveParaAnadir } from "./clave-linea";
 import { precioEfectivo as precioEfectivoPuro } from "./precio";
+import {
+  nombreDeKey as nombreDeKeyPuro,
+  nombreBaseDeKey as nombreBaseDeKeyPuro,
+  extraIngredientesDetallados as extraIngredientesDetalladosPuro,
+  obtenerBaseManualSiDifiere as obtenerBaseManualSiDifierePuro,
+} from "./nombres";
 import { toast } from "@/app/lib/toast";
 import { escucharCambios } from "../lib/cambios";
 import { getSetting } from "../lib/settings";
@@ -556,79 +562,13 @@ export default function TPV() {
   const prodDeKey = (key: string) => prodPorId.get(claveBase(key).split("|")[0]!);
   // campo: usa nombre_ticket / nombre_cocina (0051) como nombre base cuando existan;
   // si no, cae al nombre normal (los sufijos de formato/peso/modificadores se conservan).
-  function nombreDeKey(key: string, campo?: "nombre_ticket" | "nombre_cocina"): string {
-    const [pid, fid, mods] = claveBase(key).split("|");
-    const p = pid ? prodPorId.get(pid) : undefined;
-    if (!p) return "";
-    const base = (campo && p[campo]) || p.nombre;
-    let nombre: string;
-    if (fid?.startsWith("@")) nombre = `${base} (${fid.slice(1)} kg)`;   // por peso
-    else {
-      const fmt = fid ? (formatos[p.id] ?? []).find((f) => f.id === fid) : undefined;
-      nombre = fmt ? `${base} (${fmt.nombre})` : base;
-    }
-    if (mods) {
-      const ns = mods.split(",").map((m) => modById[m]?.nombre).filter(Boolean);
-      if (ns.length) nombre += ` · ${ns.join(", ")}`;
-    }
-    return nombre;
-  }
-
-  function nombreBaseDeKey(key: string, campo?: "nombre_ticket" | "nombre_cocina"): string {
-    const [pid, fid] = claveBase(key).split("|");
-    const p = pid ? prodPorId.get(pid) : undefined;
-    if (!p) return "";
-    const base = (campo && p[campo]) || p.nombre;
-    if (fid?.startsWith("@")) return `${base} (${fid.slice(1)} kg)`;
-    const fmt = fid ? (formatos[p.id] ?? []).find((f) => f.id === fid) : undefined;
-    return fmt ? `${base} (${fmt.nombre})` : base;
-  }
-
-  interface ExtraDetalle {
-    nombre: string;
-    precio: number;
-    uds: number;
-  }
-
-  function extraIngredientesDetallados(key: string): ExtraDetalle[] {
-    const [, , mods] = claveBase(key).split("|");
-    if (!mods) return [];
-    const counts: Record<string, number> = {};
-    for (const m of mods.split(",")) {
-      counts[m] = (counts[m] ?? 0) + 1;
-    }
-    return Object.entries(counts).map(([mId, uds]) => {
-      const mod = modById[mId];
-      return {
-        nombre: mod?.nombre ?? mId,
-        precio: mod?.precio_extra ?? 0,
-        uds,
-      };
-    });
-  }
-
-  function obtenerBaseManualSiDifiere(baseKey: string, precioUnitario: number): number | undefined {
-    const [pid, fid, mods] = baseKey.split("|");
-    // Solo products reales (las líneas de menú llegan con product_id NULL y no pasan por aquí).
-    const prod = pid ? prodPorId.get(pid) : undefined;
-    if (!prod) return undefined;
-    let calcBase = prod.precio;
-    if (fid && !fid.startsWith("@")) {
-      const fmt = (formatos[pid!] ?? []).find((f) => f.id === fid);
-      if (fmt) calcBase = fmt.precio;
-    }
-    let calcTotal = calcBase;
-    if (mods) {
-      for (const m of mods.split(",")) {
-        calcTotal += modById[m]?.precio_extra ?? 0;
-      }
-    }
-    if (Math.abs(precioUnitario - calcTotal) > 0.01) {
-      const extrasCost = calcTotal - calcBase;
-      return Math.max(0, precioUnitario - extrasCost);
-    }
-    return undefined;
-  }
+  // Resolvores de nombre/extras (módulo puro ./nombres.ts); se les pasa el contexto
+  // del catálogo. El ctx se recrea por render pero es un objeto plano barato.
+  const ctxNombres = useMemo(() => ({ prodPorId, formatos, modById }), [prodPorId, formatos, modById]);
+  const nombreDeKey = (key: string, campo?: "nombre_ticket" | "nombre_cocina") => nombreDeKeyPuro(ctxNombres, key, campo);
+  const nombreBaseDeKey = (key: string, campo?: "nombre_ticket" | "nombre_cocina") => nombreBaseDeKeyPuro(ctxNombres, key, campo);
+  const extraIngredientesDetallados = (key: string) => extraIngredientesDetalladosPuro(ctxNombres, key);
+  const obtenerBaseManualSiDifiere = (baseKey: string, precioUnitario: number) => obtenerBaseManualSiDifierePuro(ctxNombres, baseKey, precioUnitario);
 
   /* ── Precio efectivo (peso/formato + suplemento de modificadores + desc./precio manual).
      El cálculo vive en ./precio.ts (puro, con tests); aquí solo se le da el contexto. ── */
