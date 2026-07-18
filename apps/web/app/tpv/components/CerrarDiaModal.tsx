@@ -39,9 +39,12 @@ interface Props {
   z: Z;
   onCerrar: (contado: number | null) => Promise<void>;
   onCancelar: () => void;
+  /** Solo mostrar el Z del turno en marcha (Utilidades → Resumen de caja): sin
+   *  arqueo ni cierre. La misma pantalla, en modo consulta. */
+  soloLectura?: boolean;
 }
 
-export function CerrarDiaModal({ jornada, z, onCerrar, onCancelar }: Props) {
+export function CerrarDiaModal({ jornada, z, onCerrar, onCancelar, soloLectura = false }: Readonly<Props>) {
   const [contado, setContado] = React.useState("");
   const [busy, setBusy] = React.useState(false);
 
@@ -69,7 +72,7 @@ export function CerrarDiaModal({ jornada, z, onCerrar, onCancelar }: Props) {
       >
         <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold">Cerrar día</h2>
+            <h2 className="text-lg font-semibold">{soloLectura ? "Resumen de caja" : "Cerrar día"}</h2>
             <p className="text-xs text-muted-foreground">
               Jornada nº {jornada.numero} · abierta el{" "}
               {new Date(jornada.abierta_en).toLocaleString("es-ES", {
@@ -174,8 +177,15 @@ export function CerrarDiaModal({ jornada, z, onCerrar, onCancelar }: Props) {
           {/* ── ★ EL ARQUEO ── */}
           <section>
             <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Coins className="h-3.5 w-3.5" /> Arqueo de caja
+              <Coins className="h-3.5 w-3.5" /> {soloLectura ? "Efectivo en caja" : "Arqueo de caja"}
             </h3>
+            {soloLectura ? (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Debería haber</span>
+                <span className="text-lg font-semibold tabular-nums">{eur(efectivo)}</span>
+              </div>
+            ) : (
+            <>
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <label htmlFor="contado" className="text-xs text-muted-foreground">
@@ -210,21 +220,31 @@ export function CerrarDiaModal({ jornada, z, onCerrar, onCancelar }: Props) {
                   : `${diferencia > 0 ? "Sobran" : "Faltan"} ${eur(Math.abs(diferencia))}.`}
               </p>
             )}
+            </>
+            )}
           </section>
         </div>
 
         <footer className="flex gap-2 border-t border-border px-5 py-4">
-          <button type="button" onClick={onCancelar} className="btn-ghost flex-1" disabled={busy}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={confirmar}
-            disabled={busy}
-            className="flex-1 rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground disabled:opacity-50"
-          >
-            {busy ? "Cerrando…" : "Cerrar el día"}
-          </button>
+          {soloLectura ? (
+            <button type="button" onClick={onCancelar} className="flex-1 rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground">
+              Volver
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={onCancelar} className="btn-ghost flex-1" disabled={busy}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmar}
+                disabled={busy}
+                className="flex-1 rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? "Cerrando…" : "Cerrar el día"}
+              </button>
+            </>
+          )}
         </footer>
       </div>
     </div>

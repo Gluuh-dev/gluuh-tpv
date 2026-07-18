@@ -258,7 +258,7 @@ export default function TPV() {
   // Total provisional del cobro optimista de una aparcada (hasta que cargan las líneas).
   const [totalCobroPrevio, setTotalCobroPrevio] = useState<number | null>(null);
   const [ultimoDoc, setUltimoDoc] = useState<TicketImpresion | null>(null);
-  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | null>(null);
+  const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | 'RESUMEN_CAJA' | null>(null);
   // El Z de la jornada en curso, tal como está AHORA MISMO. Se pide al abrir el cierre.
   const [cierre, setCierre] = useState<{ jornada: { id: string; numero: number; abierta_en: string }; z: Z } | null>(null);
   const { resolvedTheme } = useTheme();
@@ -2094,6 +2094,22 @@ export default function TPV() {
     setModalActivo('CERRAR_DIA');
   }
 
+  // Resumen de caja (Utilidades): el MISMO Z del turno en marcha, en modo consulta.
+  // No cierra ni pide recuento — solo enseña. Comparte fetch con abrirCierreDelDia.
+  async function abrirResumenCaja() {
+    setModalActivo(null);
+    if (!locationId) return;
+    const { data: j } = await sb
+      .from("jornada").select("id,numero,abierta_en")
+      .eq("location_id", locationId).is("cerrada_en", null).maybeSingle();
+    if (!j) { toast.info("No hay ninguna jornada abierta: hoy todavía no se ha vendido nada."); return; }
+    const jornada = j as { id: string; numero: number; abierta_en: string };
+    const { data: z } = await sb.rpc("z_de_jornada", { p_jornada: jornada.id });
+    if (!z) { toast.error("No se pudo calcular el resumen de caja."); return; }
+    setCierre({ jornada, z: z as Z });
+    setModalActivo('RESUMEN_CAJA');
+  }
+
   async function cerrarElDia(contado: number | null) {
     if (!cierre) return;
 
@@ -3423,6 +3439,7 @@ export default function TPV() {
           onReimprimirCocina={() => { setModalActivo(null); imprimirComandas(); }}
           onReimprimir={reprimirUltimo}
           onCerrarDia={abrirCierreDelDia}
+          onResumenCaja={abrirResumenCaja}
           onModulos={() => { setModalActivo(null); router.push("/modulos"); }}
           onCambiarTema={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")}
           onSalir={() => { setModalActivo(null); salirOperario(); }}
@@ -3453,10 +3470,11 @@ export default function TPV() {
       )}
 
       {/* ── Cerrar día: el Z, las mesas que quedan abiertas y el arqueo ── */}
-      {modalActivo === 'CERRAR_DIA' && cierre && (
+      {(modalActivo === 'CERRAR_DIA' || modalActivo === 'RESUMEN_CAJA') && cierre && (
         <CerrarDiaModal
           jornada={cierre.jornada}
           z={cierre.z}
+          soloLectura={modalActivo === 'RESUMEN_CAJA'}
           onCerrar={cerrarElDia}
           onCancelar={() => { setModalActivo(null); setCierre(null); }}
         />

@@ -48,6 +48,7 @@ interface Props {
   onReimprimirCocina: () => void;
   onReimprimir: () => void;
   onCerrarDia: () => void;
+  onResumenCaja: () => void;
   onModulos: () => void;
   onCambiarTema: () => void;
   onSalir: () => void;
@@ -66,6 +67,7 @@ export function UtilidadesModal({
   onReimprimirCocina,
   onReimprimir,
   onCerrarDia,
+  onResumenCaja,
   onModulos,
   onCambiarTema,
   onSalir,
@@ -82,7 +84,7 @@ export function UtilidadesModal({
     { id: "buscar-documento", etiqueta: "Buscar documento", icono: ReceiptText, deshabilitada: true },
     { id: "apunte-caja", etiqueta: "Apunte de caja", icono: Banknote, tono: "caja", deshabilitada: true },
     { id: "cerrar-dia", etiqueta: "Cerrar turno / día", icono: ArchiveRestore, tono: "caja", accion: onCerrarDia, deshabilitada: !puedeCobrar },
-    { id: "resumen-caja", etiqueta: "Resumen de caja", icono: CircleDollarSign, tono: "caja", deshabilitada: true },
+    { id: "resumen-caja", etiqueta: "Resumen de caja", icono: CircleDollarSign, tono: "caja", accion: onResumenCaja },
     { id: "cashlogy", etiqueta: "Opciones CashLogy", icono: Settings2, deshabilitada: true },
     { id: "agenda", etiqueta: "Agenda", icono: CalendarDays, deshabilitada: true },
     { id: "tarifa", etiqueta: "Selección de tarifa", icono: Tag, deshabilitada: true },
