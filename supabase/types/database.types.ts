@@ -747,6 +747,79 @@ export type Database = {
         }
         Relationships: []
       }
+      cuenta_parte: {
+        Row: {
+          client_id: string
+          cobrada: boolean
+          cobrada_at: string | null
+          cobrada_order_id: string | null
+          created_at: string
+          id: string
+          importe: number
+          indice: number
+          lineas: Json | null
+          order_id: string
+          payment_id: string | null
+          tenant_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string
+          cobrada?: boolean
+          cobrada_at?: string | null
+          cobrada_order_id?: string | null
+          created_at?: string
+          id?: string
+          importe?: number
+          indice: number
+          lineas?: Json | null
+          order_id: string
+          payment_id?: string | null
+          tenant_id?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          cobrada?: boolean
+          cobrada_at?: string | null
+          cobrada_order_id?: string | null
+          created_at?: string
+          id?: string
+          importe?: number
+          indice?: number
+          lineas?: Json | null
+          order_id?: string
+          payment_id?: string | null
+          tenant_id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_parte_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuenta_parte_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuenta_parte_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer: {
         Row: {
           codigo_postal: string | null
@@ -3703,6 +3776,8 @@ export type Database = {
       }
       reservation: {
         Row: {
+          alergias: string | null
+          canal: string | null
           comensales: number
           created_at: string
           customer_id: string | null
@@ -3713,10 +3788,13 @@ export type Database = {
           nombre: string | null
           notas: string | null
           table_id: string | null
+          telefono: string | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          alergias?: string | null
+          canal?: string | null
           comensales: number
           created_at?: string
           customer_id?: string | null
@@ -3727,10 +3805,13 @@ export type Database = {
           nombre?: string | null
           notas?: string | null
           table_id?: string | null
+          telefono?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          alergias?: string | null
+          canal?: string | null
           comensales?: number
           created_at?: string
           customer_id?: string | null
@@ -3741,6 +3822,7 @@ export type Database = {
           nombre?: string | null
           notas?: string | null
           table_id?: string | null
+          telefono?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -3919,6 +4001,7 @@ export type Database = {
         Row: {
           aparcado_como: string | null
           canal: string
+          canal_pedido: string | null
           client_id: string
           cliente_nombre: string | null
           cliente_telefono: string | null
@@ -3926,6 +4009,8 @@ export type Database = {
           created_at: string
           customer_id: string | null
           deleted_at: string | null
+          direccion: string | null
+          entrega_at: string | null
           estado: string
           estado_preparacion: string
           id: string
@@ -3945,6 +4030,7 @@ export type Database = {
         Insert: {
           aparcado_como?: string | null
           canal?: string
+          canal_pedido?: string | null
           client_id: string
           cliente_nombre?: string | null
           cliente_telefono?: string | null
@@ -3952,6 +4038,8 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           deleted_at?: string | null
+          direccion?: string | null
+          entrega_at?: string | null
           estado?: string
           estado_preparacion?: string
           id?: string
@@ -3971,6 +4059,7 @@ export type Database = {
         Update: {
           aparcado_como?: string | null
           canal?: string
+          canal_pedido?: string | null
           client_id?: string
           cliente_nombre?: string | null
           cliente_telefono?: string | null
@@ -3978,6 +4067,8 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           deleted_at?: string | null
+          direccion?: string | null
+          entrega_at?: string | null
           estado?: string
           estado_preparacion?: string
           id?: string
@@ -5175,6 +5266,16 @@ export type Database = {
           p_user: string
         }
         Returns: undefined
+      }
+      separar_cuenta: {
+        Args: {
+          p_mesa_order: string
+          p_location: string
+          p_user: string
+          p_campos: Json
+          p_lineas: Json
+        }
+        Returns: string
       }
       emitir_credencial_dispositivo: {
         Args: { p_device: string; p_dias?: number; p_refresh_hash: string }

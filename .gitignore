@@ -61,3 +61,4 @@ supabase/.temp/
 # y recursivo — o sea que una carga aquí dentro se METERÍA A SÍ MISMA EN EL PAQUETE.
 supabase/nodo/instalador/carga/
 supabase/nodo/instalador/dist/
+dist-instalador2/
