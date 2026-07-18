@@ -27,7 +27,7 @@ export function RailSalas({
   vista, onVista, onConfig,
 }: Readonly<{ vista: string; onVista: (v: string) => void; onConfig: () => void }>) {
   return (
-    <aside className="flex w-[104px] flex-none flex-col gap-0.5 overflow-y-auto border-l border-border bg-surface py-1.5">
+    <aside className="flex w-[84px] flex-none flex-col gap-0.5 overflow-y-auto border-l border-border bg-surface py-1.5">
       <Tab Icono={ReceiptText} label="Ticket" activo={vista === "ticket"} onClick={() => onVista("ticket")} />
       <Tab Icono={Armchair} label="Aparcado" badge={13} activo={vista === "aparcado"} onClick={() => onVista("aparcado")} />
       {SALAS_DEMO.map((s) => {
