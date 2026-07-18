@@ -1,10 +1,9 @@
 import { create } from "zustand";
 import { PRODUCTOS_DEMO } from "./datos";
 
-// Store de la VENTA (operativa), calcado en esencia del TPV de Next (page.tsx +
-// useTpvStore): comanda, línea seleccionada, teclado con modos, contexto. Demo
-// sobre PRODUCTOS_DEMO; al cablear el nodo se cambia la fuente del catálogo y el
-// cobro, no la forma del store.
+// Store de la VENTA (operativa), calcado en esencia del TPV de Next: comanda,
+// línea seleccionada, teclado con modos que aplican EN VIVO. Demo sobre
+// PRODUCTOS_DEMO; al cablear el nodo cambia la fuente del catálogo, no la forma.
 
 export type ModoTeclado = "UND" | "PREC" | "DTO%" | "DTO€";
 export interface Descuento { tipo: "PCT" | "EUR"; valor: number }
@@ -14,28 +13,23 @@ function precioBase(id: string): number {
 }
 
 export interface VentaState {
-  // Contexto de la cuenta
   contexto: string;
   comensales: number;
   alias: string;
 
-  // Comanda: clave de línea → unidades
   comanda: Record<string, number>;
-  precios: Record<string, number>;        // precio manual por línea
-  descuentos: Record<string, Descuento>;  // descuento por línea
+  precios: Record<string, number>;
+  descuentos: Record<string, Descuento>;
   invitadas: Record<string, boolean>;
   lineaSel: string | null;
 
-  // Rejilla
   catSel: string | null;
   busqueda: string;
 
-  // Teclado
   buffer: string;
   modo: ModoTeclado;
   editando: boolean;
 
-  // Acciones
   iniciar: (contexto: string, comensales?: number) => void;
   addProd: (id: string) => void;
   seleccionar: (id: string) => void;
@@ -47,17 +41,38 @@ export interface VentaState {
   anularLinea: (id: string) => void;
   vaciar: () => void;
 
-  // Teclado
   pulsarModo: (m: ModoTeclado) => void;
   pulsarDigito: (d: string) => void;
-  aplicar: () => void;      // "Label": aplica el buffer al modo activo sobre la línea sel
-  borrar: () => void;       // retroceso
-  limpiar: () => void;      // tecla C: vacía el buffer
+  borrar: () => void;
+  limpiar: () => void;
 
-  // Derivados
   precioEfectivo: (id: string) => number;
+  precioSel: () => number;   // precio unitario de la línea seleccionada (para la barra)
+  descSel: () => Descuento | null;
   total: () => number;
   unidades: () => number;
+}
+
+// Aplica el buffer a la línea seleccionada SEGÚN el modo (en vivo). Buffer vacío
+// = revertir (uds→1, sin precio manual, sin descuento).
+function aplicar(s: VentaState, buffer: string): Partial<VentaState> {
+  const id = s.lineaSel;
+  if (!id) return {};
+  const num = Number.parseFloat(buffer.replace(",", ".")) || 0;
+
+  if (s.modo === "UND") {
+    if (buffer === "") return {};
+    return { comanda: { ...s.comanda, [id]: Math.max(1, Math.round(num)) } };
+  }
+  if (s.modo === "PREC") {
+    const precios = { ...s.precios };
+    if (buffer === "") delete precios[id]; else precios[id] = num;
+    return { precios };
+  }
+  const descuentos = { ...s.descuentos };
+  if (buffer === "") delete descuentos[id];
+  else descuentos[id] = { tipo: s.modo === "DTO%" ? "PCT" : "EUR", valor: num };
+  return { descuentos };
 }
 
 export const useVenta = create<VentaState>((set, get) => ({
@@ -81,14 +96,10 @@ export const useVenta = create<VentaState>((set, get) => ({
     lineaSel: null, buffer: "", modo: "UND", editando: false, busqueda: "",
   }),
 
-  addProd: (id) => set((s) => {
-    // En modo Und. con buffer, añade esa cantidad; si no, +1.
-    const n = s.editando && s.modo === "UND" && s.buffer ? Math.max(1, parseInt(s.buffer, 10) || 1) : 1;
-    return {
-      comanda: { ...s.comanda, [id]: (s.comanda[id] ?? 0) + n },
-      lineaSel: id, buffer: "", editando: false, modo: "UND",
-    };
-  }),
+  addProd: (id) => set((s) => ({
+    comanda: { ...s.comanda, [id]: (s.comanda[id] ?? 0) + 1 },
+    lineaSel: id, buffer: "", editando: false, modo: "UND",
+  })),
 
   seleccionar: (id) => set({ lineaSel: id, buffer: "", editando: false }),
   setComensales: (n) => set({ comensales: Math.max(1, n) }),
@@ -108,29 +119,23 @@ export const useVenta = create<VentaState>((set, get) => ({
 
   vaciar: () => set({ comanda: {}, precios: {}, descuentos: {}, invitadas: {}, lineaSel: null, buffer: "", editando: false }),
 
+  // Pulsar un modo: si ya estabas en él, sales; si no, entras (empieza vacío; el
+  // valor de la línea no cambia hasta que teclees).
   pulsarModo: (m) => set((s) => (s.modo === m && s.editando ? { editando: false, buffer: "" } : { modo: m, editando: true, buffer: "" })),
 
   pulsarDigito: (d) => set((s) => {
     if (!s.editando) return s;
     if (d === "," && s.buffer.includes(",")) return s;
-    return { buffer: (s.buffer + d).slice(0, 8) };
+    const buffer = (s.buffer + d).slice(0, 8);
+    return { buffer, ...aplicar({ ...s, buffer }, buffer) };
   }),
 
-  borrar: () => set((s) => ({ buffer: s.buffer.slice(0, -1) })),
-  limpiar: () => set({ buffer: "" }),
-
-  aplicar: () => set((s) => {
-    const id = s.lineaSel;
-    if (!id || !s.editando || !s.buffer) return { editando: false, buffer: "" };
-    const num = parseFloat(s.buffer.replace(",", ".")) || 0;
-    if (s.modo === "UND") {
-      const n = Math.max(1, Math.round(num));
-      return { comanda: { ...s.comanda, [id]: n }, buffer: "", editando: false };
-    }
-    if (s.modo === "PREC") return { precios: { ...s.precios, [id]: num }, buffer: "", editando: false };
-    if (s.modo === "DTO%") return { descuentos: { ...s.descuentos, [id]: { tipo: "PCT", valor: num } }, buffer: "", editando: false };
-    return { descuentos: { ...s.descuentos, [id]: { tipo: "EUR", valor: num } }, buffer: "", editando: false };
+  borrar: () => set((s) => {
+    const buffer = s.buffer.slice(0, -1);
+    return { buffer, ...aplicar({ ...s, buffer }, buffer) };
   }),
+
+  limpiar: () => set((s) => ({ buffer: "", ...aplicar({ ...s, buffer: "" }, "") })),
 
   precioEfectivo: (id) => {
     const s = get();
@@ -138,6 +143,17 @@ export const useVenta = create<VentaState>((set, get) => ({
     const d = s.descuentos[id];
     if (d) base = d.tipo === "PCT" ? base * (1 - d.valor / 100) : base - d.valor;
     return Math.max(0, Math.round(base * 100) / 100);
+  },
+
+  precioSel: () => {
+    const s = get();
+    const id = s.lineaSel;
+    if (!id) return 0;
+    return s.precios[id] ?? precioBase(id.split("|")[0]!);
+  },
+  descSel: () => {
+    const s = get();
+    return (s.lineaSel && s.descuentos[s.lineaSel]) || null;
   },
 
   total: () => {

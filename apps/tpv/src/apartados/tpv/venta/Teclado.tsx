@@ -16,16 +16,12 @@ const DIGITOS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 export function Teclado({ onCobrar }: Readonly<{ onCobrar: () => void }>) {
   const modo = useVenta((s) => s.modo);
   const editando = useVenta((s) => s.editando);
-  const buffer = useVenta((s) => s.buffer);
   const pulsarDigito = useVenta((s) => s.pulsarDigito);
   const pulsarModo = useVenta((s) => s.pulsarModo);
-  const aplicar = useVenta((s) => s.aplicar);
   const borrar = useVenta((s) => s.borrar);
   const limpiar = useVenta((s) => s.limpiar);
   const unidades = useVenta((s) => s.unidades());
   const total = useVenta((s) => s.total());
-
-  const onModo = (m: ModoTeclado) => (m === modo && editando && buffer ? aplicar() : pulsarModo(m));
   const digito = "min-h-[62px] rounded-[10px] border border-border bg-surface-overlay text-[1.55rem] font-semibold tabular-nums text-foreground transition-transform active:scale-95 disabled:opacity-40";
 
   return (
@@ -43,7 +39,7 @@ export function Teclado({ onCobrar }: Readonly<{ onCobrar: () => void }>) {
         {MODOS.map(({ m, label }) => {
           const act = m === modo && editando;
           return (
-            <button key={m} type="button" onClick={() => onModo(m)}
+            <button key={m} type="button" onClick={() => pulsarModo(m)}
               className={`flex-1 rounded-[10px] border text-xs font-bold transition-transform active:scale-95 ${act ? "border-brand bg-brand text-brand-foreground" : "border-border bg-surface-overlay text-foreground"}`}>
               {label}
             </button>

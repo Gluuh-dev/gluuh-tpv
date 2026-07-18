@@ -32,7 +32,7 @@ export function Ticket() {
         <span>Producto</span><span className="text-center">Uds</span><span className="text-right">Precio</span><span className="text-right">Total</span>
       </div>
 
-      <div className="no-scrollbar min-h-0 flex-1 overflow-auto px-2 py-1">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-auto py-1">
         {ids.length === 0 && <p className="mt-10 text-center text-sm text-muted-foreground">Toca un producto para empezar la comanda.</p>}
         {ids.map((id) => {
           const q = comanda[id]!;
@@ -43,7 +43,7 @@ export function Ticket() {
           const editandoEsta = sel && editando;
           return (
             <button key={id} type="button" onClick={() => seleccionar(id)}
-              className={`grid w-full grid-cols-[1fr_2.4rem_4.2rem_4.8rem] items-center gap-1 rounded-md px-1.5 py-1.5 text-left text-xs transition-transform active:scale-[.99] ${sel ? "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_#0e8fa2]" : ""}`}>
+              className={`grid w-full grid-cols-[1fr_2.4rem_4.2rem_4.8rem] items-center gap-1 border-l-[3px] px-3 py-2 text-left text-xs ${sel ? "border-[#0e8fa2] bg-accent-soft text-foreground" : "border-transparent"}`}>
               <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="truncate font-bold text-foreground">{nombreDe(id)}</span>
                 {inv && <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success"><Gift size={9} /> Invitado</span>}
