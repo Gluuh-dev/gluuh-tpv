@@ -11,7 +11,7 @@ function icoSala(id: string): LucideIcon {
 function Tab({ Icono, label, activo, badge, onClick }: Readonly<{ Icono: LucideIcon; label: string; activo?: boolean; badge?: number; onClick: () => void }>) {
   return (
     <button type="button" onClick={onClick}
-      className={`mx-1.5 flex flex-col items-center gap-1.5 rounded-xl py-4 text-[.66rem] font-semibold transition-colors ${activo ? "bg-brand text-white" : "text-muted-foreground"}`}>
+      className={`mx-1.5 flex flex-col items-center gap-0.5 rounded-xl py-4 text-[.66rem] font-semibold transition-colors ${activo ? "bg-brand text-white" : "text-muted-foreground"}`}>
       <span className="relative">
         <Icono size={20} />
         {badge != null && badge > 0 && (
