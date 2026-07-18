@@ -118,17 +118,31 @@ UninstallDisplayIcon={app}\supabase\nodo\instalador\gluuh.ico
 [Languages]
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
+; ── UN UNICO INSTALADOR ───────────────────────────────────────────────────────
+; El tecnico marca que pone en ESTA maquina: el servidor del bar, el TPV, o los
+; dos (el mini-PC de la barra suele ser ambas cosas). El TPV va DENTRO como su
+; propio Setup (electron-builder/NSIS) y se lanza al final si esta marcado.
+[Types]
+Name: "completa"; Description: "Servidor + TPV (este ordenador hace de todo)"
+Name: "soloservidor"; Description: "Solo el servidor del bar"
+Name: "solotpv"; Description: "Solo el TPV (una terminal)"
+Name: "custom"; Description: "Personalizada"; Flags: iscustom
+
+[Components]
+Name: "servidor"; Description: "Servidor del bar (base de datos, panel y sincronizacion)"; Types: completa soloservidor
+Name: "tpv"; Description: "TPV (la aplicacion de venta de este equipo)"; Types: completa solotpv
+
 [Files]
 ; Los binarios (Postgres, PostgREST, Node). Postgres y PostgREST van JUNTOS a proposito:
 ; libpq.dll viene con Postgres y no en el zip de PostgREST. Separados, PostgREST muere en
 ; silencio nada mas arrancar.
-Source: "{#Carga}\pgsql\*";   DestDir: "{app}\.nodo\pgsql"; Flags: ignoreversion recursesubdirs
-Source: "{#Carga}\bin\*";     DestDir: "{app}\.nodo\bin";   Flags: ignoreversion
+Source: "{#Carga}\pgsql\*";   DestDir: "{app}\.nodo\pgsql"; Flags: ignoreversion recursesubdirs; Components: servidor
+Source: "{#Carga}\bin\*";     DestDir: "{app}\.nodo\bin";   Flags: ignoreversion; Components: servidor
 
 ; NODE. En el ordenador de un bar NO HAY NODE INSTALADO, y el gateway, el auth, el realtime,
 ; las imagenes y la web son TODOS Node: sin esto no arranca ni un servicio. Los .ps1 meten
 ; {app}\node al principio del PATH.
-Source: "{#Carga}\node\*";    DestDir: "{app}\node";        Flags: ignoreversion recursesubdirs
+Source: "{#Carga}\node\*";    DestDir: "{app}\node";        Flags: ignoreversion recursesubdirs; Components: servidor
 
 ; LA INTERFAZ, ya compilada. El nodo la sirve por su mismo puerto: por eso en las terminales
 ; no hay NADA que configurar.
@@ -136,15 +150,15 @@ Source: "{#Carga}\node\*";    DestDir: "{app}\node";        Flags: ignoreversion
 ; `build:nodo` copia `.next\static` y `public` DENTRO del standalone, y `Montar-Paquete.ps1`
 ; comprueba que esten. Sin ellos la web ARRANCA IGUAL y sirve el HTML sin CSS ni JavaScript:
 ; pagina en blanco en el TPV de un bar, y ni un error en los logs.
-Source: "{#Carga}\web\*";     DestDir: "{app}\apps\web\.next\standalone"; Flags: ignoreversion recursesubdirs
+Source: "{#Carga}\web\*";     DestDir: "{app}\apps\web\.next\standalone"; Flags: ignoreversion recursesubdirs; Components: servidor
 
 ; El codigo del servidor.
 ;
 ; OJO con `supabase\*`: la carga NO puede vivir ahi dentro. Vivia en
 ; `supabase\nodo\instalador\carga\`, y esta linea —recursiva— se metia los 510 MB del
 ; paquete DENTRO DEL PAQUETE. Por eso la carga se monta fuera del repositorio.
-Source: "..\..\..\apps\nodo\*";   DestDir: "{app}\apps\nodo"; Flags: ignoreversion recursesubdirs
-Source: "..\..\..\supabase\*";    DestDir: "{app}\supabase";  Flags: ignoreversion recursesubdirs
+Source: "..\..\..\apps\nodo\*";   DestDir: "{app}\apps\nodo"; Flags: ignoreversion recursesubdirs; Components: servidor
+Source: "..\..\..\supabase\*";    DestDir: "{app}\supabase";  Flags: ignoreversion recursesubdirs; Components: servidor
 
 ; Las dependencias de Node: `pg` Y LAS SUYAS, en un arbol PLANO montado con npm.
 ;
@@ -152,16 +166,21 @@ Source: "..\..\..\supabase\*";    DestDir: "{app}\supabase";  Flags: ignoreversi
 ; dependencias (pg-pool, pg-protocol, pg-types, pgpass...) viven fuera del enlace. Copiarlo
 ; se lleva `pg` sin sus tripas, y en el bar `import pg` revienta con "Cannot find module
 ; 'pg-pool'": el nodo no podria ni conectar a su propia base de datos.
-Source: "{#Carga}\node_modules\*"; DestDir: "{app}\node_modules"; Flags: ignoreversion recursesubdirs
+Source: "{#Carga}\node_modules\*"; DestDir: "{app}\node_modules"; Flags: ignoreversion recursesubdirs; Components: servidor
 
 ; La configuracion de los servicios (plantilla: el instalador la reescribe con las claves
 ; aleatorias de ESE bar).
-Source: "{#Carga}\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion
+Source: "{#Carga}\postgrest.conf"; DestDir: "{app}\.nodo"; Flags: ignoreversion; Components: servidor
+
+; EL TPV, dentro: su propio Setup (electron-builder/NSIS). Se extrae a temporal
+; y se lanza al final si el componente esta marcado. `Montar-Paquete.ps1` lo
+; copia a la carga desde C:\gluuh-paquete\tpv y FALLA si no esta compilado.
+Source: "{#Carga}\tpv\Gluuh TPV Setup 0.1.0.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: tpv
 
 [Dirs]
-Name: "{app}\.nodo\tmp"
-Name: "{app}\.nodo\media"
-Name: "{app}\.nodo\pgdata"
+Name: "{app}\.nodo\tmp"; Components: servidor
+Name: "{app}\.nodo\media"; Components: servidor
+Name: "{app}\.nodo\pgdata"; Components: servidor
 
 [Icons]
 ; ── EL ICONO EN LA BANDEJA (y en el escritorio) ──────────────────────────────
@@ -171,14 +190,14 @@ Name: "{app}\.nodo\pgdata"
 ; y .ps1 ya se copian con `supabase\*`, asi que aqui solo hay que crear los accesos.
 Name: "{commonstartup}\Servidor Gluuh"; Filename: "{app}\supabase\nodo\bandeja.vbs"; \
   IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; \
-  Comment: "Pone el servidor del bar en la bandeja del sistema"
+  Comment: "Pone el servidor del bar en la bandeja del sistema"; Components: servidor
 
 ; Y en el escritorio y el menu inicio: al pulsar, abre el PANEL en una ventana de app (sin
 ; barras de navegador). Ahi se ve si esta activo, la version, y estan Reiniciar y Actualizar.
 Name: "{autodesktop}\Servidor Gluuh"; Filename: "{app}\supabase\nodo\abrir-panel.vbs"; \
-  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; Components: servidor
 Name: "{autoprograms}\Gluuh\Panel del servidor"; Filename: "{app}\supabase\nodo\abrir-panel.vbs"; \
-  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"
+  IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; Components: servidor
 
 ; ── DESINSTALAR ──────────────────────────────────────────────────────────────
 ;
@@ -188,10 +207,10 @@ Name: "{autoprograms}\Gluuh\Panel del servidor"; Filename: "{app}\supabase\nodo\
 ; directo con nombre claro que apunta a el — en la carpeta del programa y en el menu inicio.
 Name: "{app}\Desinstalar Gluuh"; Filename: "{uninstallexe}"; \
   IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; \
-  Comment: "Quita el servidor Gluuh de este equipo"
+  Comment: "Quita el servidor Gluuh de este equipo"; Components: servidor
 Name: "{autoprograms}\Gluuh\Desinstalar el servidor"; Filename: "{uninstallexe}"; \
   IconFilename: "{app}\supabase\nodo\instalador\gluuh.ico"; \
-  Comment: "Quita el servidor Gluuh de este equipo"
+  Comment: "Quita el servidor Gluuh de este equipo"; Components: servidor
 
 [Run]
 ; 1. Crear el cluster de Postgres (initdb). Es lo unico que no se puede traer hecho:
@@ -202,7 +221,7 @@ Name: "{autoprograms}\Gluuh\Desinstalar el servidor"; Filename: "{uninstallexe}"
 ;    FUNCIONANDO, ese directorio son sus ventas.
 Filename: "{app}\.nodo\pgsql\bin\initdb.exe"; \
   Parameters: "-D ""{app}\.nodo\pgdata"" -U postgres --pwfile=""{tmp}\pw.txt"" -E UTF8 --locale=Spanish_Spain.1252"; \
-  StatusMsg: "Preparando la base de datos..."; Flags: runhidden; Check: not YaHayBase
+  StatusMsg: "Preparando la base de datos..."; Flags: runhidden; Check: not YaHayBase; Components: servidor
 
 ; 2. Y el trabajo: base de datos, bajarse el bar, las fotos, arrancar los servicios.
 ;
@@ -224,12 +243,19 @@ Filename: "{app}\.nodo\pgsql\bin\initdb.exe"; \
 ; 3. El icono en la bandeja, YA — sin esperar a reiniciar. `wscript` lanza el .vbs, que a su
 ;    vez arranca la bandeja sin ninguna ventana negra. A partir de aqui esta en la esquina.
 Filename: "wscript.exe"; Parameters: """{app}\supabase\nodo\bandeja.vbs"""; \
-  Flags: nowait runhidden skipifsilent
+  Flags: nowait runhidden skipifsilent; Components: servidor
 
 ; 4. Y se le ensena la hoja de entrega al tecnico.
 Filename: "notepad.exe"; Parameters: """{app}\INSTALACION.txt"""; \
   Description: "Ver la direccion que hay que poner en los TPV"; \
-  Flags: postinstall nowait skipifsilent
+  Flags: postinstall nowait skipifsilent; Components: servidor
+
+; 5. El TPV: su instalador se abre al terminar (asistido, 30 segundos). Si esta
+;    maquina tambien es el servidor, en la pantalla de conexion del TPV vale
+;    poner  localhost  como direccion.
+Filename: "{app}\Gluuh TPV Setup 0.1.0.exe"; \
+  Description: "Instalar ahora el TPV en este ordenador"; \
+  Flags: postinstall nowait skipifsilent; Components: tpv
 
 [UninstallRun]
 ; Cerrar la bandeja (el arranque automatico se quita solo con los [Icons]). En su propio
@@ -278,8 +304,12 @@ var
   // sitios: mas claro que un campo largo, salta solo a la siguiente al llenarse, y si se pega
   // el codigo entero se reparte por las cajas. `RellenandoCodigo` evita que el reparto se
   // llame a si mismo (cambiar el texto de una caja vuelve a disparar su OnChange).
-  CajasCodigo: array[0..4] of TNewEdit;
+  // UN SOLO CAMPO para el codigo: los guiones se ponen solos al teclear o pegar
+  // (las cinco cajitas separadas se veian mal y obligaban a saltar de caja).
+  CajaCodigo: TNewEdit;
+  EtiquetaCheck: TNewStaticText;   // el "check" verde con el nombre del bar
   RellenandoCodigo: Boolean;
+  CodigoValidado: string;          // los 21 digitos que ya pasaron la comprobacion
 
   // El territorio fiscal, en un DESPLEGABLE y no tecleando 1/2/3. Un numero a mano se
   // equivoca: un tecnico le mete IVA a un bar canario y las facturas salen mal desde el
@@ -355,59 +385,107 @@ begin
 end;
 
 // Cuantos digitos lleva cada cajita: 4-4-5-4-4 = 21.
-function CapCodigo(i: Integer): Integer;
+// El codigo entero (solo digitos), del CAMPO UNICO.
+function CodigoActual(): string;
 begin
-  if i = 2 then Result := 5 else Result := 4;
+  Result := SoloDigitos(CajaCodigo.Text);
+  if Length(Result) > 21 then Result := Copy(Result, 1, 21);
 end;
 
-// El codigo entero, juntando las 5 cajas (solo digitos).
-function CodigoDeCajas(): string;
-var i: Integer;
+// Comprueba el codigo con la nube y lo dice EN LA PROPIA PAGINA: el nombre del
+// bar en verde con su check. Sin ventanas emergentes ni pregunta de "es este?":
+// ver el nombre del bar YA ES la confirmacion — si no es el suyo, el tecnico
+// corrige el codigo y punto.
+procedure ValidarCodigoEnVivo();
+var
+  Codigo, Norm, Cuerpo, Rta: string;
+  Estado: Integer;
 begin
-  Result := '';
-  for i := 0 to 4 do
-    Result := Result + SoloDigitos(CajasCodigo[i].Text);
+  Codigo := CodigoActual();
+  if Codigo = CodigoValidado then Exit;
+  TenantId := ''; Empresa := ''; CodigoValidado := '';
+
+  Norm := Copy(Codigo,1,4) + '-' + Copy(Codigo,5,4) + '-' + Copy(Codigo,9,5) + '-' +
+          Copy(Codigo,14,4) + '-' + Copy(Codigo,18,4);
+
+  EtiquetaCheck.Font.Color := clGray;
+  EtiquetaCheck.Caption := 'Comprobando con Gluuh...';
+  WizardForm.Refresh;
+
+  // El RPC `empresa_por_codigo` (0104). NO se consulta `tenant` a pelo: sin
+  // sesion la RLS devolveria cero filas con un 200 tan tranquila.
+  Cuerpo := '{"p_codigo":"' + Norm + '"}';
+  Rta := Pedir('POST', '{#Nube}/rest/v1/rpc/empresa_por_codigo',
+               'Bearer {#AnonKey}', Cuerpo, Estado);
+
+  if Estado = 0 then
+  begin
+    EtiquetaCheck.Font.Color := clMaroon;
+    EtiquetaCheck.Caption := 'Sin conexion con Gluuh. La instalacion necesita internet UNA vez.';
+    Exit;
+  end;
+
+  TenantId := DelJson(Rta, 'id');
+  Empresa  := DelJson(Rta, 'nombre');
+
+  if TenantId = '' then
+  begin
+    EtiquetaCheck.Font.Color := clMaroon;
+    EtiquetaCheck.Caption := 'Ese codigo no es valido. Comprueba que lo has copiado entero.';
+    Exit;
+  end;
+  if DelJson(Rta, 'activo') = 'false' then
+  begin
+    TenantId := '';
+    EtiquetaCheck.Font.Color := clMaroon;
+    EtiquetaCheck.Caption := 'La empresa "' + Empresa + '" esta dada de baja. Llama a Gluuh.';
+    Exit;
+  end;
+
+  EtiquetaCheck.Font.Color := clGreen;
+  EtiquetaCheck.Caption := #$2713 + '  ' + Empresa;
+  CodigoValidado := Codigo;
 end;
 
-// Al escribir (o pegar) en cualquier caja: se juntan todos los digitos y se reparten por las
-// cajas segun su capacidad. Asi da igual pegar el codigo entero en la primera o teclearlo
-// caja a caja. Y al terminar se pone el foco en la primera caja que aun no este llena.
+// Al teclear o PEGAR: los guiones se ponen solos (4-4-5-4-4) y, en cuanto hay
+// 21 digitos, se comprueba con la nube ahi mismo.
 procedure CajaCodigoCambio(Sender: TObject);
 var
-  i, idx, posic: Integer;
-  todos, trozo: string;
+  i: Integer;
+  digitos, bonito: string;
 begin
   if RellenandoCodigo then Exit;
   RellenandoCodigo := True;
 
-  todos := CodigoDeCajas();
-  if Length(todos) > 21 then todos := Copy(todos, 1, 21);
-
-  posic := 1;
-  for i := 0 to 4 do
+  digitos := CodigoActual();
+  bonito := '';
+  for i := 1 to Length(digitos) do
   begin
-    trozo := Copy(todos, posic, CapCodigo(i));
-    // Solo se reescribe si cambia: si no, el cursor saltaria al principio y se escribiria al reves.
-    if CajasCodigo[i].Text <> trozo then CajasCodigo[i].Text := trozo;
-    posic := posic + CapCodigo(i);
+    bonito := bonito + digitos[i];
+    if ((i = 4) or (i = 8) or (i = 13) or (i = 17)) and (i < Length(digitos)) then
+      bonito := bonito + '-';
+  end;
+  if CajaCodigo.Text <> bonito then
+  begin
+    CajaCodigo.Text := bonito;
+    CajaCodigo.SelStart := Length(bonito);
   end;
 
-  idx := 4;
-  for i := 0 to 4 do
-    if Length(SoloDigitos(CajasCodigo[i].Text)) < CapCodigo(i) then
-    begin
-      idx := i;
-      break;
-    end;
-  WizardForm.ActiveControl := CajasCodigo[idx];
+  if Length(digitos) = 21 then
+    ValidarCodigoEnVivo()
+  else
+  begin
+    EtiquetaCheck.Caption := '';
+    CodigoValidado := '';
+    TenantId := '';
+  end;
 
   RellenandoCodigo := False;
 end;
 
 procedure InitializeWizard();
 var
-  i, x: Integer;
-  Etiqueta, Guion, Pista: TNewStaticText;
+  Etiqueta, Pista: TNewStaticText;
 begin
   // ── 1 · El codigo de instalacion, en cajitas ───────────────────────────────
   PagCodigo := CreateInputQueryPage(wpSelectDir,
@@ -420,37 +498,36 @@ begin
   Etiqueta.Top := ScaleY(4);
   Etiqueta.Caption := 'Codigo de instalacion (21 digitos):';
 
-  x := 0;
-  for i := 0 to 4 do
-  begin
-    CajasCodigo[i] := TNewEdit.Create(WizardForm);
-    CajasCodigo[i].Parent := PagCodigo.Surface;
-    CajasCodigo[i].Top := ScaleY(26);
-    CajasCodigo[i].Left := x;
-    if i = 2 then CajasCodigo[i].Width := ScaleX(72) else CajasCodigo[i].Width := ScaleX(60);
-    CajasCodigo[i].Font.Name := 'Consolas';
-    CajasCodigo[i].Font.Size := 12;
-    CajasCodigo[i].OnChange := @CajaCodigoCambio;
-    x := CajasCodigo[i].Left + CajasCodigo[i].Width;
-    if i < 4 then
-    begin
-      Guion := TNewStaticText.Create(WizardForm);
-      Guion.Parent := PagCodigo.Surface;
-      Guion.Caption := '—';
-      Guion.Font.Size := 12;
-      Guion.Top := ScaleY(30);
-      Guion.Left := x + ScaleX(5);
-      x := x + ScaleX(18);
-    end;
-  end;
+  // UN SOLO CAMPO: se puede pegar el codigo entero (con o sin guiones) o
+  // teclearlo del tiron — los guiones se colocan solos.
+  CajaCodigo := TNewEdit.Create(WizardForm);
+  CajaCodigo.Parent := PagCodigo.Surface;
+  CajaCodigo.Top := ScaleY(26);
+  CajaCodigo.Left := 0;
+  CajaCodigo.Width := ScaleX(280);
+  CajaCodigo.Font.Name := 'Consolas';
+  CajaCodigo.Font.Size := 13;
+  CajaCodigo.MaxLength := 25;   // 21 digitos + 4 guiones
+  CajaCodigo.OnChange := @CajaCodigoCambio;
+
+  // El "check": al completar los 21 digitos se comprueba con la nube y aqui
+  // aparece el nombre del bar en verde (o el aviso en rojo). Sin preguntas.
+  EtiquetaCheck := TNewStaticText.Create(WizardForm);
+  EtiquetaCheck.Parent := PagCodigo.Surface;
+  EtiquetaCheck.Top := ScaleY(60);
+  EtiquetaCheck.Width := PagCodigo.SurfaceWidth;
+  EtiquetaCheck.WordWrap := True;
+  EtiquetaCheck.Font.Size := 11;
+  EtiquetaCheck.Font.Style := [fsBold];
+  EtiquetaCheck.Caption := '';
 
   Pista := TNewStaticText.Create(WizardForm);
   Pista.Parent := PagCodigo.Surface;
-  Pista.Top := ScaleY(64);
+  Pista.Top := ScaleY(92);
   Pista.Width := PagCodigo.SurfaceWidth;
   Pista.WordWrap := True;
-  Pista.Caption := 'Al pulsar Siguiente se comprueba con Gluuh y se enseña el nombre del bar: ' +
-    'asi sabras seguro que no te has equivocado.';
+  Pista.Caption := 'Pega o teclea el codigo: los guiones se ponen solos y el nombre del bar ' +
+    'aparece aqui en cuanto este completo.';
 
   // ── 2 · La cuenta del titular ──────────────────────────────────────────────
   PagCuenta := CreateInputQueryPage(PagCodigo.ID,
@@ -507,6 +584,17 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
+  // Instalando SOLO el TPV, nada del servidor aplica: ni codigo, ni cuenta,
+  // ni datos fiscales, ni arranque. El TPV pide lo suyo en su propio asistente.
+  if not WizardIsComponentSelected('servidor') then
+  begin
+    if (PageID = PagCodigo.ID) or (PageID = PagCuenta.ID) or
+       (PageID = PagFiscal.ID) or (PageID = PagArranque.ID) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
   if PageID = PagFiscal.ID then
     Result := not FaltanDatosFiscales;
 end;
@@ -538,7 +626,8 @@ begin
   // nodo se actualiza solo (apps/nodo/actualizar.mjs), sin tocar los datos.
   if CurPageID = wpSelectDir then
   begin
-    if FileExists(AddBackslash(WizardDirValue) + '.nodo\pgdata\PG_VERSION') then
+    if WizardIsComponentSelected('servidor') and
+       FileExists(AddBackslash(WizardDirValue) + '.nodo\pgdata\PG_VERSION') then
     begin
       // OJO: ninguna linea de este fichero puede EMPEZAR por `#`. El preprocesador de Inno
       // se cree que es una directiva suya («Unknown preprocessor directive») aunque este
@@ -555,10 +644,29 @@ begin
     end;
   end;
 
-  // ── 1 · Canjear el codigo ─────────────────────────────────────────────────
+  // ── 0.5 · El aviso del SERVIDOR, al salir de la pagina de componentes ─────
+  if (CurPageID = wpSelectComponents) and WizardIsComponentSelected('servidor') then
+  begin
+    Result := MsgBox(
+      'Este ordenador va a ser el SERVIDOR del bar.' + #13#10#13#10 +
+      'Tiene que quedarse ENCENDIDO siempre: aqui viven los datos y desde aqui' + #13#10 +
+      'trabajan todos los TPV. Si se apaga, el bar no puede cobrar.' + #13#10#13#10 +
+      'La instalacion necesita internet UNA vez (para bajarse la carta).' + #13#10 +
+      'Despues el bar funciona sin conexion.' + #13#10#13#10 +
+      'Continuar?',
+      mbConfirmation, MB_YESNO) = IDYES;
+    Exit;
+  end;
+
+  // ── 1 · El codigo ─────────────────────────────────────────────────────────
+  //
+  // La validacion ya paso EN VIVO al completarse los 21 digitos (el nombre del
+  // bar sale en verde en la propia pagina). Aqui solo se impide avanzar si el
+  // codigo esta incompleto o no valido — SIN pregunta de confirmacion: ver el
+  // nombre del bar en la pagina ES la confirmacion.
   if CurPageID = PagCodigo.ID then
   begin
-    Codigo := CodigoDeCajas();
+    Codigo := CodigoActual();
     if Length(Codigo) <> 21 then
     begin
       MsgBox('El codigo tiene que tener 21 digitos.' + #13#10#13#10 +
@@ -566,51 +674,10 @@ begin
       Result := False;
       Exit;
     end;
-
-    Norm := Copy(Codigo,1,4) + '-' + Copy(Codigo,5,4) + '-' + Copy(Codigo,9,5) + '-' +
-            Copy(Codigo,14,4) + '-' + Copy(Codigo,18,4);
-
-    // El RPC `empresa_por_codigo` (migracion 0104). NO se consulta `tenant` a pelo: aqui no
-    // hay sesion, y su RLS devolveria cero filas — que es lo que hacia que el instalador
-    // dijera "codigo no valido" SIEMPRE.
-    Cuerpo := '{"p_codigo":"' + Norm + '"}';
-    Rta := Pedir('POST', '{#Nube}/rest/v1/rpc/empresa_por_codigo',
-                 'Bearer {#AnonKey}', Cuerpo, Estado);
-
-    if Estado = 0 then
-    begin
-      MsgBox('No hay conexion con Gluuh.' + #13#10#13#10 +
-             'La instalacion necesita internet UNA vez, para bajarse la carta del bar. ' +
-             'Despues el bar ya funciona sin conexion.', mbError, MB_OK);
-      Result := False;
-      Exit;
-    end;
-
-    TenantId := DelJson(Rta, 'id');
-    Empresa  := DelJson(Rta, 'nombre');
-
+    if Codigo <> CodigoValidado then ValidarCodigoEnVivo();
     if TenantId = '' then
     begin
-      MsgBox('Ese codigo no es valido.' + #13#10#13#10 +
-             'Comprueba que lo has copiado bien, entero y sin cambiar ningun digito.',
-             mbError, MB_OK);
-      Result := False;
-      Exit;
-    end;
-
-    if DelJson(Rta, 'activo') = 'false' then
-    begin
-      MsgBox('La empresa "' + Empresa + '" esta dada de baja.' + #13#10#13#10 +
-             'Llama a Gluuh antes de seguir.', mbError, MB_OK);
-      Result := False;
-      Exit;
-    end;
-
-    // Que el tecnico CONFIRME que no se ha equivocado de bar. Instalar el servidor del bar
-    // equivocado significa bajarle la carta de otro y subirle las ventas a otro.
-    if MsgBox('Empresa: ' + Empresa + #13#10#13#10 + 'Es este el bar?',
-              mbConfirmation, MB_YESNO) <> IDYES then
-    begin
+      // El motivo ya esta en rojo en la pagina (sin conexion / codigo malo / baja).
       Result := False;
       Exit;
     end;
@@ -798,6 +865,9 @@ var
   Lineas: TArrayOfString;
   Terr: string;
 begin
+  // Instalando SOLO el TPV no hay nada del servidor que preparar ni lanzar.
+  if not WizardIsComponentSelected('servidor') then Exit;
+
   if CurStep = ssInstall then
   begin
     // La contrasena de Postgres, en un fichero temporal: initdb no la acepta por linea de
@@ -810,7 +880,7 @@ begin
     if ComboTerritorio.ItemIndex = 2 then Terr := 'CEUTA_MELILLA';
 
     SetArrayLength(Lineas, 7);
-    Lineas[0] := 'codigo=' + CodigoDeCajas();
+    Lineas[0] := 'codigo=' + CodigoActual();
     Lineas[1] := 'email=' + Trim(PagCuenta.Values[0]);
     Lineas[2] := 'password=' + PagCuenta.Values[1];
     Lineas[3] := 'cif=' + Trim(PagFiscal.Values[0]);
@@ -830,19 +900,10 @@ begin
     EjecutarNodoConProgreso();
 end;
 
-// Aviso ANTES de instalar. Un servidor que alguien apaga por la noche "para ahorrar"
-// es un bar que por la manana no puede cobrar.
-function InitializeSetup(): Boolean;
-begin
-  Result := MsgBox(
-    'Este ordenador va a ser el SERVIDOR del bar.' + #13#10#13#10 +
-    'Tiene que quedarse ENCENDIDO siempre: aqui viven los datos y desde aqui' + #13#10 +
-    'trabajan todos los TPV. Si se apaga, el bar no puede cobrar.' + #13#10#13#10 +
-    'La instalacion necesita internet UNA vez (para bajarse la carta).' + #13#10 +
-    'Despues el bar funciona sin conexion.' + #13#10#13#10 +
-    'Continuar?',
-    mbConfirmation, MB_YESNO) = IDYES;
-end;
+// (El aviso de "este ordenador va a ser el SERVIDOR" ya no va aqui: en
+// InitializeSetup todavia no se sabe que componentes van a marcarse. Se enseña
+// al salir de la pagina de componentes, y SOLO si el servidor esta marcado —
+// a quien instala solo un TPV ese aviso no le aplica.)
 
 // ── AL DESINSTALAR: ¿Y LOS DATOS DEL BAR? ────────────────────────────────────
 //

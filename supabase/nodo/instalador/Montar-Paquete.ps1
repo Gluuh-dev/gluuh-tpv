@@ -186,6 +186,21 @@ Bien "$(Pesa $destinoWeb) MB  (de $antes MB: fuera $($mapas.Count) mapas y $($de
 # «Cannot find module 'pg-pool'» y el nodo no podría ni conectar a su base de datos.
 #
 # Se instala un árbol PLANO y autocontenido con npm, que es lo que hay que empaquetar.
+# ── El instalador del TPV, DENTRO (instalador unico) ─────────────────────────
+#
+# electron-builder lo deja en {carga}\tpv (electron-builder.yml, output fuera del
+# repositorio por el EBUSY del antivirus). El .iss lo empaqueta como componente
+# "tpv". Si falta, el instalador unico saldria SIN TPV — y eso no da error al
+# compilar... si no se comprueba aqui.
+Paso "El instalador del TPV (va dentro como componente)"
+$setupTpv = Join-Path $carga "tpv\Gluuh TPV Setup 0.1.0.exe"
+if (-not (Test-Path $setupTpv)) {
+  Mal "Falta $setupTpv"
+  Mal "Compila el TPV primero:  pnpm --filter @gluuh/desktop dist"
+  exit 1
+}
+Bien "$([math]::Round((Get-Item $setupTpv).Length / 1MB)) MB"
+
 Paso "Dependencias de Node (pg y las suyas)"
 $destinoDeps = Join-Path $carga "node_modules"
 
