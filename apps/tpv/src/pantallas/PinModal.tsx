@@ -65,8 +65,8 @@ export function PinModal({
   const tecla = "rounded-2xl border border-line bg-paper/5 py-4 font-display text-2xl font-semibold tabular-nums text-paper transition-transform active:scale-90 active:bg-paper/10 disabled:opacity-50";
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#0a040e]/72 p-4 backdrop-blur-md" onClick={onCancelar}>
-      <div className="w-full max-w-sm rounded-3xl border border-line bg-linear-165 from-panel to-ink-2 p-7 text-paper shadow-md" onClick={(e) => e.stopPropagation()}>
+    <div className="gl-velo fixed inset-0 z-50 grid place-items-center bg-[#0a040e]/72 p-4 backdrop-blur-md" onClick={onCancelar}>
+      <div className="gl-aparecer w-full max-w-sm rounded-3xl border border-line bg-linear-165 from-panel to-ink-2 p-7 text-paper shadow-md" onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={onCancelar} aria-label="Cerrar" className="float-right -mr-1 -mt-1 rounded-lg p-1.5 text-muted transition-transform active:scale-90"><X size={18} /></button>
 
         <div className="flex flex-col items-center text-center">

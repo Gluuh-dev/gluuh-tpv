@@ -116,3 +116,11 @@
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Aparición de modales: CENTRADA (fundido + leve escala desde el centro), sin
+   deslizar de ningún lado. transform-origin center por defecto. */
+@keyframes gl-aparecer { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes gl-velo { from { opacity: 0; } to { opacity: 1; } }
+.gl-aparecer { animation: gl-aparecer 0.16s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.gl-velo { animation: gl-velo 0.16s ease; }
+@media (prefers-reduced-motion: reduce) { .gl-aparecer, .gl-velo { animation: none; } }

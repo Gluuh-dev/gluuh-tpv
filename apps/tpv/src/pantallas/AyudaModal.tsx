@@ -31,8 +31,8 @@ export function AyudaModal({ licencia, terminal, version, onCerrar }: Readonly<{
   }, [onCerrar]);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#0a040e]/75 p-4 backdrop-blur-md" onClick={onCerrar}>
-      <div className="w-full max-w-[560px] rounded-3xl border border-line bg-linear-165 from-panel to-ink-2 p-8 text-paper shadow-md" onClick={(e) => e.stopPropagation()}>
+    <div className="gl-velo fixed inset-0 z-50 grid place-items-center bg-[#0a040e]/75 p-4 backdrop-blur-md" onClick={onCerrar}>
+      <div className="gl-aparecer w-full max-w-[560px] rounded-3xl border border-line bg-linear-165 from-panel to-ink-2 p-8 text-paper shadow-md" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-bold tracking-tight">Hablar con el servicio técnico</h3>
         <p className="mb-6 mt-2 text-sm leading-relaxed text-muted">Estamos de 8:00 a 00:00, todos los días del año. Si el local está parado, llama: es la vía más rápida.</p>
 
