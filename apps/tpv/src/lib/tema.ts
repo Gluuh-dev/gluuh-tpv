@@ -7,10 +7,10 @@ const CLAVE = "gluuh_tema";
 type Tema = "light" | "dark";
 
 function leer(): Tema {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   const g = localStorage.getItem(CLAVE);
   if (g === "light" || g === "dark") return g;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark"; // la operativa es dark-first (mockups del cliente); el toggle manda
 }
 
 function aplicar(t: Tema) {

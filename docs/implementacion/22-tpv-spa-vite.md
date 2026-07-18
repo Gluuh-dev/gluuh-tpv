@@ -106,9 +106,15 @@ packages/
 | D (recorte/bloqueo) | ⬜ |
 
 **Estructura viva de `apps/tpv`**: `index.html` · `vite.config.ts` (base relativa, offline) ·
-`src/main.tsx` · `src/App.tsx` (starter operativa: rejilla + ticket, para diseñar) ·
-`src/index.css` (copia fiel del sistema de diseño de `apps/web/app/globals.css`) ·
-`src/lib/tema.ts` (claro/oscuro sin next-themes). Dev: `pnpm --filter @gluuh/tpv dev` (:3120).
+`src/main.tsx` (dark-first) · `src/App.tsx` (router mínimo: Inicio + 5 apartados, F1–F5/Esc,
+puerta de PIN) · `src/nav.ts` · `src/index.css` (copia fiel del sistema de diseño de
+`apps/web/app/globals.css`) · `src/lib/tema.ts` (claro/oscuro sin next-themes) ·
+`src/pantallas/Inicio.tsx` (hub fiel al mockup: cabecera con logo/estado/hora/usuario, saludo,
+Abrir TPV + Configuración + Análisis + Administrador + Visor Node) · `src/pantallas/PinModal.tsx`
+(**acceso por PIN pedido en CADA entrada a un apartado**, sin cachear; `onValidar` = enganche al
+nodo `validar_pin_terminal` + permiso) · `src/pantallas/Seccion.tsx` (marco de apartado, "en obras")
+· `public/` (logos Gluuh reales + iconos). Dev: `pnpm --filter @gluuh/tpv dev` (:3120).
+Datos de Inicio HOY son DEMO (María Ruiz / BAR LA ALAMEDA); se cablean al nodo (sesión + jornada) después.
 
 > El nodo como servicio Windows "de verdad" (arranque, recuperación, logs,
 > apagado limpio) tiene guía propia: [`23-nodo-servicio-windows.md`](23-nodo-servicio-windows.md).

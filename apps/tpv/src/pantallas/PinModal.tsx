@@ -10,7 +10,7 @@ const LARGO = 4;
 // acepta cualquier PIN de 4 dígitos para enseñar el flujo.
 export function PinModal({
   titulo, icono, color, onOk, onCancelar, onValidar,
-}: {
+}: Readonly<{
   titulo: string;
   icono: ReactNode;
   color: string;
@@ -18,7 +18,7 @@ export function PinModal({
   onCancelar: () => void;
   /** Devuelve true si el PIN es válido y el trabajador tiene acceso al apartado. */
   onValidar?: (pin: string) => Promise<boolean> | boolean;
-}) {
+}>) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [verificando, setVerificando] = useState(false);
@@ -56,49 +56,41 @@ export function PinModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verificando]);
 
+  const tecla = "rounded-xl border border-border bg-surface-overlay py-4 text-2xl font-semibold tabular-nums transition-colors hover:bg-surface-muted active:scale-95 disabled:opacity-50";
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm" onClick={onCancelar}>
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15171f] p-7 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <button type="button" onClick={onCancelar} aria-label="Cerrar" className="float-right -mr-1 -mt-1 rounded-md p-1.5 text-white/40 hover:bg-white/10 hover:text-white"><X size={18} /></button>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm" onClick={onCancelar}>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-7 text-foreground shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={onCancelar} aria-label="Cerrar" className="float-right -mr-1 -mt-1 rounded-md p-1.5 text-muted-foreground hover:bg-surface-overlay hover:text-foreground"><X size={18} /></button>
 
         <div className="flex flex-col items-center text-center">
           <span className="grid h-14 w-14 place-items-center text-white" style={{ background: color, clipPath: PENTA }}>{icono}</span>
-          <h2 className="mt-4 flex items-center gap-2 text-lg font-bold"><Lock size={16} className="text-white/50" /> Acceso a {titulo}</h2>
-          <p className="mt-1 text-sm text-white/40">Introduce tu PIN de trabajador para continuar.</p>
+          <h2 className="mt-4 flex items-center gap-2 text-lg font-bold"><Lock size={16} className="text-muted-foreground" /> Acceso a {titulo}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Introduce tu PIN de trabajador para continuar.</p>
 
           {/* Puntos del PIN */}
           <div className="mt-6 flex gap-3">
-            {Array.from({ length: LARGO }).map((_, i) => (
-              <span
-                key={i}
-                className={`h-3.5 w-3.5 rounded-full border transition-colors ${
-                  error ? "border-[#cf5346] bg-[#cf5346]/40"
-                    : i < pin.length ? "border-[#b57fd0] bg-[#b57fd0]" : "border-white/25"
-                }`}
-              />
-            ))}
+            {Array.from({ length: LARGO }).map((_, i) => {
+              let clase = "border-border-strong";
+              if (error) clase = "border-danger bg-danger/40";
+              else if (i < pin.length) clase = "border-brand bg-brand";
+              return <span key={i} className={`h-3.5 w-3.5 rounded-full border transition-colors ${clase}`} />;
+            })}
           </div>
-          <p className={`mt-2 h-5 text-sm font-medium ${error ? "text-[#e07b6f]" : "text-transparent"}`}>PIN incorrecto o sin acceso</p>
+          <p className={`mt-2 h-5 text-sm font-medium ${error ? "text-danger" : "text-transparent"}`}>PIN incorrecto o sin acceso</p>
         </div>
 
         {/* Teclado numérico */}
         <div className="mt-2 grid grid-cols-3 gap-2.5">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-            <button key={d} type="button" onClick={() => pulsa(d)} disabled={verificando}
-              className="rounded-xl border border-white/10 bg-white/[.03] py-4 text-2xl font-semibold tabular-nums transition-colors hover:bg-white/[.09] active:scale-95 disabled:opacity-50">
-              {d}
-            </button>
+            <button key={d} type="button" onClick={() => pulsa(d)} disabled={verificando} className={tecla}>{d}</button>
           ))}
-          <button type="button" onClick={onCancelar}
-            className="rounded-xl border border-white/10 bg-white/[.03] py-4 text-sm font-semibold text-white/60 hover:bg-white/[.09]">
+          <button type="button" onClick={onCancelar} className="rounded-xl border border-border bg-surface-overlay py-4 text-sm font-semibold text-muted-foreground hover:bg-surface-muted">
             Cancelar
           </button>
-          <button type="button" onClick={() => pulsa("0")} disabled={verificando}
-            className="rounded-xl border border-white/10 bg-white/[.03] py-4 text-2xl font-semibold tabular-nums hover:bg-white/[.09] active:scale-95 disabled:opacity-50">
-            0
-          </button>
+          <button type="button" onClick={() => pulsa("0")} disabled={verificando} className={tecla}>0</button>
           <button type="button" onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }} disabled={verificando} aria-label="Borrar"
-            className="grid place-items-center rounded-xl border border-white/10 bg-white/[.03] py-4 hover:bg-white/[.09] disabled:opacity-50">
+            className="grid place-items-center rounded-xl border border-border bg-surface-overlay py-4 hover:bg-surface-muted disabled:opacity-50">
             <Delete size={22} />
           </button>
         </div>

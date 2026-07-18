@@ -8,9 +8,8 @@ import { TECLA_A_VISTA, type Vista } from "./nav";
 type Apartado = Exclude<Vista, "inicio">;
 
 // Datos DEMO de la pantalla de inicio. Se reemplazan por los reales del nodo
-// (sesión de operario + jornada) al cablear la SPA a los datos; la forma no cambia.
+// (identidad del local + jornada) al cablear la SPA a los datos; la forma no cambia.
 const DEMO = {
-  operario: { nombre: "María Ruiz", rol: "Encargada" },
   local: { nombre: "BAR LA ALAMEDA", terminal: "TERMINAL 01" },
   turno: { mesasAbiertas: 12, mesasTotal: 24, ventas: "486,30 €", comandas: 3 },
 };
@@ -30,12 +29,16 @@ export function App() {
   // salir y volver a entrar SIEMPRE vuelve a pedir el PIN (control de acceso del bar).
   const [pendiente, setPendiente] = useState<Apartado | null>(null);
 
+  // Abrir un apartado. «Abrir TPV» entra DIRECTO (el login por operario ocurre
+  // dentro del TPV, por acción); el resto pide PIN de trabajador CADA vez.
+  const abrir = (v: Apartado) => (v === "tpv" ? setVista("tpv") : setPendiente(v));
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (pendiente) return; // el PIN gestiona su propio teclado
       if (e.key === "Escape") { setVista("inicio"); return; }
       const v = TECLA_A_VISTA[e.key];
-      if (v) { e.preventDefault(); setPendiente(v); } // pedir PIN, no entrar aún
+      if (v) { e.preventDefault(); abrir(v); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -45,12 +48,10 @@ export function App() {
     <>
       {vista === "inicio" ? (
         <Inicio
-          operario={DEMO.operario}
           local={DEMO.local}
           turno={DEMO.turno}
-          onNavegar={setPendiente}
+          onNavegar={abrir}
           onSalir={() => setVista("inicio")}
-          onCambiarUsuario={() => setVista("inicio")}
         />
       ) : (
         <Seccion {...SECCIONES[vista]} onVolver={() => setVista("inicio")} />
