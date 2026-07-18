@@ -1,37 +1,35 @@
 import {
   UserRound, Bookmark, ArrowRightLeft, Coffee, Split, Trash2, Send, ChefHat,
-  ReceiptText, Banknote, LayoutGrid, Printer, Lock, type LucideIcon,
+  Banknote, LayoutGrid, Printer, Lock, type LucideIcon,
 } from "lucide-react";
 
 // Rail vertical de funciones de la cuenta (izquierda), como en el TPV de Next.
-// Las que aún no tienen su modal quedan visibles pero inertes; se cablean por
-// fases (Cliente, Dividir, Pasar mesa… abren sus modales al portarlos).
-function Boton({ Icono, label, tono = "accion", onClick, disabled }: Readonly<{ Icono: LucideIcon; label: string; tono?: "accion" | "util"; onClick?: () => void; disabled?: boolean }>) {
+// Cada botón dispara onFuncion(clave); el shell abre el modal correspondiente.
+function Boton({ Icono, label, tono = "accion", onClick }: Readonly<{ Icono: LucideIcon; label: string; tono?: "accion" | "util"; onClick: () => void }>) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled}
-      className={`flex h-14 w-full flex-col items-center justify-center gap-1 rounded-[7px] border text-[.62rem] font-semibold leading-tight transition-transform active:scale-95 disabled:opacity-40 ${tono === "util" ? "border-border bg-muted text-muted-foreground" : "border-border bg-surface-2 text-muted-foreground"}`}>
+    <button type="button" onClick={onClick}
+      className={`flex h-14 w-full flex-col items-center justify-center gap-1 rounded-[7px] border text-[.62rem] font-semibold leading-tight transition-transform active:scale-95 ${tono === "util" ? "border-border bg-muted text-muted-foreground" : "border-border bg-surface-2 text-muted-foreground"}`}>
       <Icono size={19} /> <span className="px-0.5 text-center">{label}</span>
     </button>
   );
 }
 
-export function ColumnaFunciones({ onVaciar }: Readonly<{ onVaciar: () => void }>) {
+export function ColumnaFunciones({ onVaciar, onFuncion }: Readonly<{ onVaciar: () => void; onFuncion: (f: string) => void }>) {
   return (
     <div className="no-scrollbar flex w-[88px] flex-none flex-col gap-[.28rem] overflow-y-auto bg-surface px-[.3rem] py-[.4rem]">
-      <Boton Icono={UserRound} label="Cliente" disabled />
-      <Boton Icono={Bookmark} label="Aparcar" disabled />
-      <Boton Icono={ArrowRightLeft} label="Pasar mesa" disabled />
-      <Boton Icono={Coffee} label="Cons. propio" disabled />
-      <Boton Icono={Split} label="Dividir" disabled />
+      <Boton Icono={UserRound} label="Cliente" onClick={() => onFuncion("cliente")} />
+      <Boton Icono={Bookmark} label="Aparcar" onClick={() => onFuncion("aparcar")} />
+      <Boton Icono={ArrowRightLeft} label="Pasar mesa" onClick={() => onFuncion("pasar")} />
+      <Boton Icono={Coffee} label="Cons. propio" onClick={() => onFuncion("consumo")} />
+      <Boton Icono={Split} label="Dividir" onClick={() => onFuncion("dividir")} />
       <Boton Icono={Trash2} label="Borrar" onClick={onVaciar} />
-      <Boton Icono={Send} label="Preparar" disabled />
-      <Boton Icono={ChefHat} label="Marchar" disabled />
-      {/* Utilidades ancladas al fondo */}
+      <Boton Icono={Send} label="Preparar" onClick={() => onFuncion("preparar")} />
+      <Boton Icono={ChefHat} label="Marchar" onClick={() => onFuncion("marchar")} />
       <div className="mt-auto flex flex-col gap-[.28rem]">
-        <Boton Icono={Banknote} label="Cajón" tono="util" disabled />
-        <Boton Icono={LayoutGrid} label="Utilidades" tono="util" disabled />
-        <Boton Icono={Printer} label="Imprimir" tono="util" disabled />
-        <Boton Icono={Lock} label="Bloquear" tono="util" disabled />
+        <Boton Icono={Banknote} label="Cajón" tono="util" onClick={() => onFuncion("cajon")} />
+        <Boton Icono={LayoutGrid} label="Utilidades" tono="util" onClick={() => onFuncion("utilidades")} />
+        <Boton Icono={Printer} label="Imprimir" tono="util" onClick={() => onFuncion("imprimir")} />
+        <Boton Icono={Lock} label="Bloquear" tono="util" onClick={() => onFuncion("bloquear")} />
       </div>
     </div>
   );

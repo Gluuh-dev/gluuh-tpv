@@ -10,9 +10,9 @@ function Accion({ Icono, label, activo, disabled, onClick }: Readonly<{ Icono: L
   );
 }
 
-// Acciones sobre la línea seleccionada (fila bajo el ticket): anular, componer
-// menú, comentario/extra, invitar. Se activan con una línea seleccionada.
-export function FilaAcciones() {
+// Acciones sobre la línea seleccionada: anular, componer menú, comentario/extra,
+// invitar. Menú/extra abren su modal (onFuncion); anular/invitar actúan directas.
+export function FilaAcciones({ onFuncion }: Readonly<{ onFuncion: (f: string) => void }>) {
   const lineaSel = useVenta((s) => s.lineaSel);
   const invitadas = useVenta((s) => s.invitadas);
   const anular = useVenta((s) => s.anularLinea);
@@ -22,8 +22,8 @@ export function FilaAcciones() {
   return (
     <div className="flex flex-none items-stretch gap-1 px-2 pb-1">
       <Accion Icono={Ban} label="Anular" disabled={!hay} onClick={() => lineaSel && anular(lineaSel)} />
-      <Accion Icono={Combine} label="Comp. menú" disabled onClick={() => {}} />
-      <Accion Icono={MessageSquarePlus} label="Com. y extra" disabled onClick={() => {}} />
+      <Accion Icono={Combine} label="Comp. menú" disabled={!hay} onClick={() => onFuncion("menu")} />
+      <Accion Icono={MessageSquarePlus} label="Com. y extra" disabled={!hay} onClick={() => onFuncion("extra")} />
       <Accion Icono={Gift} label="Invitar" activo={!!lineaSel && !!invitadas[lineaSel]} disabled={!hay} onClick={() => lineaSel && invitar(lineaSel)} />
     </div>
   );

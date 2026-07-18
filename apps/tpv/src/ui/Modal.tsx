@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 // (fundido + escala desde el centro), cierre con Esc y clic fuera. Todos los
 // modales del TPV (credencial, ayuda, cobro…) se montan sobre este.
 // Reglas del TPV: sin hover, sombras mínimas.
-const ANCHOS = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg", xl: "max-w-[560px]" } as const;
+const ANCHOS = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg", xl: "max-w-[560px]", "2xl": "max-w-3xl", "3xl": "max-w-5xl" } as const;
 
 export function Modal({
   children, onCerrar, ancho = "sm", className = "", cerrarFuera = true,

@@ -39,7 +39,7 @@ export function PlanoMesas({
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
       {/* Cabecera morada */}
       <header className="flex h-14 flex-none items-center gap-3 bg-brand px-3 text-white">
         <button type="button" onClick={onInicio} aria-label="Inicio" className="grid h-9 w-9 place-items-center rounded-md bg-white/10 transition-transform active:scale-90"><Home size={18} /></button>

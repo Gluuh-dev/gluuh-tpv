@@ -7,7 +7,7 @@ export function BarraEstado({
   operario, terminal, contexto, zurdo, onZurdo,
 }: Readonly<{ operario: string; terminal: string; contexto: string; zurdo: boolean; onZurdo: (v: boolean) => void }>) {
   return (
-    <footer className="flex flex-none items-center gap-3 border-t border-border bg-[#12141b] px-4 py-2 text-xs text-muted-foreground">
+    <footer className="flex flex-none items-center gap-3 border-t border-border bg-surface-2 px-4 py-2 text-xs text-muted-foreground">
       <span className="flex items-center gap-2">
         <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[10px] font-bold text-white">{operario.split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
         {operario}
