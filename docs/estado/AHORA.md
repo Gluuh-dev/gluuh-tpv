@@ -141,7 +141,14 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0126`.**
+**Siguiente número libre: `0127`.**
+
+- `0126` — **RESERVADA 18-07 (sesión chat, combinar copas / 7.1)**: `family.combinable`
+  (bool, default false) + `product.combinable` (bool NULL = hereda de la familia; true/false
+  = override por producto). La categoría de "con qué" (refrescos) va en un **setting**
+  (`tpv.combinados.categoria_id`), no en columna. Modelo decidido con el usuario: combinable
+  a nivel familia, desactivable/activable por producto. El resolver de herencia es puro en
+  `apps/web/app/lib/catalogo-store.ts`.
 
 - `0125` — **APLICADA 18-07 (sesión chat, llevar+reservas)**: `reservation` +telefono/canal/
   alergias y estado TERMINADA en el CHECK; `sales_order` +entrega_at/direccion/canal_pedido

@@ -3,9 +3,9 @@ import { persist } from "zustand/middleware";
 import type { GluuhSupabaseClient } from "@gluuh/supabase";
 
 // Tipos del catálogo (compartidos por TPV, kiosko, KDS…).
-export interface Family { id: string; nombre: string; color: string }
+export interface Family { id: string; nombre: string; color: string; combinable?: boolean }
 export interface Cat    { id: string; nombre: string; orden: number; family_id: string | null; foto_url?: string | null; mostrar_venta?: boolean; color?: string | null; texto_boton?: string | null; categoria_padre_id?: string | null }
-export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null; family_id?: string | null; texto_boton?: string | null }
+export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null; family_id?: string | null; texto_boton?: string | null; combinable?: boolean | null }
 export interface Formato { id: string; product_id: string; nombre: string; precio: number }
 export interface ModOpcion { id: string; nombre: string; precio_extra: number }
 export interface ModGrupo  { id: string; product_id: string | null; nombre: string; min_sel: number; max_sel: number; tipo?: "EXTRA" | "COMENTARIO"; opciones: ModOpcion[] }
@@ -61,9 +61,14 @@ export const useCatalogo = create<CatalogoState>()(
         // si el select con esas columnas falla, reintenta sin ellas (no rompe la carta).
         const PROD_COLS = "id,nombre,precio,tipo_impositivo,category_id,estacion,foto_url,agotado_hasta,vendido_por_peso";
         const cargarProds = async () => {
-          // family_id (0065) y nombre_ticket/nombre_cocina (0051) pueden no existir aún.
-          const r0 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id,texto_boton`).eq("disponible", true).order("nombre");
+          // combinable (0126), family_id (0065) y nombre_ticket/nombre_cocina (0051) pueden no
+          // existir aún (p. ej. un nodo sin la última migración). Cada tier añade una columna
+          // opcional; combinable va en su PROPIO tier para no arrastrar a family_id si falta
+          // (TRAMPAS §2: la nube va delante del nodo).
+          const r0 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id,texto_boton,combinable`).eq("disponible", true).order("nombre");
           if (!r0.error) return r0;
+          const r0b = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id,texto_boton`).eq("disponible", true).order("nombre");
+          if (!r0b.error) return r0b;
           const r1 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina`).eq("disponible", true).order("nombre");
           return r1.error ? sb.from("product").select(PROD_COLS).eq("disponible", true).order("nombre") : r1;
         };
@@ -82,8 +87,13 @@ export const useCatalogo = create<CatalogoState>()(
           const r = await sb.from("modifier_group").select(`${MG_COLS},tipo`);
           return r.error ? sb.from("modifier_group").select(MG_COLS) : r;
         };
+        // family.combinable (0126) puede no existir aún en el nodo: reintenta sin ella.
+        const cargarFamilias = async () => {
+          const r = await sb.from("family").select("id,nombre,color,combinable").order("orden");
+          return r.error ? sb.from("family").select("id,nombre,color").order("orden") : r;
+        };
         const [{ data: f }, { data: c }, { data: p }, { data: fmts }, { data: mgs }, { data: mods }, { data: pcs }, { data: asg }, { data: hor }] = await Promise.all([
-          sb.from("family").select("id,nombre,color").order("orden"),
+          cargarFamilias(),
           cargarCats(),
           cargarProds(),
           sb.from("product_format").select("id,product_id,nombre,precio").order("orden"),
@@ -184,6 +194,23 @@ export function gruposDeProducto(
   const porId = new Map(s.biblioteca.map((g) => [g.id, g]));
   const heredados = [...efectivos].map((id) => porId.get(id)).filter((g): g is ModGrupo => !!g);
   return [...propios, ...heredados];
+}
+
+// ── ¿El producto es un COMBINADO? (7.1) ─────────────────────────────────────
+// Combinable a nivel FAMILIA (default), con override por PRODUCTO: si el producto
+// trae combinable no-nulo manda; si es null, hereda de su familia; si no hay
+// familia, false. Misma resolución de familia que gruposDeProducto (directa del
+// producto, o la de su categoría principal). Función pura: TPV y panel la comparten.
+export function esCombinable(
+  s: Pick<CatalogoState, "prods" | "cats" | "families">,
+  productId: string,
+): boolean {
+  const prod = s.prods.find((p) => p.id === productId);
+  if (!prod) return false;
+  if (prod.combinable != null) return prod.combinable;   // override explícito del producto
+  const famId = prod.family_id ?? s.cats.find((c) => c.id === prod.category_id)?.family_id ?? null;
+  const fam = famId ? s.families.find((f) => f.id === famId) : undefined;
+  return fam?.combinable ?? false;
 }
 
 // ── Horario por categoría (0067) ────────────────────────────────────────────

@@ -776,7 +776,7 @@ export type Database = {
           lineas?: Json | null
           order_id: string
           payment_id?: string | null
-          tenant_id?: string
+          tenant_id: string
           tipo: string
           updated_at?: string
         }
@@ -797,6 +797,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cuenta_parte_cobrada_order_id_fkey"
+            columns: ["cobrada_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cuenta_parte_order_id_fkey"
             columns: ["order_id"]
@@ -1142,6 +1149,7 @@ export type Database = {
       family: {
         Row: {
           color: string | null
+          combinable: boolean
           created_at: string | null
           familia_padre_id: string | null
           foto_url: string | null
@@ -1158,6 +1166,7 @@ export type Database = {
         }
         Insert: {
           color?: string | null
+          combinable?: boolean
           created_at?: string | null
           familia_padre_id?: string | null
           foto_url?: string | null
@@ -1174,6 +1183,7 @@ export type Database = {
         }
         Update: {
           color?: string | null
+          combinable?: boolean
           created_at?: string | null
           familia_padre_id?: string | null
           foto_url?: string | null
@@ -3282,6 +3292,7 @@ export type Database = {
           category_id: string | null
           clase_fiscal: string
           codigo_barras: string | null
+          combinable: boolean | null
           created_at: string
           descripcion: string | null
           disponible: boolean
@@ -3312,6 +3323,7 @@ export type Database = {
           category_id?: string | null
           clase_fiscal?: string
           codigo_barras?: string | null
+          combinable?: boolean | null
           created_at?: string
           descripcion?: string | null
           disponible?: boolean
@@ -3342,6 +3354,7 @@ export type Database = {
           category_id?: string | null
           clase_fiscal?: string
           codigo_barras?: string | null
+          combinable?: boolean | null
           created_at?: string
           descripcion?: string | null
           disponible?: boolean
@@ -5267,16 +5280,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      separar_cuenta: {
-        Args: {
-          p_mesa_order: string
-          p_location: string
-          p_user: string
-          p_campos: Json
-          p_lineas: Json
-        }
-        Returns: string
-      }
       emitir_credencial_dispositivo: {
         Args: { p_device: string; p_dias?: number; p_refresh_hash: string }
         Returns: {
@@ -5379,6 +5382,16 @@ export type Database = {
       }
       revocar_sesion: { Args: { p_session: string }; Returns: undefined }
       revocar_sesion_soporte: { Args: { p_sesion: string }; Returns: undefined }
+      separar_cuenta: {
+        Args: {
+          p_campos: Json
+          p_lineas: Json
+          p_location: string
+          p_mesa_order: string
+          p_user: string
+        }
+        Returns: string
+      }
       setting_get: {
         Args: { p_device_id?: string; p_key: string; p_location_id?: string }
         Returns: Json

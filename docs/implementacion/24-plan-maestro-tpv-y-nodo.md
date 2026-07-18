@@ -123,8 +123,15 @@ E7 en paralelo desde E0 (features sobre el TPV actual; se mueven con él en E4)
 - **Sesión escritorio**: E5 (instalador/nodo ya en su máquina), revisa E2.
 - **Usuario**: decisión 7.1 (combinado), prueba máquina limpia, firma exe, canary 0122.
 
-## Decisiones pendientes del usuario
+## Decisiones del usuario — RESUELTAS (18-07-2026)
 
-1. Combinar copas: modelo de datos (7.1).
-2. ¿La SPA del nodo sirve también KDS/cocina/pantalla o se quedan en el standalone del panel local? (propuesta: moverlas a la SPA en una fase 2 — mismo criterio que el TPV).
-3. Nombre/puerto definitivos del servicio (`GluuhNodo`, SPA en 3100).
+1. **Combinar copas (7.1)**: flag `combinable` a nivel **familia** (default), **desactivable/
+   activable por producto** (`product.combinable` NULL = hereda). Categoría de "con qué" en
+   setting `tpv.combinados.categoria_id`. Migración **0126** (reservada). ← en marcha.
+2. **KDS/cocina/pantalla/kiosko**: **Fase 2 a la SPA** del nodo, mismo criterio que el TPV
+   (la operativa fuera de Next). Se aborda tras la SPA del TPV (post-E4).
+3. **Servicio del nodo**: **`GluuhNodo`**, gateway **54321** (fijo), SPA en **3100**
+   (confirma la propuesta de la guía 23). Definitivo.
+4. **E2 (fiscal al gateway)** y **aplicar 0125 al nodo**: se **coordinan con la sesión de
+   escritorio** (packaging `@gluuh/core` + reinicio del nodo vivo; y la migración del nodo por
+   su ledger). No se tocan en solitario.
