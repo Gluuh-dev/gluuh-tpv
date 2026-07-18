@@ -52,16 +52,27 @@ export const SALAS_DEMO: Sala[] = [
 ];
 
 // ── Catálogo demo (para la pantalla de venta) ────────────────────────────────
+// Colores por familia como en el TPV real: azul bebidas, rojo comida, morado
+// dulces, gris menús. "Populares" es una familia destacada (favoritos).
 export interface Categoria { id: string; nombre: string; color: string }
 export interface Producto { id: string; nombre: string; precio: number; categoria: string }
 
+const AZUL = "#2f7fd0", ROJO = "#c0553f", MORADO = "#7c3d9b", GRIS = "#3b414d", VERDE = "#2ea06a";
+
 export const CATEGORIAS_DEMO: Categoria[] = [
-  { id: "cafes", nombre: "Cafés", color: "#8a5a2b" },
-  { id: "cervezas", nombre: "Cervezas", color: "#b5892b" },
-  { id: "refrescos", nombre: "Refrescos", color: "#2f7fd0" },
-  { id: "copas", nombre: "Copas", color: "#7c3d9b" },
-  { id: "raciones", nombre: "Raciones", color: "#c0553f" },
-  { id: "bocadillos", nombre: "Bocadillos", color: "#2ea06a" },
+  { id: "populares", nombre: "Populares", color: VERDE },
+  { id: "menus", nombre: "Menús", color: GRIS },
+  { id: "cervezas", nombre: "Cervezas", color: AZUL },
+  { id: "vinos", nombre: "Vinos", color: AZUL },
+  { id: "refrescos", nombre: "Refrescos", color: AZUL },
+  { id: "cafes", nombre: "Cafés e infusiones", color: AZUL },
+  { id: "cocteles", nombre: "Cócteles", color: AZUL },
+  { id: "raciones", nombre: "Raciones", color: ROJO },
+  { id: "hamburguesas", nombre: "Hamburguesas", color: ROJO },
+  { id: "bocadillos", nombre: "Bocadillos", color: ROJO },
+  { id: "pizzas", nombre: "Pizzas", color: ROJO },
+  { id: "postres", nombre: "Postres", color: MORADO },
+  { id: "bolleria", nombre: "Bollería", color: MORADO },
 ];
 
 export function colorCategoria(id: string): string {
@@ -69,26 +80,65 @@ export function colorCategoria(id: string): string {
 }
 
 export const PRODUCTOS_DEMO: Producto[] = [
-  { id: "p1", nombre: "Café solo", precio: 1.2, categoria: "cafes" },
-  { id: "p2", nombre: "Café con leche", precio: 1.4, categoria: "cafes" },
-  { id: "p3", nombre: "Cortado", precio: 1.3, categoria: "cafes" },
-  { id: "p4", nombre: "Carajillo", precio: 2.0, categoria: "cafes" },
-  { id: "p5", nombre: "Caña", precio: 1.8, categoria: "cervezas" },
-  { id: "p6", nombre: "Doble", precio: 2.6, categoria: "cervezas" },
-  { id: "p7", nombre: "Tercio", precio: 2.8, categoria: "cervezas" },
-  { id: "p8", nombre: "Sin alcohol", precio: 2.2, categoria: "cervezas" },
-  { id: "p9", nombre: "Coca-Cola", precio: 2.2, categoria: "refrescos" },
-  { id: "p10", nombre: "Fanta", precio: 2.2, categoria: "refrescos" },
-  { id: "p11", nombre: "Agua", precio: 1.5, categoria: "refrescos" },
-  { id: "p12", nombre: "Tónica", precio: 2.4, categoria: "refrescos" },
-  { id: "p13", nombre: "Gin-tonic", precio: 7.5, categoria: "copas" },
-  { id: "p14", nombre: "Ron cola", precio: 7.0, categoria: "copas" },
-  { id: "p15", nombre: "Whisky", precio: 6.5, categoria: "copas" },
-  { id: "p16", nombre: "Bravas", precio: 5.5, categoria: "raciones" },
-  { id: "p17", nombre: "Croquetas", precio: 6.0, categoria: "raciones" },
-  { id: "p18", nombre: "Calamares", precio: 9.5, categoria: "raciones" },
-  { id: "p19", nombre: "Jamón", precio: 12.0, categoria: "raciones" },
-  { id: "p20", nombre: "Serranito", precio: 4.5, categoria: "bocadillos" },
-  { id: "p21", nombre: "Pepito", precio: 5.0, categoria: "bocadillos" },
-  { id: "p22", nombre: "Vegetal", precio: 4.0, categoria: "bocadillos" },
+  // Populares (favoritos)
+  { id: "pop1", nombre: "Alhambra 1925", precio: 1.4, categoria: "populares" },
+  { id: "pop2", nombre: "Café con leche", precio: 1.5, categoria: "populares" },
+  { id: "pop3", nombre: "Coca-Cola", precio: 2.0, categoria: "populares" },
+  { id: "pop4", nombre: "Coca-Cola Zero", precio: 2.0, categoria: "populares" },
+  { id: "pop5", nombre: "Croquetas caseras", precio: 4.5, categoria: "populares" },
+  { id: "pop6", nombre: "Hamburguesa clásica", precio: 8.5, categoria: "populares" },
+  { id: "pop7", nombre: "Patatas bravas", precio: 6.0, categoria: "populares" },
+  { id: "pop8", nombre: "Rioja crianza", precio: 2.5, categoria: "populares" },
+  { id: "pop9", nombre: "Tarta de queso", precio: 4.5, categoria: "populares" },
+  // Cervezas
+  { id: "c1", nombre: "Caña", precio: 1.8, categoria: "cervezas" },
+  { id: "c2", nombre: "Doble", precio: 2.6, categoria: "cervezas" },
+  { id: "c3", nombre: "Tercio", precio: 2.8, categoria: "cervezas" },
+  { id: "c4", nombre: "Alhambra 1925", precio: 2.4, categoria: "cervezas" },
+  { id: "c5", nombre: "Sin alcohol", precio: 2.2, categoria: "cervezas" },
+  // Vinos
+  { id: "v1", nombre: "Rioja crianza", precio: 2.5, categoria: "vinos" },
+  { id: "v2", nombre: "Ribera del Duero", precio: 3.0, categoria: "vinos" },
+  { id: "v3", nombre: "Verdejo", precio: 2.4, categoria: "vinos" },
+  { id: "v4", nombre: "Albariño", precio: 2.8, categoria: "vinos" },
+  // Refrescos
+  { id: "r1", nombre: "Coca-Cola", precio: 2.0, categoria: "refrescos" },
+  { id: "r2", nombre: "Coca-Cola Zero", precio: 2.0, categoria: "refrescos" },
+  { id: "r3", nombre: "Fanta", precio: 2.0, categoria: "refrescos" },
+  { id: "r4", nombre: "Tónica", precio: 2.4, categoria: "refrescos" },
+  { id: "r5", nombre: "Agua 50cl", precio: 1.5, categoria: "refrescos" },
+  // Cafés
+  { id: "cf1", nombre: "Café solo", precio: 1.2, categoria: "cafes" },
+  { id: "cf2", nombre: "Café con leche", precio: 1.5, categoria: "cafes" },
+  { id: "cf3", nombre: "Cortado", precio: 1.3, categoria: "cafes" },
+  { id: "cf4", nombre: "Carajillo", precio: 2.0, categoria: "cafes" },
+  { id: "cf5", nombre: "Té / Infusión", precio: 1.5, categoria: "cafes" },
+  // Cócteles
+  { id: "co1", nombre: "Gin-tonic", precio: 7.5, categoria: "cocteles" },
+  { id: "co2", nombre: "Mojito", precio: 7.0, categoria: "cocteles" },
+  { id: "co3", nombre: "Ron cola", precio: 7.0, categoria: "cocteles" },
+  // Raciones
+  { id: "ra1", nombre: "Patatas bravas", precio: 6.0, categoria: "raciones" },
+  { id: "ra2", nombre: "Croquetas caseras", precio: 4.5, categoria: "raciones" },
+  { id: "ra3", nombre: "Calamares", precio: 9.5, categoria: "raciones" },
+  { id: "ra4", nombre: "Jamón ibérico", precio: 12.0, categoria: "raciones" },
+  // Hamburguesas
+  { id: "h1", nombre: "Hamburguesa clásica", precio: 8.5, categoria: "hamburguesas" },
+  { id: "h2", nombre: "Hamburguesa doble", precio: 10.5, categoria: "hamburguesas" },
+  { id: "h3", nombre: "Veggie", precio: 8.0, categoria: "hamburguesas" },
+  // Bocadillos
+  { id: "b1", nombre: "Serranito", precio: 4.5, categoria: "bocadillos" },
+  { id: "b2", nombre: "Pepito", precio: 5.0, categoria: "bocadillos" },
+  { id: "b3", nombre: "Vegetal", precio: 4.0, categoria: "bocadillos" },
+  // Pizzas
+  { id: "pz1", nombre: "Margarita", precio: 8.0, categoria: "pizzas" },
+  { id: "pz2", nombre: "Cuatro quesos", precio: 9.5, categoria: "pizzas" },
+  { id: "pz3", nombre: "Barbacoa", precio: 10.0, categoria: "pizzas" },
+  // Postres
+  { id: "po1", nombre: "Tarta de queso", precio: 4.5, categoria: "postres" },
+  { id: "po2", nombre: "Flan casero", precio: 3.5, categoria: "postres" },
+  { id: "po3", nombre: "Helado", precio: 3.0, categoria: "postres" },
+  // Bollería
+  { id: "bo1", nombre: "Croissant", precio: 1.6, categoria: "bolleria" },
+  { id: "bo2", nombre: "Napolitana", precio: 1.8, categoria: "bolleria" },
 ];

@@ -8,15 +8,22 @@ import { Teclado } from "./venta/Teclado";
 import { ColumnaFunciones } from "./venta/ColumnaFunciones";
 import { PanelProductos } from "./venta/PanelProductos";
 import { BarraEstado } from "./venta/BarraEstado";
+import { RailSalas } from "./RailSalas";
 import { useVenta } from "./store";
 
-// PANTALLA DE VENTA — layout fiel al TPV de Next (Glop): cabecera morada arriba;
-// cuerpo con la columna izquierda (cuenta + ticket + totales + acciones + teclado
-// y el rail de funciones) y la columna derecha (categorías + productos); barra de
-// estado abajo. El modo zurdo invierte los lados.
+// PANTALLA DE VENTA (vista "Ticket"), layout fiel al TPV de Next: cabecera morada
+// (full width) · cuerpo [columna izquierda (cuenta+ticket+totales+acciones+teclado)
+// + rail de funciones | categorías+productos | RAIL de salas] · barra de estado.
+// El modo zurdo invierte los lados.
 export function Venta({
-  operario, onVolverPlano, onCobrar,
-}: Readonly<{ operario: string; onVolverPlano: () => void; onCobrar: (total: number) => void }>) {
+  operario, vista, onVista, onConfig, onCobrar,
+}: Readonly<{
+  operario: string;
+  vista: string;
+  onVista: (v: string) => void;
+  onConfig: () => void;
+  onCobrar: (total: number) => void;
+}>) {
   const [zurdo, setZurdo] = useState(() => (typeof localStorage !== "undefined" && localStorage.getItem("gluuh_zurdo") === "1"));
   const cambiarZurdo = (v: boolean) => { setZurdo(v); localStorage.setItem("gluuh_zurdo", v ? "1" : "0"); };
 
@@ -26,7 +33,7 @@ export function Venta({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <HeaderVenta operario={operario} onVolverPlano={onVolverPlano} />
+      <HeaderVenta operario={operario} onVolverPlano={() => onVista("salon")} />
 
       <div className={`flex min-h-0 flex-1 ${zurdo ? "flex-row-reverse" : ""}`}>
         {/* Columna izquierda: cuenta + ticket + teclado + funciones */}
@@ -41,8 +48,11 @@ export function Venta({
           <ColumnaFunciones onVaciar={vaciar} />
         </div>
 
-        {/* Columna derecha: categorías + productos */}
+        {/* Categorías + productos */}
         <PanelProductos />
+
+        {/* Rail de salas (derecha, persistente) */}
+        <RailSalas vista={vista} onVista={onVista} onConfig={onConfig} />
       </div>
 
       <BarraEstado operario={operario} terminal="TERMINAL 01" contexto={contexto} zurdo={zurdo} onZurdo={cambiarZurdo} />
