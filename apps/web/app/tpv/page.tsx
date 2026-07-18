@@ -18,6 +18,7 @@ import {
 import { etiquetaContexto, lineasImprimibles } from "./ticket-impresion";
 import { marcar, cerrarMarca, medir } from "./perf";
 import { repartirIgual } from "./reparto";
+import { mapearPagos } from "./pagos";
 import { toast } from "@/app/lib/toast";
 import { escucharCambios } from "../lib/cambios";
 import { getSetting } from "../lib/settings";
@@ -109,17 +110,6 @@ const FORMAS_PAGO_FALLBACK: FormaPagoTPV[] = [
   { id: "efectivo", nombre: "Contado", tipo: "EFECTIVO", abre_cajon: true, cuenta_arqueo: true },
   { id: "tarjeta", nombre: "Tarjeta", tipo: "TARJETA", abre_cajon: false, cuenta_arqueo: true },
 ];
-// payment_method.tipo (EFECTIVO/TARJETA/BIZUM/VALE/OTRO) → payment.metodo (CHECK del esquema).
-function metodoPago(tipo?: string): "EFECTIVO" | "TARJETA" | "BIZUM" | "WALLET" {
-  switch (tipo) {
-    case "EFECTIVO": return "EFECTIVO";
-    case "TARJETA": return "TARJETA";
-    case "BIZUM": return "BIZUM";
-    default: return "WALLET";   // VALE / OTRO / desconocido → monedero
-  }
-}
-
-
 /* ─── Config de la botonera de productos (setting GLOBAL tpv.botones) ─── */
 type BotonesConfig = {
   columnas: "auto" | 6 | 8 | 10;
@@ -1553,24 +1543,6 @@ export default function TPV() {
   // `payment` sobre un importe debido: reparte los importes hasta cubrirlo (el
   // exceso = cambio, no se registra), separa la propina y decide el cajón. Lo usan
   // el cobro completo y el cobro por partes (dividir).
-  function mapearPagos(pagos: LineaPago[], base: number, opts: CobrarOpciones) {
-    const due = Math.max(0, Math.round((base + (opts.propina || 0) - (opts.descuento || 0)) * 100) / 100);
-    const prop = Math.round((opts.propina || 0) * 100) / 100;
-    let restante = due;
-    const filas: { metodo: string; importe: number; propina: number }[] = [];
-    for (const p of pagos) {
-      const imp = Math.min(Math.round(p.importe * 100) / 100, restante);
-      if (imp <= 0) continue;
-      const forma = formasPago.find((f) => f.id === p.formaPagoId);
-      filas.push({ metodo: metodoPago(forma?.tipo), importe: imp, propina: 0 });
-      restante = Math.round((restante - imp) * 100) / 100;
-    }
-    // La propina va aparte: se descuenta del primer importe para no doble-contarla.
-    const primera = filas[0];
-    if (prop > 0 && primera) { primera.propina = prop; primera.importe = Math.max(0, Math.round((primera.importe - prop) * 100) / 100); }
-    const abrirCajon = pagos.some((p) => formasPago.find((f) => f.id === p.formaPagoId)?.abre_cajon) || undefined;
-    return { filas, abrirCajon };
-  }
 
   // Cobro desde CobrarModal (cuenta completa). Lo debido es el PENDIENTE: si hubo
   // cobros parciales (dividir), esos pagos YA están en `payment` y el cierre factura
@@ -1580,7 +1552,7 @@ export default function TPV() {
     // se cierra el modal (cobrar() saldría sin hacer nada y el pago se perdería).
     if (!unidades) { toast.error("La cuenta aún se está cargando. Repite en un segundo."); return; }
     setModalActivo(null);
-    const { filas, abrirCajon } = mapearPagos(pagos, pendienteCuenta, opts);
+    const { filas, abrirCajon } = mapearPagos(pagos, pendienteCuenta, opts, formasPago);
     const finales = filas.length ? filas : [{ metodo: "EFECTIVO", importe: pendienteCuenta, propina: 0 }];
     // ponytail: un descuento global de cobro se refleja en los importes cobrados
     // (due = pendiente − descuento) pero NO se prorratea en el desglose fiscal (que
@@ -1714,7 +1686,7 @@ export default function TPV() {
     try {
       // Pago PARCIAL real: se registra el pago y la cuenta queda ABIERTA (POR_COBRAR)
       // con el resto pendiente. La factura sale al saldar (ciclo §6.2).
-      const { filas, abrirCajon } = mapearPagos(pagos, ctx.importe, opts);
+      const { filas, abrirCajon } = mapearPagos(pagos, ctx.importe, opts, formasPago);
       const finales = filas.length ? filas : [{ metodo: "EFECTIVO", importe: ctx.importe, propina: 0 }];
       const { data: pagosIns, error: payErr } = await sb.from("payment")
         .insert(finales.map((p) => ({ order_id: oid, ...p, client_id: crypto.randomUUID() })))
@@ -1821,7 +1793,7 @@ export default function TPV() {
 
       // 3) Cobro del sub-pedido. Si el pago falla, queda POR_COBRAR en Aparcado:
       //    recuperable y visible, nunca un descuadre silencioso.
-      const { filas, abrirCajon } = mapearPagos(pagos, ctx.importe, opts);
+      const { filas, abrirCajon } = mapearPagos(pagos, ctx.importe, opts, formasPago);
       const finales = filas.length ? filas : [{ metodo: "EFECTIVO", importe: ctx.importe, propina: 0 }];
       const { data: pagosIns, error: payErr } = await sb.from("payment")
         .insert(finales.map((p) => ({ order_id: sub, ...p, client_id: crypto.randomUUID() })))
