@@ -124,6 +124,8 @@ type Vista = "estado" | "servicios" | "dispositivos" | "red" | "modulos" | "cata
 export default function Servidor() {
   const [e, setE] = React.useState<Estado | null>(null);
   const [caido, setCaido] = React.useState(false);
+  const [detalle, setDetalle] = React.useState("");
+  const [intentos, setIntentos] = React.useState(0);
   const [vista, setVista] = React.useState<Vista>("estado");
   const [aviso, setAviso] = React.useState<string | null>(null);
 
@@ -144,12 +146,19 @@ export default function Servidor() {
   React.useEffect(() => {
     const pedir = async () => {
       try {
-        const r = await fetch(`${config().url}/nodo/estado`, { cache: "no-store" });
-        if (!r.ok) throw new Error();
+        // Con tiempo límite: una petición que se queda colgada dejaría la pantalla
+        // en "Conectando…" para siempre, sin error y sin pista. Eso ya nos pasó.
+        const r = await fetch(`${config().url}/nodo/estado`, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+        if (!r.ok) throw new Error(`el servidor contesta con error ${r.status}`);
         setE((await r.json()) as Estado);
         setCaido(false);
-      } catch {
+      } catch (err) {
         setCaido(true);
+        setIntentos((n) => n + 1);
+        setDetalle(
+          err instanceof Error && err.name === "TimeoutError" ? "no contesta (tiempo agotado)"
+          : err instanceof Error && err.message ? err.message
+          : "no se puede conectar");
       }
     };
     void pedir();
@@ -157,22 +166,34 @@ export default function Servidor() {
     return () => clearInterval(t);
   }, []);
 
-  if (caido) {
+  // Nunca una pantalla muda: siempre se dice QUÉ dirección se consulta, qué ha
+  // contestado y que se sigue reintentando. Una espera sin información no es funcional.
+  if (caido || !e) {
+    const direccion = `${config().url || (typeof window !== "undefined" ? window.location.origin : "")}/nodo/estado`;
     return (
       <>
         <style>{CSS}</style>
         <div className="caido">
           <div>
-            <p style={{ fontSize: 64 }}>🔌</p>
-            <h1>El servidor no responde</h1>
-            <p className="sub">El equipo de la barra está apagado o se ha caído. Los TPV no pueden cobrar.</p>
+            {caido ? (
+              <>
+                <p style={{ fontSize: 64 }}>🔌</p>
+                <h1>El servidor no responde</h1>
+                <p className="sub">El equipo de la barra está apagado o se ha caído. Los TPV no pueden cobrar.</p>
+              </>
+            ) : (
+              <p className="sub" style={{ fontSize: 18 }}>Conectando con el servidor…</p>
+            )}
+            <p className="sub" style={{ marginTop: 16, fontFamily: "Consolas, monospace", fontSize: 12 }}>{direccion}</p>
+            {caido && (
+              <p className="sub" style={{ fontSize: 12 }}>
+                {detalle} · se reintenta cada 5 segundos{intentos > 1 ? ` (${intentos} intentos)` : ""}
+              </p>
+            )}
           </div>
         </div>
       </>
     );
-  }
-  if (!e) {
-    return <><style>{CSS}</style><div className="caido"><div className="sub">Conectando con el servidor…</div></div></>;
   }
 
   const serviciosOk = e.servicios.filter((s) => s.up).length;

@@ -104,6 +104,31 @@ function ArrancaNode([string]$fichero, [string]$extra = "") {
     -RedirectStandardError  "$nodo\tmp\$($fichero -replace '\.mjs$','').err" -WindowStyle Hidden
 }
 
+# ── El puerto de la web: si esta OCUPADO por otro, se busca uno libre ────────
+#
+# En la maquina de un desarrollador puede haber un `next dev` en el 3100 (o
+# cualquier otra cosa). Antes, la web del nodo moria sin poder enlazar y el
+# gateway proxeaba AL PROCESO EQUIVOCADO: el panel servia la web de desarrollo
+# sin que nadie lo supiera. Ahora: si el puerto lo ocupa un proceso AJENO, se
+# prueba el siguiente (+10, hasta 10 saltos). Si lo ocupa NUESTRA web (un
+# relanzamiento), se conserva. Gateway y web lo leen del entorno: se decide
+# AQUI para que los dos coincidan siempre.
+function ElegirPuertoWeb {
+  $p = 3100
+  if ($env:NODO_WEB_PUERTO) { $p = [int]$env:NODO_WEB_PUERTO }
+  for ($i = 0; $i -lt 10; $i++) {
+    $ocupado = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
+    if (-not $ocupado) { return $p }
+    $duenyo = (Get-CimInstance Win32_Process `
+      -Filter "ProcessId=$(@($ocupado.OwningProcess)[0])" -ErrorAction SilentlyContinue).CommandLine
+    if ($duenyo -match 'web\.mjs|standalone') { return $p }   # es la nuestra: relanzamiento
+    Write-Host "  puerto $p ocupado por otro proceso; probando $($p + 10)" -ForegroundColor Yellow
+    $p = $p + 10
+  }
+  return $p
+}
+$env:NODO_WEB_PUERTO = [string](ElegirPuertoWeb)
+
 # ── Los servicios, como DATOS ────────────────────────────────────────────────
 # Así el arranque y el vigilante usan exactamente la misma definición: imposible que uno
 # arranque algo que el otro no sepa comprobar.
@@ -183,7 +208,14 @@ $SERVICIOS = @(
   @{
     nombre = "Realtime"
     # SSE: sólo se comprueba el puerto. Un GET se quedaría esperando un final que no llega.
-    vivo     = { (ProcesoNode "realtime.mjs") -and (PuertoAbierto 55435) }
+    # Y OJO: no vale ProcesoNode — un proceso ELEVADO no enseña su línea de comandos a un
+    # shell normal, se le daría por muerto y se arrancaría un duplicado (muere EADDRINUSE).
+    # Basta con saber que el 55435 lo tiene un node.
+    vivo     = {
+      $c = Get-NetTCPConnection -LocalPort 55435 -State Listen -ErrorAction SilentlyContinue
+      if (-not $c) { return $false }
+      (Get-Process -Id @($c.OwningProcess)[0] -ErrorAction SilentlyContinue).ProcessName -eq "node"
+    }
     arrancar = { ArrancaNode "realtime.mjs" }
   }
   @{
@@ -197,7 +229,9 @@ $SERVICIOS = @(
     # Al salir la web y los datos del MISMO origen, en las terminales no hay NADA que
     # configurar: ni IP, ni claves, ni .env. Solo abrir el navegador.
     nombre   = "Web"
-    vivo     = { Responde "http://127.0.0.1:3100/" }
+    # OJO: por el puerto ELEGIDO, nunca fijo al 3100 — si ahí vive un `next dev`
+    # ajeno, contesta él, el chequeo da "viva" y nuestra web no arranca jamás.
+    vivo     = { Responde "http://127.0.0.1:$($env:NODO_WEB_PUERTO)/" }
     arrancar = { ArrancaNode "web.mjs" }
   }
   @{
