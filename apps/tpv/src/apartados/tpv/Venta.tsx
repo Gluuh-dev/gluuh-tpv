@@ -1,5 +1,4 @@
 import { HeaderVenta } from "./venta/HeaderVenta";
-import { CabeceraCuenta } from "./venta/CabeceraCuenta";
 import { Ticket } from "./venta/Ticket";
 import { BarraTotales } from "./venta/BarraTotales";
 import { FilaAcciones } from "./venta/FilaAcciones";
@@ -33,7 +32,6 @@ export function Venta({
       <div className={`flex min-h-0 flex-1 ${zurdo ? "flex-row-reverse" : ""}`}>
         <div className={`flex w-[532px] flex-none ${zurdo ? "border-l" : "border-r"} border-border bg-card`}>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-border">
-            <CabeceraCuenta />
             <Ticket />
             <BarraTotales />
             <FilaAcciones onFuncion={onFuncion} />

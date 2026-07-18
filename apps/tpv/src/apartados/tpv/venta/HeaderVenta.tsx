@@ -1,4 +1,4 @@
-import { Search, Minus, Plus, ArrowLeft } from "lucide-react";
+import { Search, Minus, Plus, ArrowLeft, Tag } from "lucide-react";
 import { useVenta } from "../store";
 
 // Chip compacto de una sola línea (estilo del PAX): etiqueta pequeña + valor.
@@ -17,6 +17,8 @@ export function HeaderVenta({ onVolverPlano }: Readonly<{ onVolverPlano: () => v
   const contexto = useVenta((s) => s.contexto);
   const comensales = useVenta((s) => s.comensales);
   const setComensales = useVenta((s) => s.setComensales);
+  const alias = useVenta((s) => s.alias);
+  const setAlias = useVenta((s) => s.setAlias);
   const busqueda = useVenta((s) => s.busqueda);
   const setBusqueda = useVenta((s) => s.setBusqueda);
 
@@ -34,6 +36,11 @@ export function HeaderVenta({ onVolverPlano }: Readonly<{ onVolverPlano: () => v
       </Chip>
 
       <Chip label="Gr. cocina"><span className="text-[#ffd27a]">General</span></Chip>
+
+      <label className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-semibold ${alias ? "bg-white/25" : "bg-white/10"}`}>
+        <Tag size={13} className="opacity-80" />
+        <input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Alias" className="w-24 bg-transparent text-white outline-none placeholder:text-white/50" />
+      </label>
 
       <label className="relative ml-1 flex flex-1 items-center">
         <Search size={16} className="absolute left-3 opacity-80" />
