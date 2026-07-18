@@ -51,7 +51,8 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 
 | quién | qué | ficheros |
 |---|---|---|
-| Claude (chat) | **Dividir cuenta v2** (17/18-07): flujo decidido con el usuario en `docs/plan/dividir-cuenta-flujo-ux.md`; migraciones 0123 (`cuenta_parte`) y 0124 (`separar_cuenta`) APLICADAS en la nube; modal sobre partes persistidas + cobro parcial (pago sin cerrar pedido) + cobro por artículos que salen de la mesa. Pendiente: probar en el TPV, pasos 4-6 del flujo (plano con pendiente, entrada desde cobro). | `apps/web/app/tpv/page.tsx`, `components/DividirCuentaModal.tsx`, `supabase/migrations/0123-0124`, `supabase/types/` |
+| Claude (chat) | **DECISIÓN 18-07: el TPV será app propia (Vite+React SPA servida por el nodo, dentro de Electron); la nube no servirá la operativa.** Decisión en `docs/plan/15-tpv-app-propia-vite.md`, migración en `docs/implementacion/22-tpv-spa-vite.md` (sin big-bang; prerequisito F1–F3 de la guía 21; incluye estructura de paquetes e inventario de módulos). Nodo como servicio Windows real (supervisor + SCM, health-checks, secretos con rotación, logs rotados, update con rollback): `docs/implementacion/23-nodo-servicio-windows.md`. **➡ PUNTO DE ENTRADA del desarrollo: `docs/implementacion/24-plan-maestro-tpv-y-nodo.md`** (etapas 0–8 con dependencias y puertas; E0 = commit+push pendiente). ⚠ Renombrado `17-tpv-perfecto.md` → `21-tpv-perfecto.md` (colisionaba con el 17 del manual del nodo). | `docs/plan/15…`, `docs/implementacion/21…`, `22…` |
+| Claude (chat) | **Dividir cuenta v2** (17/18-07): flujo decidido con el usuario en `docs/plan/dividir-cuenta-flujo-ux.md`; migraciones 0123 (`cuenta_parte`) y 0124 (`separar_cuenta`) APLICADAS en la nube; modal sobre partes persistidas + cobro parcial (pago sin cerrar pedido) + cobro por artículos que salen de la mesa. **Pasos 1-6 implementados** (18-07): cierre a 0 con navegación, plano con PENDIENTE (resta partes cobradas), botón Dividir en el CobrarModal, y cobro completo sobre el pendiente (anti doble cobro). Typecheck verde — este árbol deja consistente el par página/modal que el commit `1736e1e` del escritorio rompió. Pendiente: prueba manual + push. | `apps/web/app/tpv/page.tsx`, `components/DividirCuentaModal.tsx`, `components/CobrarModal.tsx`, `supabase/migrations/0123-0124`, `supabase/types/` |
 | Claude (escritorio) | **Nodo instalado en esta máquina** (18-07): la web del nodo elige puerto libre sola (aquí **3110**, el 3100 lo ocupa el `next dev`); panel /servidor con espera informativa + manifest/iconos; standalone desplegado en `C:\Gluuh` desde worktree limpio `C:\gluuh-paquete\web-limpia`. ⚠ **HEAD no compila**: mi commit `1736e1e` arrastró líneas a medias de Dividir cuenta v2 en `page.tsx` (la pareja página/modal no encaja ni en HEAD ni en el árbol) — al cerrar Dividir v2, dejad el par consistente y `pnpm typecheck` verde. ⚠ Quedan 3 servicios **elevados** con el secreto viejo (auth/realtime/media, PIDs de antes de reinstalar): mueren con un reinicio de Windows. | `supabase/nodo/arrancar-nodo.ps1`, `apps/web/app/servidor/*`, `apps/web/public/manifest-servidor.webmanifest` |
 | Codex + Claude (chat) | **F0 ENTREGADA · F1/F2 núcleo APLICADO EN LA NUBE** (17-07, autorizado): 0111–0115 aplicadas por MCP, tipos regenerados, espejos de transición retirados, smoke verde. Pendiente: aplicar la tanda **en el nodo** cuando se levante + prueba adversarial; F1 contract (1.5) tras canary; F2 restos (MFA, revocar sesiones, temporal cifrada, provisional offline). Seguimiento: `docs/estado/REPARACION-F0-F8.md` | `supabase/migrations/0111–0115`, `supabase/types/`, `apps/web/app/(panel)/layout.tsx`, `login`, `elegir-empresa`, `invitacion/`, `api/invitaciones|cuenta`, `lib/contexto.ts`, `packages/supabase`, `scripts/` |
 
@@ -152,7 +153,12 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0125`.**
+**Siguiente número libre: `0126`.**
+
+- `0125` — **APLICADA 18-07 (sesión chat, llevar+reservas)**: `reservation` +telefono/canal/
+  alergias y estado TERMINADA en el CHECK; `sales_order` +entrega_at/direccion/canal_pedido
+  y EN_CAMINO en el CHECK de preparación. Para las pantallas de Para llevar y Reservas
+  (mockups `docs/diseño/gluuh-para-llevar.html` / `gluuh-reservas.html`).
 
 - `0124` — **APLICADA 17-07 (sesión chat, dividir cuenta)**: `separar_cuenta(p_mesa_order,
   p_location, p_user, p_campos, p_lineas)` — saca líneas concretas del pedido de una mesa

@@ -4,6 +4,10 @@
 > cobra por partes, y **dónde vive la cuenta en cada momento** (ticket · mesa ·
 > aparcado · para llevar · cobrada). Todo lo marcado 🟢 es lo que ya hace el código;
 > 🟡 lo que falta; ❓ decisión pendiente de confirmar.
+>
+> **El flujo de interacción pantalla a pantalla (18-07) está en
+> [`dividir-cuenta-flujo-ux.md`](dividir-cuenta-flujo-ux.md)** — manda sobre el
+> comportamiento de los modales y la navegación.
 
 Referencias al código: `apps/web/app/tpv/page.tsx` salvo que se diga otra cosa.
 
@@ -129,6 +133,10 @@ Reglas: `tenant_id` + RLS `current_tenant_id()` + trigger `set_tenant_id()`;
    justificante; la mesa queda `POR_COBRAR` con lo que falta.
 4. 🟡 **La cuenta NO se dispersa a Aparcado** al dividir: sigue en la mesa como una
    sola cuenta con sus partes.
+4bis. 🟡 **Pagar por artículos = esos artículos SALEN de la mesa abierta**: al cobrar
+   por productos, esas líneas se **retiran del pedido de la mesa** (con su propia
+   factura) y la mesa muestra menos productos y menos total. La mesa abierta solo
+   enseña lo que **queda por pagar**. (Detalle fiscal en §6.2).
 5. 🟡 **Al cobrar (terminar) → navegar a las mesas** (salón), no quedarse en el
    recibo. ❓ ¿Siempre, o solo si la cuenta era de mesa? (una venta directa sin mesa
    quizá quiera volver a ticket en blanco).
@@ -189,8 +197,9 @@ además **migrar el caller** de `page.tsx` a `cobrar_cuenta` (hoy usa el camino 
 3. **Método de pago por parte** → **abrir la pantalla de cobro** (CobrarModal) con el
    importe de esa parte: efectivo con cambio, tarjeta, mixto. Reutiliza lo existente.
 4. **Editar con partes cobradas** → **bloquear lo cobrado**, re-repartir el resto.
-5. **Factura** → **una factura por mesa** al cerrar + **justificantes** por persona
-   (no fiscales). Factura real por parte = fuera de v1.
+5. **Factura** → **mixto por modo** (ver §6.2): por **artículos** = factura propia que
+   **sale de la mesa**; por **partes iguales/importe** = pago parcial + **justificante**,
+   y **1 factura del remanente** al cerrar la mesa.
 6. **Mezclar modos** → **SÍ se permite mezclar.** Clave (§6.1): IGUAL/IMPORTE reparten
    **el pendiente**, no el total.
 
@@ -215,6 +224,45 @@ Consecuencias de diseño:
 3) Cobrar las 3 partes → cobrado 40, pendiente 0    → mesa COBRADA + 1 factura
 ```
 
+### 6.2 "Lo ya pagado se quita de la mesa" ⭐ (17-07)
+Decisión: al cobrar una parte, **lo pagado desaparece de la mesa** y la mesa muestra
+solo lo pendiente (total y productos). Esto choca con la decisión 5 (una factura por
+mesa) y hay que elegir **qué significa "quitar"**:
+
+- **(A) Solo visual + 1 factura final**: las líneas pagadas se **marcan pagadas** y se
+  ocultan de la vista de la mesa, pero **siguen en el pedido** para la factura única al
+  cerrar. La mesa "se vacía" a la vista; por dentro se conserva todo. Necesita marcar
+  líneas/partes como pagadas.
+- **(B) Cada cobro = su propio ticket fiscal y sale de verdad**: cada parte cobrada
+  emite **su factura** y sus líneas **salen** del pedido de la mesa; la mesa encoge de
+  verdad. **No hay factura única**; hay una por cobro. (En PRODUCTOS encaja perfecto;
+  en IGUAL/IMPORTE, la parte es una porción del pendiente → su ticket representa esa
+  porción.)
+
+**Decisión (17-07): modelo por modo.**
+- **PRODUCTOS → opción (B)**: lo pagado por artículos **sale de la mesa** con su
+  **propio ticket/factura**; las líneas se retiran del pedido de la mesa y el total
+  baja. Encaja perfecto porque conocemos las líneas exactas (base/cuota fiscal limpia).
+- **IGUAL / IMPORTE → opción (A)** sobre el **pendiente**: son porciones de lo que
+  queda (sin líneas propias), así que se cobran como **pago parcial** con **justificante**
+  por persona; el remanente de la mesa cierra con **una factura** cuando llega a 0.
+
+Resultado: una mesa puede emitir **N facturas** (una por cada cobro por artículos) **+ 1
+factura** del remanente final. Regla que se mantiene: **Σ(cobrado) + pendiente = total**.
+
+**Ejemplo revisado** (total 40 €):
+```
+1) PRODUCTOS: pizza 8 + Coca 2 = 10 € → FACTURA de 10 €, esas líneas SALEN de la mesa.
+   Mesa: quedan líneas por 30 € (pendiente 30).
+2) El resto se va y pide dividir a PARTES IGUALES entre 3 → 3 × 10 € (sobre el pendiente).
+   Cada parte: pago parcial + justificante. Mesa sigue POR_COBRAR.
+3) Pagadas las 3 → 1 FACTURA del remanente (30 €) → mesa COBRADA + LIBRE → ir a MESAS.
+```
+
+> Implicación de esquema: `cuenta_parte` distingue partes tipo `PRODUCTOS` (materializan
+> un pedido COBRADA propio que sale de la mesa) de `IGUAL`/`IMPORTE` (pagos parciales
+> contra el pedido de la mesa, que se cierra con una factura al saldar el pendiente).
+
 ---
 
 ## 7. Estado de implementación (hoy)
@@ -222,5 +270,18 @@ Consecuencias de diseño:
 - 🟢 Modal `DividirCuentaModal` con 3 pestañas (IGUAL/PRODUCTOS/IMPORTE), estilo
   `ModalTPV` (arrastrable/redimensionable), justificante proforma por parte.
 - 🟢 Renombrado Barra → Aparcado.
-- 🟡 Persistencia de partes (`cuenta_parte`) — **pendiente** (este documento).
-- 🟡 Cobro parcial + navegación a mesas — **pendiente**.
+- 🟢 **Migración 0123 `cuenta_parte` APLICADA en la nube (MCP, 17-07)** + tipos
+  regenerados (`supabase/types/database.types.ts`) + typecheck verde. Es la
+  persistencia de las partes.
+- 🟡 Cablear el TPV: guardar/leer partes, cobrar por artículos que **salen de la
+  mesa**, cobro parcial (iguales/importe) y navegación a mesas — **en curso**.
+
+### 7.1 Nota de implementación — el punto delicado del "sale de la mesa"
+Cobrar por artículos y que **salgan de la mesa** exige **sacar líneas concretas del
+pedido de la mesa** dejando el resto. Hoy el cobro está atado a un único
+`ordenAbiertaId`, así que la forma limpia y **atómica** (sin riesgo de cobrar dos
+veces) es una RPC pequeña **no fiscal** `separar_cuenta(p_mesa_order, p_lineas)` que:
+crea un sub-pedido con esas líneas, las quita del pedido de la mesa y devuelve el id
+del sub-pedido. Luego el TPV cobra ese sub-pedido por el **camino de cobro ya probado**
+(que emite la factura correctamente). Reserva prevista: **migración 0124**. Se
+implementa y prueba con el TPV en marcha (es fiscal-adyacente).
