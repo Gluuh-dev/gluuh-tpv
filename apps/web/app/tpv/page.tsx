@@ -16,6 +16,7 @@ import {
   obtenerBaseManualSiDifiere as obtenerBaseManualSiDifierePuro,
 } from "./nombres";
 import { etiquetaContexto, lineasImprimibles } from "./ticket-impresion";
+import { marcar, cerrarMarca, medir } from "./perf";
 import { toast } from "@/app/lib/toast";
 import { escucharCambios } from "../lib/cambios";
 import { getSetting } from "../lib/settings";
@@ -742,6 +743,10 @@ export default function TPV() {
      
   }, [operario, bloqueoInactividad, bloqueoSegundos, bloqueado]);
 
+  /* ── F7: cierra la marca de rendimiento tras pintar (mide interacción→pintado).
+       Sin deps: corre en cada render; en producción es un no-op. ── */
+  useEffect(() => { cerrarMarca(); });
+
   /* ── Barra de estado: nombre del terminal (Desktop) y si hay caja abierta ── */
   useEffect(() => { setTerminal(window.gluuh?.device?.nombre ?? "Navegador"); }, []);
   useEffect(() => {
@@ -1397,6 +1402,7 @@ export default function TPV() {
   }
 
   function irASala(destino: { tipo: "ticket" | "barra" | "room" | "llevar"; id?: string }) {
+    marcar("cambio de vista", 50);
     setMesaSel(null); setMesaSelInfo(null);
     if (destino.tipo === "ticket") {
       if (!mesa && !llevar) setBarra(true);   // Ticket vacío = venta directa
@@ -1572,7 +1578,8 @@ export default function TPV() {
     // ponytail: un descuento global de cobro se refleja en los importes cobrados
     // (due = pendiente − descuento) pero NO se prorratea en el desglose fiscal (que
     // sigue saliendo íntegro de /api/ticket). Prorratear por línea antes de VERIFACTU.
-    void cobrar(finales, { abrirCajon, imprimir: opts.imprimir });
+    const fin = medir("cobrar", 350);
+    void cobrar(finales, { abrirCajon, imprimir: opts.imprimir }).finally(fin);
   }
 
   // Justificante (proforma) de una parte/importe al dividir: documento NO fiscal
@@ -2529,7 +2536,7 @@ export default function TPV() {
   /* ── Identidades ESTABLES para los hijos memoizados (plan 011): los wrappers
      useEventCallback invocan siempre la última versión del handler, así
      ColumnaFunciones/RailSalas/TecladoTPV (memo) no re-renderizan por identidad. ── */
-  const abrirCobrar = useCallback(() => setModalActivo('COBRAR'), []);
+  const abrirCobrar = useCallback(() => { marcar("abrir cobrar", 100); setModalActivo('COBRAR'); }, []);
   const abrirUtilidades = useCallback(() => setModalActivo('UTILIDADES'), []);
   const onAparcadosModal = useCallback(() => setModalActivo('APARCADOS'), []);
   const onPasarMesaModal = useCallback(() => setModalActivo('PASAR_MESA'), []);
