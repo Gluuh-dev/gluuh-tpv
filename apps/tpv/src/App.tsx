@@ -1,66 +1,70 @@
-import { Moon, Sun, ShoppingCart } from "lucide-react";
-import { useTema } from "./lib/tema";
+import { useEffect, useState, type ReactNode } from "react";
+import { MonitorSmartphone, Settings2, BarChart3, Users, Share2 } from "lucide-react";
+import { Inicio } from "./pantallas/Inicio";
+import { Seccion } from "./pantallas/Seccion";
+import { PinModal } from "./pantallas/PinModal";
+import { TECLA_A_VISTA, type Vista } from "./nav";
 
-// STARTER de la SPA del TPV (Vite). No es la operativa final: es el lienzo con el
-// sistema de diseño Gluuh ya cargado (tokens claro/oscuro, marca), listo para
-// empezar a diseñar aquí. La operativa de apps/web/app/tpv se irá moviendo por
-// fases (guía 22), sin romper el TPV Next que sigue de referencia.
+type Apartado = Exclude<Vista, "inicio">;
+
+// Datos DEMO de la pantalla de inicio. Se reemplazan por los reales del nodo
+// (sesión de operario + jornada) al cablear la SPA a los datos; la forma no cambia.
+const DEMO = {
+  operario: { nombre: "María Ruiz", rol: "Encargada" },
+  local: { nombre: "BAR LA ALAMEDA", terminal: "TERMINAL 01" },
+  turno: { mesasAbiertas: 12, mesasTotal: 24, ventas: "486,30 €", comandas: 3 },
+};
+
+const SECCIONES: Record<Apartado, { titulo: string; desc: string; icono: ReactNode; color: string }> = {
+  tpv:      { titulo: "Abrir TPV",     desc: "Mesas, barra, comandas y cobros del turno.",            icono: <MonitorSmartphone size={22} />, color: "linear-gradient(160deg,#7c3d9b,#4a1e63)" },
+  config:   { titulo: "Configuración", desc: "Carta, precios, salas, impresoras, pagos, impuestos.",  icono: <Settings2 size={22} />,          color: "linear-gradient(160deg,#7c3d9b,#57236f)" },
+  analisis: { titulo: "Análisis",      desc: "Ventas, platos más vendidos, tickets medios, caja.",    icono: <BarChart3 size={22} />,          color: "linear-gradient(160deg,#7c3d9b,#57236f)" },
+  admin:    { titulo: "Administrador", desc: "Empleados, turnos, permisos, licencias.",               icono: <Users size={22} />,              color: "linear-gradient(160deg,#7c3d9b,#57236f)" },
+  nodo:     { titulo: "Visor Node",    desc: "Servidor, dispositivos, colas de impresión, registro.", icono: <Share2 size={22} />,             color: "linear-gradient(160deg,#34b476,#1f7a4e)" },
+};
+
 export function App() {
-  const { oscuro, alternar } = useTema();
+  const [vista, setVista] = useState<Vista>("inicio");
+  // Apartado que se quiere abrir pero AÚN no autorizado: mientras esté aquí, se
+  // muestra el PIN. No guardamos "autorizado" en ningún sitio a propósito: por eso
+  // salir y volver a entrar SIEMPRE vuelve a pedir el PIN (control de acceso del bar).
+  const [pendiente, setPendiente] = useState<Apartado | null>(null);
 
-  const demo = [
-    { n: "Café solo", p: "1,20 €", c: "bg-brand text-brand-foreground" },
-    { n: "Caña", p: "1,80 €", c: "bg-surface" },
-    { n: "Tostada", p: "2,50 €", c: "bg-surface" },
-    { n: "Zumo", p: "2,20 €", c: "bg-surface" },
-    { n: "Croissant", p: "1,60 €", c: "bg-surface" },
-    { n: "Bocadillo", p: "4,50 €", c: "bg-surface" },
-  ];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (pendiente) return; // el PIN gestiona su propio teclado
+      if (e.key === "Escape") { setVista("inicio"); return; }
+      const v = TECLA_A_VISTA[e.key];
+      if (v) { e.preventDefault(); setPendiente(v); } // pedir PIN, no entrar aún
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendiente]);
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="flex flex-none items-center gap-3 bg-brand px-4 py-3 text-brand-foreground">
-        <ShoppingCart size={22} />
-        <h1 className="text-lg font-bold tracking-tight">Gluuh TPV</h1>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold">Vite · React · Tailwind 4</span>
-        <span className="flex-1" />
-        <button
-          type="button"
-          onClick={alternar}
-          className="flex items-center gap-1.5 rounded-md bg-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/25"
-        >
-          {oscuro ? <Sun size={16} /> : <Moon size={16} />} {oscuro ? "Claro" : "Oscuro"}
-        </button>
-      </header>
+    <>
+      {vista === "inicio" ? (
+        <Inicio
+          operario={DEMO.operario}
+          local={DEMO.local}
+          turno={DEMO.turno}
+          onNavegar={setPendiente}
+          onSalir={() => setVista("inicio")}
+          onCambiarUsuario={() => setVista("inicio")}
+        />
+      ) : (
+        <Seccion {...SECCIONES[vista]} onVolver={() => setVista("inicio")} />
+      )}
 
-      <div className="flex min-h-0 flex-1">
-        {/* Rejilla de productos (mock) — sitio donde se diseñará la venta */}
-        <main className="grid flex-1 auto-rows-min grid-cols-3 gap-3 overflow-auto p-4 sm:grid-cols-4">
-          {demo.map((d) => (
-            <button
-              key={d.n}
-              type="button"
-              className={`flex min-h-24 flex-col items-start justify-between rounded-lg border border-border p-3 text-left shadow-sm transition-transform active:scale-[.98] ${d.c}`}
-            >
-              <span className="font-semibold leading-tight">{d.n}</span>
-              <span className="text-sm opacity-80 tabular-nums">{d.p}</span>
-            </button>
-          ))}
-        </main>
-
-        {/* Ticket (mock) — la comanda en curso */}
-        <aside className="flex w-72 flex-none flex-col border-l border-border bg-surface">
-          <div className="flex-1 space-y-2 overflow-auto p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ticket</p>
-            <div className="flex justify-between text-sm"><span>1 · Café solo</span><span className="tabular-nums">1,20 €</span></div>
-            <div className="flex justify-between text-sm"><span>2 · Caña</span><span className="tabular-nums">3,60 €</span></div>
-          </div>
-          <div className="flex-none border-t border-border p-4">
-            <div className="mb-3 flex justify-between text-lg font-bold"><span>Total</span><span className="tabular-nums">4,80 €</span></div>
-            <button type="button" className="btn-primary w-full">Cobrar</button>
-          </div>
-        </aside>
-      </div>
-    </div>
+      {pendiente && (
+        <PinModal
+          titulo={SECCIONES[pendiente].titulo}
+          icono={SECCIONES[pendiente].icono}
+          color={SECCIONES[pendiente].color}
+          onOk={() => { setVista(pendiente); setPendiente(null); }}
+          onCancelar={() => setPendiente(null)}
+        />
+      )}
+    </>
   );
 }
