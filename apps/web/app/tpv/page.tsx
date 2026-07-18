@@ -17,6 +17,7 @@ import {
 } from "./nombres";
 import { etiquetaContexto, lineasImprimibles } from "./ticket-impresion";
 import { marcar, cerrarMarca, medir } from "./perf";
+import { repartirIgual } from "./reparto";
 import { toast } from "@/app/lib/toast";
 import { escucharCambios } from "../lib/cambios";
 import { getSetting } from "../lib/settings";
@@ -1633,9 +1634,7 @@ export default function TPV() {
   async function repartirIgualesEnBD(n: number): Promise<ParteCuenta[] | null> {
     const oid = ordenAbiertaId ?? await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
     if (!oid) { toast.error("No se pudo guardar la cuenta."); return null; }
-    const totalC = Math.round(pendienteCuenta * 100);
-    const baseC = Math.floor(totalC / n);
-    const importes = Array.from({ length: n }, (_, i) => (i === n - 1 ? totalC - baseC * (n - 1) : baseC) / 100);
+    const importes = repartirIgual(pendienteCuenta, n);
     const sig = partesCuenta.filter((p) => p.cobrada).reduce((m, p) => Math.max(m, p.indice), 0);
     await sb.from("cuenta_parte").delete().eq("order_id", oid).eq("cobrada", false);
     const { data, error } = await sb.from("cuenta_parte")
