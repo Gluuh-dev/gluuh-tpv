@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, Hammer } from "lucide-react";
 
-const PENTA = "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)";
-
 // Sección destino del hub (Abrir TPV / Configuración / Análisis / Administrador /
 // Visor Node). Por ahora es el marco navegable + un aviso HONESTO de "en obras":
 // cada una se irá diseñando aquí, sin fingir contenido que no existe.
@@ -14,12 +12,12 @@ export function Seccion({
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex flex-none items-center gap-4 border-b border-border px-8 py-5">
-        <span className="grid h-11 w-11 place-items-center text-white" style={{ background: color, clipPath: PENTA }}>{icono}</span>
+        <span className="escudo grid h-11 w-11 place-items-center text-white" style={{ background: color }}>{icono}</span>
         <div className="mr-auto">
           <h1 className="text-xl font-black leading-none tracking-tight">{titulo}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
         </div>
-        <button type="button" onClick={onVolver} className="flex items-center gap-2 rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm font-semibold text-secondary-foreground hover:bg-surface-muted">
+        <button type="button" onClick={onVolver} className="flex items-center gap-2 rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm font-semibold text-secondary-foreground transition-transform active:scale-95">
           <ArrowLeft size={16} /> Inicio <span className="ml-1 rounded bg-foreground/10 px-1.5 py-0.5 text-[11px] font-bold text-muted-foreground">Esc</span>
         </button>
       </header>

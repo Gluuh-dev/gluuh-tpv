@@ -5,57 +5,49 @@ import {
 } from "lucide-react";
 import type { Vista } from "../nav";
 import { useTema } from "../lib/tema";
+import { Marca } from "../componentes/Marca";
 
-// ── Pentágono de marca (el motivo de los iconos del mockup) ──────────────────
-const PENTA = "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)";
-const MARCA = "linear-gradient(160deg,#7c3d9b,#4a1e63)";
+// REGLAS del TPV (táctil): sin `hover`, solo animación al pulsar (`active:`);
+// sombras al mínimo.
 
-function Pentagono({ children, fondo, tam = 56 }: Readonly<{ children: ReactNode; fondo: string; tam?: number }>) {
+function Chip({ dot, warn, children }: Readonly<{ dot?: boolean; warn?: boolean; children: ReactNode }>) {
   return (
-    <span className="grid place-items-center text-white" style={{ width: tam, height: tam, background: fondo, clipPath: PENTA }}>
+    <span className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-line bg-paper/5 px-3.5 py-2 font-mono text-[12.5px] text-paper/90">
+      {dot && <span className={`h-2 w-2 rounded-full ${warn ? "bg-amber" : "bg-mint"}`} style={{ boxShadow: `0 0 0 4px ${warn ? "rgba(245,166,35,.16)" : "rgba(63,216,164,.16)"}` }} />}
       {children}
     </span>
   );
 }
 
-function Fkey({ children }: Readonly<{ children: ReactNode }>) {
-  return <span className="rounded-md bg-foreground/10 px-2 py-0.5 text-[11px] font-bold tracking-wide text-muted-foreground">{children}</span>;
+// Placa con la silueta del ESCUDO del logo (icono dentro).
+function Escudo({ children, fondo, tam = 56 }: Readonly<{ children: ReactNode; fondo: string; tam?: number }>) {
+  return <span className="escudo grid place-items-center text-white" style={{ width: tam, height: tam, background: fondo }}>{children}</span>;
 }
 
-function PillEstado({ color, children }: Readonly<{ color: string; children: ReactNode }>) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-overlay px-3 py-1.5 text-[13px] font-medium text-secondary-foreground">
-      <span className="h-2 w-2 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
-      {children}
-    </span>
-  );
-}
-
-// ── Tarjeta secundaria (Configuración / Análisis / Administrador / Visor) ─────
 function Tarjeta({
-  fkey, icono, iconoFondo, titulo, insignia, desc, pie, onClick,
+  fkey, icono, placa, titulo, insignia, desc, meta, onClick,
 }: Readonly<{
-  fkey: string; icono: ReactNode; iconoFondo: string; titulo: string;
-  insignia?: { texto: string; color: string }; desc: string; pie: string; onClick: () => void;
+  fkey: string; icono: ReactNode; placa: string; titulo: string;
+  insignia?: { texto: string; tono: "mint" | "lock" }; desc: string; meta: string; onClick: () => void;
 }>) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-col rounded-2xl border border-border bg-card p-6 text-left shadow-sm transition-all hover:border-border-strong hover:bg-surface-overlay active:scale-[.995]"
+      className="group relative flex flex-col gap-2.5 overflow-hidden rounded-3xl border border-line bg-linear-165 from-panel-2 to-ink-2 p-[22px] text-left transition-transform duration-150 active:scale-[.97]"
     >
-      <div className="absolute right-5 top-5"><Fkey>{fkey}</Fkey></div>
-      <Pentagono fondo={iconoFondo} tam={52}>{icono}</Pentagono>
-      <div className="mt-5 flex items-center gap-2">
-        <h3 className="text-xl font-bold text-foreground">{titulo}</h3>
+      <span className="absolute right-4 top-4 rounded-md border border-line bg-black/10 px-1.5 py-0.5 font-mono text-[11px] text-muted">{fkey}</span>
+      <Escudo fondo={placa} tam={56}>{icono}</Escudo>
+      <h3 className="mt-1.5 flex items-center font-display text-[19px] font-semibold tracking-tight text-paper">
+        {titulo}
         {insignia && (
-          <span className="rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ background: `${insignia.color}22`, color: insignia.color }}>
+          <span className={`ml-2 rounded-full border px-2 py-0.5 font-mono text-[11px] ${insignia.tono === "mint" ? "border-mint/35 bg-mint/10 text-mint" : "border-brand-lit/30 bg-brand-lit/10 text-brand-lit"}`}>
             {insignia.texto}
           </span>
         )}
-      </div>
-      <p className="mt-2 max-w-[34ch] text-[15px] leading-snug text-muted-foreground">{desc}</p>
-      <p className="mt-auto pt-6 text-[13px] text-muted-foreground/70">{pie}</p>
+      </h3>
+      <p className="max-w-[34ch] text-[13.5px] leading-relaxed text-muted">{desc}</p>
+      <span className="mt-auto font-mono text-[11.5px] tracking-wide text-muted/80">{meta}</span>
     </button>
   );
 }
@@ -65,13 +57,12 @@ interface Props {
   turno: { mesasAbiertas: number; mesasTotal: number; ventas: string; comandas: number };
   onNavegar: (v: Exclude<Vista, "inicio">) => void;
   onSalir: () => void;
+  onAyuda: () => void;
 }
 
-// El Inicio es ANÓNIMO: aquí no hay nadie logueado. La identidad del trabajador se
-// pide al ENTRAR en cada apartado (Config/Análisis/Admin/Visor Node) con su PIN;
-// «Abrir TPV» entra directo y el login por operario ocurre dentro del TPV, por
-// acción (por si hay varios trabajadores en el mismo terminal).
-export function Inicio({ local, turno, onNavegar, onSalir }: Readonly<Props>) {
+// El Inicio es ANÓNIMO: nadie logueado. La identidad se pide al entrar en cada
+// apartado (PIN o pulsera); «Abrir TPV» entra directo (login por operario dentro).
+export function Inicio({ local, turno, onNavegar, onSalir, onAyuda }: Readonly<Props>) {
   const { oscuro, alternar } = useTema();
   const [hora, setHora] = useState(() => new Date());
   useEffect(() => {
@@ -85,109 +76,81 @@ export function Inicio({ local, turno, onNavegar, onSalir }: Readonly<Props>) {
   else if (h >= 14 && h < 21) saludo = "Buenas tardes";
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Textura de rejilla sutil (se adapta al tema vía currentColor) */}
-      <div
-        className="pointer-events-none absolute inset-0 text-foreground opacity-[.04]"
-        style={{
-          backgroundImage: "linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute -left-40 -top-40 h-130 w-130 rounded-full opacity-30 blur-3xl"
-        style={{ background: "radial-gradient(circle, #7c3d9baa, transparent 70%)" }}
-      />
-
-      {/* ── Cabecera ── */}
-      <header className="relative z-10 flex flex-none items-center gap-4 px-8 pt-6">
-        <span className="grid h-11 w-11 place-items-center rounded-xl" style={{ background: MARCA }}>
-          <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-7 w-7" />
-        </span>
-        <div className="mr-auto">
-          <h1 className="text-lg font-black leading-none tracking-tight">Gluuh TPV</h1>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
-            {local.nombre} · {local.terminal}
-          </p>
+    <div className="relative mx-auto flex h-screen max-w-[1500px] flex-col gap-[18px] px-[clamp(18px,3vw,40px)] pb-4 pt-5 text-paper">
+      {/* ── Barra superior ── */}
+      <header className="flex items-center gap-[18px]">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <Marca className="h-[52px] w-auto" alt="Gluuh" />
+          <div>
+            <h1 className="font-display text-[23px] font-extrabold leading-none tracking-tight">Gluuh TPV</h1>
+            <span className="mt-1.5 block text-[12px] uppercase tracking-[.14em] text-muted">{local.nombre} · {local.terminal}</span>
+          </div>
         </div>
-        <PillEstado color="#34b476"><Wifi size={14} /> Node conectado</PillEstado>
-        <PillEstado color="#e0a83b"><Printer size={14} /> Impresora cocina: sin papel</PillEstado>
-        <span className="rounded-full border border-border bg-surface-overlay px-3.5 py-1.5 text-[13px] font-semibold tabular-nums text-secondary-foreground">{hhmm}</span>
-        <button
-          type="button"
-          onClick={alternar}
-          aria-label="Cambiar tema"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface-overlay text-secondary-foreground hover:bg-surface-muted"
-        >
-          {oscuro ? <Sun size={17} /> : <Moon size={17} />}
-        </button>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
+          <Chip dot><Wifi size={13} /> Node conectado</Chip>
+          <Chip dot warn><Printer size={13} /> Impresora cocina: sin papel</Chip>
+          <Chip><span className="text-[14px] font-semibold tracking-wide">{hhmm}</span></Chip>
+          <button type="button" onClick={alternar} aria-label="Cambiar tema"
+            className="grid h-[42px] w-[42px] place-items-center rounded-full border border-line bg-paper/5 text-paper/80 transition-transform active:scale-90">
+            {oscuro ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+        </div>
       </header>
 
-      {/* ── Saludo (anónimo: el equipo del local) ── */}
-      <div className="relative z-10 flex-none px-8 pb-2 pt-6">
-        <h2 className="text-3xl font-black tracking-tight">
-          {saludo}, <span className="text-brand">Equipo de {local.nombre}</span>.
-          <span className="ml-3 align-middle text-base font-medium text-muted-foreground">Elige por dónde empezar. Puedes usar las teclas F1 a F5.</span>
+      {/* ── Saludo (anónimo, sin nombre del negocio) ── */}
+      <div>
+        <h2 className="font-display text-[clamp(22px,2.4vw,32px)] font-semibold tracking-tight">
+          {saludo}, <em className="not-italic text-brand-lit">Equipo</em>.
         </h2>
+        <p className="mt-1.5 text-sm text-muted">Elige por dónde empezar. Puedes usar las teclas F1 a F5.</p>
       </div>
 
-      {/* ── Rejilla del hub ── */}
-      <main className="relative z-10 grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-4 px-8 pb-4 pt-4">
-        {/* Abrir TPV — carta grande a la izquierda (entra DIRECTO, sin PIN) */}
+      {/* ── Rejilla ── */}
+      <main className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "repeat(4,1fr)", gridTemplateRows: "1.25fr 1fr" }}>
+        {/* Hero: Abrir TPV (entra directo) */}
         <button
           type="button"
           onClick={() => onNavegar("tpv")}
-          className="group relative col-span-1 row-span-2 flex flex-col overflow-hidden rounded-2xl border border-[#8a55a8]/30 p-8 text-left text-white transition-transform active:scale-[.995]"
-          style={{ background: "linear-gradient(155deg,#6a2d87 0%,#4a1e63 55%,#3a1650 100%)" }}
+          className="group relative col-span-2 row-span-2 flex flex-col gap-2.5 overflow-hidden rounded-3xl border border-white/[.18] p-[30px] text-left text-white transition-transform duration-150 active:scale-[.985]"
+          style={{ background: "linear-gradient(150deg,#8B45AC 0%, var(--brand) 52%, #3B1650 100%)" }}
         >
-          <div className="absolute right-6 top-6"><span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/60">F1</span></div>
-          <div className="pointer-events-none absolute -bottom-16 -right-16 h-72 w-72 opacity-[.13]" style={{ background: "#fff", clipPath: PENTA }} />
-          <Pentagono fondo="rgba(255,255,255,.14)" tam={72}><MonitorSmartphone size={34} /></Pentagono>
-          <h3 className="mt-6 text-5xl font-black leading-none tracking-tight">Abrir TPV</h3>
-          <p className="mt-4 max-w-[28ch] text-lg leading-snug text-white/70">Mesas, barra, comandas y cobros del turno de hoy.</p>
-
-          <div className="mt-auto">
-            <div className="flex items-end gap-8">
-              <div><p className="text-3xl font-black tabular-nums">{turno.mesasAbiertas}/{turno.mesasTotal}</p><p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-white/50">Mesas abiertas</p></div>
-              <div><p className="text-3xl font-black tabular-nums">{turno.ventas}</p><p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-white/50">Ventas del turno</p></div>
-              <div><p className="text-3xl font-black tabular-nums">{turno.comandas}</p><p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-white/50">Comandas en cocina</p></div>
-            </div>
-            <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-bold text-[#3a1650] transition-transform group-hover:gap-3">
-              Entrar al turno <ArrowRight size={18} />
-            </span>
+          <span className="absolute right-5 top-5 rounded-md border border-white/15 bg-black/15 px-1.5 py-0.5 font-mono text-[11px] text-white/60">F1</span>
+          <span className="escudo pointer-events-none absolute -bottom-30 -right-24 h-100 w-100 -rotate-6 bg-white/[.07]" />
+          <span className="escudo grid h-[76px] w-[76px] place-items-center bg-white/90"><MonitorSmartphone size={36} className="text-brand" strokeWidth={2} /></span>
+          <h3 className="mt-2 font-display text-[clamp(30px,3.2vw,44px)] font-extrabold leading-none tracking-tight">Abrir TPV</h3>
+          <p className="max-w-[30ch] text-[15px] leading-snug text-white/80">Mesas, barra, comandas y cobros del turno de hoy.</p>
+          <div className="relative z-10 mt-auto flex flex-wrap gap-7">
+            <div><b className="block font-display text-2xl font-extrabold tracking-tight">{turno.mesasAbiertas}/{turno.mesasTotal}</b><span className="text-[11.5px] uppercase tracking-wider text-white/70">Mesas abiertas</span></div>
+            <div><b className="block font-display text-2xl font-extrabold tracking-tight">{turno.ventas}</b><span className="text-[11.5px] uppercase tracking-wider text-white/70">Ventas del turno</span></div>
+            <div><b className="block font-display text-2xl font-extrabold tracking-tight">{turno.comandas}</b><span className="text-[11.5px] uppercase tracking-wider text-white/70">Comandas en cocina</span></div>
           </div>
+          <span className="relative z-10 mt-3.5 inline-flex items-center gap-2.5 self-start rounded-full bg-white px-5 py-3 font-bold text-brand">
+            Entrar al turno <ArrowRight size={17} strokeWidth={2.4} />
+          </span>
         </button>
 
-        <Tarjeta
-          fkey="F2" iconoFondo={MARCA} icono={<Settings2 size={26} />}
+        <Tarjeta fkey="F2" placa="linear-gradient(150deg,var(--brand-lit),var(--brand))" icono={<Settings2 size={26} />}
           titulo="Configuración" desc="Carta, precios, salas y mesas, impresoras, métodos de pago e impuestos."
-          pie="Última edición: ayer, 18:42" onClick={() => onNavegar("config")}
-        />
-        <Tarjeta
-          fkey="F3" iconoFondo={MARCA} icono={<BarChart3 size={26} />}
+          meta="Última edición: ayer, 18:42" onClick={() => onNavegar("config")} />
+        <Tarjeta fkey="F3" placa="linear-gradient(150deg,var(--brand-lit),var(--brand))" icono={<BarChart3 size={26} />}
           titulo="Análisis" desc="Ventas por hora, platos más vendidos, tickets medios y cierres de caja."
-          pie="Ayer: 1.842,10 € · +8,4 %" onClick={() => onNavegar("analisis")}
-        />
-        <Tarjeta
-          fkey="F4" iconoFondo={MARCA} icono={<Users size={26} />}
-          titulo="Administrador" insignia={{ texto: "Equipo Gluuh", color: "#7c3d9b" }}
+          meta="Ayer: 1.842,10 € · +8,4 %" onClick={() => onNavegar("analisis")} />
+        <Tarjeta fkey="F4" placa="linear-gradient(150deg,#E3B7FF,#9A5BBE)" icono={<Users size={26} />}
+          titulo="Administrador" insignia={{ texto: "Equipo Gluuh", tono: "lock" }}
           desc="Empleados, turnos, permisos, licencias y ajustes avanzados del local."
-          pie="Requiere PIN de administrador" onClick={() => onNavegar("admin")}
-        />
-        <Tarjeta
-          fkey="F5" iconoFondo="linear-gradient(160deg,#34b476,#1f7a4e)" icono={<Share2 size={26} />}
-          titulo="Visor Node" insignia={{ texto: "activo", color: "#2ea06a" }}
+          meta="Requiere PIN de administrador" onClick={() => onNavegar("admin")} />
+        <Tarjeta fkey="F5" placa="linear-gradient(150deg,#54E3B1,#159C6E)" icono={<Share2 size={26} />}
+          titulo="Visor Node" insignia={{ texto: "activo", tono: "mint" }}
           desc="Estado del servidor, dispositivos conectados, colas de impresión y registro."
-          pie="4 terminales · 128 ms · v2.4.1" onClick={() => onNavegar("nodo")}
-        />
+          meta="4 terminales · 128 ms · v2.4.1" onClick={() => onNavegar("nodo")} />
       </main>
 
       {/* ── Pie ── */}
-      <footer className="relative z-10 flex flex-none items-center gap-4 px-8 pb-5 pt-1 text-[13px] text-muted-foreground">
-        <span className="font-mono">Gluuh TPV v3.2.0 · Licencia LA-ALAMEDA-0417</span>
-        <button type="button" onClick={onSalir} className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-semibold text-secondary-foreground hover:bg-surface-overlay"><LogOut size={14} /> Salir</button>
-        <button type="button" className="ml-auto flex items-center gap-2 rounded-full bg-[#f0b429] px-5 py-2.5 font-bold text-[#3a2c07] hover:brightness-105">
-          <LifeBuoy size={16} /> Ayuda y soporte técnico
+      <footer className="flex flex-wrap items-center gap-3.5">
+        <span className="font-mono text-[11.5px] tracking-wide text-muted">Gluuh TPV v3.2.0 · Licencia LA-ALAMEDA-0417</span>
+        <button type="button" onClick={onSalir} className="btn-ghost"><LogOut size={14} /> Salir</button>
+        <button type="button" onClick={onAyuda} className="ml-auto flex items-center gap-2.5 rounded-full bg-amber px-5 py-3 font-bold text-[#2b1605] transition-transform active:scale-95">
+          <LifeBuoy size={18} /> Ayuda y soporte técnico
         </button>
       </footer>
     </div>

@@ -3,126 +3,115 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================================
-   Sistema de diseño Gluuh — MISMOS tokens que apps/web/app/globals.css.
-   Copiado aquí para la SPA del TPV (guía 22 Fase C). Cuando se extraiga
-   packages/ui, ambos lo importarán de ahí; por ahora es una copia fiel.
+   SISTEMA DE DISEÑO DE LA OPERATIVA (TPV) — del mockup gluuh-inicio-diseño.html.
+   Distinto del backoffice (apps/web): morado de marca + oscuro cálido, tipografía
+   Bricolage/DM Sans/JetBrains Mono, silueta de escudo.
+
+   MARCA THEMEABLE: --brand y --brand-lit son la marca. Por defecto el morado
+   Gluuh; el cliente los cambia desde Configuración (presets de color) y todo lo
+   que use la marca (glows, placas, hero, acentos) se recolorea solo. El LOGO va
+   por el componente <Marca> (icono-tpv.png → logo del cliente cuando lo suba).
    ========================================================================== */
 @layer base {
   :root {
-    /* Escala gris (claro) */
-    --scale-1:#fbfcfd; --scale-2:#f8f9fa; --scale-3:#f1f3f5; --scale-4:#eceef0;
-    --scale-5:#e6e8eb; --scale-6:#dfe1e4; --scale-7:#d7d9dc; --scale-8:#c1c4c8;
-    --scale-9:#8b8d98; --scale-10:#7e8086; --scale-11:#60646c; --scale-12:#1c2024;
+    /* Marca (la cambia el cliente) */
+    --brand: #572370;
+    --brand-lit: #7c3d9b;
+    --mint: #3fd8a4;
+    --amber: #f5a623;
 
-    --bg-default: var(--scale-1);
-    --bg-surface: var(--scale-2);
-    --bg-overlay: var(--scale-3);
-    --bg-muted:   var(--scale-4);
-    --input-bg:   var(--bg-surface);
-
-    --border-muted: var(--scale-5);
-    --border-default: var(--scale-6);
-    --border-strong: var(--scale-8);
-
-    --text-muted: var(--scale-9);
-    --text-secondary: var(--scale-11);
-    --text-primary: var(--scale-12);
-
-    /* Morado Gluuh de los mockups (#572370). Hover/active oscurecen (tema claro). */
-    --brand:#572370; --brand-hover:#451A5C; --brand-active:#38134A; --brand-muted: rgba(87,35,112,.15);
-    --accent-soft:#f3edf7;  /* fondo sólido para estados seleccionados (claro) */
-    --boton-bg:#ffffff; --boton-tono:#60646c;   /* botón de acción rail/fila: fondo + texto/filo (claro) */
-    --success:#2ea06a; --warning:#d0a24a; --danger:#cf5346; --info:#2f7fd0;
-
-    --radius: 0.5rem;
+    /* Tema CLARO (fallback) — la operativa arranca en oscuro, pero el toggle vale */
+    --ink: #f3edf7;
+    --ink-2: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #faf6fc;
+    --paper: #1c1024;
+    --muted: #6d5c7a;
+    --line: rgba(28, 16, 36, 0.1);
+    --radius: 18px;
     color-scheme: light;
   }
 
   .dark {
-    /* Paleta oscura "Gluuh cian" (del mockup del cliente): grises fríos + acento turquesa. */
-    --scale-1:#14171d; --scale-2:#1c212b; --scale-3:#242a35; --scale-4:#2c3340;
-    --scale-5:#353d4a; --scale-6:#3f4956; --scale-7:#4b5768; --scale-8:#5d6a7a;
-    --scale-9:#727e8e; --scale-10:#98a2b0; --scale-11:#c2ccd8; --scale-12:#eef1f6;
-
-    --bg-default:#14171d; --bg-surface:#1c212b;
-    --bg-overlay:#242a35; --bg-muted:#2c3340;
-    --input-bg:#212731;
-
-    --border-muted:#2a313d; --border-default:#38414f; --border-strong:#4b5768;
-
-    --text-muted:#98a2b0; --text-secondary:#c2ccd8; --text-primary:#eef1f6;
-    /* Morado Gluuh en oscuro: variante clara (#7C3D9B) para que contraste sobre fondo oscuro. */
-    --brand:#7C3D9B; --brand-hover:#9358b5; --brand-active:#572370; --brand-muted: rgba(124,61,155,.2);
-    --accent-soft:#24152e;  /* violeta tenue para seleccionado/activo (oscuro) */
-    --boton-bg:#212731; --boton-tono:#7f8b9a;    /* botón de acción rail/fila: fondo + texto/filo (oscuro) */
-    --success:#34b476; --warning:#d0a24a; --danger:#cf5346; --info:#3ba7e0;
+    /* Tema OSCURO — colores exactos del mockup */
+    --ink: #150a1b;
+    --ink-2: #200e2b;
+    --panel: #2c1339;
+    --panel-2: #37194a;
+    --paper: #f6f1f9;
+    --muted: #b9a5c6;
+    --line: rgba(255, 255, 255, 0.1);
     color-scheme: dark;
   }
 
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground antialiased; }
+  * { border-color: var(--line); }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    color: var(--paper);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    background: var(--ink);
+  }
+  /* Los glows morados de las esquinas SOLO en oscuro (en claro se ven raros). */
+  .dark body {
+    background:
+      radial-gradient(1100px 620px at 12% -8%, color-mix(in srgb, var(--brand-lit) 45%, transparent), transparent 60%),
+      radial-gradient(900px 700px at 105% 110%, color-mix(in srgb, var(--brand) 55%, transparent), transparent 62%),
+      var(--ink);
+  }
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
-  html { @apply font-sans; }
 }
 
-/* Tailwind v4: tokens como utilidades + alias shadcn (los componentes heredan). */
+/* Tokens → utilidades Tailwind v4. Incluye los alias shadcn para que los
+   componentes que ya usan bg-card/text-foreground/etc. sigan funcionando. */
 @theme inline {
-  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Utilidades de marca/superficie/estado */
-  --color-background: var(--bg-default);
-  --color-surface: var(--bg-surface);
-  --color-surface-2: var(--input-bg);       /* panel-2 del mockup (#1d222b): celdas, teclas, alias */
-  --color-surface-overlay: var(--bg-overlay);
-  --color-surface-muted: var(--bg-muted);
-  --color-foreground: var(--text-primary);
-  --color-border: var(--border-default);
-  --color-border-muted: var(--border-muted);
-  --color-border-strong: var(--border-strong);
+  /* Marca y superficies de la operativa */
   --color-brand: var(--brand);
-  --color-brand-hover: var(--brand-hover);
-  --color-accent-soft: var(--accent-soft);
-  --color-boton-bg: var(--boton-bg);
-  --color-boton-tono: var(--boton-tono);
-  --color-brand-foreground: #ffffff;  /* texto claro sobre el violeta de marca */
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --color-info: var(--info);
+  --color-brand-lit: var(--brand-lit);
+  --color-mint: var(--mint);
+  --color-amber: var(--amber);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-paper: var(--paper);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
 
-  /* Radios sobrios (sin píldoras) */
-  --radius-sm: 0.25rem; --radius-md: 0.375rem; --radius-lg: 0.5rem;
-  --radius-xl: 0.625rem; --radius-2xl: 0.75rem; --radius-3xl: 0.75rem; --radius-4xl: 0.5rem;
-
-  /* Alias shadcn → tokens (para que sus componentes salgan con el tema) */
-  --color-card: var(--bg-surface);
-  --color-card-foreground: var(--text-primary);
-  --color-popover: var(--bg-overlay);
-  --color-popover-foreground: var(--text-primary);
+  /* Alias shadcn/backoffice → palette de la operativa (compat) */
+  --color-background: var(--ink);
+  --color-foreground: var(--paper);
+  --color-card: var(--panel-2);
+  --color-surface: var(--panel);
+  --color-surface-overlay: color-mix(in srgb, var(--paper) 6%, transparent);
+  --color-surface-muted: color-mix(in srgb, var(--paper) 12%, transparent);
+  --color-border: var(--line);
+  --color-border-strong: color-mix(in srgb, var(--paper) 30%, transparent);
+  --color-muted-foreground: var(--muted);
+  --color-secondary-foreground: color-mix(in srgb, var(--paper) 85%, transparent);
   --color-primary: var(--brand);
-  --color-primary-foreground: #ffffff;  /* texto claro sobre el violeta de marca */
-  --color-secondary: var(--bg-muted);
-  --color-secondary-foreground: var(--text-primary);
-  --color-muted: var(--bg-muted);
-  --color-muted-foreground: var(--text-muted);
-  --color-accent: var(--bg-overlay);
-  --color-accent-foreground: var(--text-primary);
-  --color-input: var(--border-default);
-  --color-ring: var(--brand);
-  --color-destructive: var(--danger);
-  --color-destructive-foreground: #ffffff;
+  --color-primary-foreground: #ffffff;
+  --color-brand-foreground: #ffffff;
+  --color-danger: #e0554a;
+  --color-destructive: #e0554a;
+
+  --radius-sm: 0.5rem; --radius-md: 0.75rem; --radius-lg: 0.875rem;
+  --radius-xl: 1rem; --radius-2xl: 1.125rem; --radius-3xl: 1.25rem;
 }
 
-html, body { height: 100%; }
+/* Silueta de escudo del logo (placas de icono) */
+.escudo { clip-path: polygon(50% 0%, 100% 22%, 88% 88%, 50% 100%, 12% 88%, 0% 22%); }
 
-/* Clases legadas (TPV/comandera), alineadas al tema. */
+/* Botones legados (por si algún módulo portado los usa).
+   REGLAS del TPV (táctil): sin hover, solo animación al pulsar; sombras al mínimo. */
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors; }
-  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50; }
-  .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors border border-border bg-surface text-foreground hover:bg-surface-overlay; }
-  .input { @apply w-full rounded-md border border-input bg-surface px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring; }
-  .card { @apply rounded-lg border border-border bg-surface p-5; }
-  .label { @apply mb-1 block text-sm font-medium; }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white transition-transform active:scale-95 disabled:opacity-50; }
+  .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-transparent px-4 py-2 text-sm font-semibold text-muted transition-transform active:scale-95; }
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
