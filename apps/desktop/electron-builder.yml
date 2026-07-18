@@ -2,7 +2,9 @@
 appId: com.gluuh.tpv
 productName: Gluuh TPV
 directories:
-  output: dist-instalador
+  # FUERA del repositorio (TRAMPAS §5): dentro de Documents, el AV/OneDrive
+  # agarra el .asar recien escrito y el empaquetado muere con EBUSY.
+  output: C:/gluuh-paquete/tpv
 files:
   - dist/**
   - package.json
