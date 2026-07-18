@@ -1,22 +1,23 @@
 import { ReceiptText, Armchair, Sun, ShoppingBag, CalendarCheck, Settings, type LucideIcon } from "lucide-react";
 import { SALAS_DEMO } from "./datos";
 
-// Rail derecho persistente (como en el TPV de Next): Ticket · Aparcado · [salas del
-// restaurante] · Para llevar · Reservas · ⚙. Las SALAS son dinámicas (config del
-// local): si el dueño crea una, aparece aquí. `vista` = clave fija o id de sala.
+// Rail derecho persistente: Ticket · Aparcado · [salas del restaurante] · Para
+// llevar · Reservas · ⚙. Salas dinámicas (config del local). `vista` = clave fija
+// o id de sala. Activo = pastilla morada redondeada (con margen); badge sobre el icono.
 function icoSala(id: string): LucideIcon {
-  if (id === "terraza") return Sun;
-  return Armchair;
+  return id === "terraza" ? Sun : Armchair;
 }
 
 function Tab({ Icono, label, activo, badge, onClick }: Readonly<{ Icono: LucideIcon; label: string; activo?: boolean; badge?: number; onClick: () => void }>) {
   return (
     <button type="button" onClick={onClick}
-      className={`relative flex flex-col items-center gap-1 py-3 text-[.68rem] font-semibold transition-transform active:scale-95 ${activo ? "bg-accent-soft text-brand" : "text-muted-foreground"}`}>
-      {badge != null && badge > 0 && (
-        <span className="absolute right-3 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-cobro px-1 text-[9px] font-bold text-white">{badge}</span>
-      )}
-      <Icono size={22} />
+      className={`mx-1.5 flex flex-col items-center gap-1 rounded-xl py-2.5 text-[.66rem] font-semibold transition-colors ${activo ? "bg-brand text-white" : "text-muted-foreground"}`}>
+      <span className="relative">
+        <Icono size={20} />
+        {badge != null && badge > 0 && (
+          <span className="absolute -right-3 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-cobro px-1 text-[9px] font-bold text-white">{badge}</span>
+        )}
+      </span>
       {label}
     </button>
   );
@@ -26,7 +27,7 @@ export function RailSalas({
   vista, onVista, onConfig,
 }: Readonly<{ vista: string; onVista: (v: string) => void; onConfig: () => void }>) {
   return (
-    <aside className="flex w-[140px] flex-none flex-col overflow-y-auto border-l border-border bg-surface">
+    <aside className="flex w-[104px] flex-none flex-col gap-0.5 overflow-y-auto border-l border-border bg-surface py-1.5">
       <Tab Icono={ReceiptText} label="Ticket" activo={vista === "ticket"} onClick={() => onVista("ticket")} />
       <Tab Icono={Armchair} label="Aparcado" badge={13} activo={vista === "aparcado"} onClick={() => onVista("aparcado")} />
       {SALAS_DEMO.map((s) => {
@@ -35,7 +36,7 @@ export function RailSalas({
       })}
       <Tab Icono={ShoppingBag} label="Para llevar" activo={vista === "llevar"} onClick={() => onVista("llevar")} />
       <Tab Icono={CalendarCheck} label="Reservas" activo={vista === "reservas"} onClick={() => onVista("reservas")} />
-      <button type="button" onClick={onConfig} aria-label="Configuración" className="mt-auto grid place-items-center border-t border-border py-3 text-muted-foreground transition-transform active:scale-95">
+      <button type="button" onClick={onConfig} aria-label="Configuración" className="mx-1.5 mt-auto grid place-items-center rounded-xl border-t border-border py-3 text-muted-foreground transition-transform active:scale-95">
         <Settings size={20} />
       </button>
     </aside>

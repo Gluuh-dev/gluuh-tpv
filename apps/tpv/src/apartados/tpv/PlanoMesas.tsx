@@ -42,7 +42,6 @@ export function PlanoMesas({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
       {/* Cabecera morada */}
       <header className="flex h-14 flex-none items-center gap-3 bg-brand px-3 text-white">
-        <button type="button" onClick={onInicio} aria-label="Inicio" className="grid h-9 w-9 place-items-center rounded-md bg-white/10 transition-transform active:scale-90"><Home size={18} /></button>
         <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-8 w-auto" draggable={false} />
         <span className="rounded-md bg-white/10 px-3 py-1.5 text-sm"><span className="opacity-70">SALA</span> <b>{sala.nombre}</b></span>
         <span className="rounded-md bg-white/10 px-3 py-1.5 text-sm"><span className="opacity-70">OCUPADAS</span> <b>{ocup}/{sala.mesas.length}</b></span>

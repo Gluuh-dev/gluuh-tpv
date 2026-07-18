@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Home } from "lucide-react";
 import { EnObras, Modal } from "../../ui";
 import { eur } from "../../lib/dinero";
 import { PlanoMesas } from "./PlanoMesas";
@@ -23,7 +22,6 @@ function VistaSimple({ titulo, vista, onVista, onInicio, onConfig }: Readonly<{ 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <header className="flex h-14 flex-none items-center gap-3 bg-brand px-3 text-white">
-        <button type="button" onClick={onInicio} aria-label="Inicio" className="grid h-9 w-9 place-items-center rounded-md bg-white/10 transition-transform active:scale-90"><Home size={18} /></button>
         <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-8 w-auto" draggable={false} />
         <span className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-bold">{titulo}</span>
       </header>
