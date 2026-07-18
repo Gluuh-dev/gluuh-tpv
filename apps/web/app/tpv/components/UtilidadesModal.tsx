@@ -40,10 +40,12 @@ type Utilidad = {
 
 interface Props {
   hayUltimoDocumento: boolean;
+  hayComanda: boolean;
   puedeCobrar: boolean;
   puedeAbrirCajon: boolean;
   temaOscuro: boolean;
   onAbrirCajon: () => void;
+  onReimprimirCocina: () => void;
   onReimprimir: () => void;
   onCerrarDia: () => void;
   onModulos: () => void;
@@ -56,10 +58,12 @@ interface Props {
 
 export function UtilidadesModal({
   hayUltimoDocumento,
+  hayComanda,
   puedeCobrar,
   puedeAbrirCajon,
   temaOscuro,
   onAbrirCajon,
+  onReimprimirCocina,
   onReimprimir,
   onCerrarDia,
   onModulos,
@@ -70,7 +74,7 @@ export function UtilidadesModal({
   onClose,
 }: Readonly<Props>) {
   const utilidades: Utilidad[] = [
-    { id: "reimprimir-cocina", etiqueta: "Re. cocina", icono: CookingPot, tono: "caja", deshabilitada: true },
+    { id: "reimprimir-cocina", etiqueta: "Re. cocina", icono: CookingPot, tono: "caja", accion: onReimprimirCocina, deshabilitada: !hayComanda },
     { id: "grupo-cocina", etiqueta: "Grupo cocina", icono: UsersRound, deshabilitada: true },
     { id: "zonas-impresion", etiqueta: "Zonas de impresión", icono: UtensilsCrossed, deshabilitada: true },
     { id: "buscador-articulos", etiqueta: "Buscador de artículos", icono: FileSearch, deshabilitada: true },

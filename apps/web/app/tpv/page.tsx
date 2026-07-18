@@ -3415,10 +3415,12 @@ export default function TPV() {
       {modalActivo === 'UTILIDADES' && (
         <UtilidadesModal
           hayUltimoDocumento={!!ultimoDoc}
+          hayComanda={unidades > 0}
           puedeCobrar={puede("cobrar")}
           puedeAbrirCajon={!!window.gluuh && puede("abrir_cajon")}
           temaOscuro={resolvedTheme === "dark"}
           onAbrirCajon={() => { setModalActivo(null); abrirCajonManual(); }}
+          onReimprimirCocina={() => { setModalActivo(null); imprimirComandas(); }}
           onReimprimir={reprimirUltimo}
           onCerrarDia={abrirCierreDelDia}
           onModulos={() => { setModalActivo(null); router.push("/modulos"); }}
