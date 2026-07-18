@@ -52,17 +52,21 @@ export const SALAS_DEMO: Sala[] = [
 ];
 
 // ── Catálogo demo (para la pantalla de venta) ────────────────────────────────
-export interface Categoria { id: string; nombre: string }
+export interface Categoria { id: string; nombre: string; color: string }
 export interface Producto { id: string; nombre: string; precio: number; categoria: string }
 
 export const CATEGORIAS_DEMO: Categoria[] = [
-  { id: "cafes", nombre: "Cafés" },
-  { id: "cervezas", nombre: "Cervezas" },
-  { id: "refrescos", nombre: "Refrescos" },
-  { id: "copas", nombre: "Copas" },
-  { id: "raciones", nombre: "Raciones" },
-  { id: "bocadillos", nombre: "Bocadillos" },
+  { id: "cafes", nombre: "Cafés", color: "#8a5a2b" },
+  { id: "cervezas", nombre: "Cervezas", color: "#b5892b" },
+  { id: "refrescos", nombre: "Refrescos", color: "#2f7fd0" },
+  { id: "copas", nombre: "Copas", color: "#7c3d9b" },
+  { id: "raciones", nombre: "Raciones", color: "#c0553f" },
+  { id: "bocadillos", nombre: "Bocadillos", color: "#2ea06a" },
 ];
+
+export function colorCategoria(id: string): string {
+  return CATEGORIAS_DEMO.find((c) => c.id === id)?.color ?? "#64748b";
+}
 
 export const PRODUCTOS_DEMO: Producto[] = [
   { id: "p1", nombre: "Café solo", precio: 1.2, categoria: "cafes" },

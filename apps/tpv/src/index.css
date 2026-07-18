@@ -99,6 +99,14 @@
   --color-brand-foreground: #ffffff;
   --color-danger: #e0554a;
   --color-destructive: #e0554a;
+  /* Vocabulario del TPV Next (para portar la venta 1:1) */
+  --color-surface-2: color-mix(in srgb, var(--paper) 6%, var(--panel));
+  --color-accent-soft: color-mix(in srgb, var(--brand) 16%, transparent);
+  --color-success: var(--mint);
+  --color-warning: var(--amber);
+  /* Naranja "acción de dinero" (Cobrar) — el único acento naranja de la UI */
+  --color-cobro: #c46a2a;
+  --color-cobro-lit: #d47c34;
 
   --radius-sm: 0.5rem; --radius-md: 0.75rem; --radius-lg: 0.875rem;
   --radius-xl: 1rem; --radius-2xl: 1.125rem; --radius-3xl: 1.25rem;
