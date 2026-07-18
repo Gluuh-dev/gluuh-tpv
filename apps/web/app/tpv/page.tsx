@@ -15,6 +15,7 @@ import {
   extraIngredientesDetallados as extraIngredientesDetalladosPuro,
   obtenerBaseManualSiDifiere as obtenerBaseManualSiDifierePuro,
 } from "./nombres";
+import { etiquetaContexto, lineasImprimibles } from "./ticket-impresion";
 import { toast } from "@/app/lib/toast";
 import { escucharCambios } from "../lib/cambios";
 import { getSetting } from "../lib/settings";
@@ -753,19 +754,10 @@ export default function TPV() {
   function construirTicketImpresion(t: Ticket): TicketImpresion {
     return {
       local: locInfo,
-      contexto: mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra",
+      contexto: etiquetaContexto(mesa, llevar),
       operario: operario?.nombre,
       numSerieFactura: VERIFACTU_ACTIVO ? t.numSerieFactura : undefined,
-      lineas: lineasComanda().map((l) => ({
-        cantidad: l.cantidad,
-        nombre: nombreBaseDeKey(l.id, "nombre_ticket"),
-        importe: l.precio * l.cantidad,
-        extras: extraIngredientesDetallados(l.id).map((ext) => ({
-          nombre: ext.nombre,
-          cantidad: ext.uds,
-          precioExtra: ext.precio,
-        })),
-      })),
+      lineas: lineasImprimibles(ctxNombres, lineasComanda()),
       desglose: t.impuestos.desglose.map((d) => ({
         etiqueta: `${t.impuestos.impuesto} ${d.tipo}% (base ${eur(d.base)})`,
         cuota: d.cuota,
@@ -808,18 +800,9 @@ export default function TPV() {
       ? construirTicketImpresion(ticket)
       : {
           local: locInfo,
-          contexto: mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra",
+          contexto: etiquetaContexto(mesa, llevar),
           operario: operario?.nombre,
-          lineas: lineasComanda().map((l) => ({
-            cantidad: l.cantidad,
-            nombre: nombreBaseDeKey(l.id, "nombre_ticket"),
-            importe: l.precio * l.cantidad,
-            extras: extraIngredientesDetallados(l.id).map((ext) => ({
-              nombre: ext.nombre,
-              cantidad: ext.uds,
-              precioExtra: ext.precio,
-            })),
-          })),
+          lineas: lineasImprimibles(ctxNombres, lineasComanda()),
           desglose: [],
           total,
           proforma: true,
