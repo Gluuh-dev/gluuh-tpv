@@ -55,6 +55,7 @@ export default function FamiliaEditarPage() {
   const [subiendo, setSubiendo] = useState(false);
   const [mostrarVenta, setMostrarVenta] = useState(true);
   const [mostrarMenus, setMostrarMenus] = useState(true);
+  const [combinable, setCombinable] = useState(false);   // 0126: sus productos se venden como combinado
 
   const [familias, setFamilias] = useState<FamiliaOpcion[]>([]);
   const [gruposMayores, setGruposMayores] = useState<GrupoMayor[]>([]);
@@ -100,7 +101,7 @@ export default function FamiliaEditarPage() {
 
       if (!esNueva) {
         const full = await sb.from("family")
-          .select("nombre,color,orden,grupo_mayor_id,familia_padre_id,orden_impresion,texto_boton,foto_url,mostrar_venta,mostrar_menus")
+          .select("nombre,color,orden,grupo_mayor_id,familia_padre_id,orden_impresion,texto_boton,foto_url,mostrar_venta,mostrar_menus,combinable")
           .eq("id", id).maybeSingle();
         if (full.error) {
           setSin0065(true);
@@ -114,7 +115,7 @@ export default function FamiliaEditarPage() {
           const f = full.data as {
             nombre: string; color: string | null; orden: number | null; grupo_mayor_id: string | null;
             familia_padre_id: string | null; orden_impresion: number | null; texto_boton: string | null;
-            foto_url: string | null; mostrar_venta: boolean | null; mostrar_menus: boolean | null;
+            foto_url: string | null; mostrar_venta: boolean | null; mostrar_menus: boolean | null; combinable: boolean | null;
           } | null;
           if (!f) { toast.error("No se pudo cargar la familia."); router.push("/familias"); return; }
           setNombre(f.nombre); setColor(f.color ?? COLOR_DEFECTO); setOrden(String(f.orden ?? 0));
@@ -124,6 +125,7 @@ export default function FamiliaEditarPage() {
           setTextoBoton(f.texto_boton ?? "");
           setFotoUrl(f.foto_url);
           setMostrarVenta(f.mostrar_venta ?? true); setMostrarMenus(f.mostrar_menus ?? true);
+          setCombinable(f.combinable ?? false);
         }
         await cargarProductosDeFamilia();
       }
@@ -151,6 +153,7 @@ export default function FamiliaEditarPage() {
       grupo_mayor_id: grupoMayorId === NINGUNO ? null : grupoMayorId,
       mostrar_venta: mostrarVenta,
       mostrar_menus: mostrarMenus,
+      combinable,
     };
     if (!sin0065) {
       base.familia_padre_id = familiaPadreId === NINGUNO ? null : familiaPadreId;
@@ -299,6 +302,10 @@ export default function FamiliaEditarPage() {
               <div className="flex items-center gap-2 text-sm">
                 <Switch id="f-menus" checked={mostrarMenus} onCheckedChange={setMostrarMenus} />
                 <label htmlFor="f-menus">Mostrar esta familia en la pantalla de configuración de menús</label>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Switch id="f-combinable" checked={combinable} onCheckedChange={setCombinable} />
+                <label htmlFor="f-combinable">Combinable: al vender una copa de esta familia, pregunta el refresco (cada producto puede desactivarlo)</label>
               </div>
             </div>
           </CardContent>
