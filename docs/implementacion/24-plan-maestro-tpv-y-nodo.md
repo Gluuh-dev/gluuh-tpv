@@ -125,9 +125,12 @@ E7 en paralelo desde E0 (features sobre el TPV actual; se mueven con él en E4)
 
 ## Decisiones del usuario — RESUELTAS (18-07-2026)
 
-1. **Combinar copas (7.1)**: flag `combinable` a nivel **familia** (default), **desactivable/
-   activable por producto** (`product.combinable` NULL = hereda). Categoría de "con qué" en
-   setting `tpv.combinados.categoria_id`. Migración **0126** (reservada). ← en marcha.
+1. **Combinar copas (7.1)**: ✅ **HECHA (18-07)**. Flag `combinable` a nivel **familia**
+   (default), **override por producto** (`product.combinable` NULL = hereda). Categoría de
+   "con qué" en setting `tpv.combinados.categoria_id`. Migración **0126** aplicada en la nube;
+   resolver `esCombinable()` con tests; flujo de combinar en el TPV; toggles en familia/
+   producto y selector en Ajustes. Pendiente: aplicar 0126 al nodo (con la tanda de escritorio)
+   y humo en navegador.
 2. **KDS/cocina/pantalla/kiosko**: **Fase 2 a la SPA** del nodo, mismo criterio que el TPV
    (la operativa fuera de Next). Se aborda tras la SPA del TPV (post-E4).
 3. **Servicio del nodo**: **`GluuhNodo`**, gateway **54321** (fijo), SPA en **3100**
