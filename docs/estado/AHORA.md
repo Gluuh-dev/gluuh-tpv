@@ -52,7 +52,7 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 | quién | qué | ficheros |
 |---|---|---|
 | Claude (chat) | **DECISIÓN 18-07: el TPV será app propia (Vite+React SPA servida por el nodo, dentro de Electron); la nube no servirá la operativa.** Decisión en `docs/plan/15-tpv-app-propia-vite.md`, migración en `docs/implementacion/22-tpv-spa-vite.md` (sin big-bang; prerequisito F1–F3 de la guía 21; incluye estructura de paquetes e inventario de módulos). Nodo como servicio Windows real (supervisor + SCM, health-checks, secretos con rotación, logs rotados, update con rollback): `docs/implementacion/23-nodo-servicio-windows.md`. **➡ PUNTO DE ENTRADA del desarrollo: `docs/implementacion/24-plan-maestro-tpv-y-nodo.md`** (etapas 0–8 con dependencias y puertas; E0 = commit+push pendiente). ⚠ Renombrado `17-tpv-perfecto.md` → `21-tpv-perfecto.md` (colisionaba con el 17 del manual del nodo). | `docs/plan/15…`, `docs/implementacion/21…`, `22…` |
-| Claude (chat) | **E0 CERRADA · E1.2 hecha · E1.3 parcial · E2 BLOQUEADO** (18-07). **E0**: todo el trabajo TPV commiteado+pusheado (HEAD `08ec216`), `typecheck` 12/12 verde → desbloquea escritorio (el par que rompía `1736e1e` compila). **E1.2** (migración `useTpvStore`) ya estaba hecha (selectores+`getState`). **E1.3** — extraídas piezas PURAS con tests: `tpv/nombres.ts` (nombres/extras de línea) y `tpv/ticket-impresion.ts` (dedup fiscal/proforma); `page.tsx` 3578→3501, +30 tests. ⚠ **El resto de E1.3 (cobro/división/JSX) queda DIFERIDO**: es ruta del dinero y aquí solo hay typecheck, no el humo de `PRUEBAS-TPV.md` (necesita nodo vivo). **E7.2**: encendidas dos utilidades antes muertas — "Re. cocina" (reusa `imprimirComandas`) y "Resumen de caja" (Z del turno en modo consulta, reusa `z_de_jornada` + `CerrarDiaModal` con `soloLectura`, cero escritura). Quedan por valor: buscar documento, apunte de caja, cobros pendientes (son builds nuevos con modal/escritura, no reuse directo). ⛔ **E2 (fiscal al gateway) BLOQUEADO**: `gateway.mjs` es zero-dep y `apps/nodo` no es paquete; meter `@gluuh/core` exige tocar `Montar-Paquete.ps1` (empaquetar core en el nodo) + reiniciar/probar el nodo vivo → **coordinar con escritorio** antes de tocarlo (si no, TRAMPAS §5: módulo no encontrado en el bar, sin error). | `apps/web/app/tpv/{page.tsx,nombres.ts,ticket-impresion.ts,components/UtilidadesModal.tsx}` |
+| Claude (chat) | **E0 CERRADA · E1.2 hecha · E1.3 parcial · E2 BLOQUEADO** (18-07). **E0**: todo el trabajo TPV commiteado+pusheado (HEAD `08ec216`), `typecheck` 12/12 verde → desbloquea escritorio (el par que rompía `1736e1e` compila). **E1.2** (migración `useTpvStore`) ya estaba hecha (selectores+`getState`). **E1.3** — extraídas piezas PURAS con tests: `tpv/nombres.ts` (nombres/extras de línea) y `tpv/ticket-impresion.ts` (dedup fiscal/proforma); `page.tsx` 3578→3501, +30 tests. ⚠ **El resto de E1.3 (cobro/división/JSX) queda DIFERIDO**: es ruta del dinero y aquí solo hay typecheck, no el humo de `PRUEBAS-TPV.md` (necesita nodo vivo). **E7.2**: encendidas 4 utilidades antes muertas, todas por reuse y sin escritura de riesgo — "Re. cocina" (`imprimirComandas`), "Resumen de caja" (Z del turno, `z_de_jornada` + `CerrarDiaModal` soloLectura), "Cobros pendientes" (`sales_order` POR_COBRAR, navega a la cuenta) y "Agenda" (→ vista Reservas). **E1.4 (F7)**: `tpv/perf.ts` con marcas de presupuesto (abrir cobrar 100ms, cambio de vista 50ms, cobrar 350ms; avisa en consola solo en dev). Quedan aparcadas, con motivo: "Buscar documento" (reimprimir doc fiscal pasado = sensible, necesita factura/huella), "Apunte de caja" (escribe `cash_move`, ruta de dinero no verificable aquí), "Selección de tarifa" (repricing, ruta de dinero); el resto de utilidades atenuadas necesitan módulos inexistentes (correcto así). ⛔ **E2 (fiscal al gateway) BLOQUEADO**: `gateway.mjs` es zero-dep y `apps/nodo` no es paquete; meter `@gluuh/core` exige tocar `Montar-Paquete.ps1` (empaquetar core en el nodo) + reiniciar/probar el nodo vivo → **coordinar con escritorio** antes de tocarlo (si no, TRAMPAS §5: módulo no encontrado en el bar, sin error). | `apps/web/app/tpv/{page.tsx,nombres.ts,ticket-impresion.ts,components/UtilidadesModal.tsx}` |
 | Claude (escritorio) | **Nodo instalado en esta máquina** (18-07): la web del nodo elige puerto libre sola (aquí **3110**, el 3100 lo ocupa el `next dev`); panel /servidor con espera informativa + manifest/iconos; standalone desplegado en `C:\Gluuh` desde worktree limpio `C:\gluuh-paquete\web-limpia`. ✅ **RESUELTO (18-07, sesión chat)**: el HEAD actual `08ec216` **compila** (typecheck 12/12); el par página/modal de Dividir v2 quedó consistente. (Era: `1736e1e` arrastraba líneas a medias.) ⚠ Quedan 3 servicios **elevados** con el secreto viejo (auth/realtime/media, PIDs de antes de reinstalar): mueren con un reinicio de Windows. | `supabase/nodo/arrancar-nodo.ps1`, `apps/web/app/servidor/*`, `apps/web/public/manifest-servidor.webmanifest` |
 | Codex + Claude (chat) | **F0 ENTREGADA · F1/F2 núcleo APLICADO EN LA NUBE** (17-07, autorizado): 0111–0115 aplicadas por MCP, tipos regenerados, espejos de transición retirados, smoke verde. Pendiente: aplicar la tanda **en el nodo** cuando se levante + prueba adversarial; F1 contract (1.5) tras canary; F2 restos (MFA, revocar sesiones, temporal cifrada, provisional offline). Seguimiento: `docs/estado/REPARACION-F0-F8.md` | `supabase/migrations/0111–0115`, `supabase/types/`, `apps/web/app/(panel)/layout.tsx`, `login`, `elegir-empresa`, `invitacion/`, `api/invitaciones|cuenta`, `lib/contexto.ts`, `packages/supabase`, `scripts/` |
 
@@ -111,25 +111,13 @@ por `auth.uid()`). Pero **hay una ruta que lee los claims a pelo**:
 
 ## 🧹 Tarea limpia y suelta (buena para coger en paralelo)
 
-**Quitar la mentira de las páginas de detalle.** Ya está hecho en las 10 páginas principales
-(empleados, tarifas, impresoras, descuentos, promociones, formas-pago, menús, planos, caja,
-informes, personalizar, ordenar-productos) — ver `TRAMPAS.md` §11.
-
-Faltan las de **detalle**, que hacen lo mismo:
-
-| fichero | lo que dice mientras carga |
-|---|---|
-| `(panel)/productos/[id]` | «Sin categorías: el producto no aparece en la pantalla de venta» 😬 |
-| `(panel)/categorias/[id]` | «Esta categoría aún no tiene productos» |
-| `(panel)/familias/[id]` | «Esta familia aún no tiene productos» |
-| `(panel)/grupos-mayores/[id]` | «Sin familias todavía» |
-| `(panel)/ordenar-familias-y-categorias` | «No hay categorías en este grupo» |
-
-El arreglo es siempre el mismo: una bandera `loading` y `{!loading && x.length === 0 && …}`.
-Y `<FilasCargando />` de `components/ui/filas-cargando.tsx` si es una tabla.
-
-*(La de `productos/[id]` es la más fea: le dice al dueño que su producto **no aparece en el
-TPV** cuando en realidad sólo está cargando.)*
+**Quitar la mentira de las páginas de detalle** — ✅ **VERIFICADO HECHO (18-07, sesión chat)**.
+Las cinco de detalle (`productos/[id]`, `categorias/[id]`, `familias/[id]`,
+`grupos-mayores/[id]`, `ordenar-familias-y-categorias`) **ya guardan la carga**: las cuatro
+primeras con `if (cargando) return <Cargando…>` antes de pintar el estado vacío, y `ordenar`
+con `{cargado && …}`. Ninguna afirma «no hay nada» mientras carga. La nota anterior (que las
+daba por pendientes) era obsoleta. Junto con las 10 principales (`TRAMPAS.md` §11), el panel
+ya no miente sobre el estado del negocio.
 
 ---
 
