@@ -45,6 +45,22 @@ pnpm --filter @gluuh/core test         # 44 tests del motor fiscal
 
 ---
 
+## 🆕 La SPA del TPV en Vite YA EXISTE (18-07)
+
+**`apps/tpv`** — el TPV instalable como **SPA Vite + React + Tailwind 4** (decisión plan 15,
+guía 22 Fase C). **Compila** (`pnpm --filter @gluuh/tpv build`, `vite build` verde) y typecheck
+verde; el workspace pasó a **13 paquetes**. Trae el **sistema de diseño Gluuh entero** (copia
+fiel de `apps/web/app/globals.css`: tokens claro/oscuro, marca morada) y **tema propio**
+(`src/lib/tema.ts`, sin next-themes). `src/App.tsx` es un starter operativo (rejilla + ticket)
+**para empezar a diseñar el TPV en Vite ya**. Dev: `pnpm --filter @gluuh/tpv dev` (:3120).
+
+⚠ **Sin big-bang**: el TPV Next (`apps/web/app/tpv`) **sigue funcionando** como referencia
+hasta que la SPA alcance paridad y pase el humo. Siguiente fase: mover por tandas los módulos
+puros (ya extraídos: `precio/nombres/reparto/pagos/ticket-impresion`) y luego el `page.tsx`
+stateful + su desacople de `next/navigation`/`next/dynamic`.
+
+---
+
 ## 🔨 En marcha
 
 *(Apúntate AQUÍ antes de empezar, con los ficheros que vas a tocar. Y quítate al terminar.)*

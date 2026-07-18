@@ -99,8 +99,16 @@ packages/
 
 | Fase | Estado |
 |---|---|
-| Prerequisito (F1–F3 guía 21) | F1 ✅ · F2 🟡 · F3 🟡 (store a medias, coordinada con escritorio) |
-| A–D | ⬜ |
+| Prerequisito (F1–F3 guía 21) | F1 ✅ · F2 🟡 · F3 🟡 (store hecho; módulos puros extraídos: precio/nombres/reparto/pagos/ticket-impresion) |
+| A (fiscal→gateway) | ⬜ bloqueada (coordinar escritorio: packaging @gluuh/core) |
+| B (soltar de Next) | 🟡 en curso — tema propio (`tema.ts`) ya hecho en la SPA; queda navegación/dynamic en el `page.tsx` que se mueva |
+| **C (crear `apps/tpv`)** | 🟢 **ARRANCADA (18-07)**: scaffold Vite+React+Tailwind4 con tokens Gluuh + tema claro/oscuro propio. **Compila** (`vite build`, 1743 módulos) y typecheck verde. Falta mover la operativa (page.tsx + componentes + libs) por fases. |
+| D (recorte/bloqueo) | ⬜ |
+
+**Estructura viva de `apps/tpv`**: `index.html` · `vite.config.ts` (base relativa, offline) ·
+`src/main.tsx` · `src/App.tsx` (starter operativa: rejilla + ticket, para diseñar) ·
+`src/index.css` (copia fiel del sistema de diseño de `apps/web/app/globals.css`) ·
+`src/lib/tema.ts` (claro/oscuro sin next-themes). Dev: `pnpm --filter @gluuh/tpv dev` (:3120).
 
 > El nodo como servicio Windows "de verdad" (arranque, recuperación, logs,
 > apagado limpio) tiene guía propia: [`23-nodo-servicio-windows.md`](23-nodo-servicio-windows.md).
