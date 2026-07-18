@@ -82,6 +82,7 @@ export function UtilidadesModal({
     { id: "cashlogy", etiqueta: "Opciones CashLogy", icono: Settings2, deshabilitada: true },
     { id: "agenda", etiqueta: "Agenda", icono: CalendarDays, deshabilitada: true },
     { id: "tarifa", etiqueta: "Selección de tarifa", icono: Tag, deshabilitada: true },
+    { id: "empleados", etiqueta: "Empleados", icono: ContactRound, accion: () => { window.location.assign("/tpv/config/empleados"); } },
     { id: "presencia", etiqueta: "Control de presencia", icono: ContactRound, deshabilitada: true },
     { id: "cobros-pendientes", etiqueta: "Cobros pendientes", icono: CircleDollarSign, deshabilitada: true },
     { id: "safepay", etiqueta: "Opciones SafePay", icono: Settings2, deshabilitada: true },
@@ -93,13 +94,15 @@ export function UtilidadesModal({
     { id: "precio", etiqueta: "Cambio de precio", icono: Tags, tono: "alerta", deshabilitada: true },
     { id: "unidades", etiqueta: "Cambio de unidades", icono: SlidersHorizontal, deshabilitada: true },
     { id: "impresion-cocina", etiqueta: "Desactivar imp. cocina", icono: CookingPot, tono: "alerta", deshabilitada: true },
-    { id: "descuento", etiqueta: "Descuento de línea", icono: Percent, tono: "alerta", deshabilitada: true },
+    // Abre "Invitaciones y descuentos" (ya cubre el descuento por línea y por cuenta).
+    { id: "descuento", etiqueta: "Descuento de línea", icono: Percent, tono: "alerta", accion: onInvitacion },
     { id: "balanza", etiqueta: "Opciones balanza", icono: Scale, deshabilitada: true },
     { id: "forma-pago", etiqueta: "Selec. forma de pago", icono: CreditCard, deshabilitada: true },
     { id: "cajon", etiqueta: "Abrir cajón", icono: Banknote, tono: "caja", accion: onAbrirCajon, deshabilitada: !puedeAbrirCajon },
     { id: "email", etiqueta: "Enviar por email", icono: Mail, deshabilitada: true },
     { id: "invitacion", etiqueta: "Invitación", icono: Gift, tono: "alerta", accion: onInvitacion },
-    { id: "ajustes", etiqueta: "Ajustes del terminal", icono: Settings2, accion: onCambiarTema },
+    // Página de ajustes locales (tema, zurdo…); el hub de config cuelga de ella.
+    { id: "ajustes", etiqueta: "Ajustes del terminal", icono: Settings2, accion: () => { window.location.assign("/tpv/config"); } },
   ];
 
   return (
@@ -111,7 +114,7 @@ export function UtilidadesModal({
       onClose={onClose}
     >
       <div className="flex h-full min-h-0 flex-col bg-surface">
-        <div className="grid min-h-0 flex-1 grid-cols-5 grid-rows-6 gap-2 overflow-hidden p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-5 grid-rows-7 gap-2 overflow-hidden p-3">
           {utilidades.map((utilidad) => {
             const Icono = utilidad.icono;
             const estilo = utilidad.deshabilitada

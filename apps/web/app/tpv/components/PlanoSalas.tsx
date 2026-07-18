@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
-import { 
+import {
   Trash2, Sun, Store, Armchair, ShoppingBag, CalendarCheck,
-  ZoomIn, ZoomOut, RefreshCw, X, Pencil, Trash, Copy, RotateCw, Plus, Minus, Receipt, LayoutGrid
+  ZoomIn, ZoomOut, RefreshCw, X, Pencil, Trash, Copy, RotateCw, Plus, Minus, Receipt, LayoutGrid, Search
 } from "lucide-react";
 import { PlanoSvg } from "@/components/plano-svg";
 import { RailSalas, type RailTab } from "./RailSalas";
+import { AparcadasVista, ParaLlevarVista, ReservasVista } from "./VistasOperativa";
+import { NavbarTPV, NavChip } from "./NavbarTPV";
 import { ASSETS, ASSETS_LEGACY, FORMAS_MESA, assetPorId, mesaPorCapacidad, dim, type PlanoAsset, PLANO_VER } from "../../lib/plano-assets";
 import { toast } from "@/app/lib/toast";
 import { eur } from "@/app/lib/money";
@@ -68,6 +70,11 @@ export interface PlanoSalasProps {
   aparcadosLineas: Record<string, any[]>;
   llevarList: any[];
   recuperarAparcado: (o: any) => void;
+  cobrarAparcado: (o: any) => void;
+  pasarAMesaAparcado: (o: any) => void;
+  imprimirAparcado: (o: any) => void;
+  recargarAparcados: () => Promise<void>;
+  operarioId: string | null;
   nuevoParaLlevar: (nombre: string, telefono: string) => void;
   abrirLlevar: (o: any) => void;
   irASala: (dest: { tipo: "ticket" | "barra" | "room" | "llevar"; id?: string }) => void;
@@ -128,6 +135,11 @@ export function PlanoSalas({
   aparcadosLineas,
   llevarList,
   recuperarAparcado,
+  cobrarAparcado,
+  pasarAMesaAparcado,
+  imprimirAparcado,
+  recargarAparcados,
+  operarioId,
   nuevoParaLlevar,
   abrirLlevar,
   irASala,
@@ -189,8 +201,11 @@ export function PlanoSalas({
   const panOffset = { x: 0, y: 0 };
   
   // Nuevos modales locales
-  const [nuevoLlevarForm, setNuevoLlevarForm] = useState({ nombre: "", telefono: "" });
   const [reservaPop, setReservaPop] = useState<Mesa | null>(null);
+  // Filtros/buscador de Aparcadas: viven AQUÍ porque se pintan en el navbar morado
+  // (encima del rail) y la vista los recibe controlados.
+  const [filtroApk, setFiltroApk] = useState<"todas" | "mias" | "viejas">("todas");
+  const [qApk, setQApk] = useState("");
   const [resForm, setResForm] = useState<{ id: string | null; nombre: string; personas: string; hora: string }>({ id: null, nombre: "", personas: "", hora: "" });
   const [modalNota, setModalNota] = useState(false);
   const [notaTexto, setNotaTexto] = useState("");
@@ -1044,36 +1059,68 @@ export function PlanoSalas({
       {renderVelo()}
       {dialogo}
 
-      {/* Header Fijo */}
-      <header className="flex flex-none items-center justify-between border-b border-border bg-card px-4 py-2.5 shadow-sm z-30">
-        <div className="flex items-center gap-3">
-          <span className="h-2.5 w-2.5 rounded-full bg-brand animate-pulse" />
-          <strong className="font-semibold text-sm">Salón · {operario.nombre}</strong>
-          
-          {editandoPlano && (
-            <button 
-              type="button" 
-              onClick={() => setPaletaAbierta((v) => !v)} 
-              className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-black shadow-sm hover:bg-accent text-foreground transition-all active:scale-95"
-            >
-              <LayoutGrid size={14} className="text-brand" />
-              {paletaAbierta ? "Ocultar catálogo" : "Ver catálogo"}
-            </button>
-          )}
-        </div>
-        {editandoPlano ? (
-          <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-bold text-brand border border-brand/20 animate-pulse">
-            🛠️ Edición de Salón Activa · Arrastra las mesas
-          </span>
-        ) : (
-          /* Leyenda en el navbar en modo vista */
-          <div className="flex items-center gap-3.5 rounded-full bg-muted/40 border border-border/60 px-4 py-1 text-[10px] font-bold">
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />Libre</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Ocupada</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" />Reservada</span>
+      {/* ── Navbar del TPV (morado, el MISMO que la pantalla Ticket): según dónde
+          estés se ve una cosa u otra — sala/leyenda en los planos, contadores en
+          aparcados/llevar/reservas. ── */}
+      <NavbarTPV operario={operario.nombre} subtitulo={
+        vistaSala === "BARRA" ? "Aparcados" : vistaSala === "LLEVAR" ? "Para llevar" : vistaSala === "RESERVAS" ? "Reservas" : (roomActiva?.nombre ?? "Salón")
+      }>
+        {vistaSala === "BARRA" ? (<>
+          {/* Título · total aparcado · filtros · buscador (como el mockup). */}
+          <h1 className="flex-none whitespace-nowrap text-lg font-bold tracking-tight">Cuentas aparcadas</h1>
+          <NavChip label="Aparcado">{eur(aparcados.reduce((s: number, o: any) => s + Number(o.total), 0))}</NavChip>
+          {(() => {
+            const esVieja = (o: any) => (Date.now() - new Date(o.created_at).getTime()) / 60000 > 120;
+            const esMia = (o: any) => !!operarioId && o.user_id === operarioId;
+            const filtros: ["todas" | "mias" | "viejas", string, number][] = [
+              ["todas", "Todas", aparcados.length],
+              ...(operarioId ? [["mias", "Mías", aparcados.filter(esMia).length] as ["mias", string, number]] : []),
+              ["viejas", "Más de 2 h", aparcados.filter(esVieja).length],
+            ];
+            return filtros.map(([k, nm, n]) => (
+              <button key={k} type="button" onClick={() => setFiltroApk(k)} aria-pressed={filtroApk === k}
+                className={`flex flex-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-semibold transition-colors ${filtroApk === k ? "bg-white text-brand" : "bg-white/10 hover:bg-white/25"}`}>
+                {nm} <span className={`rounded-full px-1.5 text-[10px] font-black ${filtroApk === k ? "bg-brand/15" : "bg-white/20"}`}>{n}</span>
+              </button>
+            ));
+          })()}
+          <div className="relative min-w-0 flex-1">
+            <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-white/70" />
+            <input
+              value={qApk}
+              onChange={(e) => setQApk(e.target.value)}
+              placeholder="Alias, cliente o nº de ticket…"
+              aria-label="Buscar cuenta aparcada"
+              className="w-full rounded-md bg-white/15 py-2 pl-9 pr-3 text-[13px] text-brand-foreground outline-none placeholder:text-white/60 focus:bg-white/20"
+            />
           </div>
-        )}
-      </header>
+        </>) : vistaSala === "LLEVAR" ? (<>
+          <NavChip label="Pedidos">{llevarList.length}</NavChip>
+          <NavChip>{new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</NavChip>
+        </>) : vistaSala === "RESERVAS" ? (<>
+          <NavChip label="Hoy">{reservas.length}</NavChip>
+          <NavChip label="Pax">{reservas.reduce((s: number, r: any) => s + (r.comensales || 0), 0)}</NavChip>
+        </>) : (<>
+          <NavChip label="Sala">{roomActiva?.nombre ?? "—"}</NavChip>
+          <NavChip label="Ocupadas">{mesasSala.filter((m) => (totalesMesa[m.id] ?? 0) > 0).length}/{mesasSala.length}</NavChip>
+          {editandoPlano ? (<>
+            <button
+              type="button"
+              onClick={() => setPaletaAbierta((v) => !v)}
+              className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-white/25"
+            >
+              <LayoutGrid size={14} /> {paletaAbierta ? "Ocultar catálogo" : "Ver catálogo"}
+            </button>
+            <span className="animate-pulse rounded-full bg-white/15 px-3 py-1 text-xs font-bold">🛠️ Edición activa · arrastra las mesas</span>
+          </>) : (
+            <div className="ml-1 hidden items-center gap-3.5 rounded-full bg-white/10 px-4 py-1.5 text-[10px] font-bold md:flex">
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />Libre</span>
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Ocupada</span>
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" />Reservada</span>
+            </div>
+          )}
+        </>)}
+      </NavbarTPV>
 
       {/* Workspace Principal */}
       <div className="flex min-h-0 flex-1 relative">
@@ -1139,121 +1186,27 @@ export function PlanoSalas({
         {/* Zona del Plano / Listados centrales */}
         <main className="relative min-w-0 flex-1 overflow-hidden bg-muted/10">
           
-          {/* Barra (Cuentas aparcadas) */}
+          {/* Aparcado / Para llevar / Reservas: vistas fieles a los mockups de
+              docs/diseño (gluuh-cuentas-aparcadas / gluuh-para-llevar /
+              gluuh-reservas), bajo el rail del TPV. El plano NO se toca. */}
           {vistaSala === "BARRA" ? (
-            <div className="p-5 h-full overflow-y-auto">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-brand" /> Cuentas Aparcadas
-                </h3>
-                <button type="button" onClick={() => irASala({ tipo: "ticket" })} className="bg-brand text-brand-foreground px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-brand-hover active:scale-95 transition-all">+ Nueva venta</button>
-              </div>
-              {aparcados.length === 0 ? (
-                <div className="border border-dashed border-border rounded-xl p-8 text-center text-muted-foreground bg-card">No hay cuentas abiertas. Pulsa «Nueva venta» para empezar una.</div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {aparcados.map((o) => {
-                    const lineas = aparcadosLineas[o.id] ?? [];
-                    return (
-                      <button 
-                        type="button" 
-                        key={o.id} 
-                        onClick={() => recuperarAparcado(o)}
-                        className="flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-brand/40 hover:shadow-md active:scale-98"
-                      >
-                        <div className="bg-brand px-2 py-1.5 text-center text-xs font-extrabold text-brand-foreground truncate">{o.aparcado_como || `Aparcado ${hhmm(o.created_at)}`}</div>
-                        <div className="flex-1 p-3">
-                          <div className="mb-1.5 flex gap-1 border-b border-border pb-1 text-[9px] font-bold uppercase text-muted-foreground">
-                            <span className="flex-1">Artículo</span><span className="w-8 text-right">Uds</span><span className="w-12 text-right">Total</span>
-                          </div>
-                          <ul className="space-y-1 text-xs">
-                            {lineas.slice(0, 5).map((l, idx) => (
-                              <li key={`${o.id}-${idx}`} className="flex gap-1">
-                                <span className="flex-1 truncate">{l.nombre}</span>
-                                <span className="w-8 text-right font-medium text-muted-foreground">{l.cantidad}</span>
-                                <span className="w-12 text-right font-bold">{eur(l.total)}</span>
-                              </li>
-                            ))}
-                            {lineas.length > 5 && <li className="text-[10px] text-muted-foreground italic font-semibold">+{lineas.length - 5} más…</li>}
-                            {lineas.length === 0 && <li className="text-[10px] text-muted-foreground">Sin líneas</li>}
-                          </ul>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 border-t border-border p-3 bg-muted/10">
-                          <span className="rounded bg-brand/10 border border-brand/20 px-2 py-0.5 text-[10px] font-black text-brand uppercase">Abrir</span>
-                          <span className="text-base font-black tabular-nums">{eur(Number(o.total))}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <AparcadasVista
+              sb={sb}
+              aparcados={aparcados}
+              lineasPor={aparcadosLineas}
+              operarioId={operarioId}
+              filtro={filtroApk}
+              q={qApk}
+              recuperarAparcado={recuperarAparcado}
+              cobrarAparcado={cobrarAparcado}
+              pasarAMesa={pasarAMesaAparcado}
+              imprimir={imprimirAparcado}
+              onCambio={() => { void recargarAparcados(); }}
+            />
           ) : vistaSala === "LLEVAR" ? (
-            /* Para Llevar */
-            <div className="mx-auto max-w-2xl space-y-4 p-5 h-full overflow-y-auto">
-              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <h3 className="mb-3 font-bold text-sm">Nuevo pedido para llevar</h3>
-                <div className="flex flex-wrap gap-3">
-                  <input value={nuevoLlevarForm.nombre} onChange={(e) => setNuevoLlevarForm((s) => ({ ...s, nombre: e.target.value }))} placeholder="Nombre del cliente" className="min-w-40 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                  <input value={nuevoLlevarForm.telefono} onChange={(e) => setNuevoLlevarForm((s) => ({ ...s, telefono: e.target.value }))} placeholder="Teléfono" inputMode="tel" className="w-40 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      nuevoParaLlevar(nuevoLlevarForm.nombre, nuevoLlevarForm.telefono);
-                      setNuevoLlevarForm({ nombre: "", telefono: "" });
-                    }} 
-                    disabled={!nuevoLlevarForm.nombre.trim()} 
-                    className="bg-brand text-brand-foreground px-5 py-2 rounded-lg font-bold shadow hover:bg-brand-hover active:scale-95 disabled:opacity-40 transition-all"
-                  >
-                    Crear
-                  </button>
-                </div>
-              </div>
-              
-              {llevarList.length === 0 && <div className="border border-dashed border-border rounded-xl p-8 text-center text-muted-foreground bg-card">Sin pedidos para llevar abiertos.</div>}
-              <div className="space-y-2">
-                {llevarList.map((o) => (
-                  <button 
-                    type="button" 
-                    key={o.id} 
-                    onClick={() => abrirLlevar(o)} 
-                    className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 hover:border-brand/40 active:scale-[0.99] transition-all shadow-sm"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-bold flex items-center gap-1.5">🛍️ {o.cliente_nombre}</div>
-                      {o.cliente_telefono && <div className="text-xs text-muted-foreground font-semibold mt-0.5">{o.cliente_telefono}</div>}
-                    </div>
-                    <span className="font-black text-lg text-brand tabular-nums">{eur(Number(o.total))}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ParaLlevarVista sb={sb} abrirLlevar={abrirLlevar} nuevoParaLlevar={nuevoParaLlevar} />
           ) : vistaSala === "RESERVAS" ? (
-            /* Reservas de mesa */
-            <div className="mx-auto max-w-2xl space-y-3 p-5 h-full overflow-y-auto">
-              <h3 className="font-bold text-lg flex items-center gap-2 mb-3">
-                <span className="h-3 w-3 rounded-full bg-sky-500" /> Registro de Reservas
-              </h3>
-              {reservas.length === 0 && <div className="border border-dashed border-border rounded-xl p-8 text-center text-muted-foreground bg-card">Sin reservas registradas para hoy.</div>}
-              <div className="space-y-2">
-                {reservas.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-sky-400 transition-colors">
-                    <div className="min-w-0">
-                      <div className="font-bold text-sm flex items-center gap-2 flex-wrap">
-                        <span className="bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded px-2 py-0.5 text-xs font-black tabular-nums">
-                          {new Date(r.fecha_hora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        {r.nombre && <span>{r.nombre}</span>}
-                        <span className="text-muted-foreground font-medium">· {r.comensales} pax</span>
-                        {r.table_id && <span className="text-brand font-semibold">· {mesas.find((mm) => mm.id === r.table_id)?.nombre ?? "Mesa"}</span>}
-                      </div>
-                      {r.notas && <div className="text-xs text-muted-foreground mt-1 truncate max-w-md">📝 {r.notas}</div>}
-                    </div>
-                    <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-black uppercase text-muted-foreground tracking-wider">{r.estado}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ReservasVista sb={sb} locationId={locationId} mesas={mesas} onCambio={() => { void recargarReservas(); }} />
           ) : (
             /* Plano Interactivo SVG */
             <div 

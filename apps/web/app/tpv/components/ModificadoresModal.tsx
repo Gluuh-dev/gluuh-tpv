@@ -102,22 +102,23 @@ export function ModificadoresModal({
     });
   }
 
+  // OJO: el autosave se dispara FUERA de los updaters de setState — React ejecuta
+  // los updaters durante el render y un setState anidado ahí es un error
+  // ("Cannot update a component while rendering a different component").
   function toggleComentario(grupo: GrupoComentario, id: string) {
-    setComentarios((prev) => {
-      const next = new Set(prev);
-      if (esUnicaGrupo(grupo)) {
-        const yaActiva = next.has(id);
-        for (const o of grupo.opciones) next.delete(o.id); // desmarca las hermanas
-        // obligatorio: siempre queda una elegida; opcional: permite desmarcar.
-        if (!yaActiva || (grupo.min ?? 0) >= 1) next.add(id);
-      } else if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      triggerAutoSave(next, extrasUds, comentarioManual, unidades);
-      return next;
-    });
+    const next = new Set(comentarios);
+    if (esUnicaGrupo(grupo)) {
+      const yaActiva = next.has(id);
+      for (const o of grupo.opciones) next.delete(o.id); // desmarca las hermanas
+      // obligatorio: siempre queda una elegida; opcional: permite desmarcar.
+      if (!yaActiva || (grupo.min ?? 0) >= 1) next.add(id);
+    } else if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setComentarios(next);
+    triggerAutoSave(next, extrasUds, comentarioManual, unidades);
   }
 
   const segmentos = comentarioManual.split("·").map((s) => s.trim()).filter(Boolean);
@@ -271,32 +272,36 @@ export function ModificadoresModal({
             <div className="flex-1 overflow-y-auto pr-1">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {extras.map((e) => {
-                  const activo = (extrasUds[e.id] ?? 0) > 0;
+                  const uds = extrasUds[e.id] ?? 0;
+                  const activo = uds > 0;
+                  // UNIDADES ± (mockup comentarios-extras): tocar la tarjeta suma; el − resta.
+                  const fijar = (n: number) => {
+                    const next = { ...extrasUds };
+                    if (n <= 0) delete next[e.id];
+                    else next[e.id] = Math.min(9, n);
+                    setExtrasUds(next);
+                    triggerAutoSave(comentarios, next, comentarioManual, unidades);
+                  };
                   return (
-                    <button
+                    <div
                       key={e.id}
-                      type="button"
-                      onClick={() => {
-                        setExtrasUds((prev) => {
-                          const next = { ...prev };
-                          if (prev[e.id] > 0) {
-                            delete next[e.id];
-                          } else {
-                            next[e.id] = 1;
-                          }
-                          triggerAutoSave(comentarios, next, comentarioManual, unidades);
-                          return next;
-                        });
-                      }}
-                      className={`flex flex-col items-center justify-center text-center min-h-[64px] rounded-md border px-2 py-1.5 transition-all active:scale-[.98] ${
+                      className={`relative flex min-h-16 flex-col items-center justify-center rounded-md border px-2 py-1.5 text-center transition-all ${
                         activo
                           ? "border-brand bg-brand/10 text-brand shadow-[0_0_0_1px_rgba(13,143,162,0.2)]"
                           : "border-border bg-background hover:border-strong hover:bg-accent"
                       }`}
                     >
-                      <span className="text-xs font-semibold truncate w-full">{e.nombre}</span>
-                      <span className={`text-[10px] ${activo ? "text-brand" : "text-muted-foreground"} mt-0.5 tabular-nums`}>+{eur(e.precioExtra)}</span>
-                    </button>
+                      <button type="button" onClick={() => fijar(uds + 1)} className="absolute inset-0" aria-label={`Añadir ${e.nombre}`} />
+                      {activo && (
+                        <>
+                          <span className="pointer-events-none absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[11px] font-black tabular-nums text-white">{uds}</span>
+                          <button type="button" onClick={(ev) => { ev.stopPropagation(); fijar(uds - 1); }}
+                            className="absolute bottom-1 right-1 z-10 grid h-6 w-6 place-items-center rounded-full border border-brand bg-card text-sm font-black leading-none text-brand active:scale-90" aria-label={`Quitar una unidad de ${e.nombre}`}>−</button>
+                        </>
+                      )}
+                      <span className="pointer-events-none w-full truncate text-xs font-semibold">{e.nombre}</span>
+                      <span className={`pointer-events-none mt-0.5 text-[10px] tabular-nums ${activo ? "text-brand" : "text-muted-foreground"}`}>+{eur(e.precioExtra)}</span>
+                    </div>
                   );
                 })}
               </div>
@@ -317,11 +322,11 @@ export function ModificadoresModal({
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">Unidades del plato</span>
             <button
               type="button"
-              onClick={() => setUnidades((u) => {
-                const next = Math.max(1, u - 1);
+              onClick={() => {
+                const next = Math.max(1, unidades - 1);
+                setUnidades(next);
                 triggerAutoSave(comentarios, extrasUds, comentarioManual, next);
-                return next;
-              })}
+              }}
               disabled={unidades <= 1}
               className="grid h-11 w-11 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95 disabled:opacity-30"
             >
@@ -330,11 +335,11 @@ export function ModificadoresModal({
             <span className="w-8 text-center text-lg font-bold tabular-nums">{unidades}</span>
             <button
               type="button"
-              onClick={() => setUnidades((u) => {
-                const next = u + 1;
+              onClick={() => {
+                const next = unidades + 1;
+                setUnidades(next);
                 triggerAutoSave(comentarios, extrasUds, comentarioManual, next);
-                return next;
-              })}
+              }}
               className="grid h-11 w-11 place-items-center rounded-md border border-border bg-card transition-all hover:bg-accent active:scale-95"
             >
               <Plus size={18} />

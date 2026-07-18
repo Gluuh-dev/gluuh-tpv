@@ -51,6 +51,12 @@ import { urlFoto } from "@/app/lib/urlFoto";
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number; sprite?: string | null; color?: string | null }
 interface Room   { id: string; nombre: string; orden: number; suelo: string | null }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
+/** Parte persistida del reparto de una cuenta (`cuenta_parte`, mig. 0123). */
+interface ParteCuenta { id: string; indice: number; tipo: "IGUAL" | "IMPORTE" | "PRODUCTOS"; importe: number; lineas: unknown; cobrada: boolean }
+/** Cobro abierto ENCIMA del modal Dividir (docs/plan/dividir-cuenta-flujo-ux.md). */
+type CobroParte = { modo: "PARTE" | "PENDIENTE" | "PRODUCTOS"; titulo: string; importe: number; parteId?: string; lineasSel?: { id: string; uds: number }[] };
+// Variante de columnas de restaurant_table que funciona (cacheada para la sesión).
+const varMesas: { v: "color" | "sprite" | "base" | null } = { v: null };
 interface Elemento { id: string; room_id: string; tipo: string; etiqueta: string | null; icono: string | null; pos_x: number; pos_y: number; ancho: number; alto: number; rotacion: number; color?: string | null }
 interface Ticket {
   impuestos: { impuesto: string; desglose: { tipo: number; base: number; cuota: number }[]; importeTotal: number };
@@ -176,16 +182,15 @@ export default function TPV() {
   // Se recuerda la sala/vista donde estabas (room id, "BARRA", "RESERVAS", "LLEVAR").
   const [vistaSala, setVistaSala] = useState<string>(() => (typeof window !== "undefined" && localStorage.getItem("gluuh_tpv_sala")) || "");
   // Navegación estilo Glop: false = pantalla Ticket (venta directa); true = rail (plano/barra/…).
-  // Se recuerda entre sesiones: si saliste en Ticket, vuelves a Ticket; si en Salón/Aparcados, ahí.
-  const [navSala, setNavSala] = useState(() => typeof window === "undefined" || localStorage.getItem("gluuh_tpv_nav") !== "ticket");
+  // Se ENTRA SIEMPRE por el salón (decisión 18-07): la primera pantalla es el plano.
+  const [navSala, setNavSala] = useState(true);
   const [lineasGuardadas, setLineasGuardadas] = useState<Set<string>>(new Set());
-  // Recuerda la vista (Ticket vs Salón/Aparcados) y la sala para restaurarla al reabrir el TPV.
+  // Recuerda la sala concreta para restaurarla al reabrir el TPV.
   useEffect(() => {
     try {
-      localStorage.setItem("gluuh_tpv_nav", navSala ? "salas" : "ticket");
       if (vistaSala) localStorage.setItem("gluuh_tpv_sala", vistaSala);
     } catch { /* sin persistencia */ }
-  }, [navSala, vistaSala]);
+  }, [vistaSala]);
   // Mesa preseleccionada en el plano: 1er toque = ver cuenta; 2º toque = abrir en TPV.
   const [mesaSel, setMesaSel] = useState<Mesa | null>(null);
   const [mesaSelInfo, setMesaSelInfo] = useState<{ apertura: string; importe: number; comensales: number | null; nota?: string; lineas: { nombre: string; cantidad: number; precio: number }[] } | null>(null);
@@ -239,6 +244,12 @@ export default function TPV() {
   const [aparcados, setAparcados] = useState<{ id: string; aparcado_como: string | null; total: number; created_at: string }[]>([]);
   // Desglose de líneas por cuenta abierta, para las tarjetas de la vista Barra.
   const [aparcadosLineas, setAparcadosLineas] = useState<Record<string, { nombre: string; cantidad: number; total: number }[]>>({});
+  // Reparto persistido de la cuenta abierta (cuenta_parte) + cobro de una parte
+  // abierto encima del modal Dividir. Flujo: docs/plan/dividir-cuenta-flujo-ux.md.
+  const [partesCuenta, setPartesCuenta] = useState<ParteCuenta[]>([]);
+  const [cobroParte, setCobroParte] = useState<CobroParte | null>(null);
+  // Total provisional del cobro optimista de una aparcada (hasta que cargan las líneas).
+  const [totalCobroPrevio, setTotalCobroPrevio] = useState<number | null>(null);
   const [ultimoDoc, setUltimoDoc] = useState<TicketImpresion | null>(null);
   const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | null>(null);
   // El Z de la jornada en curso, tal como está AHORA MISMO. Se pide al abrir el cierre.
@@ -248,7 +259,7 @@ export default function TPV() {
   const invitadas = useTpvStore((s) => s.invitadas);
   const setInvitadas = useTpvStore((s) => s.setInvitadas);
   const [pedirBorrar, setPedirBorrar] = useState(false);
-  const [nuevoProd, setNuevoProd] = useState({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "" });
+  const [nuevoProd, setNuevoProd] = useState({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "", estacion: "COCINA", vendido_por_peso: false, disponible: true });
   const [agotarPop, setAgotarPop] = useState<Prod | null>(null);
   const formatos  = useCatalogo((s) => s.formatos);
   const [formatoPop, setFormatoPop] = useState<Prod | null>(null);
@@ -384,7 +395,10 @@ export default function TPV() {
           sb.from("tenant").select("id").limit(1).maybeSingle().then((r) => r.data),
           useCatalogo.getState().cargar(sb),   // catálogo del store (cache + revalidación)
           sb.from("room").select("id,nombre,orden,suelo").order("orden").then((r) => r.data),
-          sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora").then((r) => r.data),
+          sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre")
+            .gte("fecha_hora", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+            .in("estado", ["PENDIENTE", "CONFIRMADA", "SENTADA"])
+            .order("fecha_hora").then((r) => r.data),
         ]);
         setOperarios((ops as { id: string; nombre: string; rol: string; codigo: string | null }[]) ?? []);
         setMarca(marcaV);
@@ -629,6 +643,13 @@ export default function TPV() {
     [comanda, precioEfectivo, invitadas],
   );
   const unidades = Object.values(comanda).reduce((s, q) => s + q, 0);
+  // Cobro por partes: lo ya cobrado en partes de DINERO (iguales/importe) y lo que
+  // falta. Las partes PRODUCTOS no restan aquí: sus líneas ya salieron del total.
+  const cobradoParcial = useMemo(
+    () => Math.round(partesCuenta.filter((p) => p.cobrada && p.tipo !== "PRODUCTOS").reduce((s, p) => s + p.importe, 0) * 100) / 100,
+    [partesCuenta],
+  );
+  const pendienteCuenta = Math.max(0, Math.round((total - cobradoParcial) * 100) / 100);
   const logoTicket = marca.logo_ticket_url || marca.logo_url || undefined;
   // Desglose base/impuesto para MOSTRAR en el modal de cobro (impuesto INCLUIDO,
   // hacia atrás por el % de cada línea). Solo display: el desglose fiscal real lo
@@ -997,23 +1018,50 @@ export default function TPV() {
     // Promise.resolve fuerza el arranque del thenable de supabase YA: la query de
     // pedidos abiertos viaja en paralelo con la cadena (con fallback) de mesas.
     const pOrds = Promise.resolve(
-      sb.from("sales_order").select("table_id,total,created_at")
+      sb.from("sales_order").select("id,table_id,total,created_at")
         .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
         .not("table_id", "is", null),
     );
-    const conColor = await sb.from("restaurant_table").select(`${cols},sprite,color`).order("nombre");
-    const conSprite = conColor.error ? await sb.from("restaurant_table").select(`${cols},sprite`).order("nombre") : null;
-    const sinSprite = (conColor.error && conSprite?.error) ? await sb.from("restaurant_table").select(cols).order("nombre") : null;
-    const mData = (!conColor.error ? conColor.data : (!conSprite?.error ? conSprite?.data : sinSprite?.data)) as Mesa[] | null;
+    // El fallback triple de columnas (color/sprite/base) solo se paga la PRIMERA vez:
+    // la variante que funciona queda cacheada para el resto de la sesión.
+    let mData: Mesa[] | null = null;
+    if (varMesas.v === "color" || varMesas.v === null) {
+      const r = await sb.from("restaurant_table").select(`${cols},sprite,color`).order("nombre");
+      if (!r.error) { varMesas.v = "color"; mData = r.data as Mesa[]; }
+      else varMesas.v = "sprite";
+    }
+    if (!mData && varMesas.v === "sprite") {
+      const r = await sb.from("restaurant_table").select(`${cols},sprite`).order("nombre");
+      if (!r.error) mData = r.data as Mesa[];
+      else varMesas.v = "base";
+    }
+    if (!mData && varMesas.v === "base") {
+      const r = await sb.from("restaurant_table").select(cols).order("nombre");
+      mData = (r.data as Mesa[] | null) ?? null;
+    }
     const { data: ords } = await pOrds;
     setMesas(mData ?? []);
-    const ultima: Record<string, { total: number; created_at: string }> = {};
-    for (const o of (ords ?? []) as { table_id: string; total: number; created_at: string }[]) {
+    const ultima: Record<string, { id: string; total: number; created_at: string }> = {};
+    for (const o of (ords ?? []) as { id: string; table_id: string; total: number; created_at: string }[]) {
       const prev = ultima[o.table_id];
-      if (!prev || o.created_at > prev.created_at) ultima[o.table_id] = { total: Number(o.total), created_at: o.created_at };
+      if (!prev || o.created_at > prev.created_at) ultima[o.table_id] = { id: o.id, total: Number(o.total), created_at: o.created_at };
+    }
+    // Cobros parciales (dividir): la mesa del plano muestra lo PENDIENTE, no el
+    // total (flujo-ux §6). La señal visual de "a medias" es el estado POR_COBRAR.
+    const ids = Object.values(ultima).map((o) => o.id);
+    const pagadoPor: Record<string, number> = {};
+    if (ids.length) {
+      const { data: ptes } = await sb.from("cuenta_parte")
+        .select("order_id,importe").eq("cobrada", true).neq("tipo", "PRODUCTOS").in("order_id", ids);
+      for (const p of (ptes ?? []) as { order_id: string; importe: number }[]) {
+        pagadoPor[p.order_id] = (pagadoPor[p.order_id] ?? 0) + Number(p.importe);
+      }
     }
     const tot: Record<string, number> = {};
-    for (const k of Object.keys(ultima)) tot[k] = ultima[k]!.total;
+    for (const k of Object.keys(ultima)) {
+      const o = ultima[k]!;
+      tot[k] = Math.max(0, Math.round((o.total - (pagadoPor[o.id] ?? 0)) * 100) / 100);
+    }
     setTotalesMesa(tot);
   }
 
@@ -1026,7 +1074,10 @@ export default function TPV() {
   }
 
   async function recargarReservas() {
-    const { data } = await sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre").order("fecha_hora");
+    const { data } = await sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre")
+      .gte("fecha_hora", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+      .in("estado", ["PENDIENTE", "CONFIRMADA", "SENTADA"])
+      .order("fecha_hora");
     setReservas((data as Reserva[]) ?? []);
   }
 
@@ -1197,8 +1248,9 @@ export default function TPV() {
     if (!ord) { setNotaMesa(""); return false; }
     const o = ord as { id: string; updated_at: string };
     const oid = o.id;
-    await tomarCuenta(oid, o.updated_at);   // el id Y su versión: ver `tomarCuenta`
-    // La nota (best-effort, la columna puede no existir) viaja EN PARALELO con las líneas.
+    await tomarCuenta(oid, o.updated_at);   // con la versión pasada NO hay viaje de red
+    // Partes y nota viajan EN PARALELO con las líneas (cero series evitables).
+    const pPartes = recargarPartes(oid);
     const pNotas = Promise.resolve(sb.from("sales_order").select("notas").eq("id", oid).maybeSingle());
 
     // Cada order_line = su propia línea de comanda (clave única base#n), preservando el
@@ -1208,6 +1260,7 @@ export default function TPV() {
       ? (await sb.from("order_line").select("product_id,cantidad,precio_unitario,notas,modificadores,pase").eq("order_id", oid)).data
       : conUser.data;
     const nq = await pNotas;
+    await pPartes;   // el pendiente (cobro por partes) queda correcto antes de cobrar
     setNotaMesa((nq.data as { notas?: string } | null)?.notas ?? "");
     const comandaCargada: Record<string, number> = {};
     const precios: Record<string, number> = {};
@@ -1439,7 +1492,9 @@ export default function TPV() {
   // (metodo del esquema + importe + propina). NO recalcula fiscalidad.
   async function cobrar(
     filas: { metodo: string; importe: number; propina: number }[],
-    opts: { abrirCajon?: boolean; imprimir?: boolean } = {},
+    // sinPagos: cierre de una cuenta SALDADA por cobros parciales (dividir): los
+    // pagos ya están en `payment`, aquí solo se factura y se cierra.
+    opts: { abrirCajon?: boolean; imprimir?: boolean; sinPagos?: boolean } = {},
   ) {
     if (busy || cobrandoRef.current || !unidades) return;
     cobrandoRef.current = true;
@@ -1475,7 +1530,7 @@ export default function TPV() {
       if (!orderId) { toast.error("No se pudo guardar la cuenta. No se ha cobrado nada."); return; }
       // Invitación y consumo propio se REGISTRAN (crearOrden aplica tipo_operacion)
       // pero no generan cobro ni factura: no se inserta payment ni se factura.
-      if (orderId && tipoOperacion === "VENTA") {
+      if (orderId && tipoOperacion === "VENTA" && !opts.sinPagos) {
         const pagos = filas
           .map((p) => ({ metodo: p.metodo, importe: Math.round(p.importe * 100) / 100, propina: Math.round((p.propina || 0) * 100) / 100 }))
           .filter((p) => p.importe > 0 || p.propina > 0);
@@ -1513,8 +1568,9 @@ export default function TPV() {
 
       if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
       setOrdenAbiertaId(null);
-      await recargarMesas();
-      await recargarLlevar();
+      // Recargas EN PARALELO: el camarero no debe esperar 3 viajes en serie para
+      // ver el salón tras cobrar (si era aparcada, desaparece de la lista).
+      await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
 
       // ── Persistencia VERIFACTU: DESACTIVADA hasta el final (pagos en prueba) ──
       if (VERIFACTU_ACTIVO && tipoOperacion === "VENTA") {
@@ -1545,20 +1601,24 @@ export default function TPV() {
         }
       }
 
-      setTicket(t);
-      setUltimoDoc(construirTicketImpresion(t));
-      // F11 (Cobrar+Imprimir): imprime el recibo con el logo de tickets.
-      if (opts.imprimir) void imprimirTicket(construirTicketImpresion(t), cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
+      // El ticket imprimible se construye ANTES de limpiar (lee la comanda en pantalla).
+      const docTicket = construirTicketImpresion(t);
+      setUltimoDoc(docTicket);   // "reimprimir último" sigue disponible en Utilidades
+      if (opts.imprimir) void imprimirTicket(docTicket, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
+      // Sin pantalla de "Ticket cobrado" (decisión 18-07): cobro terminado → limpiar
+      // y AL SALÓN directamente, listo para la siguiente venta.
+      reset();
+      setNavSala(true);
     } finally { cobrandoRef.current = false; setBusy(false); }
   }
 
-  // Cobro desde CobrarModal: mapea las líneas de pago (payment_method) al esquema
-  // de `payment`, reparte propina/descuento y decide el cajón por abre_cajon.
-  function cobrarDesdeModal(pagos: LineaPago[], opts: CobrarOpciones) {
-    setModalActivo(null);
-    const due = Math.max(0, Math.round((total + (opts.propina || 0) - (opts.descuento || 0)) * 100) / 100);
+  // Mapea las líneas de pago del CobrarModal (payment_method) a filas del esquema
+  // `payment` sobre un importe debido: reparte los importes hasta cubrirlo (el
+  // exceso = cambio, no se registra), separa la propina y decide el cajón. Lo usan
+  // el cobro completo y el cobro por partes (dividir).
+  function mapearPagos(pagos: LineaPago[], base: number, opts: CobrarOpciones) {
+    const due = Math.max(0, Math.round((base + (opts.propina || 0) - (opts.descuento || 0)) * 100) / 100);
     const prop = Math.round((opts.propina || 0) * 100) / 100;
-    // Reparte los importes hasta cubrir el debido (el exceso = cambio, no se registra).
     let restante = due;
     const filas: { metodo: string; importe: number; propina: number }[] = [];
     for (const p of pagos) {
@@ -1571,23 +1631,44 @@ export default function TPV() {
     // La propina va aparte: se descuenta del primer importe para no doble-contarla.
     const primera = filas[0];
     if (prop > 0 && primera) { primera.propina = prop; primera.importe = Math.max(0, Math.round((primera.importe - prop) * 100) / 100); }
-    // ponytail: un descuento global de cobro se refleja en los importes cobrados
-    // (due = total − descuento) pero NO se prorratea en el desglose fiscal (que sigue
-    // saliendo íntegro de /api/ticket). Prorratear por línea antes de activar VERIFACTU.
     const abrirCajon = pagos.some((p) => formasPago.find((f) => f.id === p.formaPagoId)?.abre_cajon) || undefined;
-    void cobrar(filas, { abrirCajon, imprimir: opts.imprimir });
+    return { filas, abrirCajon };
+  }
+
+  // Cobro desde CobrarModal (cuenta completa). Lo debido es el PENDIENTE: si hubo
+  // cobros parciales (dividir), esos pagos YA están en `payment` y el cierre factura
+  // el remanente — cobrar el total otra vez sería un doble cobro.
+  function cobrarDesdeModal(pagos: LineaPago[], opts: CobrarOpciones) {
+    // Guarda del cobro optimista: si las líneas AÚN están cargando, no se cobra ni
+    // se cierra el modal (cobrar() saldría sin hacer nada y el pago se perdería).
+    if (!unidades) { toast.error("La cuenta aún se está cargando. Repite en un segundo."); return; }
+    setModalActivo(null);
+    const { filas, abrirCajon } = mapearPagos(pagos, pendienteCuenta, opts);
+    const finales = filas.length ? filas : [{ metodo: "EFECTIVO", importe: pendienteCuenta, propina: 0 }];
+    // ponytail: un descuento global de cobro se refleja en los importes cobrados
+    // (due = pendiente − descuento) pero NO se prorratea en el desglose fiscal (que
+    // sigue saliendo íntegro de /api/ticket). Prorratear por línea antes de VERIFACTU.
+    void cobrar(finales, { abrirCajon, imprimir: opts.imprimir });
   }
 
   // Justificante (proforma) de una parte/importe al dividir: documento NO fiscal
-  // con lo que le toca pagar a esa persona. Reutiliza la impresión del ticket.
-  function imprimirParteProforma(etiqueta: string, importe: number) {
+  // con lo que le toca pagar a esa persona Y el cuadre de la cuenta (total de la
+  // mesa, cobrado, pendiente). `resumen` permite pasar el estado TRAS un cobro
+  // (el estado de React aún no se ha actualizado en ese momento).
+  function imprimirParteProforma(etiqueta: string, importe: number, resumen?: { cobrado: number; pendiente: number }) {
     const ctx = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Aparcado";
+    const cobrado = resumen?.cobrado ?? cobradoParcial;
+    const pendiente = resumen?.pendiente ?? pendienteCuenta;
     const doc: TicketImpresion = {
       local: locInfo,
       contexto: `${ctx} · ${etiqueta}`,
       operario: operario?.nombre,
       lineas: [{ cantidad: 1, nombre: "A pagar", importe }],
-      desglose: [],
+      desglose: [
+        { etiqueta: "Total de la cuenta", cuota: total },
+        { etiqueta: "Cobrado", cuota: cobrado },
+        { etiqueta: "Pendiente", cuota: pendiente },
+      ],
       total: importe,
       proforma: true,
       esPrueba: !VERIFACTU_ACTIVO,
@@ -1595,113 +1676,181 @@ export default function TPV() {
     void imprimirTicket(doc, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
   }
 
-  // Núcleo de la división (compartido por "dividir" y "cobrar cuenta"). Doc 1 → pedido
-  // `origen` (o uno nuevo si es null); resto → cuentas de barra aparcadas ("Mesa X (2)"…).
-  // División ATÓMICA (RPC 0095) con degradación comprobada. Devuelve { ok, baseId } donde
-  // baseId es el id del doc 1 (null si la RPC lo creó de cero por no haber `origen`).
-  async function ejecutarDivision(
-    origen: string | null,
-    clean: { lineas: { id: string; uds: number }[] }[],
-  ): Promise<{ ok: boolean; baseId: string | null }> {
-    const meta: Record<string, ReturnType<typeof lineasComanda>[number]> = {};
-    for (const l of lineasComanda()) meta[l.id] = l;
-    const camposCuenta = {
-      tipo_operacion: tipoOperacion,
-      motivo_no_venta: tipoOperacion === "INVITACION" ? "Invitación" : tipoOperacion === "AUTOCONSUMO" ? "Consumo propio" : null,
-      comensales: comensales || null,
-      customer_id: cliente?.id ?? null,
-      cliente_nombre: llevar?.nombre ?? cliente?.nombre ?? null,
-      cliente_telefono: llevar?.telefono ?? null,
-    };
-    const totalDe = (asign: { id: string; uds: number }[]) =>
-      Math.round(asign.reduce((s, a) => s + (invitadas[a.id] ? 0 : (meta[a.id]?.precio ?? 0)) * a.uds, 0) * 100) / 100;
-    const filasDe = (asign: { id: string; uds: number }[]) => {
-      const out: { product_id: string | null; nombre: string; cantidad: number; precio_unitario: number; tipo_impositivo: number; notas: string | null; estacion: string; modificadores: any }[] = [];
-      for (const a of asign) {
-        const m = meta[a.id]; if (!m) continue;
-        out.push({ product_id: m.productId, nombre: m.nombre, cantidad: a.uds, precio_unitario: invitadas[a.id] ? 0 : m.precio, tipo_impositivo: m.tipo, notas: notas[a.id]?.trim() || null, estacion: m.estacion, modificadores: menuParte[a.id] ? { key: a.id, menuParte: menuParte[a.id] } : { key: a.id } });
-      }
-      return out;
-    };
+  /* ── Reparto de la cuenta (cuenta_parte) y cobro por partes ──
+     Flujo decidido: docs/plan/dividir-cuenta-flujo-ux.md. Las partes de DINERO
+     (IGUAL/IMPORTE) son pagos parciales contra el pedido de la mesa (que sigue
+     abierta hasta saldar, cuando sale UNA factura del remanente). Las partes
+     PRODUCTOS salen de la mesa con su propia factura vía separar_cuenta. */
 
-    const etiquetaBase = mesa?.nombre ?? llevar?.nombre ?? "Ticket";
-    const docsRpc = clean.map((d) => ({ total: totalDe(d.lineas), lineas: filasDe(d.lineas) }));
-    const { error: rpcErr } = await sb.rpc("dividir_cuenta", {
-      p_origen: origen,
-      p_location: locationId,
-      p_mesa: mesa?.id ?? null,
-      p_user: operario?.id ?? userId,
-      p_etiqueta_base: etiquetaBase,
-      p_campos: camposCuenta,
-      p_docs: docsRpc,
-    });
-    if (!rpcErr) return { ok: true, baseId: origen };
-
-    // Degradación (0095 sin aplicar): camino antiguo, ahora COMPROBANDO cada insert.
-    const doc0 = clean[0]!;
-    let baseId = origen;
-    if (baseId) {
-      await sb.from("sales_order").update({ estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), ...camposCuenta }).eq("id", baseId);
-      await sb.from("order_line").delete().eq("order_id", baseId);
-    } else {
-      const { data } = await sb.from("sales_order").insert({ location_id: locationId, table_id: mesa?.id ?? null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(doc0.lineas), client_id: crypto.randomUUID(), ...camposCuenta }).select("id").single();
-      baseId = (data as { id: string } | null)?.id ?? null;
-    }
-    if (!baseId) { toast.error("No se pudo dividir la cuenta. Nada se ha modificado."); return { ok: false, baseId: null }; }
-    const f0 = filasDe(doc0.lineas);
-    if (f0.length) {
-      const { error } = await sb.from("order_line").insert(f0.map((l) => ({ order_id: baseId, ...l })));
-      if (error) { toast.error("La división falló al guardar el primer documento."); return { ok: false, baseId: null }; }
-    }
-    for (let i = 1; i < clean.length; i++) {
-      const { data, error } = await sb.from("sales_order").insert({ location_id: locationId, table_id: null, user_id: operario?.id ?? userId, canal: "TPV", estado: "ENVIADA_COCINA", estado_preparacion: "EN_PREPARACION", total: totalDe(clean[i]!.lineas), client_id: crypto.randomUUID(), aparcado_como: `${etiquetaBase} (${i + 1})`, ...camposCuenta }).select("id").single();
-      const nid = (data as { id: string } | null)?.id;
-      if (error || !nid) { toast.error(`No se pudo crear el documento ${i + 1}. Revisa la cuenta.`); return { ok: false, baseId: null }; }
-      const fl = filasDe(clean[i]!.lineas);
-      if (fl.length) {
-        const { error: e2 } = await sb.from("order_line").insert(fl.map((l) => ({ order_id: nid, ...l })));
-        if (e2) { toast.error(`El documento ${i + 1} quedó sin líneas. Revísalo.`); return { ok: false, baseId: null }; }
-      }
-    }
-    if (mesa) await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", mesa.id);
-    return { ok: true, baseId };
+  async function recargarPartes(oid?: string | null) {
+    const target = oid ?? ordenAbiertaId;
+    if (!target) { setPartesCuenta([]); return; }
+    const { data } = await sb.from("cuenta_parte")
+      .select("id,indice,tipo,importe,lineas,cobrada")
+      .eq("order_id", target).order("indice");
+    setPartesCuenta((data as ParteCuenta[]) ?? []);
   }
 
-  // Dividir cuenta (footer "Dividir en N tickets"): parte en N documentos y DEJA al
-  // operario en «Barra», con los tickets a la vista para cobrarlos por separado.
-  async function dividirAceptar(docs: { lineas: { id: string; uds: number }[] }[]) {
-    setModalActivo(null);
-    const clean = docs.filter((d) => d.lineas.length);
-    if (clean.length <= 1) { reset(); return; }   // sin reparto real: no se divide
-    setBusy(true);
-    try {
-      const { ok } = await ejecutarDivision(ordenAbiertaId, clean);
-      if (!ok) return;
-      await Promise.all([recargarMesas(), recargarLlevar(), recargarAparcados()]);
-      reset();
-      setNavSala(true); setVistaSala("BARRA");   // quedarse en Barra con los tickets divididos
-      toast.success(`Cuenta dividida en ${clean.length} documentos`);
-    } finally { setBusy(false); }
+  // Sustituye las partes de dinero PENDIENTES por un reparto del pendiente en n
+  // iguales (céntimos exactos). Las cobradas jamás se tocan (flujo §5).
+  async function repartirIgualesEnBD(n: number): Promise<ParteCuenta[] | null> {
+    const oid = ordenAbiertaId ?? await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
+    if (!oid) { toast.error("No se pudo guardar la cuenta."); return null; }
+    const totalC = Math.round(pendienteCuenta * 100);
+    const baseC = Math.floor(totalC / n);
+    const importes = Array.from({ length: n }, (_, i) => (i === n - 1 ? totalC - baseC * (n - 1) : baseC) / 100);
+    const sig = partesCuenta.filter((p) => p.cobrada).reduce((m, p) => Math.max(m, p.indice), 0);
+    await sb.from("cuenta_parte").delete().eq("order_id", oid).eq("cobrada", false);
+    const { data, error } = await sb.from("cuenta_parte")
+      .insert(importes.map((im, i) => ({ order_id: oid, indice: sig + i + 1, tipo: "IGUAL", importe: im })))
+      .select("id,indice,tipo,importe,lineas,cobrada");
+    if (error || !data) { toast.error("No se pudo guardar el reparto."); return null; }
+    const nuevas = data as ParteCuenta[];
+    setPartesCuenta((prev) => [...prev.filter((p) => p.cobrada), ...nuevas]);
+    return nuevas;
   }
 
-  // Cobrar por ARTÍCULOS: las líneas elegidas SALEN de la mesa a un sub-pedido propio
-  // (RPC separar_cuenta, atómica y no fiscal), que se carga como cuenta de barra y se
-  // cobra por el camino normal (con su factura). El resto se queda en la mesa.
-  // Decisión: docs/plan/dividir-cuenta-y-ciclo.md §6.2.
-  async function cobrarArticulos(sel: { id: string; uds: number }[]) {
+  // Cobrar la parte `pos` de un reparto en n iguales: materializa el reparto en BD
+  // si aún era un preview (o cambió n) y abre el cobro ENCIMA del modal.
+  async function cobrarIgual(n: number, pos: number) {
+    let pend = partesCuenta.filter((p) => !p.cobrada && p.tipo === "IGUAL");
+    if (pend.length !== n) {
+      const nuevas = await repartirIgualesEnBD(n);
+      if (!nuevas) return;
+      pend = nuevas;
+    }
+    const p = pend[pos];
+    if (p) setCobroParte({ modo: "PARTE", titulo: `Parte ${p.indice}`, importe: p.importe, parteId: p.id });
+  }
+
+  async function separarImporteBD(v: number): Promise<ParteCuenta | null> {
+    const oid = ordenAbiertaId ?? await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
+    if (!oid) { toast.error("No se pudo guardar la cuenta."); return null; }
+    const sig = partesCuenta.reduce((m, p) => Math.max(m, p.indice), 0);
+    const { data, error } = await sb.from("cuenta_parte")
+      .insert({ order_id: oid, indice: sig + 1, tipo: "IMPORTE", importe: v })
+      .select("id,indice,tipo,importe,lineas,cobrada").single();
+    if (error || !data) { toast.error("No se pudo separar el importe."); return null; }
+    const p = data as ParteCuenta;
+    setPartesCuenta((prev) => [...prev, p]);
+    return p;
+  }
+
+  async function cobrarResto(v: number) {
+    const p = await separarImporteBD(v);
+    if (p) setCobroParte({ modo: "PARTE", titulo: `Importe ${p.indice}`, importe: p.importe, parteId: p.id });
+  }
+
+  async function quitarDivision() {
+    if (ordenAbiertaId) await sb.from("cuenta_parte").delete().eq("order_id", ordenAbiertaId).eq("cobrada", false);
+    setPartesCuenta((prev) => prev.filter((p) => p.cobrada));
+  }
+
+  // Botón del pie del modal: cobrar TODO el pendiente de una. Sin parciales previos
+  // es el cobro completo normal (camino probado); con ellos, un parcial que salda.
+  function cobrarPendiente() {
+    if (cobradoParcial <= 0) { setModalActivo("COBRAR"); return; }
+    setCobroParte({ modo: "PENDIENTE", titulo: "Pendiente", importe: pendienteCuenta });
+  }
+
+  // Por ARTÍCULOS: prepara el cobro de las líneas elegidas. El carve y el cobro real
+  // ocurren AL CONFIRMAR (confirmarCobroArticulos) — si se cancela, nada cambió.
+  function abrirCobroArticulos(sel: { id: string; uds: number }[]) {
     const pedir = sel.filter((s) => s.uds > 0);
     if (!pedir.length) return;
-    setModalActivo(null);
-    setBusy(true);
-    try {
-      // Para carvar de la mesa, su pedido tiene que estar persistido (id conocido).
-      let mesaOrderId = ordenAbiertaId;
-      if (!mesaOrderId) mesaOrderId = await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
-      if (!mesaOrderId) { toast.error("No se pudo preparar la cuenta."); return; }
+    const meta = new Map(lineasComanda().map((l) => [l.id, l]));
+    const importe = Math.round(pedir.reduce((s, x) => s + (invitadas[x.id] ? 0 : (meta.get(x.id)?.precio ?? 0)) * x.uds, 0) * 100) / 100;
+    if (importe <= 0) return;
+    setCobroParte({ modo: "PRODUCTOS", titulo: "Artículos", importe, lineasSel: pedir });
+  }
 
+  // Confirmación del cobro abierto encima del modal Dividir (los tres modos).
+  async function confirmarCobroParte(pagos: LineaPago[], opts: CobrarOpciones) {
+    const ctx = cobroParte;
+    if (!ctx || cobrandoRef.current) return;
+    if (ctx.modo === "PRODUCTOS") { await confirmarCobroArticulos(ctx, pagos, opts); return; }
+
+    const oid = ordenAbiertaId;
+    if (!oid) { toast.error("La cuenta no está guardada."); setCobroParte(null); return; }
+    cobrandoRef.current = true;
+    setBusy(true);
+    let saldada = false;
+    try {
+      // Pago PARCIAL real: se registra el pago y la cuenta queda ABIERTA (POR_COBRAR)
+      // con el resto pendiente. La factura sale al saldar (ciclo §6.2).
+      const { filas, abrirCajon } = mapearPagos(pagos, ctx.importe, opts);
+      const finales = filas.length ? filas : [{ metodo: "EFECTIVO", importe: ctx.importe, propina: 0 }];
+      const { data: pagosIns, error: payErr } = await sb.from("payment")
+        .insert(finales.map((p) => ({ order_id: oid, ...p, client_id: crypto.randomUUID() })))
+        .select("id");
+      if (payErr) { sonidos.error(); toast.error("El pago NO quedó registrado. La parte sigue pendiente."); return; }
+      const { data: v } = await sb.from("sales_order").update({ estado: "POR_COBRAR" }).eq("id", oid).select("updated_at").maybeSingle();
+      if (v) setVersionOrden((v as { updated_at: string }).updated_at);
+      if (mesa) { await sb.from("restaurant_table").update({ estado: "POR_COBRAR" }).eq("id", mesa.id); void recargarMesas(); }
+
+      const payId = (pagosIns as { id: string }[] | null)?.[0]?.id ?? null;
+      const marca = { cobrada: true, cobrada_at: new Date().toISOString(), payment_id: payId };
+      if (ctx.modo === "PARTE" && ctx.parteId) await sb.from("cuenta_parte").update(marca).eq("id", ctx.parteId);
+      else await sb.from("cuenta_parte").update(marca).eq("order_id", oid).eq("cobrada", false);
+      await recargarPartes(oid);
+
+      if (abrirCajon ?? finales.some((p) => p.metodo === "EFECTIVO")) void window.gluuh?.abrirCajon();
+      // Cada cobro de una división saca SU ticket (justificante de lo que pagó esa
+      // persona, con el cuadre: total · cobrado · pendiente) — decisión 18-07.
+      imprimirParteProforma(ctx.titulo, ctx.importe, {
+        cobrado: Math.round((cobradoParcial + ctx.importe) * 100) / 100,
+        pendiente: Math.max(0, Math.round((total - cobradoParcial - ctx.importe) * 100) / 100),
+      });
+      sonidos.exito();
+      setCobroParte(null);
+      saldada = Math.round((total - cobradoParcial - ctx.importe) * 100) / 100 <= 0.009;
+    } finally { cobrandoRef.current = false; setBusy(false); }
+
+    // Saldada → cierre: factura del remanente (los pagos YA están todos), el ticket
+    // COMPLETO de la mesa impreso, y al salón (lo hace cobrar()).
+    if (saldada) {
+      setModalActivo(null);
+      await cobrar([], { sinPagos: true, imprimir: true });
+    }
+  }
+
+  // Cobro POR ARTÍCULOS (flujo §2): fiscal → carve (separar_cuenta) → cobro del
+  // sub-pedido con su factura → la mesa se queda con el resto y se VUELVE al modal.
+  async function confirmarCobroArticulos(ctx: CobroParte, pagos: LineaPago[], opts: CobrarOpciones) {
+    if (cobrandoRef.current) return;
+    cobrandoRef.current = true;
+    setBusy(true);
+    let cerrarMesa = false;
+    const eraMesa = !!mesa;
+    try {
+      const sel = ctx.lineasSel ?? [];
       const meta: Record<string, ReturnType<typeof lineasComanda>[number]> = {};
       for (const l of lineasComanda()) meta[l.id] = l;
-      const lineasSub = pedir
+      const udsAntes = lineasComanda().reduce((s, l) => s + l.cantidad, 0);
+      const filasFiscales = sel
+        .map((s) => { const m = meta[s.id]; return m ? { precio: invitadas[s.id] ? 0 : m.precio, tipo: m.tipo, cantidad: s.uds } : null; })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      if (!filasFiscales.length) { toast.error("No hay artículos válidos."); return; }
+
+      // 1) Cálculo fiscal ANTES de tocar nada: si falla, la mesa queda intacta.
+      let t: Ticket;
+      try {
+        const tok = (await sb.auth.getSession()).data.session?.access_token;
+        const res = await fetch("/api/ticket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
+          signal: AbortSignal.timeout(15_000),
+          body: JSON.stringify({ territorio: TERR[territorio] ?? "PENINSULA_BALEARES", lineas: filasFiscales }),
+        });
+        if (!res.ok) { toast.error("No se pudo calcular el ticket. No se ha cobrado nada."); return; }
+        t = (await res.json()) as Ticket;
+      } catch { toast.error("Sin conexión con el servidor. No se ha cobrado nada."); return; }
+      if (!t?.impuestos?.desglose) { toast.error("Respuesta fiscal inválida. No se ha cobrado nada."); return; }
+
+      // 2) Carve: los artículos salen de la mesa a un sub-pedido (atómico, RPC 0124).
+      const oid = ordenAbiertaId ?? await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
+      if (!oid) { toast.error("No se pudo guardar la cuenta."); return; }
+      const lineasSub = sel
         .map((s) => {
           const m = meta[s.id]; if (!m) return null;
           return {
@@ -1712,39 +1861,116 @@ export default function TPV() {
           };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null);
-      if (!lineasSub.length) { toast.error("No hay artículos válidos para cobrar."); return; }
-
-      const campos = {
-        etiqueta: `${mesa?.nombre ?? "Cuenta"} · parte`,
-        tipo_operacion: tipoOperacion,
-        motivo_no_venta: tipoOperacion === "INVITACION" ? "Invitación" : tipoOperacion === "AUTOCONSUMO" ? "Consumo propio" : null,
-        comensales: comensales || null,
-        customer_id: cliente?.id ?? null,
-        cliente_nombre: llevar?.nombre ?? cliente?.nombre ?? null,
-        cliente_telefono: llevar?.telefono ?? null,
-      };
-
-      const { data: subId, error } = await sb.rpc("separar_cuenta", {
-        p_mesa_order: mesaOrderId,
+      const { data: subId, error: sepErr } = await sb.rpc("separar_cuenta", {
+        p_mesa_order: oid,
         p_location: locationId,
         p_user: operario?.id ?? userId,
-        p_campos: campos,
+        p_campos: {
+          etiqueta: `${mesa?.nombre ?? "Cuenta"} · parte`,
+          tipo_operacion: tipoOperacion,
+          motivo_no_venta: tipoOperacion === "INVITACION" ? "Invitación" : tipoOperacion === "AUTOCONSUMO" ? "Consumo propio" : null,
+          comensales: comensales || null,
+          customer_id: cliente?.id ?? null,
+          cliente_nombre: llevar?.nombre ?? cliente?.nombre ?? null,
+          cliente_telefono: llevar?.telefono ?? null,
+        },
         p_lineas: lineasSub,
       });
-      if (error || !subId) {
-        console.error("separar_cuenta falló:", error);
-        toast.error(`No se pudieron separar los artículos: ${error?.message ?? "sin id"}`);
+      if (sepErr || !subId) {
+        console.error("separar_cuenta:", sepErr);
+        toast.error(`No se pudieron separar los artículos: ${sepErr?.message ?? "sin id"}. Nada se ha cobrado.`);
         return;
       }
+      const sub = subId as string;
 
-      await Promise.all([recargarMesas(), recargarAparcados()]);
-      // El sub-pedido es de barra (sin mesa): cargarlo como tal para que el cobro NO libere
-      // la mesa original (que se queda con el resto). Al confirmar sale con su factura.
-      setMesa(null); setLlevar(null); setBarra(true);
-      await tomarCuenta(subId as string);
-      await cargarLineas(subId as string);
-      setModalActivo("COBRAR");
-    } finally { setBusy(false); }
+      // 3) Cobro del sub-pedido. Si el pago falla, queda POR_COBRAR en Aparcado:
+      //    recuperable y visible, nunca un descuadre silencioso.
+      const { filas, abrirCajon } = mapearPagos(pagos, ctx.importe, opts);
+      const finales = filas.length ? filas : [{ metodo: "EFECTIVO", importe: ctx.importe, propina: 0 }];
+      const { data: pagosIns, error: payErr } = await sb.from("payment")
+        .insert(finales.map((p) => ({ order_id: sub, ...p, client_id: crypto.randomUUID() })))
+        .select("id");
+      if (payErr) {
+        sonidos.error();
+        toast.error("El pago NO quedó registrado. Los artículos quedaron en Aparcado, pendientes de cobro.");
+        await cargarLineas(oid);
+        await Promise.all([recargarMesas(), recargarAparcados()]);
+        return;
+      }
+      await sb.from("sales_order").update({ estado: "COBRADA", estado_preparacion: "ENTREGADO" }).eq("id", sub);
+
+      // 4) Registro de la parte (al volver a la mesa se ve qué se cobró ya).
+      const sig = partesCuenta.reduce((m, p) => Math.max(m, p.indice), 0);
+      await sb.from("cuenta_parte").insert({
+        order_id: oid, indice: sig + 1, tipo: "PRODUCTOS", importe: ctx.importe,
+        lineas: sel.map((s) => ({ key: s.id, nombre: meta[s.id]?.nombre ?? "", uds: s.uds, precio: meta[s.id]?.precio ?? 0 })),
+        cobrada: true, cobrada_at: new Date().toISOString(),
+        payment_id: (pagosIns as { id: string }[] | null)?.[0]?.id ?? null,
+        cobrada_order_id: sub,
+      });
+
+      // 5) VERIFACTU del sub-pedido (best-effort, mismo patrón que cobrar()).
+      if (VERIFACTU_ACTIVO && tipoOperacion === "VENTA") {
+        try {
+          const tok = (await sb.auth.getSession()).data.session?.access_token;
+          const fr = await fetch("/api/factura", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
+            body: JSON.stringify({ orderId: sub, lineas: filasFiscales }),
+          });
+          const fj = await fr.json();
+          if (fj?.ok) {
+            t.numSerieFactura = fj.numSerieFactura ?? t.numSerieFactura;
+            if (fj.qrDataUrl) t.verifactu.qrDataUrl = fj.qrDataUrl;
+            if (fj.qrUrl) t.verifactu.qrUrl = fj.qrUrl;
+            if (fj.huella) t.verifactu.huella = fj.huella;
+          }
+        } catch { /* best-effort: el ticket sigue con /api/ticket */ }
+      }
+
+      // 6) Ticket de la parte (SIEMPRE: cada cobro de una división saca su ticket) y cajón.
+      {
+        const doc: TicketImpresion = {
+          local: locInfo,
+          contexto: `${mesa ? mesa.nombre : "Aparcado"} · parte`,
+          operario: operario?.nombre,
+          numSerieFactura: VERIFACTU_ACTIVO ? t.numSerieFactura : undefined,
+          lineas: lineasSub.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, importe: l.precio_unitario * l.cantidad })),
+          desglose: t.impuestos.desglose.map((d) => ({ etiqueta: `${t.impuestos.impuesto} ${d.tipo}% (base ${eur(d.base)})`, cuota: d.cuota })),
+          total: t.impuestos.importeTotal,
+          qrUrl: VERIFACTU_ACTIVO ? t.verifactu.qrUrl : undefined,
+          leyenda: VERIFACTU_ACTIVO ? t.verifactu.leyenda : undefined,
+          huella: VERIFACTU_ACTIVO ? t.verifactu.huella : undefined,
+          esPrueba: !VERIFACTU_ACTIVO,
+        };
+        void imprimirTicket(doc, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
+      }
+      if (abrirCajon ?? finales.some((p) => p.metodo === "EFECTIVO")) void window.gluuh?.abrirCajon();
+
+      // 7) La mesa se queda con el resto → recargar y VOLVER al modal (flujo §2).
+      // Un reparto de dinero PENDIENTE quedó calculado sobre el pendiente viejo:
+      // se retira (lo cobrado jamás) y se regenera solo sobre el pendiente nuevo.
+      await sb.from("cuenta_parte").delete().eq("order_id", oid).eq("cobrada", false);
+      await cargarLineas(oid);
+      await Promise.all([recargarMesas(), recargarAparcados(), recargarPartes(oid)]);
+      sonidos.exito();
+      setCobroParte(null);
+
+      cerrarMesa = udsAntes - sel.reduce((s, x) => s + x.uds, 0) <= 0;
+      if (cerrarMesa) {
+        // ponytail: mesa saldada solo con cobros por artículos → su pedido queda vacío
+        // y se cierra a 0 sin factura (todo lo facturado salió en las partes).
+        await sb.from("sales_order").update({ estado: "COBRADA", estado_preparacion: "ENTREGADO", total: 0 }).eq("id", oid);
+        if (mesa) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
+        await recargarMesas();
+      }
+    } finally { cobrandoRef.current = false; setBusy(false); }
+    if (cerrarMesa) {
+      setModalActivo(null);
+      reset();
+      if (eraMesa) setNavSala(true);
+      toast.success("Cuenta saldada");
+    }
   }
 
   /* ── Funciones de cuenta (columna estilo Glop) ── */
@@ -1780,7 +2006,7 @@ export default function TPV() {
   // llevan cliente_nombre). Incluye aparcados y los que están en cocina, para que en
   // «Barra» se vea todo lo comandado, no solo lo aparcado a mano.
   async function recargarAparcados() {
-    const { data } = await sb.from("sales_order").select("id,aparcado_como,total,created_at")
+    const { data } = await sb.from("sales_order").select("id,aparcado_como,total,created_at,user_id,numero_pedido")
       .is("table_id", null).is("cliente_nombre", null)
       .in("estado", ["ABIERTA", "ENVIADA_COCINA", "SERVIDA", "POR_COBRAR"])
       .order("created_at", { ascending: false });
@@ -1834,6 +2060,22 @@ export default function TPV() {
     } finally { setBusy(false); }
   }
 
+  // Cobrar una APARCADA in situ: carga la cuenta POR DEBAJO y abre el cobro ENCIMA
+  // de la vista de Aparcados, sin saltar a la pantalla Ticket. Si se cancela, la
+  // cuenta se descarga y sigue aparcada tal cual (no se toca aparcado_como).
+  async function cobrarAparcadoEnSitio(o: { id: string; total?: number }) {
+    reset();
+    // OPTIMISTA: el modal se abre AL INSTANTE con el total que ya está en la tarjeta;
+    // líneas/partes cargan por debajo en paralelo (1 viaje). cobrarDesdeModal tiene
+    // guarda para el caso extremo de confirmar antes de que lleguen las líneas.
+    setTotalCobroPrevio(Number(o.total ?? 0) || null);
+    setModalActivo("COBRAR");
+    const t0 = performance.now();
+    await Promise.all([tomarCuenta(o.id), recargarPartes(o.id), cargarLineas(o.id)]);
+    setTotalCobroPrevio(null);   // ya manda el pendiente real
+    if (process.env.NODE_ENV !== "production") console.info(`[tpv] aparcada cargada en ${Math.round(performance.now() - t0)} ms`);
+  }
+
   async function recuperarAparcado(o: { id: string }) {
     setModalActivo(null);
     reset();
@@ -1841,10 +2083,14 @@ export default function TPV() {
     // El `update` mueve el `updated_at`, así que la versión se coge DESPUÉS. Al revés, el
     // TPV se quedaría con una versión ya caducada y el primer guardado chocaría consigo
     // mismo: «otro TPV ha tocado esto»… cuando el otro TPV era él.
-    await sb.from("sales_order").update({ aparcado_como: null }).eq("id", o.id);
-    await tomarCuenta(o.id);
-    await cargarLineas(o.id);
-    await recargarAparcados();
+    // En paralelo: quitar la etiqueta, versión, partes y líneas no dependen entre sí.
+    await Promise.all([
+      sb.from("sales_order").update({ aparcado_como: null }).eq("id", o.id),
+      tomarCuenta(o.id),
+      recargarPartes(o.id),
+      cargarLineas(o.id),
+    ]);
+    void recargarAparcados();   // el listado se refresca en segundo plano
   }
 
   async function pasarAMesa(destino: Mesa) {
@@ -1853,11 +2099,14 @@ export default function TPV() {
     setBusy(true);
     try {
       const orderId = await crearOrden("ENVIADA_COCINA", "EN_PREPARACION");
+      // Los tres updates son independientes entre sí: EN PARALELO (1 viaje, no 3).
+      const cambios: PromiseLike<unknown>[] = [];
       if (orderId) {
-        await sb.from("sales_order").update({ table_id: destino.id, aparcado_como: null }).eq("id", orderId);
-        await sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", destino.id);
+        cambios.push(sb.from("sales_order").update({ table_id: destino.id, aparcado_como: null }).eq("id", orderId));
+        cambios.push(sb.from("restaurant_table").update({ estado: "OCUPADA" }).eq("id", destino.id));
       }
-      if (mesa && mesa.id !== destino.id) await sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id);
+      if (mesa && mesa.id !== destino.id) cambios.push(sb.from("restaurant_table").update({ estado: "LIBRE" }).eq("id", mesa.id));
+      await Promise.all(cambios);
       
       setMesa(destino);
       setBarra(false);
@@ -1876,6 +2125,8 @@ export default function TPV() {
 
   // Borrar cuenta: anula el pedido abierto (queda en informes) y libera la mesa.
   async function borrarCuenta() {
+    // Con cobros parciales registrados, borrar la cuenta descuadraría caja: prohibido.
+    if (cobradoParcial > 0) { sonidos.error(); toast.error("Hay partes ya cobradas: la cuenta no se puede borrar."); return; }
     setPedirBorrar(false);
     if (!unidades && !ordenAbiertaId) return;
     setBusy(true);
@@ -2115,13 +2366,15 @@ export default function TPV() {
       const { data, error } = await sb.from("product").insert({
         nombre: nuevoProd.nombre.trim(), precio,
         clase_fiscal: nuevoProd.clase, tipo_impositivo: ivaAuto(nuevoProd.clase, territorio),
-        category_id: categoria, foto_url: nuevoProd.foto_url || null, disponible: true, estacion: "COCINA",
+        category_id: categoria, foto_url: nuevoProd.foto_url || null,
+        disponible: nuevoProd.disponible, estacion: nuevoProd.estacion,
+        vendido_por_peso: nuevoProd.vendido_por_peso,
       }).select("id").single();
-      if (error) { console.error(error.message); return; }
+      if (error) { console.error(error.message); toast.error("No se pudo crear el artículo."); return; }
       await recargarProductos();
       if (anadir && data) addProd((data as { id: string }).id);
       setModalActivo(null);
-      setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "" });
+      setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: "", foto_url: "", estacion: "COCINA", vendido_por_peso: false, disponible: true });
     } finally { setBusy(false); }
   }
 
@@ -2133,6 +2386,7 @@ export default function TPV() {
     setOrdenAbiertaId(null); setLlevar(null);
     setCliente(null); setComensales(1); setTipoOperacion("VENTA");
     setMesaSel(null); setMesaSelInfo(null); setNotaMesa(""); setAlias("");
+    setPartesCuenta([]); setCobroParte(null); setTotalCobroPrevio(null);
   }
 
   function salirOperario() {
@@ -2257,7 +2511,7 @@ export default function TPV() {
       {/* Alta rápida: crear un producto sin salir del TPV (oculta al buscar) */}
       {!buscandoDiferido && (
         <button type="button"
-          onClick={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "" }); setModalActivo('NUEVO_PROD'); }}
+          onClick={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "", estacion: "COCINA", vendido_por_peso: false, disponible: true }); setModalActivo('NUEVO_PROD'); }}
           className="flex min-h-[78px] flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-border text-[9px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <Plus size={14} strokeWidth={1.5} />
           <span className="text-xs font-medium">Nuevo</span>
@@ -2311,7 +2565,8 @@ export default function TPV() {
   const onAparcadosModal = useCallback(() => setModalActivo('APARCADOS'), []);
   const onPasarMesaModal = useCallback(() => setModalActivo('PASAR_MESA'), []);
   const onClienteModal = useCallback(() => setModalActivo('CLIENTE'), []);
-  const onDividirModal = useCallback(() => setModalActivo('DIVIDIR'), []);
+  // Abre Dividir recargando el reparto persistido (estable: lee ordenAbiertaId fresco).
+  const onDividirModal = useEventCallback(() => { void recargarPartes(); setModalActivo('DIVIDIR'); });
   const onAparcarEstable = useEventCallback(aparcar);
   const onLlevarBarraEstable = useEventCallback(() => { void llevarABarra(); });
   const onPrepararEstable = useEventCallback(() => enviarCocina("PENDIENTE"));
@@ -2472,6 +2727,7 @@ export default function TPV() {
   /* ── Navegación de salas (estilo Glop): plano / barra / llevar / reservas ── */
   if (navSala) {
     return (
+      <>
       <PlanoSalas
         sb={sb}
         operario={operario!}
@@ -2486,6 +2742,24 @@ export default function TPV() {
         aparcadosLineas={aparcadosLineas}
         llevarList={llevarList}
         recuperarAparcado={recuperarAparcado}
+        cobrarAparcado={cobrarAparcadoEnSitio}
+        pasarAMesaAparcado={async (o: { id: string }) => { await recuperarAparcado(o); setModalActivo("PASAR_MESA"); }}
+        imprimirAparcado={(o: { id: string; aparcado_como: string | null; total: number; created_at: string }) => {
+          // Proforma de la cuenta aparcada (no fiscal), con sus líneas.
+          const doc: TicketImpresion = {
+            local: locInfo,
+            contexto: `Aparcado · ${o.aparcado_como ?? new Date(o.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`,
+            operario: operario?.nombre,
+            lineas: (aparcadosLineas[o.id] ?? []).map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, importe: l.total })),
+            desglose: [],
+            total: Number(o.total),
+            proforma: true,
+            esPrueba: !VERIFACTU_ACTIVO,
+          };
+          void imprimirTicket(doc, cfgImpresion?.ticket ?? {}, resolverImpresora(cfgImpresion, "TICKET_CLIENTE"), { logoUrl: logoTicket });
+        }}
+        recargarAparcados={recargarAparcados}
+        operarioId={operario?.id ?? null}
         nuevoParaLlevar={nuevoParaLlevar}
         abrirLlevar={abrirLlevar}
         irASala={irASala}
@@ -2518,6 +2792,27 @@ export default function TPV() {
         renderVelo={renderVelo}
         puede={puede}
       />
+
+      {/* ── Cobro ENCIMA de la vista de salas (p. ej. cobrar una aparcada sin
+          saltar al Ticket): la cuenta ya está cargada por cobrarAparcadoEnSitio.
+          Cancelar descarga la cuenta (sigue aparcada tal cual). ── */}
+      {modalActivo === 'COBRAR' && (
+        <CobrarModal
+          total={unidades ? pendienteCuenta : (totalCobroPrevio ?? pendienteCuenta)}
+          baseImponible={Math.round(desgloseCobro.base * (total > 0 ? pendienteCuenta / total : 1) * 100) / 100}
+          impuesto={Math.round(desgloseCobro.impuesto * (total > 0 ? pendienteCuenta / total : 1) * 100) / 100}
+          contexto={`· ${aparcados.find((o) => o.id === ordenAbiertaId)?.aparcado_como ?? "Aparcado"}`}
+          cliente={cliente?.nombre}
+          clienteNif={cliente?.nif ?? null}
+          empleado={operario?.nombre}
+          terminal={terminal}
+          formasPago={formasPago}
+          onCobrar={cobrarDesdeModal}
+          onImprimirCuenta={imprimirRecibo}
+          onCancelar={() => { setModalActivo(null); reset(); }}
+        />
+      )}
+      </>
     );
   }
 
@@ -2528,9 +2823,18 @@ export default function TPV() {
   // (Las props del rail de acciones se construyen arriba como `accionesRapidasProps`
   // memoizadas — plan 011.)
   const hayInvitadas = Object.values(invitadas).some(Boolean);
+  // Con partes de DINERO ya cobradas (dividir), la cuenta NO puede menguar: lo pagado
+  // dejaría de cuadrar con lo facturable (flujo-ux, decisión 4). Añadir sí; quitar no.
+  const bloqueadaPorPartes = () => {
+    if (cobradoParcial <= 0) return false;
+    sonidos.error();
+    toast.error("Hay partes ya cobradas: no se puede quitar ni invitar líneas. Añadir sí.");
+    return true;
+  };
   // Anular la línea seleccionada (misma lógica que "Eliminar" del editor de línea).
   const anularLineaSel = () => {
     if (!lineaSel) return;
+    if (bloqueadaPorPartes()) return;
     const sel = lineaSel;
     // Si es la CABECERA de un menú, arrastra sus partes (menuParte → sel). Si es una parte,
     // borra solo esa. `claves` = líneas a eliminar.
@@ -2752,7 +3056,7 @@ export default function TPV() {
             onAnular={anularLineaSel}
             onCompMenu={abrirCompMenu}
             onComExtra={comExtraSel}
-            onInvitar={() => { if (puede("invitar")) setModalActivo('INVITAR'); }}
+            onInvitar={() => { if (bloqueadaPorPartes()) return; if (puede("invitar")) setModalActivo('INVITAR'); }}
           />
           </div>{/* fin parte superior */}
 
@@ -2874,14 +3178,39 @@ export default function TPV() {
         <DividirCuentaModal
           lineas={lineasComanda().map((l) => ({ id: l.id, nombre: l.nombre, uds: l.cantidad, precio: l.precio }))}
           total={total}
+          pendiente={pendienteCuenta}
+          partes={partesCuenta}
           comensales={comensales}
-          contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Barra"}
-          onAceptarProductos={dividirAceptar}
-          onCobrarCuenta={cobrarArticulos}
+          contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Aparcado"}
+          onCobrarIgual={(n, pos) => { void cobrarIgual(n, pos); }}
+          onSepararImporte={(v) => { void separarImporteBD(v); }}
+          onCobrarParte={(p) => setCobroParte({ modo: "PARTE", titulo: `${p.tipo === "IMPORTE" ? "Importe" : "Parte"} ${p.indice}`, importe: p.importe, parteId: p.id })}
+          onCobrarResto={(v) => { void cobrarResto(v); }}
+          onCobrarCuenta={abrirCobroArticulos}
+          onCobrarPendiente={cobrarPendiente}
+          onQuitarDivision={() => { void quitarDivision(); }}
           onImprimirParte={imprimirParteProforma}
-          onCobrar={() => { setModalActivo('COBRAR'); }}
-          onCancelar={() => setModalActivo(null)}
+          onCerrar={() => setModalActivo(null)}
           onAbrirCajon={abrirCajonManual}
+        />
+      )}
+
+      {/* ── Cobro de UNA parte, ENCIMA del modal Dividir (vuelve al modal al
+             confirmar; flujo-ux §1-2). Mismo CobrarModal, con el importe de la parte. ── */}
+      {modalActivo === 'DIVIDIR' && cobroParte && (
+        <CobrarModal
+          total={cobroParte.importe}
+          baseImponible={Math.round(desgloseCobro.base * (total > 0 ? cobroParte.importe / total : 1) * 100) / 100}
+          impuesto={Math.round(desgloseCobro.impuesto * (total > 0 ? cobroParte.importe / total : 1) * 100) / 100}
+          contexto={`· ${cobroParte.titulo}${mesa ? ` (${mesa.nombre})` : ""}`}
+          cliente={cliente?.nombre}
+          clienteNif={cliente?.nif ?? null}
+          empleado={operario?.nombre}
+          terminal={terminal}
+          formasPago={formasPago}
+          onCobrar={(pagos, opts) => { void confirmarCobroParte(pagos, opts); }}
+          onImprimirCuenta={() => imprimirParteProforma(cobroParte.titulo, cobroParte.importe)}
+          onCancelar={() => setCobroParte(null)}
         />
       )}
 
@@ -2986,6 +3315,7 @@ export default function TPV() {
             onGuardar={guardarModificadores}
             onCancelar={() => setModProd(null)}
             onEliminar={() => {
+              if (bloqueadaPorPartes()) return;
               if (modProd.reemplazar) {
                 const key = modProd.reemplazar;
                 setComanda((c) => { const { [key]: _, ...r } = c; return r; });
@@ -3074,42 +3404,86 @@ export default function TPV() {
       )}
 
       {/* ── Modal: Nuevo producto (alta rápida) ── */}
+      {/* ── Configuración rápida de artículo (fiel a gluuh-articulo-rapido.html; sin
+             tarifas por zona ni báscula real: pendientes de esquema/hardware) ── */}
       {modalActivo === 'NUEVO_PROD' && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4" onClick={() => setModalActivo(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 font-semibold">Nuevo producto</h3>
-            <p className="mb-3 text-sm text-muted-foreground">Rellena lo básico; el resto lo completas luego en la carta.</p>
-            <div className="space-y-2">
-              <input aria-label="Nombre del producto" autoFocus value={nuevoProd.nombre}
-                onChange={(e) => setNuevoProd((s) => ({ ...s, nombre: e.target.value }))}
-                placeholder="Nombre" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand" />
-              <div className="flex gap-2">
-                <input aria-label="Precio" inputMode="decimal" value={nuevoProd.precio}
-                  onChange={(e) => setNuevoProd((s) => ({ ...s, precio: e.target.value }))}
-                  placeholder="Precio €" className="w-28 rounded-md border border-border bg-background px-3 py-2 text-right text-sm tabular-nums outline-none focus:border-brand" />
-                <select aria-label="Clase fiscal" value={nuevoProd.clase}
-                  onChange={(e) => setNuevoProd((s) => ({ ...s, clase: e.target.value }))}
-                  className="flex-1 rounded-md border border-border bg-background px-2 py-2 text-sm">
-                  {CLASES_FISCALES.map((c) => <option key={c.v} value={c.v}>{c.t} · {ivaAuto(c.v, territorio)}%</option>)}
-                </select>
+          <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between rounded-t-xl bg-brand px-4 py-3 text-white">
+              <div>
+                <h3 className="text-lg font-bold">Configuración rápida</h3>
+                <p className="text-xs text-white/70">Lo básico para vender ya; el resto, en la carta.</p>
               </div>
-              <select aria-label="Familia / categoría" value={nuevoProd.categoryId}
-                onChange={(e) => setNuevoProd((s) => ({ ...s, categoryId: e.target.value }))}
-                className="w-full rounded-md border border-border bg-background px-2 py-2 text-sm">
-                {cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
+              <button type="button" onClick={() => setModalActivo(null)} aria-label="Cerrar" className="grid h-9 w-9 place-items-center rounded-md hover:bg-white/15">✕</button>
+            </div>
+            <div className="space-y-2.5 p-4">
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground" htmlFor="np-nombre">Nombre en el botón del TPV</label>
+                <input id="np-nombre" autoFocus value={nuevoProd.nombre}
+                  onChange={(e) => setNuevoProd((s) => ({ ...s, nombre: e.target.value }))}
+                  placeholder="Ej. Croquetas caseras" className="min-h-12 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand" />
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-2.5">
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground" htmlFor="np-precio">Precio €</label>
+                  <input id="np-precio" inputMode="decimal" value={nuevoProd.precio}
+                    onChange={(e) => setNuevoProd((s) => ({ ...s, precio: e.target.value }))}
+                    placeholder="0,00" className="min-h-12 w-full rounded-md border border-border bg-background px-3 text-right text-base font-bold tabular-nums outline-none focus:border-brand" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground" htmlFor="np-clase">Clase de IVA</label>
+                  <select id="np-clase" value={nuevoProd.clase}
+                    onChange={(e) => setNuevoProd((s) => ({ ...s, clase: e.target.value }))}
+                    className="min-h-12 w-full rounded-md border border-border bg-background px-2 text-sm outline-none focus:border-brand">
+                    {CLASES_FISCALES.map((c) => <option key={c.v} value={c.v}>{c.t} · {ivaAuto(c.v, territorio)}%</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground" htmlFor="np-cat">Familia / categoría</label>
+                  <select id="np-cat" value={nuevoProd.categoryId}
+                    onChange={(e) => setNuevoProd((s) => ({ ...s, categoryId: e.target.value }))}
+                    className="min-h-12 w-full rounded-md border border-border bg-background px-2 text-sm outline-none focus:border-brand">
+                    {cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground" htmlFor="np-zona">Zona de impresión</label>
+                  <select id="np-zona" value={nuevoProd.estacion}
+                    onChange={(e) => setNuevoProd((s) => ({ ...s, estacion: e.target.value }))}
+                    className="min-h-12 w-full rounded-md border border-border bg-background px-2 text-sm outline-none focus:border-brand">
+                    <option value="COCINA">Cocina</option>
+                    <option value="BARRA">Barra</option>
+                    <option value="NINGUNA">No se imprime</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm">
+                  <input type="checkbox" checked={nuevoProd.disponible} onChange={(e) => setNuevoProd((s) => ({ ...s, disponible: e.target.checked }))} className="h-4 w-4 accent-(--brand)" />
+                  <span className="font-semibold">Visible en el TPV</span>
+                </label>
+                <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm">
+                  <input type="checkbox" checked={nuevoProd.vendido_por_peso} onChange={(e) => setNuevoProd((s) => ({ ...s, vendido_por_peso: e.target.checked }))} className="h-4 w-4 accent-(--brand)" />
+                  <span className="font-semibold">Se vende al peso</span>
+                </label>
+              </div>
               <div className="flex items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent">
+                <label className="inline-flex min-h-12 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-accent">
                   📷 Foto<input type="file" accept="image/*" className="hidden" onChange={onFotoRapida} />
                 </label>
-                {nuevoProd.foto_url && <img src={urlFoto(nuevoProd.foto_url)} alt="" className="h-9 w-9 rounded object-cover" />}
+                {nuevoProd.foto_url && <img src={urlFoto(nuevoProd.foto_url)} alt="" className="h-11 w-11 rounded-md object-cover" />}
               </div>
             </div>
-            <div className="mt-4 flex gap-2">
-              <button type="button" onClick={() => crearProductoRapido(false)} disabled={!nuevoProd.nombre.trim() || !nuevoProd.precio || busy} className="btn-ghost flex-1 disabled:opacity-50">Crear</button>
-              <button type="button" onClick={() => crearProductoRapido(true)} disabled={!nuevoProd.nombre.trim() || !nuevoProd.precio || busy} className="btn-primary flex-1 disabled:opacity-50">Crear y añadir</button>
+            <div className="flex gap-2 border-t border-border bg-surface p-3">
+              <button type="button" onClick={() => setModalActivo(null)} className="min-h-12 rounded-md border border-border bg-card px-4 text-sm font-semibold hover:bg-accent">Cancelar</button>
+              <span className="flex-1" />
+              <button type="button" onClick={() => crearProductoRapido(false)} disabled={!nuevoProd.nombre.trim() || !nuevoProd.precio || busy}
+                className="min-h-12 rounded-md border border-brand bg-card px-5 text-sm font-bold text-brand transition-all hover:bg-brand/10 disabled:opacity-50">Guardar</button>
+              <button type="button" onClick={() => crearProductoRapido(true)} disabled={!nuevoProd.nombre.trim() || !nuevoProd.precio || busy}
+                className="min-h-12 rounded-md bg-brand px-5 text-sm font-bold text-white transition-all hover:bg-brand-hover disabled:opacity-50">Guardar y vender</button>
             </div>
-            <button type="button" onClick={() => setModalActivo(null)} className="btn-ghost mt-2 w-full">Cancelar</button>
           </div>
         </div>
       )}
@@ -3127,18 +3501,20 @@ export default function TPV() {
           onModulos={() => { setModalActivo(null); router.push("/modulos"); }}
           onCambiarTema={() => setSurfaceTheme(resolvedTheme === "dark" ? "light" : "dark")}
           onSalir={() => { setModalActivo(null); salirOperario(); }}
-          onNuevoArticulo={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "" }); setModalActivo('NUEVO_PROD'); }}
+          onNuevoArticulo={() => { setNuevoProd({ nombre: "", precio: "", clase: "REDUCIDO", categoryId: catSelEf ?? "", foto_url: "", estacion: "COCINA", vendido_por_peso: false, disponible: true }); setModalActivo('NUEVO_PROD'); }}
           onInvitacion={() => setModalActivo('INVITAR')}
           onClose={() => setModalActivo(null)}
         />
       )}
 
-      {/* ── Cobrar (CobrarModal): pago mixto, propina, descuento, F10/F11/F12 ── */}
+      {/* ── Cobrar (CobrarModal): pago mixto, propina, descuento, F10/F11/F12.
+             El total mostrado es el PENDIENTE (con cobros parciales, lo que falta). ── */}
       {modalActivo === 'COBRAR' && (
         <CobrarModal
-          total={total}
-          baseImponible={desgloseCobro.base}
-          impuesto={desgloseCobro.impuesto}
+          total={pendienteCuenta}
+          baseImponible={Math.round(desgloseCobro.base * (total > 0 ? pendienteCuenta / total : 1) * 100) / 100}
+          impuesto={Math.round(desgloseCobro.impuesto * (total > 0 ? pendienteCuenta / total : 1) * 100) / 100}
+          contexto={mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : undefined}
           cliente={cliente?.nombre}
           clienteNif={cliente?.nif ?? null}
           empleado={operario?.nombre}
@@ -3146,6 +3522,7 @@ export default function TPV() {
           formasPago={formasPago}
           onCobrar={cobrarDesdeModal}
           onImprimirCuenta={imprimirRecibo}
+          onDividir={() => setModalActivo('DIVIDIR')}
           onCancelar={() => setModalActivo(null)}
         />
       )}
