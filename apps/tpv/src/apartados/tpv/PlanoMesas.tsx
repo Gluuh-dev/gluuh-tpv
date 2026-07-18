@@ -49,10 +49,6 @@ export function PlanoMesas({
         <div className="ml-3 flex items-center gap-3">
           <Leyenda color="#34d399">Libre</Leyenda><Leyenda color="#f59e0b">Ocupada</Leyenda><Leyenda color="#38bdf8">Reservada</Leyenda>
         </div>
-        <span className="ml-auto flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-white/20 text-xs font-bold">{operario.slice(0, 1).toUpperCase()}</span>
-          <span className="hidden text-sm font-semibold sm:block">{operario}</span>
-        </span>
       </header>
 
       {/* Cuerpo: suelo + preview + rail */}

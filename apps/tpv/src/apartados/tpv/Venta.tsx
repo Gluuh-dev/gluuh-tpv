@@ -28,7 +28,7 @@ export function Venta({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <HeaderVenta operario={operario} onVolverPlano={() => onVista("salon")} />
+      <HeaderVenta onVolverPlano={() => onVista("salon")} />
 
       <div className={`flex min-h-0 flex-1 ${zurdo ? "flex-row-reverse" : ""}`}>
         <div className={`flex w-[532px] flex-none ${zurdo ? "border-l" : "border-r"} border-border bg-card`}>

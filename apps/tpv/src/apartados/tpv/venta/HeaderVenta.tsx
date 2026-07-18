@@ -3,7 +3,7 @@ import { useVenta } from "../store";
 
 // Cabecera morada de la venta: volver al plano · logo · contexto · comensales ·
 // buscador de productos · operario. Barra siempre morada (marca) en ambos temas.
-export function HeaderVenta({ operario, onVolverPlano }: Readonly<{ operario: string; onVolverPlano: () => void }>) {
+export function HeaderVenta({ onVolverPlano }: Readonly<{ onVolverPlano: () => void }>) {
   const contexto = useVenta((s) => s.contexto);
   const comensales = useVenta((s) => s.comensales);
   const setComensales = useVenta((s) => s.setComensales);
@@ -28,11 +28,6 @@ export function HeaderVenta({ operario, onVolverPlano }: Readonly<{ operario: st
         <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar producto…"
           className="h-9 w-full rounded-md bg-white/15 pl-9 pr-3 text-sm text-white outline-none placeholder:text-white/60" />
       </label>
-
-      <span className="flex items-center gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-white/20 text-xs font-bold">{operario.split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
-        <span className="hidden text-sm font-semibold sm:block">{operario}</span>
-      </span>
     </header>
   );
 }
