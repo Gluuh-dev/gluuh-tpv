@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+const NINGUNO = "__ninguno__"; // Radix Select no admite value=""
+
 const TERRITORIOS = [
   { v: "PENINSULA_BALEARES", t: "Península / Baleares (IVA)" },
   { v: "CANARIAS", t: "Canarias (IGIC)" },
@@ -54,6 +56,20 @@ export default function Ajustes() {
   async function guardarOrden() {
     try { await setSetting("GLOBAL", "tpv.funciones.orden", ordenBtns.map((b) => b.id)); setOrdenMsg("Guardado ✓"); }
     catch (e) { setOrdenMsg(`Error: ${e instanceof Error ? e.message : e}`); }
+  }
+
+  // Combinados (7.1): categoría de "con qué" (refrescos) para el flujo de combinar copas.
+  const [catsCombi, setCatsCombi] = useState<{ id: string; nombre: string }[]>([]);
+  const [mixerCat, setMixerCat] = useState("");
+  const [combiMsg, setCombiMsg] = useState("");
+  useEffect(() => {
+    sb.from("category").select("id,nombre").order("nombre").then(({ data }) => setCatsCombi((data as { id: string; nombre: string }[] | null) ?? []));
+    getSetting<string>("tpv.combinados.categoria_id").then((id) => { if (id) setMixerCat(id); }).catch(() => { /* sin configurar */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  async function guardarCombinados() {
+    try { await setSetting("GLOBAL", "tpv.combinados.categoria_id", mixerCat); setCombiMsg("Guardado ✓"); }
+    catch (e) { setCombiMsg(`Error: ${e instanceof Error ? e.message : e}`); }
   }
 
   useEffect(() => {
@@ -236,6 +252,29 @@ export default function Ajustes() {
           <div className="mt-3 flex items-center gap-3">
             <Button type="button" variant="outline" onClick={guardarOrden}>Guardar orden</Button>
             {ordenMsg && <span className="text-sm text-emerald-600">{ordenMsg}</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Combinados (copas)</CardTitle>
+          <CardDescription>Al vender una copa de una familia marcada como «combinable», el TPV pregunta el refresco de esta categoría. Sin categoría, el flujo no se activa.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="max-w-sm space-y-1.5">
+            <Label>Categoría de refrescos («con qué»)</Label>
+            <Select value={mixerCat || NINGUNO} onValueChange={(v) => setMixerCat(v === NINGUNO ? "" : v)}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Sin configurar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NINGUNO}>Sin combinados</SelectItem>
+                {catsCombi.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <Button type="button" variant="outline" onClick={guardarCombinados}>Guardar</Button>
+            {combiMsg && <span className="text-sm text-emerald-600">{combiMsg}</span>}
           </div>
         </CardContent>
       </Card>

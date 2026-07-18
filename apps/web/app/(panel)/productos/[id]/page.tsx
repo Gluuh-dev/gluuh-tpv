@@ -68,6 +68,8 @@ export default function ProductoEditar() {
   const [estacion, setEstacion] = useState<string>("COCINA");
   const [estacionHeredada, setEstacionHeredada] = useState(false);
   const [disponible, setDisponible] = useState(true);
+  // 0126: override de combinable respecto a la familia. "heredar" = null (manda la familia).
+  const [combinableOverride, setCombinableOverride] = useState<"heredar" | "si" | "no">("heredar");
   const [vendidoPorPeso, setVendidoPorPeso] = useState(false);
   const [plu, setPlu] = useState("");
   const [esPrincipal, setEsPrincipal] = useState(true);
@@ -142,7 +144,7 @@ export default function ProductoEditar() {
 
       const [pr, nr, p65] = await Promise.all([
         sb.from("product")
-          .select("nombre,precio,clase_fiscal,category_id,es_alcohol,estacion,disponible,vendido_por_peso,descripcion,codigo_barras,foto_url,alergenos")
+          .select("nombre,precio,clase_fiscal,category_id,es_alcohol,estacion,disponible,vendido_por_peso,descripcion,codigo_barras,foto_url,alergenos,combinable")
           .eq("id", id).maybeSingle(),
         sb.from("product").select("nombre_ticket,nombre_cocina").eq("id", id).maybeSingle(),
         sb.from("product").select("family_id,plu,es_principal,es_anadido,tiempo_preparacion_min,texto_boton,carta_nombre").eq("id", id).maybeSingle(),
@@ -151,6 +153,7 @@ export default function ProductoEditar() {
         nombre: string; precio: number; clase_fiscal: string | null; category_id: string | null;
         es_alcohol: boolean; estacion: string | null; disponible: boolean; vendido_por_peso: boolean;
         descripcion: string | null; codigo_barras: string | null; foto_url: string | null; alergenos: string[] | null;
+        combinable: boolean | null;
       } | null;
       if (!p) { setNoExiste(true); setCargando(false); return; }
 
@@ -161,6 +164,7 @@ export default function ProductoEditar() {
       setAlcohol(p.es_alcohol);
       setDisponible(p.disponible);
       setVendidoPorPeso(p.vendido_por_peso);
+      setCombinableOverride(p.combinable == null ? "heredar" : p.combinable ? "si" : "no");
       setDescripcion(p.descripcion ?? "");
       setCodigoBarras(p.codigo_barras ?? "");
       setFotoUrl(p.foto_url ?? "");
@@ -361,6 +365,7 @@ export default function ProductoEditar() {
       codigo_barras: codigoBarras.trim() || null,
       foto_url: fotoUrl || null,
       alergenos,
+      combinable: combinableOverride === "heredar" ? null : combinableOverride === "si",
     };
     if (nombres) {
       base.nombre_ticket = nombres.ticket.trim() || null;
@@ -506,6 +511,17 @@ export default function ProductoEditar() {
               <div className="flex items-center gap-2 text-sm">
                 <Switch id="p-peso" checked={vendidoPorPeso} onCheckedChange={setVendidoPorPeso} aria-label="Vendido por peso" />
                 <label htmlFor="p-peso">Vendido por peso (el precio es €/kg; al vender se teclea el peso)</label>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <label htmlFor="p-combinable">Combinable (al venderlo, pide el refresco)</label>
+                <Select value={combinableOverride} onValueChange={(v) => setCombinableOverride(v as "heredar" | "si" | "no")}>
+                  <SelectTrigger id="p-combinable" className="w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="heredar">Heredar de la familia</SelectItem>
+                    <SelectItem value="si">Sí, combinable</SelectItem>
+                    <SelectItem value="no">No combinable</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
