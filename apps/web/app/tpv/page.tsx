@@ -44,7 +44,7 @@ import { TecladoTPV } from "./components/TecladoTPV";
 import { RailSalas, type RailTab } from "./components/RailSalas";
 import { CerrarDiaModal, type Z } from "./components/CerrarDiaModal";
 import * as sonidos from "../lib/sonidos";
-import { useCatalogo, gruposDeProducto, categoriaDisponible, type Prod } from "../lib/catalogo-store";
+import { useCatalogo, gruposDeProducto, categoriaDisponible, esCombinable, type Prod } from "../lib/catalogo-store";
 import { CLASES_FISCALES, ivaAuto } from "@/lib/fiscal-clases";
 import { Plus, ChevronUp, ChevronDown, Search,
   Receipt, Store, Armchair, Sun, ShoppingBag, CalendarCheck,
@@ -261,6 +261,9 @@ export default function TPV() {
   const [ultimoDoc, setUltimoDoc] = useState<TicketImpresion | null>(null);
   const [modalActivo, setModalActivo] = useState<'CLIENTE' | 'PASAR_MESA' | 'UTILIDADES' | 'APARCADOS' | 'DIVIDIR' | 'INVITAR' | 'NUEVO_PROD' | 'COBRAR' | 'CERRAR_DIA' | 'RESUMEN_CAJA' | 'COBROS_PEND' | null>(null);
   const [cobrosPend, setCobrosPend] = useState<{ id: string; table_id: string | null; cliente_nombre: string | null; cliente_telefono: string | null; aparcado_como: string | null; total: number; created_at: string }[]>([]);
+  // Combinar copas (7.1): categoría de "con qué" (refrescos) y el picker abierto.
+  const [mixerCatId, setMixerCatId] = useState<string | null>(null);
+  const [combinando, setCombinando] = useState(false);
   // El Z de la jornada en curso, tal como está AHORA MISMO. Se pide al abrir el cierre.
   const [cierre, setCierre] = useState<{ jornada: { id: string; numero: number; abierta_en: string }; z: Z } | null>(null);
   const { resolvedTheme } = useTheme();
@@ -716,6 +719,9 @@ export default function TPV() {
 
   /* ── Config de la botonera de productos (columnas, foto, precio, tamaño de texto) ── */
   useEffect(() => {
+    getSetting<string>("tpv.combinados.categoria_id")
+      .then((id) => { if (id) setMixerCatId(id); })
+      .catch(() => { /* sin combinados configurados: el flujo no se activa */ });
     getSetting<Partial<BotonesConfig>>("tpv.botones")
       .then((c) => { if (c) setBotonesCfg((d) => ({ ...d, ...c })); })
       .catch(() => { /* sin config: defaults */ });
@@ -2204,6 +2210,10 @@ export default function TPV() {
     if ((formatos[p.id] ?? []).length) { setFormatoPop(p); return; }          // 1º: formato
     if ((gruposMod[p.id] ?? []).length) { abrirModificadores(p); return; }    // 2º: modificadores
     addProd(p.id);
+    // Combinado (7.1): si la copa es combinable y hay categoría de "con qué"
+    // configurada, tras añadirla se pregunta el refresco. (Copas con formato/
+    // modificadores no pasan por aquí: entran por sus pops; v2.)
+    if (mixerCatId && esCombinable({ prods, cats, families }, p.id)) setCombinando(true);
   }
   function abrirModificadores(p: Prod, fid?: string) {
     const key = addProd(claveDeLinea(p.id, fid, []));
@@ -3144,6 +3154,28 @@ export default function TPV() {
                 </button>
               ))}
               {aparcados.length === 0 && <p className="text-sm text-muted-foreground">No hay cuentas aparcadas.</p>}
+          </div>
+        </ModalTPV>
+      )}
+
+      {combinando && mixerCatId && (
+        <ModalTPV titulo="¿Con qué?" subtitulo="Combinado" onClose={() => setCombinando(false)} ancho={560} alto={520}>
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="grid min-h-0 flex-1 grid-cols-3 gap-2 overflow-auto p-4 content-start">
+              {prods.filter((r) => r.category_id === mixerCatId).map((r) => (
+                <button type="button" key={r.id} onClick={() => { addProd(r.id); setCombinando(false); }} className="flex min-h-16 items-center justify-center rounded-lg border border-border bg-card px-2 text-center text-sm font-semibold hover:bg-accent">
+                  {r.nombre}
+                </button>
+              ))}
+              {prods.filter((r) => r.category_id === mixerCatId).length === 0 && (
+                <p className="col-span-3 text-sm text-muted-foreground">La categoría de refrescos configurada no tiene productos.</p>
+              )}
+            </div>
+            <footer className="flex flex-none border-t border-border p-3">
+              <button type="button" onClick={() => setCombinando(false)} className="ml-auto rounded-md border border-border px-5 py-2.5 text-sm font-semibold hover:bg-accent">
+                Sin refresco
+              </button>
+            </footer>
           </div>
         </ModalTPV>
       )}
