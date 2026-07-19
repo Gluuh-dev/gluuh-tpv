@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  Delete, Euro, Mail, Percent, Split, X, XCircle,
+  Delete, Euro, Mail, Percent, Split, Tag, X, XCircle,
 } from "lucide-react";
 import { Modal, Select, CampoTexto } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo } from "./efectivo";
+import { imprimirTicket } from "../../../lib/impresion";
+import { construirTicketPrueba, DISENO_DEMO } from "./ticket-impresion";
 import { TIPOS_DOC_DEMO } from "../datos";
 import { useVenta } from "../store";
 
@@ -48,11 +50,19 @@ function CifraHdr({ label, valor, tono }: Readonly<{ label: string; valor: strin
   );
 }
 
-function FilaDato({ label, children, gris }: Readonly<{ label: string; children: React.ReactNode; gris?: boolean }>) {
+// Fila de la franja de datos (estilo profesional): etiqueta pequeña en mayúsculas
+// a la izquierda + valor en caja. `numero` alinea a la derecha; `cambiar` añade el
+// enlace "Cambiar" en color de marca. Sirve tanto para valores como para un select.
+function Campo({ label, children, gris, numero, cambiar }: Readonly<{ label: string; children: React.ReactNode; gris?: boolean; numero?: boolean; cambiar?: () => void }>) {
   return (
-    <div className="grid grid-cols-[92px_1fr] items-center gap-1.5">
-      <span className="rounded-md border border-border bg-surface px-2.5 py-2.5 text-xs font-semibold text-muted-foreground">{label}</span>
-      <div className={`flex min-h-11 items-center justify-end overflow-hidden whitespace-nowrap rounded-md border border-border px-2.5 text-right text-[13.5px] font-semibold ${gris ? "bg-surface text-muted-foreground" : "bg-card text-foreground"}`}>{children}</div>
+    <div className="grid grid-cols-[76px_1fr] items-center gap-2">
+      <span className="text-[10px] font-bold uppercase tracking-[.07em] text-muted-foreground">{label}</span>
+      {children === false ? null : (
+        <div className={`flex min-h-10 items-center gap-2 overflow-hidden rounded-md border border-border px-2.5 text-[13.5px] font-semibold ${gris ? "bg-surface text-muted-foreground" : "bg-card text-foreground"}`}>
+          <span className={`min-w-0 flex-1 truncate ${numero ? "text-right tabular-nums" : ""}`}>{children}</span>
+          {cambiar && <button type="button" onClick={cambiar} className="flex-none text-[11px] font-bold uppercase tracking-wide text-brand transition-transform active:scale-95">Cambiar</button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -65,6 +75,8 @@ export function CobrarModal({
   const sala = useVenta((s) => s.sala);
   const comensales = useVenta((s) => s.comensales);
   const empleado = "María Ruiz";
+  const terminal = "Terminal 1";
+  const serie = "A · 2026";
   const baseImponible = Math.round((total / 1.1) * 100) / 100;
   const impuesto = Math.round((total - baseImponible) * 100) / 100;
   const formasPago = FORMAS_PAGO;
@@ -72,9 +84,8 @@ export function CobrarModal({
 
   const [pagos, setPagos] = useState<LineaPago[]>([]);
   const [objetivo, setObjetivo] = useState<Objetivo>({ tipo: "pago" });
-  const [descuento, setDescuento] = useState(0);   // SIEMPRE en euros (lo que se resta)
-  const [descValor, setDescValor] = useState(0);   // lo TECLEADO (el % si es PCT, los € si es EUR)
-  const [descModo, setDescModo] = useState<"PCT" | "EUR">("EUR");
+  const [descuento, setDescuento] = useState(0);   // SIEMPRE en euros (fuente de verdad)
+  const [descModo, setDescModo] = useState<"PCT" | "EUR">("EUR"); // solo cómo se teclea/muestra
   const [propina, setPropina] = useState(0);
   const [display, setDisplay] = useState("");
   const [reemplazar, setReemplazar] = useState(true);
@@ -100,22 +111,19 @@ export function CobrarModal({
     setReemplazar(true);
   }
 
-  // Descuento en € o en %: como el teclado de la venta (DTO€ / DTO%). Pulsar el
-  // modo activo lo desactiva; cambiar de modo empieza a teclear de cero.
-  function elegirDescuento(modo: "PCT" | "EUR") {
-    // Pulsar el modo activo lo DESACTIVA y borra el descuento (re-habilita el otro).
-    if (objetivo.tipo === "descuento" && descModo === modo) {
-      setDescuento(0); setDescValor(0); seleccionar({ tipo: "pago" });
-      return;
-    }
-    setDescModo(modo);
-    setObjetivo({ tipo: "descuento" });
-    setDisplay("");
-    setReemplazar(true);
+  // Descuento: un solo botón con selector €/% integrado. El € es la fuente; el %
+  // es el mismo importe expresado sobre el total. Tocar el botón activa el tecleo;
+  // tocarlo de nuevo (ya activo) lo desactiva sin borrar el valor.
+  const descActivo = objetivo.tipo === "descuento";
+  const pctDesc = total > 0 ? Math.round((descuento / total) * 1000) / 10 : 0;
+  function activarDescuento() {
+    if (descActivo) { seleccionar({ tipo: "pago" }); return; }
+    setObjetivo({ tipo: "descuento" }); setDisplay(""); setReemplazar(true);
   }
-  const descActivo = (modo: "PCT" | "EUR") => objetivo.tipo === "descuento" && descModo === modo;
-  // El otro modo de descuento se DESACTIVA mientras haya un descuento puesto.
-  const descBloqueado = (modo: "PCT" | "EUR") => descuento > 0 && descModo !== modo;
+  function elegirModoDescuento(modo: "PCT" | "EUR") {
+    setDescModo(modo);
+    setObjetivo({ tipo: "descuento" }); setDisplay(""); setReemplazar(true);
+  }
 
   function pulsar(tecla: string) {
     setDisplay((prev) => {
@@ -127,9 +135,7 @@ export function CobrarModal({
       const n = Number(base) || 0;
       if (objetivo.tipo === "descuento") {
         // Dto € = importe directo; Dto % = porcentaje sobre el total (máx 100 %).
-        const pct = Math.min(n, 100);
-        const euros = descModo === "PCT" ? Math.round(total * pct) / 100 : n;
-        setDescValor(descModo === "PCT" ? pct : n);
+        const euros = descModo === "PCT" ? Math.round(total * Math.min(n, 100)) / 100 : n;
         setDescuento(Math.min(euros, total));
       } else if (objetivo.tipo === "propina") setPropina(n);
       return base;
@@ -161,12 +167,24 @@ export function CobrarModal({
     onCobrado(metodo);
   }
 
+  // Imprime el ticket de PRUEBA (proforma = cuenta sin cobrar; si no, ticket de
+  // venta). En navegador sale por `window.print()`; en Electron, por la térmica.
+  function imprimir(proforma: boolean) {
+    const t = construirTicketPrueba({
+      contexto, operario: empleado,
+      baseImponible, impuesto, total: importeACobrar,
+      descuento, propina, proforma,
+    });
+    void imprimirTicket(t, DISENO_DEMO);
+  }
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
       const enCampo = !!t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName);
-      if (e.key === "F10") { e.preventDefault(); onCerrar(); return; }
-      if (e.key === "F11" || e.key === "F12") { e.preventDefault(); cobrar(); return; }
+      if (e.key === "F10") { e.preventDefault(); imprimir(true); return; }
+      if (e.key === "F11") { e.preventDefault(); imprimir(false); cobrar(); return; }
+      if (e.key === "F12") { e.preventDefault(); cobrar(); return; }
       if (e.key === "Escape") { e.preventDefault(); onCerrar(); return; }
       if (e.key === "Enter" && puedeCobrar && !enCampo) { e.preventDefault(); cobrar(); return; }
       if (enCampo) return;
@@ -206,30 +224,35 @@ export function CobrarModal({
       </header>
 
       <div className="flex h-[80vh] max-h-[820px] min-h-0 flex-col bg-background text-foreground">
-        {/* Franja de datos */}
-        <div className="grid flex-none grid-cols-1 gap-x-3 gap-y-1.5 border-b border-border bg-card px-3 py-2.5 lg:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <FilaDato label="Cliente" gris={!cliente}><span className="truncate">{cliente ?? "Cliente contado"}</span></FilaDato>
-            <FilaDato label="Empleado">{empleado}</FilaDato>
-            <label className={`flex items-center gap-1.5 pl-1 ${cliente ? "" : "opacity-40"}`}>
-              <input type="checkbox" checked={enviarFactura} disabled={!cliente} onChange={(e) => setEnviarFactura(e.target.checked)} className="h-4 w-4 accent-(--brand)" />
-              <span className="text-[12.5px] font-medium">Enviar factura al cliente</span>
-            </label>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="grid grid-cols-[92px_1fr] items-center gap-1.5">
-              <span className="rounded-md border border-border bg-surface px-2.5 py-2.5 text-xs font-semibold text-muted-foreground">Tipo doc</span>
-              <Select value={tipoDoc} onChange={setTipoDoc} Icono={FileText}
-                opciones={tiposDoc.map((t) => ({ value: t, label: esCompleta(t) && !cliente ? `${t} (asigna cliente)` : t, disabled: esCompleta(t) && !cliente }))} />
+        {/* Franja de datos (3 columnas × 3 filas, estilo profesional) */}
+        <div className="flex-none border-b border-border bg-card px-3 py-2.5">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 lg:grid-cols-3">
+            {/* ponytail: «Cambiar» abrirá el selector de cliente/empleado al cablear el nodo; hoy no-op. */}
+            <div className="flex flex-col gap-1.5">
+              <Campo label="Cliente" gris={!cliente} cambiar={() => {}}><span className="truncate">{cliente ?? "Cliente contado"}</span></Campo>
+              <Campo label="Empleado" cambiar={() => {}}>{empleado}</Campo>
+              <Campo label="Terminal" gris>{terminal}</Campo>
             </div>
-            <FilaDato label="Fecha" gris>{ahora.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" })}</FilaDato>
-            <FilaDato label="Importe"><span className="text-[17px] font-bold tabular-nums">{eur(importeACobrar)}</span></FilaDato>
+            <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-[76px_1fr] items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[.07em] text-muted-foreground">Documento</span>
+                <Select value={tipoDoc} onChange={setTipoDoc} Icono={FileText}
+                  opciones={tiposDoc.map((t) => ({ value: t, label: esCompleta(t) && !cliente ? `${t} (asigna cliente)` : t, disabled: esCompleta(t) && !cliente }))} />
+              </div>
+              <Campo label="Fecha" gris>{ahora.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" })}</Campo>
+              <Campo label="Serie" gris>{serie}</Campo>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Campo label="Base imp." gris numero>{eur(baseImponible)}</Campo>
+              <Campo label="Impuestos" gris numero>{eur(impuesto)}</Campo>
+              <Campo label="Importe" numero><span className="text-[15px] font-bold">{eur(importeACobrar)}</span></Campo>
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <FilaDato label="B. imp." gris><span className="tabular-nums">{eur(baseImponible)}</span></FilaDato>
-            <FilaDato label="Impuesto" gris><span className="tabular-nums">{eur(impuesto)}</span></FilaDato>
-            <FilaDato label="Descuento"><span className="tabular-nums">{descuento > 0 ? `− ${eur(descuento)}` : "—"}</span></FilaDato>
-          </div>
+          <label className={`mt-2 flex items-center gap-2 ${cliente ? "" : "opacity-40"}`}>
+            <input type="checkbox" checked={enviarFactura} disabled={!cliente} onChange={(e) => setEnviarFactura(e.target.checked)} className="h-4 w-4 accent-(--brand)" />
+            <span className="text-[12.5px] font-medium">Enviar factura al cliente por email</span>
+            {descuento > 0 && <span className="ml-auto text-[12px] font-semibold text-brand tabular-nums">Descuento aplicado − {eur(descuento)}</span>}
+          </label>
         </div>
 
         {/* Cuerpo */}
@@ -259,27 +282,30 @@ export function CobrarModal({
               </div>
             </div>
 
-            <div className="grid flex-none grid-cols-3 gap-2.5">
-              <button type="button" onClick={() => elegirDescuento("PCT")} disabled={descBloqueado("PCT")}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-transform active:scale-[.97] disabled:opacity-35 ${descActivo("PCT") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                <span className="flex items-center gap-1.5 text-sm"><Percent size={15} /> Descuento</span>
-                {descModo === "PCT" && descuento > 0
-                  ? <span className="text-[15px] tabular-nums">{descValor} %</span>
-                  : <span className="text-[11px] font-semibold opacity-60">En porcentaje</span>}
-              </button>
-              <button type="button" onClick={() => elegirDescuento("EUR")} disabled={descBloqueado("EUR")}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-transform active:scale-[.97] disabled:opacity-35 ${descActivo("EUR") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                <span className="flex items-center gap-1.5 text-sm"><Euro size={15} /> Descuento</span>
-                {descModo === "EUR" && descuento > 0
-                  ? <span className="text-[15px] tabular-nums">{eur(descuento)}</span>
-                  : <span className="text-[11px] font-semibold opacity-60">En euros</span>}
-              </button>
+            <div className="flex flex-none gap-2.5">
+              {/* Descuento: un botón con selector €/% integrado y el valor a la vista. */}
+              <div className={`flex min-h-13 flex-1 items-center gap-2 rounded-lg border px-2.5 transition-colors ${descActivo ? "border-brand ring-1 ring-brand/40" : "border-border"} bg-card`}>
+                <button type="button" onClick={activarDescuento} className="flex min-w-0 flex-1 items-center gap-1.5 py-2 text-left transition-transform active:scale-[.99]">
+                  <Tag size={15} className="flex-none text-brand" />
+                  <span className="text-sm font-bold text-foreground">Descuento</span>
+                  {descuento > 0 && (
+                    <span className="truncate text-[13px] font-semibold tabular-nums text-muted-foreground">
+                      · {descModo === "PCT" ? `${pctDesc}% (${eur(descuento)})` : eur(descuento)}
+                    </span>
+                  )}
+                </button>
+                <div className="flex flex-none overflow-hidden rounded-md border border-border">
+                  <button type="button" onClick={() => elegirModoDescuento("EUR")} aria-label="Descuento en euros"
+                    className={`grid h-8 w-8 place-items-center text-sm font-bold transition-transform active:scale-90 ${descModo === "EUR" ? "bg-brand text-white" : "bg-surface text-muted-foreground"}`}><Euro size={15} /></button>
+                  <button type="button" onClick={() => elegirModoDescuento("PCT")} aria-label="Descuento en porcentaje"
+                    className={`grid h-8 w-8 place-items-center text-sm font-bold transition-transform active:scale-90 ${descModo === "PCT" ? "bg-brand text-white" : "bg-surface text-muted-foreground"}`}><Percent size={15} /></button>
+                </div>
+              </div>
+              {/* Propina: más pequeña, para que la fila quepa siempre. */}
               <button type="button" onClick={() => seleccionar(objetivo.tipo === "propina" ? { tipo: "pago" } : { tipo: "propina" })}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-transform active:scale-[.97] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                <span className="flex items-center gap-1.5 text-sm"><Coins size={15} /> Propina</span>
-                {propina > 0
-                  ? <span className="text-[15px] tabular-nums">{eur(propina)}</span>
-                  : <span className="text-[11px] font-semibold opacity-60">Opcional</span>}
+                className={`flex min-h-13 w-32 flex-none flex-col items-center justify-center rounded-lg border text-sm font-bold transition-transform active:scale-[.97] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                <span className="flex items-center gap-1.5"><Coins size={14} /> Propina</span>
+                {propina > 0 && <span className="text-[13px] tabular-nums opacity-85">{eur(propina)}</span>}
               </button>
             </div>
 
@@ -335,16 +361,17 @@ export function CobrarModal({
             <Split size={16} /> Dividir
           </button>
           <span className="flex-1" />
-          <button type="button" onClick={onCerrar} className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95">
-            <Mail size={16} /> Enviar por email
+          {/* Acciones de impresión/cobro: más chicas (F10/F11/F12). */}
+          <button type="button" onClick={onCerrar} className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-warning transition-transform active:scale-95">
+            <Mail size={14} /> Email
           </button>
-          <button type="button" onClick={onCerrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95">
+          <button type="button" onClick={() => imprimir(true)} className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-warning transition-transform active:scale-95">
             Imprimir cuenta (F10)
           </button>
-          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95 disabled:text-muted-foreground">
+          <button type="button" onClick={() => { imprimir(false); cobrar(); }} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-warning transition-transform active:scale-95 disabled:text-muted-foreground">
             Cobrar e imprimir (F11)
           </button>
-          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-cobro px-5 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">
+          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-cobro px-4 py-1.5 text-xs font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">
             Cobrar (F12)
           </button>
         </footer>
