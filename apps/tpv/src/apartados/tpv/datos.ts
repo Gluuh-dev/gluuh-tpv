@@ -79,6 +79,17 @@ export function colorCategoria(id: string): string {
   return CATEGORIAS_DEMO.find((c) => c.id === id)?.color ?? "#64748b";
 }
 
+// Clientes demo (para el ClienteModal). Se reemplazan por los del nodo.
+export interface ClienteDemo { id: string; nombre: string; telefono?: string; deuda?: number; alergias?: string }
+export const CLIENTES_DEMO: ClienteDemo[] = [
+  { id: "cl1", nombre: "Ana Torres", telefono: "600 111 222" },
+  { id: "cl2", nombre: "Bar Central S.L.", telefono: "954 33 44 55", deuda: 128.4 },
+  { id: "cl3", nombre: "Carlos Ruiz", telefono: "611 222 333", alergias: "Gluten, lactosa" },
+  { id: "cl4", nombre: "Diana Gómez", telefono: "622 333 444" },
+  { id: "cl5", nombre: "Eduardo Sanz", telefono: "633 444 555", deuda: 22.0 },
+  { id: "cl6", nombre: "Familia Pérez", telefono: "644 555 666" },
+];
+
 export const PRODUCTOS_DEMO: Producto[] = [
   // Populares (favoritos)
   { id: "pop1", nombre: "Alhambra 1925", precio: 1.4, categoria: "populares" },

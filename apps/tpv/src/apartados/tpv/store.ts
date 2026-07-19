@@ -12,10 +12,13 @@ function precioBase(id: string): number {
   return PRODUCTOS_DEMO.find((p) => p.id === id)?.precio ?? 0;
 }
 
+export interface Cliente { id: string; nombre: string; telefono?: string; deuda?: number; alergias?: string }
+
 export interface VentaState {
   contexto: string;
   comensales: number;
   alias: string;
+  cliente: Cliente | null;
 
   comanda: Record<string, number>;
   precios: Record<string, number>;
@@ -35,6 +38,7 @@ export interface VentaState {
   seleccionar: (id: string) => void;
   setComensales: (n: number) => void;
   setAlias: (a: string) => void;
+  setCliente: (c: Cliente | null) => void;
   setCatSel: (c: string | null) => void;
   setBusqueda: (b: string) => void;
   invitarLinea: (id: string) => void;
@@ -80,6 +84,7 @@ export const useVenta = create<VentaState>((set, get) => ({
   contexto: "",
   comensales: 1,
   alias: "",
+  cliente: null,
   comanda: {},
   precios: {},
   descuentos: {},
@@ -92,7 +97,7 @@ export const useVenta = create<VentaState>((set, get) => ({
   editando: false,
 
   iniciar: (contexto, comensales = 1) => set({
-    contexto, comensales, alias: "",
+    contexto, comensales, alias: "", cliente: null,
     comanda: {}, precios: {}, descuentos: {}, invitadas: {},
     lineaSel: null, buffer: "", modo: "UND", editando: false, busqueda: "",
   }),
@@ -105,6 +110,7 @@ export const useVenta = create<VentaState>((set, get) => ({
   seleccionar: (id) => set({ lineaSel: id, buffer: "", editando: false }),
   setComensales: (n) => set({ comensales: Math.max(1, n) }),
   setAlias: (a) => set({ alias: a }),
+  setCliente: (c) => set({ cliente: c }),
   setCatSel: (c) => set({ catSel: c }),
   setBusqueda: (b) => set({ busqueda: b }),
 

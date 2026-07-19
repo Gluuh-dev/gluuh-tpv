@@ -7,6 +7,7 @@ import { RailSalas } from "./RailSalas";
 import { BarraEstado } from "./venta/BarraEstado";
 import { CobrarModal } from "./venta/CobrarModal";
 import { InvitacionesModal } from "./venta/InvitacionesModal";
+import { ClienteModal } from "./venta/ClienteModal";
 import { useVenta } from "./store";
 import { SALAS_DEMO, type Mesa } from "./datos";
 
@@ -78,7 +79,8 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
 
       {modal === "cobrar" && <CobrarModal total={total} contexto={contexto} onCerrar={() => setModal(null)} onCobrado={cobrar} />}
       {modal === "invitar" && <InvitacionesModal onCerrar={() => setModal(null)} />}
-      {modal && modal !== "cobrar" && modal !== "invitar" && (
+      {modal === "cliente" && <ClienteModal onCerrar={() => setModal(null)} />}
+      {modal && !["cobrar", "invitar", "cliente"].includes(modal) && (
         <Modal onCerrar={() => setModal(null)} ancho="md" className="p-7">
           <div className="flex min-h-[220px] flex-col">
             <h2 className="mb-1 font-display text-xl font-bold">{TITULO_FUNCION[modal] ?? modal}</h2>
