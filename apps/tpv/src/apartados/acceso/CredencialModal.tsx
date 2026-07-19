@@ -81,55 +81,53 @@ export function CredencialModal({
 
   return (
     <Modal onCerrar={onCancelar} ancho={conGente ? "2xl" : "sm"} className="overflow-hidden">
-      <CabeceraModal Icono={Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} />
+      <CabeceraModal Icono={Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} tono="suave" />
 
-      <div className="p-6">
-        {demo && (
-          <p className="mb-4 inline-block rounded-full border border-amber/40 bg-amber/10 px-2.5 py-1 text-[11px] font-semibold text-paper">
-            Equipo de ejemplo — terminal sin emparejar
-          </p>
-        )}
+      {demo && (
+        <p className="border-b border-amber/30 bg-amber/10 px-6 py-2 text-[12px] font-semibold text-paper">
+          Equipo de ejemplo — terminal sin emparejar
+        </p>
+      )}
 
-        <div className={conGente ? "flex items-start gap-6" : ""}>
-          {conGente && (
-            <div className="min-w-0 flex-1">
-              <p className="pb-2 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">¿Quién eres?</p>
-              <ListaUsuarios
-                usuarios={usuarios!}
-                requiere={requiere}
-                elegido={elegido}
-                onElegir={elegir}
-                onPulsera={demo ? () => onOk() : undefined}
-              />
-            </div>
-          )}
-
-          <div className={conGente ? "w-60 flex-none" : "mx-auto w-full max-w-xs"}>
-            <p className="pb-2 text-center text-[13px] font-semibold text-paper/85">
-              {elegido ? `PIN de ${elegido.nombre}` : "Marca tu PIN"}
-            </p>
-            <div className="flex justify-center gap-3">
-              {Array.from({ length: LARGO }).map((_, i) => {
-                let clase = "border-paper/30";
-                if (error) clase = "border-danger bg-danger/40";
-                else if (i < pin.length) clase = "border-brand-lit bg-brand-lit";
-                return <span key={`p${i}`} className={`h-3.5 w-3.5 rounded-full border transition-colors ${clase}`} />;
-              })}
-            </div>
-            <p className={`mb-1 mt-1.5 text-center text-sm font-medium ${error ? "text-danger" : "text-transparent"}`}>PIN incorrecto o sin acceso</p>
-
-            <TecladoNumerico
-              onDigito={pulsa}
-              onBorrar={() => { setError(false); setPin((p) => p.slice(0, -1)); }}
-              deshabilitado={verificando}
-              botonIzquierda={
-                <button type="button" onClick={onCancelar}
-                  className="rounded-2xl border border-line bg-paper/5 py-4 text-sm font-semibold text-muted transition-transform active:scale-90">
-                  Cancelar
-                </button>
-              }
+      <div className={conGente ? "flex items-stretch gap-6 p-6" : "p-6"}>
+        {conGente && (
+          <div className="flex min-w-0 flex-1 flex-col">
+            <p className="pb-2.5 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">¿Quién eres?</p>
+            <ListaUsuarios
+              usuarios={usuarios!}
+              requiere={requiere}
+              elegido={elegido}
+              onElegir={elegir}
+              onPulsera={demo ? () => onOk() : undefined}
             />
           </div>
+        )}
+
+        <div className={conGente ? "w-60 flex-none" : "mx-auto w-full max-w-xs"}>
+          <p className="truncate pb-2.5 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">
+            {elegido ? `PIN de ${elegido.nombre}` : "Tu PIN"}
+          </p>
+          <div className="flex justify-center gap-3.5 pt-1">
+            {Array.from({ length: LARGO }).map((_, i) => {
+              let clase = "border-paper/30";
+              if (error) clase = "border-danger bg-danger/40";
+              else if (i < pin.length) clase = "border-brand-lit bg-brand-lit";
+              return <span key={`p${i}`} className={`h-4 w-4 rounded-full border transition-colors ${clase}`} />;
+            })}
+          </div>
+          <p className={`mb-1.5 mt-2 text-center text-[13px] font-medium ${error ? "text-danger" : "text-transparent"}`}>PIN incorrecto o sin acceso</p>
+
+          <TecladoNumerico
+            onDigito={pulsa}
+            onBorrar={() => { setError(false); setPin((p) => p.slice(0, -1)); }}
+            deshabilitado={verificando}
+            botonIzquierda={
+              <button type="button" onClick={onCancelar}
+                className="rounded-2xl border border-line bg-paper/5 py-4 text-sm font-semibold text-muted transition-transform active:scale-90">
+                Cancelar
+              </button>
+            }
+          />
         </div>
       </div>
     </Modal>

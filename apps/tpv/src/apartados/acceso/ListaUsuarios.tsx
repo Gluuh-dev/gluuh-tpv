@@ -16,8 +16,8 @@ export function ListaUsuarios({
   onPulsera?: () => void;
 }>) {
   return (
-    <div>
-      <div className="grid max-h-85 grid-cols-2 gap-2.5 overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2.5 overflow-y-auto">
         {usuarios.map((u) => {
           const puede = cumpleRol(u.rol, requiere);
           const activo = elegido?.id === u.id;
