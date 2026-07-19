@@ -1,6 +1,6 @@
 import { PRODUCTOS_DEMO } from "../datos";
 import { useVenta } from "../store";
-import type { TicketImpresion, DisenoTicket } from "../../../lib/impresion";
+import type { TicketImpresion, DisenoTicket, ComandaImpresion } from "../../../lib/impresion";
 
 // Construye el TicketImpresion a partir del carrito de la venta (store) para
 // IMPRIMIR DE PRUEBA al cobrar. `esPrueba: true` y sin QR/huella → no toca
@@ -50,4 +50,30 @@ export function construirTicketPrueba(opts: Readonly<{
     esPrueba: true,
     proforma: opts.proforma,
   };
+}
+
+// ── MARCHAR: comanda(s) de cocina/barra, agrupadas por ESTACIÓN ──
+// La estación real la hereda el producto de su familia (config del panel). En la
+// demo no hay estación por producto, así que se deduce de la categoría: bebidas →
+// BARRA, el resto → COCINA. Al cablear el nodo, se sustituye por la estación real.
+export type Estacion = "COCINA" | "BARRA";
+const CATEGORIAS_BARRA = new Set(["cervezas", "vinos", "refrescos", "cafes", "copas", "combinados", "bebidas"]);
+
+export function estacionDeCategoria(categoria: string): Estacion {
+  return CATEGORIAS_BARRA.has(categoria) ? "BARRA" : "COCINA";
+}
+
+/** Comanda(s) a marchar desde el carrito, una por estación con productos. */
+export function construirComandas(contexto: string, operario?: string): { estacion: Estacion; comanda: ComandaImpresion }[] {
+  const s = useVenta.getState();
+  const porEstacion: Record<Estacion, ComandaImpresion["lineas"]> = { COCINA: [], BARRA: [] };
+  for (const [id, q] of Object.entries(s.comanda)) {
+    if (q <= 0) continue;
+    const base = id.split("|")[0]!;
+    const p = PRODUCTOS_DEMO.find((x) => x.id === base);
+    porEstacion[estacionDeCategoria(p?.categoria ?? "")].push({ cantidad: q, nombre: p?.nombre ?? base });
+  }
+  return (["COCINA", "BARRA"] as Estacion[])
+    .filter((e) => porEstacion[e].length > 0)
+    .map((e) => ({ estacion: e, comanda: { contexto: contexto || "Barra", operario, lineas: porEstacion[e] } }));
 }

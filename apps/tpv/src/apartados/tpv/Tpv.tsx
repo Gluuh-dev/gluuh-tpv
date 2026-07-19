@@ -9,6 +9,8 @@ import { CobrarModal } from "./venta/CobrarModal";
 import { InvitacionesModal } from "./venta/InvitacionesModal";
 import { ClienteModal } from "./venta/ClienteModal";
 import { UtilidadesModal } from "./venta/UtilidadesModal";
+import { imprimirComanda } from "../../lib/impresion";
+import { construirComandas } from "./venta/ticket-impresion";
 import { useVenta } from "./store";
 import { SALAS_DEMO, type Mesa } from "./datos";
 
@@ -59,7 +61,16 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const abrirMesa = (mesa: Mesa) => { iniciar(`Mesa ${mesa.nombre}`, mesa.comensales ?? 1, SALAS_DEMO.find((s) => s.id === vista)?.nombre ?? ""); setVista("ticket"); };
   const nuevaBarra = () => { iniciar("Barra", 1, "Barra"); setVista("ticket"); };
   const cobrar = (metodo: string) => { setCobrado(`Cobrado ${eur(total)} · ${metodo === "EFECTIVO" ? "Contado" : metodo}`); vaciar(); setModal(null); setVista(SALAS_DEMO[0]!.id); };
-  const onFuncion = (f: string) => setModal(f);
+
+  // Marchar: manda la comanda a cocina/barra (una impresión por estación, según
+  // la estación de cada producto). NO cobra ni vacía: la cuenta sigue abierta.
+  const marchar = () => {
+    const comandas = construirComandas(contexto, OPERARIO);
+    if (!comandas.length) { setCobrado("No hay nada que marchar"); return; }
+    for (const { estacion, comanda } of comandas) void imprimirComanda(comanda, `COMANDA · ${estacion}`);
+    setCobrado(`Marchado a ${comandas.map((c) => c.estacion).join(" y ")}`);
+  };
+  const onFuncion = (f: string) => { if (f === "marchar") { marchar(); return; } setModal(f); };
 
   const esSala = SALAS_DEMO.some((s) => s.id === vista);
 

@@ -198,3 +198,43 @@ export async function imprimirTicket(t: TicketImpresion, d: DisenoTicket = {}): 
   }
   imprimirEnNavegador(lineas, anchoMm);
 }
+
+// ── COMANDA de cocina/barra: el OTRO documento — SIN precios, para la partida —
+// El destino depende de la estación del producto (COCINA/BARRA…): al marchar,
+// cada grupo sale por la impresora de su estación (aquí, una impresión por
+// estación). Portado de apps/web/app/lib/impresion.ts (sin pases, que la demo
+// aún no tiene).
+
+export interface ComandaImpresion {
+  contexto: string;
+  operario?: string;
+  nota?: string;
+  lineas: { cantidad: number; nombre: string; nota?: string }[];
+}
+
+export function formatearComanda(c: ComandaImpresion, titulo: string, anchoMm: 58 | 80 = 80): string[] {
+  const ancho = columnas(anchoMm);
+  const raya = "-".repeat(ancho);
+  const hora = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const l: string[] = [centrar(titulo, ancho), raya, fila(c.contexto, hora, ancho)];
+  if (c.operario) l.push(`Camarero: ${c.operario}`);
+  if (c.nota?.trim()) l.push(raya, `** AVISO: ${c.nota.trim()} **`);
+  l.push(raya);
+  for (const li of c.lineas) {
+    l.push(`${li.cantidad} x ${li.nombre}`);
+    if (li.nota?.trim()) l.push(`   > ${li.nota.trim()}`);
+  }
+  l.push(raya, "", "", "");
+  return l;
+}
+
+/** Imprime una comanda: por la térmica de su estación en Electron, o en navegador. */
+export async function imprimirComanda(c: ComandaImpresion, titulo: string, anchoMm: 58 | 80 = 80): Promise<void> {
+  const lineas = formatearComanda(c, titulo, anchoMm);
+  const gluuh = typeof window !== "undefined" ? window.gluuh : undefined;
+  if (gluuh) {
+    await gluuh.imprimir({ lineas, cortar: true });
+    return;
+  }
+  imprimirEnNavegador(lineas, anchoMm);
+}
