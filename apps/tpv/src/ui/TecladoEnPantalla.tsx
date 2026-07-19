@@ -46,8 +46,15 @@ export function TecladoEnPantalla() {
   const [simbolos, setSimbolos] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [popup, setPopup] = useState<{ opts: string[]; x: number; y: number } | null>(null);
+  // Auto-teclado: aparece al enfocar un input y desaparece al tocar fuera.
+  const [auto, setAuto] = useState(() => leerAuto());
+  // Espejo del campo que se está escribiendo (nombre + texto), para la barra.
+  const [campo, setCampo] = useState("Campo");
+  const [texto, setTexto] = useState("");
 
   const objetivo = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const autoRef = useRef(auto);
   const arrastre = useRef<{ dx: number; dy: number } | null>(null);
   const tempLargo = useRef<ReturnType<typeof setTimeout> | null>(null);
   const largoDisparado = useRef(false);
@@ -60,26 +67,53 @@ export function TecladoEnPantalla() {
     } catch { /* sin persistencia */ }
   }, []);
 
+  useEffect(() => { autoRef.current = auto; }, [auto]);
+
+  // Refleja el campo enfocado en la barra: su nombre (aria-label/placeholder) y su texto.
+  const refrescar = useCallback(() => {
+    const el = objetivo.current;
+    setCampo(el?.getAttribute("aria-label") || el?.getAttribute("placeholder") || "Campo");
+    setTexto(el?.value ?? "");
+  }, []);
+
   useEffect(() => {
     const alEnfocar = (e: FocusEvent) => {
-      if (esEditable(e.target as Element)) objetivo.current = e.target as HTMLInputElement;
+      if (!esEditable(e.target as Element)) return;
+      objetivo.current = e.target as HTMLInputElement;
+      refrescar();
+      if (autoRef.current) setAbierto(true); // auto-teclado: aparece al enfocar un input
     };
     document.addEventListener("focusin", alEnfocar);
     return () => document.removeEventListener("focusin", alEnfocar);
-  }, []);
+  }, [refrescar]);
 
   const guardarAbierto = useCallback((v: boolean) => setAbierto(v), []);
 
   useEffect(() => {
-    const abrir = () => guardarAbierto(true);
+    const abrir = () => { refrescar(); guardarAbierto(true); };
     const cerrar = () => guardarAbierto(false);
+    const cambiarAuto = (e: Event) => setAuto(!!(e as CustomEvent<boolean>).detail);
     window.addEventListener("gluuh:abrir-teclado", abrir);
     window.addEventListener("gluuh:cerrar-teclado", cerrar);
+    window.addEventListener("gluuh:teclado-auto", cambiarAuto);
     return () => {
       window.removeEventListener("gluuh:abrir-teclado", abrir);
       window.removeEventListener("gluuh:cerrar-teclado", cerrar);
+      window.removeEventListener("gluuh:teclado-auto", cambiarAuto);
     };
-  }, [guardarAbierto]);
+  }, [guardarAbierto, refrescar]);
+
+  // Auto-teclado: al tocar fuera del teclado y fuera de un input, se oculta.
+  useEffect(() => {
+    if (!auto) return;
+    const alTocar = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (panelRef.current?.contains(t) || esEditable(t)) return;
+      guardarAbierto(false);
+    };
+    document.addEventListener("pointerdown", alTocar);
+    return () => document.removeEventListener("pointerdown", alTocar);
+  }, [auto, guardarAbierto]);
 
   const enfocar = useCallback(() => {
     const el = objetivo.current;
@@ -97,6 +131,7 @@ export function TecladoEnPantalla() {
       el.selectionStart = el.selectionEnd = ini + ch.length;
       el.dispatchEvent(new Event("input", { bubbles: true }));
     }
+    setTexto(objetivo.current?.value ?? "");
   }, [enfocar]);
 
   const borrar = useCallback(() => {
@@ -110,6 +145,7 @@ export function TecladoEnPantalla() {
         el.dispatchEvent(new Event("input", { bubbles: true }));
       }
     }
+    setTexto(objetivo.current?.value ?? "");
   }, [enfocar]);
 
   const intro = useCallback(() => {
@@ -181,10 +217,15 @@ export function TecladoEnPantalla() {
   );
 
   return (
-    <div style={{ ...panel, left: x, top: y }} role="group" aria-label="Teclado en pantalla">
-      <div style={barra} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar}>
-        <span style={{ opacity: 0.8 }}>⌨ Teclado — arrástrame si tapo el campo</span>
+    <div ref={panelRef} style={{ ...panel, left: x, top: y }} role="group" aria-label="Teclado en pantalla">
+      <div style={barra}>
+        <span style={etiquetaCampo}>{campo}</span>
+        <div style={visor}>
+          {texto ? <span>{texto}</span> : <span style={{ opacity: 0.5 }}>Escribe…</span>}
+          <span style={cursor} />
+        </div>
         <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
+        <button type="button" onMouseDown={noRobarFoco} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar} style={agarre} aria-label="Arrastrar teclado" title="Arrástrame para mover el teclado">⠿</button>
       </div>
 
       <div style={teclas}>
@@ -227,6 +268,19 @@ export function abrirTeclado() {
   window.dispatchEvent(new Event("gluuh:abrir-teclado"));
 }
 
+const CLAVE_AUTO = "gluuh_teclado_auto";
+function leerAuto(): boolean {
+  try { return localStorage.getItem(CLAVE_AUTO) === "1"; } catch { return false; }
+}
+/** ¿Está activo el auto-teclado? (aparece al enfocar un input, desaparece al tocar fuera). */
+export function getTecladoAuto(): boolean { return leerAuto(); }
+/** Activa/desactiva el auto-teclado; lo persiste y avisa a <TecladoEnPantalla/>. */
+export function setTecladoAuto(v: boolean) {
+  try { localStorage.setItem(CLAVE_AUTO, v ? "1" : "0"); } catch { /* noop */ }
+  window.dispatchEvent(new CustomEvent("gluuh:teclado-auto", { detail: v }));
+  if (!v) window.dispatchEvent(new Event("gluuh:cerrar-teclado"));
+}
+
 // ── estilos: SIGUEN EL TEMA (tokens de la operativa) → claro y oscuro ──
 const panel: React.CSSProperties = {
   position: "fixed", zIndex: 2147483000, width: 640, maxWidth: "calc(100vw - 8px)",
@@ -235,12 +289,27 @@ const panel: React.CSSProperties = {
   fontFamily: 'var(--font-sans), system-ui, "Segoe UI", sans-serif', userSelect: "none",
 };
 const barra: React.CSSProperties = {
-  display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: "8px 12px", cursor: "move", borderBottom: "1px solid var(--line)",
-  fontSize: 12, color: "var(--muted)", touchAction: "none",
+  display: "flex", alignItems: "center", gap: 8,
+  padding: "7px 8px 7px 12px", borderBottom: "1px solid var(--line)",
+  fontSize: 12, color: "var(--muted)",
+};
+const etiquetaCampo: React.CSSProperties = {
+  flexShrink: 0, textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700, fontSize: 10, opacity: 0.75,
+};
+const visor: React.CSSProperties = {
+  flex: 1, minWidth: 0, display: "flex", alignItems: "center", overflow: "hidden", whiteSpace: "nowrap",
+  height: 30, padding: "0 10px", borderRadius: 8,
+  background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--paper)", fontSize: 14, fontWeight: 600,
+};
+const cursor: React.CSSProperties = {
+  width: 1, height: 16, marginLeft: 1, background: "var(--paper)", animation: "gl-velo 1s steps(1) infinite alternate",
 };
 const cerrar: React.CSSProperties = {
-  background: "transparent", border: 0, color: "var(--paper)", fontSize: 16, cursor: "pointer", padding: "2px 8px", borderRadius: 6,
+  background: "transparent", border: 0, color: "var(--paper)", fontSize: 16, cursor: "pointer", padding: "2px 8px", borderRadius: 6, flexShrink: 0,
+};
+const agarre: React.CSSProperties = {
+  flexShrink: 0, cursor: "move", touchAction: "none", padding: "2px 10px", borderRadius: 8,
+  background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--muted)", fontSize: 18, lineHeight: 1,
 };
 const teclas: React.CSSProperties = { padding: 8, display: "flex", flexDirection: "column", gap: 6, height: 8 + 5 * 48 + 4 * 6 + 8 };
 const fila: React.CSSProperties = { display: "flex", gap: 6, flex: 1 };

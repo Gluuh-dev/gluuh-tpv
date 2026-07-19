@@ -7,6 +7,6 @@ export { Fkey } from "./Fkey";
 export { Chip } from "./Chip";
 export { Marca } from "./Marca";
 export { TecladoNumerico } from "./TecladoNumerico";
-export { TecladoEnPantalla, abrirTeclado } from "./TecladoEnPantalla";
+export { TecladoEnPantalla, abrirTeclado, getTecladoAuto, setTecladoAuto } from "./TecladoEnPantalla";
 export { EnObras } from "./EnObras";
 export { MarcoApartado } from "./MarcoApartado";

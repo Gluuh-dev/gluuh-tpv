@@ -1,6 +1,20 @@
-import { Monitor, MapPin, Wifi, CircleDot } from "lucide-react";
+import { useState } from "react";
+import { Monitor, MapPin, Wifi, CircleDot, Keyboard } from "lucide-react";
+import { getTecladoAuto, setTecladoAuto } from "../../../ui";
 
 function Sep() { return <span className="h-3.5 w-px bg-border" />; }
+
+// Interruptor del auto-teclado: al activarlo, tocar un input saca el teclado en
+// pantalla; tocar fuera lo oculta. Se persiste en localStorage (getTecladoAuto).
+function ToggleAutoTeclado() {
+  const [on, setOn] = useState(getTecladoAuto);
+  return (
+    <label className="flex cursor-pointer items-center gap-2 select-none" title="Mostrar el teclado en pantalla al tocar un campo">
+      <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setTecladoAuto(e.target.checked); }} className="accent-[color:var(--brand)]" />
+      <Keyboard size={13} /> Auto-teclado
+    </label>
+  );
+}
 
 // Pie de la operativa: operario, terminal, contexto, caja, modo zurdo, conexión.
 export function BarraEstado({
@@ -19,8 +33,10 @@ export function BarraEstado({
       <Sep />
       <span className="flex items-center gap-1.5 text-success"><CircleDot size={13} /> Caja abierta</span>
 
-      <label className="ml-auto flex cursor-pointer items-center gap-2 select-none">
-        <input type="checkbox" checked={zurdo} onChange={(e) => onZurdo(e.target.checked)} className="accent-[color:var(--brand)]" />
+      <span className="ml-auto"><ToggleAutoTeclado /></span>
+      <Sep />
+      <label className="flex cursor-pointer items-center gap-2 select-none">
+        <input type="checkbox" checked={zurdo} onChange={(e) => onZurdo(e.target.checked)} className="accent-(--brand)" />
         Modo zurdo
       </label>
       <Sep />
