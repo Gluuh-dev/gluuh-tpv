@@ -38,6 +38,7 @@ export interface VentaState {
   setCatSel: (c: string | null) => void;
   setBusqueda: (b: string) => void;
   invitarLinea: (id: string) => void;
+  invitarTodo: (v: boolean) => void;
   anularLinea: (id: string) => void;
   vaciar: () => void;
 
@@ -108,6 +109,7 @@ export const useVenta = create<VentaState>((set, get) => ({
   setBusqueda: (b) => set({ busqueda: b }),
 
   invitarLinea: (id) => set((s) => ({ invitadas: { ...s.invitadas, [id]: !s.invitadas[id] } })),
+  invitarTodo: (v) => set((s) => ({ invitadas: v ? Object.fromEntries(Object.keys(s.comanda).map((id) => [id, true])) : {} })),
 
   anularLinea: (id) => set((s) => {
     const comanda = { ...s.comanda }; delete comanda[id];
