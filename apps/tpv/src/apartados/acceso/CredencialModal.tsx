@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { type LucideIcon } from "lucide-react";
+import { Nfc, type LucideIcon } from "lucide-react";
 import { Modal, CabeceraModal, TecladoNumerico } from "../../ui";
 import { ETIQUETA_ROL, type Rol } from "../../lib/nav";
 import { ListaUsuarios } from "./ListaUsuarios";
 import type { Usuario } from "./tipos";
 
 const LARGO = 4;
+const PUNTOS = ["p0", "p1", "p2", "p3"]; // claves estables de los puntos del PIN
 
 // PUERTA DE CREDENCIAL reutilizable, TÁCTIL y de una sola vista: la gente a la
 // izquierda y el teclado del PIN a la derecha, a la vista a la vez (sin pasos).
@@ -79,6 +80,10 @@ export function CredencialModal({
   const exige = requiere === "operario" ? "" : `Requiere ${ETIQUETA_ROL[requiere]} · `;
   const sub = exige + "PIN o pulsera";
 
+  let etiquetaPin = "Tu PIN";
+  if (error) etiquetaPin = "PIN incorrecto";
+  else if (elegido) etiquetaPin = `PIN · ${elegido.nombre}`;
+
   return (
     <Modal onCerrar={onCancelar} ancho={conGente ? "2xl" : "sm"} className="overflow-hidden">
       <CabeceraModal Icono={Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} tono="suave" />
@@ -89,47 +94,59 @@ export function CredencialModal({
         </p>
       )}
 
-      <div className={conGente ? "flex items-stretch gap-6 p-6" : "p-6"}>
+      <div className={`px-6 pt-5 ${demo ? "" : "pb-6"} ${conGente ? "flex items-stretch gap-6" : ""}`}>
         {conGente && (
           <div className="flex min-w-0 flex-1 flex-col">
-            <p className="pb-2.5 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">¿Quién eres?</p>
-            <ListaUsuarios
-              usuarios={usuarios!}
-              requiere={requiere}
-              elegido={elegido}
-              onElegir={elegir}
-              onPulsera={demo ? () => onOk() : undefined}
-            />
+            <div className="flex h-7 flex-none items-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[.14em] text-muted">¿Quién eres?</p>
+            </div>
+            <ListaUsuarios usuarios={usuarios!} requiere={requiere} elegido={elegido} onElegir={elegir} />
           </div>
         )}
 
-        <div className={conGente ? "w-60 flex-none" : "mx-auto w-full max-w-xs"}>
-          <p className="truncate pb-2.5 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">
-            {elegido ? `PIN de ${elegido.nombre}` : "Tu PIN"}
-          </p>
-          <div className="flex justify-center gap-3.5 pt-1">
-            {Array.from({ length: LARGO }).map((_, i) => {
-              let clase = "border-paper/30";
-              if (error) clase = "border-danger bg-danger/40";
-              else if (i < pin.length) clase = "border-brand-lit bg-brand-lit";
-              return <span key={`p${i}`} className={`h-4 w-4 rounded-full border transition-colors ${clase}`} />;
-            })}
+        <div className={conGente ? "flex w-60 flex-none flex-col" : "mx-auto w-full max-w-xs"}>
+          {/* Rótulo + puntos del PIN en LA MISMA fila → las teclas arrancan al
+              nivel de las tarjetas de la izquierda (no empujadas hacia abajo). */}
+          <div className="flex h-7 flex-none items-center justify-between gap-2">
+            <p className={`truncate text-[11px] font-semibold uppercase tracking-[.14em] ${error ? "text-danger" : "text-muted"}`}>
+              {etiquetaPin}
+            </p>
+            <div className="flex flex-none gap-2">
+              {PUNTOS.map((k, i) => {
+                let clase = "border-paper/30";
+                if (error) clase = "border-danger bg-danger/40";
+                else if (i < pin.length) clase = "border-brand-lit bg-brand-lit";
+                return <span key={k} className={`h-3 w-3 rounded-full border transition-colors ${clase}`} />;
+              })}
+            </div>
           </div>
-          <p className={`mb-1.5 mt-2 text-center text-[13px] font-medium ${error ? "text-danger" : "text-transparent"}`}>PIN incorrecto o sin acceso</p>
 
-          <TecladoNumerico
-            onDigito={pulsa}
-            onBorrar={() => { setError(false); setPin((p) => p.slice(0, -1)); }}
-            deshabilitado={verificando}
-            botonIzquierda={
-              <button type="button" onClick={onCancelar}
-                className="rounded-2xl border border-line bg-paper/5 py-4 text-sm font-semibold text-muted transition-transform active:scale-90">
-                Cancelar
-              </button>
-            }
-          />
+          <div className="pt-3">
+            <TecladoNumerico
+              onDigito={pulsa}
+              onBorrar={() => { setError(false); setPin((p) => p.slice(0, -1)); }}
+              deshabilitado={verificando}
+              botonIzquierda={
+                <button type="button" onClick={onCancelar}
+                  className="rounded-2xl border border-line bg-paper/5 py-4 text-sm font-semibold text-muted transition-transform active:scale-90">
+                  Cancelar
+                </button>
+              }
+            />
+          </div>
         </div>
       </div>
+
+      {/* Pulsera a todo el ancho como pie: no descuadra las columnas (solo en
+          demo; con lector real llegará por su propio camino). */}
+      {demo && (
+        <div className="px-6 pb-6 pt-4">
+          <button type="button" onClick={() => onOk(elegido ?? undefined)}
+            className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-dashed border-brand-lit/40 bg-brand/10 py-3 text-sm font-semibold text-brand-lit transition-transform active:scale-[.98] active:bg-brand/20">
+            <Nfc size={18} /> …o acerca tu pulsera o tarjeta
+          </button>
+        </div>
+      )}
     </Modal>
   );
 }

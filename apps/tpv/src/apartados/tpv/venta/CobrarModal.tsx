@@ -67,7 +67,7 @@ export function CobrarModal({
   const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
   const notasRef = useRef<HTMLInputElement>(null);
-  const [tipoDoc, setTipoDoc] = useState(tiposDoc[0]!);
+  const [tipoDoc, setTipoDoc] = useState<string>(tiposDoc[0]!);
   const [enviarFactura, setEnviarFactura] = useState(false);
   const [ahora] = useState(() => new Date());
 
