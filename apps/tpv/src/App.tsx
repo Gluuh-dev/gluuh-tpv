@@ -9,8 +9,9 @@ import { CredencialModal } from "./apartados/acceso/CredencialModal";
 import { AyudaModal } from "./apartados/ayuda/AyudaModal";
 import { APARTADOS } from "./apartados/meta";
 import { TecladoEnPantalla } from "./ui";
+import { cargarOperarios, validarPin } from "./apartados/acceso/operarios";
 import type { Usuario } from "./apartados/acceso/tipos";
-import { TECLA_A_VISTA, type Vista, type Apartado } from "./lib/nav";
+import { cumpleRol, TECLA_A_VISTA, type Vista, type Apartado, type Rol } from "./lib/nav";
 
 // Datos DEMO. Se reemplazan por los reales del nodo (identidad del local + jornada
 // + operarios del terminal) al cablear la SPA; la forma no cambia.
@@ -41,6 +42,23 @@ export function App() {
   // a entrar SIEMPRE vuelve a pedir PIN/pulsera (control de acceso del bar).
   const [pendiente, setPendiente] = useState<Apartado | null>(null);
   const [ayuda, setAyuda] = useState(false);
+
+  // El equipo del terminal: el REAL del nodo si hay sesión de dispositivo;
+  // si no (sin emparejar), la demo marcada como ejemplo.
+  const [equipo, setEquipo] = useState<{ usuarios: Usuario[]; demo: boolean }>({ usuarios: USUARIOS_DEMO, demo: true });
+  useEffect(() => {
+    cargarOperarios().then((reales) => {
+      if (reales?.length) setEquipo({ usuarios: reales, demo: false });
+    });
+  }, []);
+
+  // La validación de verdad: el PIN identifica en el nodo (con backoff), y aquí
+  // se comprueba el rol de la puerta y, si se eligió usuario, que sea él.
+  async function validar(pin: string, ctx: { usuario?: Usuario; requiere: Rol }): Promise<boolean> {
+    if (equipo.demo) return pin.length === 4; // demo: enseña el flujo, no da acceso real a nada
+    const op = await validarPin(pin);
+    return !!op && cumpleRol(op.rol, ctx.requiere) && (!ctx.usuario || ctx.usuario.id === op.id);
+  }
 
   // «Abrir TPV» entra DIRECTO (el login por operario ocurre dentro del TPV, por
   // acción); el resto pide credencial CADA vez.
@@ -80,7 +98,9 @@ export function App() {
           icono={<meta.Icono size={22} />}
           color={meta.color}
           requiere={meta.requiere}
-          usuarios={USUARIOS_DEMO}
+          usuarios={equipo.usuarios}
+          demo={equipo.demo}
+          onValidar={validar}
           onOk={() => { setVista(pendiente); setPendiente(null); }}
           onCancelar={() => setPendiente(null)}
         />

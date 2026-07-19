@@ -19,3 +19,11 @@ export const ETIQUETA_ROL: Record<Rol, string> = {
   tecnico: "técnico",
   admin: "administrador",
 };
+
+// ¿`rol` abre una puerta que exige `requiere`? El administrador abre cualquier
+// puerta (incluida la técnica: el dueño puede mirar su propio nodo); el técnico
+// no administra; el trabajador solo opera.
+const NIVEL: Record<Rol, number> = { operario: 0, tecnico: 1, admin: 2 };
+export function cumpleRol(rol: Rol, requiere: Rol): boolean {
+  return NIVEL[rol] >= NIVEL[requiere];
+}

@@ -10,20 +10,22 @@ const LARGO = 4;
 // PUERTA DE CREDENCIAL reutilizable (se pide en muchos sitios). Tres formas de
 // identificarse, según lo que reciba:
 //   • `usuarios` con lista → primero eliges QUIÉN eres (o pasas la pulsera y
-//     entras directo), luego metes tu PIN.
+//     entras directo), luego metes tu PIN. Quien no llega al rol sale con candado.
 //   • sin `usuarios` → directo al PIN (o pulsera).
-// Nada se cachea: se pide CADA vez. El nodo valida la credencial Y el rol
-// (`requiere`): p. ej. Configuración exige administrador. `onValidar` es el
-// enganche del PIN y `onOk` el del lector de pulsera; en demo el PIN de 4 dígitos
-// y la pulsera conceden acceso para enseñar el flujo.
+// Nada se cachea: se pide CADA vez. La validación REAL es el PIN (el nodo dice
+// quién eres y su rol; elegir usuario antes es UX): `onValidar` la hace contra
+// el nodo. `demo` marca el equipo de ejemplo (terminal sin emparejar) y habilita
+// la pulsera simulada; SIN demo la pulsera se oculta hasta que haya lector.
 export function CredencialModal({
-  titulo, icono, color, requiere, usuarios, onOk, onCancelar, onValidar,
+  titulo, icono, color, requiere, usuarios, demo, onOk, onCancelar, onValidar,
 }: Readonly<{
   titulo: string;
   icono: ReactNode;
   color: string;
   requiere: Rol;
   usuarios?: Usuario[];
+  /** El equipo enseñado es de ejemplo (sin emparejar): avisa y simula pulsera. */
+  demo?: boolean;
   onOk: (usuario?: Usuario) => void;
   onCancelar: () => void;
   onValidar?: (pin: string, ctx: { usuario?: Usuario; requiere: Rol }) => Promise<boolean> | boolean;
@@ -77,7 +79,7 @@ export function CredencialModal({
     : `Requiere ${ETIQUETA_ROL[requiere]}: PIN o pulsera.`;
 
   return (
-    <Modal onCerrar={onCancelar} ancho="sm" className="p-7">
+    <Modal onCerrar={onCancelar} ancho="xl" className="p-7">
       <button type="button" onClick={onCancelar} aria-label="Cerrar" className="float-right -mr-1 -mt-1 rounded-lg p-1.5 text-muted transition-transform active:scale-90"><X size={18} /></button>
 
       <div className="flex flex-col items-center text-center">
@@ -88,14 +90,19 @@ export function CredencialModal({
         <p className="mt-1 text-sm text-muted">
           {pidiendoUsuario ? "¿Quién eres? Elígete o acerca tu pulsera." : sub}
         </p>
+        {demo && (
+          <span className="mt-2.5 rounded-full border border-amber/40 bg-amber/10 px-2.5 py-1 text-[11px] font-semibold text-paper">
+            Equipo de ejemplo — terminal sin emparejar
+          </span>
+        )}
       </div>
 
       {pidiendoUsuario ? (
         <div className="mt-5">
-          <ListaUsuarios usuarios={usuarios!} onElegir={setElegido} onPulsera={() => onOk()} />
+          <ListaUsuarios usuarios={usuarios!} requiere={requiere} onElegir={setElegido} onPulsera={demo ? () => onOk() : undefined} />
         </div>
       ) : (
-        <>
+        <div className="mx-auto w-full max-w-xs">
           {elegido && (
             <button type="button" onClick={() => { setElegido(null); setPin(""); setError(false); }}
               className="mx-auto mt-3 flex items-center gap-1.5 rounded-full border border-line bg-paper/5 px-3 py-1 text-[12px] font-semibold text-muted transition-transform active:scale-95">
@@ -125,11 +132,13 @@ export function CredencialModal({
             }
           />
 
-          <button type="button" onClick={() => onOk(elegido ?? undefined)}
-            className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-dashed border-brand-lit/40 bg-brand/10 py-3 text-sm font-semibold text-brand-lit transition-transform active:scale-[.98] active:bg-brand/20">
-            <Nfc size={18} /> Acerca tu pulsera o tarjeta
-          </button>
-        </>
+          {demo && (
+            <button type="button" onClick={() => onOk(elegido ?? undefined)}
+              className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-dashed border-brand-lit/40 bg-brand/10 py-3 text-sm font-semibold text-brand-lit transition-transform active:scale-[.98] active:bg-brand/20">
+              <Nfc size={18} /> Acerca tu pulsera o tarjeta
+            </button>
+          )}
+        </div>
       )}
     </Modal>
   );
