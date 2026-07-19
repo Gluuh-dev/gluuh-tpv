@@ -1,22 +1,29 @@
 import {
-  Package, Layers, LayoutGrid, ListPlus, BookOpen, ArrowUpDown,
+  UtensilsCrossed, Package, Layers, LayoutGrid, ListPlus, BookOpen, ArrowUpDown,
   Tags, Percent, BadgePercent,
-  Map as Plano, Store,
+  Map as Plano, Store, MapPin, Clock,
   Wallet, Banknote, Landmark, Hash,
-  Printer, Receipt, ChefHat,
+  Printer, Receipt, ChefHat, Tag,
+  MonitorSmartphone, Blocks,
+  Palette,
   LayoutDashboard, SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
 // ============================================================================
-// MAPA de la Configuración del TPV — sale del inventario del panel Next
-// (apps/web app/(panel), hecho el 19-07). Cada sección lista su ALCANCE (qué se
-// decide ahí) y el comentario dice de qué página del panel se porta.
+// MAPA COMPLETO de la Configuración del TPV — sale del inventario del panel
+// Next (apps/web app/(panel), 19-07) más el análisis de huecos: personalizar
+// (marca), módulos/terminales, puntos de venta, periodos de servicio,
+// plantillas de etiqueta y los settings sueltos de /ajustes que son del TPV
+// (tpv.funciones.orden, tpv.combinados.categoria_id, etiqueta_producto).
+// Cada sección lista su ALCANCE (qué se decide ahí) y el comentario dice de
+// qué página del panel se porta.
 //
-// Reparto del hub (no mezclar): empleados/perfiles/licencias → apartado
-// ADMINISTRADOR; zona técnica (VERIFACTU, copias, clave) → VISOR NODE.
-// Aquí vive lo que promete la tarjeta F2: carta, precios, salas y mesas,
-// impresión, cobro e impuestos, más los ajustes de ESTE terminal.
+// Reparto del hub (no mezclar): empresa/local/territorio, seguridad (bloqueo
+// TPV, MFA), clientes/tipos de cliente → apartado ADMINISTRADOR; zona técnica
+// (VERIFACTU, copias, clave) → VISOR NODE; proveedores/almacenes/unidades →
+// dominio Compras (aún "En preparación" también en Next); los informes no son
+// configuración.
 // ============================================================================
 
 export interface Seccion {
@@ -27,18 +34,22 @@ export interface Seccion {
   Icono: LucideIcon;
   /** Qué se configura aquí (la promesa de la sección, cara al dueño del bar). */
   alcance: string[];
+  /** Ya funciona en este terminal (si no: hoy se hace en el panel web). */
+  funcional?: boolean;
 }
 
 export interface Grupo {
   titulo: string;
+  Icono: LucideIcon;
   secciones: Seccion[];
 }
 
 export const GRUPOS: Grupo[] = [
   {
     titulo: "Carta",
+    Icono: UtensilsCrossed,
     secciones: [
-      { // ← (panel)/productos + productos/[id] + tpv/config/articulos
+      { // ← (panel)/productos + productos/[id] + etiquetas + tpv/config/articulos
         id: "productos", titulo: "Productos", Icono: Package,
         desc: "La ficha completa de cada artículo de la carta.",
         alcance: [
@@ -48,16 +59,17 @@ export const GRUPOS: Grupo[] = [
           "Formatos (caña, copa, jarra…) y extras propios o de biblioteca",
           "Nombres para ticket y cocina, PLU y código de barras",
           "Alérgenos, estación de impresión y visibilidad",
+          "Etiquetas para organizar y filtrar",
         ],
       },
-      { // ← (panel)/familias + grupos-mayores
+      { // ← (panel)/familias + grupos-mayores + setting tpv.combinados.categoria_id
         id: "familias", titulo: "Familias", Icono: Layers,
         desc: "Familias y grupos mayores: lo que heredan sus productos.",
         alcance: [
           "Nombre, color y grupo mayor de cada familia",
           "Estación de impresión (cocina, barra…) heredada",
           "Formatos, extras y notas que heredan sus productos",
-          "Copas combinables por familia",
+          "Copas combinables y con qué se combinan (categoría de refrescos)",
         ],
       },
       { // ← (panel)/categorias + categorias/[id]
@@ -100,6 +112,7 @@ export const GRUPOS: Grupo[] = [
   },
   {
     titulo: "Precios",
+    Icono: Tags,
     secciones: [
       { // ← (panel)/tarifas (el TPV aún no las aplica al vender)
         id: "tarifas", titulo: "Tarifas", Icono: Tags,
@@ -128,7 +141,8 @@ export const GRUPOS: Grupo[] = [
     ],
   },
   {
-    titulo: "Salas y mesas",
+    titulo: "Salas y zonas",
+    Icono: Plano,
     secciones: [
       { // ← (panel)/planos-de-mesas (editor visual)
         id: "planos", titulo: "Planos de mesas", Icono: Plano,
@@ -147,10 +161,27 @@ export const GRUPOS: Grupo[] = [
           "Qué carta se ve y qué tarifa se usa en cada una",
         ],
       },
+      { // ← (panel)/puntos-venta (punto_venta; agrupa terminales/ventas)
+        id: "puntos-venta", titulo: "Puntos de venta", Icono: MapPin,
+        desc: "Agrupaciones de venta para terminales e informes.",
+        alcance: [
+          "Puntos de venta del local (caja, barra, terraza…)",
+          "Nombre y descripción de cada uno",
+        ],
+      },
+      { // ← (panel)/periodos-servicio (periodo_servicio)
+        id: "periodos-servicio", titulo: "Periodos de servicio", Icono: Clock,
+        desc: "Los turnos horarios del día.",
+        alcance: [
+          "Turnos del día: desayuno, comida, cena…",
+          "Hora de inicio y fin de cada periodo",
+        ],
+      },
     ],
   },
   {
     titulo: "Cobro",
+    Icono: Wallet,
     secciones: [
       { // ← (panel)/formas-pago (flags cajón/arqueo aún sin consumir en el TPV)
         id: "formas-pago", titulo: "Formas de pago", Icono: Wallet,
@@ -191,17 +222,20 @@ export const GRUPOS: Grupo[] = [
   },
   {
     titulo: "Impresión",
+    Icono: Printer,
     secciones: [
       { // ← (panel)/impresoras (tablas printer/print_route + probar)
         id: "impresoras", titulo: "Impresoras", Icono: Printer,
         desc: "Las impresoras del local y qué imprime cada una.",
         alcance: [
-          "Impresoras: nombre, papel (tickets, cocina, barra…) e IP",
+          "Impresoras: nombre, papel (tickets, cocina, barra, etiquetas) e IP",
           "Enrutado: qué estación imprime dónde, por zona",
           "Probar impresión desde aquí",
         ],
       },
-      { // ← (panel)/plantillas-ticket + configuracion-de-impresion (setting impresion.config)
+      { // ← (panel)/plantillas-ticket + configuracion-de-impresion — al portar,
+        //   las TRES páginas del panel (2 sobre setting impresion.config + 1 sobre
+        //   tablas) se unifican AQUÍ
         id: "ticket", titulo: "Diseño del ticket", Icono: Receipt,
         desc: "Lo que sale impreso en el ticket del cliente.",
         alcance: [
@@ -210,7 +244,8 @@ export const GRUPOS: Grupo[] = [
           "Vista previa al momento",
         ],
       },
-      { // ← (panel)/plantillas-comandas + notas-preparacion + tipos-preparacion + motivos-cancelacion
+      { // ← (panel)/plantillas-comandas + notas-preparacion + tipos-preparacion
+        //   + motivos-cancelacion
         id: "comandas", titulo: "Comandas", Icono: ChefHat,
         desc: "Cómo llegan los pedidos a cocina.",
         alcance: [
@@ -219,23 +254,74 @@ export const GRUPOS: Grupo[] = [
           "Motivos de cancelación",
         ],
       },
+      { // ← (panel)/plantillas-etiquetas (plantilla_etiqueta + impresora ETIQUETAS)
+        id: "etiquetas", titulo: "Etiquetas", Icono: Tag,
+        desc: "Etiquetas de precio y código de barras.",
+        alcance: [
+          "Plantillas de etiqueta (precio, código de barras…)",
+          "Qué impresora de etiquetas las imprime",
+        ],
+      },
+    ],
+  },
+  {
+    titulo: "Terminales y pantallas",
+    Icono: MonitorSmartphone,
+    secciones: [
+      { // ← (panel)/modulos (emparejado por código) + tpv/config/terminales
+        id: "terminales", titulo: "Terminales", Icono: MonitorSmartphone,
+        desc: "Los TPV y comanderas conectados al nodo.",
+        alcance: [
+          "Emparejar un terminal nuevo con código de 6 dígitos",
+          "Nombre y estación de cada terminal",
+          "Estado de conexión y revocar acceso",
+        ],
+      },
+      { // ← (panel)/modulos (tenant_module + config por módulo en lib/modulos.ts)
+        id: "modulos", titulo: "Módulos y pantallas", Icono: Blocks,
+        desc: "Qué pantallas usa el local y cómo se comportan.",
+        alcance: [
+          "Encender o apagar módulos: comandera, cocina (KDS), pantalla de recogida, kiosko, cartelería, visor y reservas",
+          "Ajustes de cada pantalla: tema, avisos, sonido, textos y diseño",
+        ],
+      },
+    ],
+  },
+  {
+    titulo: "Marca",
+    Icono: Palette,
+    secciones: [
+      { // ← (panel)/personalizar (tenant_branding + offer). El TPV consume
+        //   --brand/--brand-lit (index.css): al construirse aquí, presets de color
+        id: "marca", titulo: "Marca del local", Icono: Palette,
+        desc: "Tu logo y tus colores, en todas las pantallas.",
+        alcance: [
+          "Logo del local y logo del ticket (blanco y negro)",
+          "Colores de la marca: el TPV y las pantallas se recoloran enteros",
+          "Ofertas para el kiosko y la cartelería",
+        ],
+      },
     ],
   },
   {
     titulo: "Este terminal",
+    Icono: SlidersHorizontal,
     secciones: [
-      { // ← (panel)/configuracion-de-botones (setting tpv.botones)
+      { // ← (panel)/configuracion-de-botones (setting tpv.botones) + orden de
+        //   funciones de /ajustes (setting tpv.funciones.orden)
         id: "botones", titulo: "Botones del TPV", Icono: LayoutDashboard,
         desc: "Cómo se ve la rejilla de venta en este local.",
         alcance: [
           "Columnas de la rejilla y tamaño del texto",
           "Mostrar foto y precio en los botones",
+          "Orden de los botones de funciones (Aparcar, Dividir…)",
         ],
       },
-      { // ← apps/web/app/tpv/config/ajustes (preferencias locales) — FUNCIONAL ya
+      { // ← apps/web/app/tpv/config/ajustes (preferencias locales) — FUNCIONAL
         id: "preferencias", titulo: "Preferencias", Icono: SlidersHorizontal,
         desc: "Ajustes de este terminal; no afectan a los demás.",
         alcance: [],
+        funcional: true,
       },
     ],
   },
