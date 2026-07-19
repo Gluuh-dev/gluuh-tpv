@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  Delete, Keyboard, Mail, Printer, Split, X, XCircle,
+  Delete, Keyboard, Mail, Split, X, XCircle,
 } from "lucide-react";
 import { Modal, CabeceraModal, TecladoTexto } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -70,7 +70,6 @@ export function CobrarModal({
   const [oskNotas, setOskNotas] = useState(false);
   const [tipoDoc, setTipoDoc] = useState(tiposDoc[0]!);
   const [enviarFactura, setEnviarFactura] = useState(false);
-  const [zonasImpresion, setZonasImpresion] = useState(true);
   const [ahora] = useState(() => new Date());
 
   const importeACobrar = Math.max(0, Math.round((total + propina - descuento) * 100) / 100);
@@ -146,7 +145,7 @@ export function CobrarModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [puedeCobrar, zonasImpresion, pagos, objetivo, reemplazar, display, propina, descuento, notas, tipoDoc]);
+  }, [puedeCobrar, pagos, objetivo, reemplazar, display, propina, descuento, notas, tipoDoc]);
 
   const teclas = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "borrar"];
   let etiquetaVisor = "Importe a aplicar";
@@ -230,13 +229,6 @@ export function CobrarModal({
               </button>
             </div>
 
-            <div className="flex flex-none items-center gap-3 rounded-xl border border-border bg-card px-3 py-2">
-              <span className="flex items-center gap-1.5 text-[13.5px] text-muted-foreground"><Printer size={15} /> Zonas de impresión:</span>
-              <button type="button" onClick={() => setZonasImpresion((v) => !v)}
-                className={`min-h-11 rounded-md border px-5 text-sm font-bold transition-all active:scale-[.98] ${zonasImpresion ? "border-success bg-success text-white" : "border-border bg-surface text-muted-foreground"}`}>
-                {zonasImpresion ? "Activadas" : "Desactivadas"}
-              </button>
-            </div>
           </div>
 
           {/* Centro: teclado */}
@@ -301,7 +293,7 @@ export function CobrarModal({
           <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95 disabled:text-muted-foreground">
             Cobrar e imprimir (F11)
           </button>
-          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-warning px-5 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">
+          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-cobro px-5 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">
             Cobrar (F12)
           </button>
         </footer>
