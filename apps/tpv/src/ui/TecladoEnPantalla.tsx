@@ -203,7 +203,7 @@ export function TecladoEnPantalla() {
           {teclaChar(",")}
           <button type="button" onMouseDown={noRobarFoco} onClick={() => escribir(" ")} style={{ ...tecla, flex: 4 }}>espacio</button>
           {teclaChar(".")}
-          <button type="button" onMouseDown={noRobarFoco} onClick={intro} style={{ ...teclaAncha, ...teclaIntro }} aria-label="Intro">⏎</button>
+          <button type="button" onMouseDown={noRobarFoco} onClick={intro} style={{ ...teclaAncha, fontSize: 22 }} aria-label="Intro">⏎</button>
         </div>
       </div>
 
@@ -251,7 +251,6 @@ const tecla: React.CSSProperties = {
 };
 const teclaAncha: React.CSSProperties = { ...tecla, flex: 1.6, fontSize: 13, fontWeight: 600 };
 const teclaActiva: React.CSSProperties = { background: "var(--brand)", color: "#fff", borderColor: "transparent" };
-const teclaIntro: React.CSSProperties = { background: "var(--mint)", color: "#053a26", borderColor: "transparent" };
 const velo: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 2147483001 };
 const acentos: React.CSSProperties = {
   position: "fixed", zIndex: 2147483002, transform: "translate(-50%, calc(-100% - 6px))",
