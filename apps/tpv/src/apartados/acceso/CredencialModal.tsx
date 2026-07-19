@@ -137,8 +137,8 @@ export function CredencialModal({
         </div>
       </div>
 
-      {/* Pulsera a todo el ancho como pie: no descuadra las columnas (solo en
-          demo; con lector real llegará por su propio camino). */}
+      {/* Pulsera como pie a lo ancho: no descuadra las columnas (solo en demo;
+          con lector real llegará por su propio camino). */}
       {demo && (
         <div className="px-6 pb-6 pt-4">
           <button type="button" onClick={() => onOk(elegido ?? undefined)}

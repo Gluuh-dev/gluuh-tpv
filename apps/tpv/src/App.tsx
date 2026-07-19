@@ -96,6 +96,7 @@ export function App() {
         <CredencialModal
           titulo={meta.titulo}
           Icono={meta.Icono}
+          color={meta.color}
           requiere={meta.requiere}
           usuarios={equipo.usuarios}
           demo={equipo.demo}
