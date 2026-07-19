@@ -2,6 +2,8 @@
 // Import limpio: `import { Modal, Escudo, TecladoNumerico } from "../../ui"`.
 export { Modal } from "./Modal";
 export { CabeceraModal } from "./CabeceraModal";
+export { Select, type OpcionSelect } from "./Select";
+export { CampoTexto } from "./CampoTexto";
 export { Escudo } from "./Escudo";
 export { Fkey } from "./Fkey";
 export { Chip } from "./Chip";

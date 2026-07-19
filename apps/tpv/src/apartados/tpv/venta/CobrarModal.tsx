@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  ChevronDown, Delete, Keyboard, Mail, Split, X, XCircle,
+  Delete, Mail, Split, X, XCircle,
 } from "lucide-react";
-import { Modal, CabeceraModal, abrirTeclado } from "../../../ui";
+import { Modal, CabeceraModal, Select, CampoTexto } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo } from "./efectivo";
 import { TIPOS_DOC_DEMO } from "../datos";
@@ -61,12 +61,12 @@ export function CobrarModal({
 
   const [pagos, setPagos] = useState<LineaPago[]>([]);
   const [objetivo, setObjetivo] = useState<Objetivo>({ tipo: "pago" });
-  const [descuento, setDescuento] = useState(0);
+  const [descuento, setDescuento] = useState(0);   // SIEMPRE en euros (lo que se resta)
+  const [descModo, setDescModo] = useState<"PCT" | "EUR">("EUR");
   const [propina, setPropina] = useState(0);
   const [display, setDisplay] = useState("");
   const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
-  const notasRef = useRef<HTMLInputElement>(null);
   const [tipoDoc, setTipoDoc] = useState<string>(tiposDoc[0]!);
   const [enviarFactura, setEnviarFactura] = useState(false);
   const [ahora] = useState(() => new Date());
@@ -83,11 +83,21 @@ export function CobrarModal({
 
   function seleccionar(o: Objetivo) {
     setObjetivo(o);
-    if (o.tipo === "descuento") setDisplay(descuento > 0 ? descuento.toFixed(2) : "");
-    else if (o.tipo === "propina") setDisplay(propina > 0 ? propina.toFixed(2) : "");
+    if (o.tipo === "propina") setDisplay(propina > 0 ? propina.toFixed(2) : "");
     else setDisplay("");
     setReemplazar(true);
   }
+
+  // Descuento en € o en %: como el teclado de la venta (DTO€ / DTO%). Pulsar el
+  // modo activo lo desactiva; cambiar de modo empieza a teclear de cero.
+  function elegirDescuento(modo: "PCT" | "EUR") {
+    if (objetivo.tipo === "descuento" && descModo === modo) { seleccionar({ tipo: "pago" }); return; }
+    setDescModo(modo);
+    setObjetivo({ tipo: "descuento" });
+    setDisplay("");
+    setReemplazar(true);
+  }
+  const descActivo = (modo: "PCT" | "EUR") => objetivo.tipo === "descuento" && descModo === modo;
 
   function pulsar(tecla: string) {
     setDisplay((prev) => {
@@ -97,8 +107,11 @@ export function CobrarModal({
       else base = (base === "0" ? "" : base) + tecla;
       if (base.length > 10) base = prev;
       const n = Number(base) || 0;
-      if (objetivo.tipo === "descuento") setDescuento(Math.min(n, total));
-      else if (objetivo.tipo === "propina") setPropina(n);
+      if (objetivo.tipo === "descuento") {
+        // Dto € = importe directo; Dto % = porcentaje sobre el total (máx 100 %).
+        const euros = descModo === "PCT" ? Math.round(total * Math.min(n, 100)) / 100 : n;
+        setDescuento(Math.min(euros, total));
+      } else if (objetivo.tipo === "propina") setPropina(n);
       return base;
     });
     setReemplazar(false);
@@ -144,11 +157,11 @@ export function CobrarModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [puedeCobrar, pagos, objetivo, reemplazar, display, propina, descuento, notas, tipoDoc]);
+  }, [puedeCobrar, pagos, objetivo, reemplazar, display, propina, descuento, descModo, notas, tipoDoc]);
 
   const teclas = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "borrar"];
   let etiquetaVisor = "Importe a aplicar";
-  if (objetivo.tipo === "descuento") etiquetaVisor = "Importe del descuento";
+  if (objetivo.tipo === "descuento") etiquetaVisor = descModo === "PCT" ? "Porcentaje de descuento" : "Importe del descuento";
   else if (objetivo.tipo === "propina") etiquetaVisor = "Importe de la propina";
 
   return (
@@ -175,13 +188,8 @@ export function CobrarModal({
           <div className="flex flex-col gap-1.5">
             <div className="grid grid-cols-[92px_1fr] items-center gap-1.5">
               <span className="rounded-md border border-border bg-surface px-2.5 py-2.5 text-xs font-semibold text-muted-foreground">Tipo doc</span>
-              <div className="relative">
-                <FileText size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <select value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value)} className="min-h-11 w-full cursor-pointer appearance-none rounded-md border border-border bg-card pl-8 pr-8 text-left text-[13.5px] font-semibold outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/40">
-                  {tiposDoc.map((t) => <option key={t} value={t} disabled={esCompleta(t) && !cliente}>{esCompleta(t) && !cliente ? `${t} (asigna cliente)` : t}</option>)}
-                </select>
-                <ChevronDown size={16} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              </div>
+              <Select value={tipoDoc} onChange={setTipoDoc} Icono={FileText}
+                opciones={tiposDoc.map((t) => ({ value: t, label: esCompleta(t) && !cliente ? `${t} (asigna cliente)` : t, disabled: esCompleta(t) && !cliente }))} />
             </div>
             <FilaDato label="Fecha" gris>{ahora.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" })}</FilaDato>
             <FilaDato label="Importe"><span className="text-[17px] font-bold tabular-nums">{eur(importeACobrar)}</span></FilaDato>
@@ -197,9 +205,8 @@ export function CobrarModal({
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 p-2.5 lg:grid-cols-[minmax(0,1fr)_330px_240px]">
           {/* Izquierda */}
           <div className="flex min-h-0 min-w-0 flex-col gap-2.5">
-            <div className="flex flex-none items-center gap-2 rounded-xl border border-border bg-card p-2.5">
-              <input ref={notasRef} type="text" value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={90} placeholder="Notas del ticket…" className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { notasRef.current?.focus(); abrirTeclado(); }} aria-label="Teclado en pantalla" className="grid h-11 w-12 flex-none place-items-center rounded-md border border-success bg-success/10 text-success transition-transform active:scale-95"><Keyboard size={18} /></button>
+            <div className="flex-none rounded-xl border border-border bg-card p-2.5">
+              <CampoTexto value={notas} onChange={(v) => setNotas(v.slice(0, 90))} placeholder="Notas del ticket…" />
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card p-3">
@@ -221,13 +228,17 @@ export function CobrarModal({
               </div>
             </div>
 
-            <div className="grid flex-none grid-cols-2 gap-2.5">
-              <button type="button" onClick={() => seleccionar(objetivo.tipo === "descuento" ? { tipo: "pago" } : { tipo: "descuento" })}
-                className={`min-h-13 rounded-md border text-sm font-bold transition-all active:scale-[.98] ${objetivo.tipo === "descuento" ? "border-warning bg-warning text-white" : "border-warning bg-card text-warning"}`}>
-                Descuento{descuento > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(descuento)}</span>}
+            <div className="grid flex-none grid-cols-3 gap-2.5">
+              <button type="button" onClick={() => elegirDescuento("PCT")}
+                className={`min-h-13 rounded-md border text-sm font-bold transition-transform active:scale-[.98] ${descActivo("PCT") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                Dto %{descActivo("PCT") && descuento > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(descuento)}</span>}
+              </button>
+              <button type="button" onClick={() => elegirDescuento("EUR")}
+                className={`min-h-13 rounded-md border text-sm font-bold transition-transform active:scale-[.98] ${descActivo("EUR") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                Dto €{descActivo("EUR") && descuento > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(descuento)}</span>}
               </button>
               <button type="button" onClick={() => seleccionar(objetivo.tipo === "propina" ? { tipo: "pago" } : { tipo: "propina" })}
-                className={`min-h-13 rounded-md border text-sm font-bold transition-all active:scale-[.98] ${objetivo.tipo === "propina" ? "border-warning bg-warning text-white" : "border-warning bg-card text-warning"}`}>
+                className={`min-h-13 rounded-md border text-sm font-bold transition-transform active:scale-[.98] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
                 Propina{propina > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(propina)}</span>}
               </button>
             </div>
@@ -242,20 +253,22 @@ export function CobrarModal({
             </div>
             <div className="grid min-h-0 flex-1 grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border">
               {teclas.map((k) => (
-                <button key={k} type="button" onClick={() => pulsar(k)} className="grid min-h-13 place-items-center bg-card text-2xl font-semibold text-success transition-colors active:bg-success/10">
+                <button key={k} type="button" onClick={() => pulsar(k)} className="grid min-h-13 place-items-center bg-card text-2xl font-semibold text-foreground transition-colors active:bg-accent">
                   {k === "borrar" ? <Delete size={24} /> : k === "." ? "," : k}
                 </button>
               ))}
             </div>
             {formaEfectivo && (
+              // Efectivo rápido: los billetes NO desaparecen al cubrir el importe;
+              // se calculan sobre el total (estable) y se desactivan como "Exacto".
               <div className="grid flex-none grid-cols-5 gap-1">
                 <button type="button" onClick={() => registrarEfectivoRapido(falta)} disabled={falta <= 0} className="rounded border border-brand/45 bg-brand/5 py-2 text-xs font-black text-brand transition-all active:scale-95 disabled:opacity-30">Exacto</button>
-                {sugerenciasEfectivo(falta).map((v) => (
+                {sugerenciasEfectivo(importeACobrar).map((v) => (
                   <button key={v} type="button" onClick={() => registrarEfectivoRapido(v)} disabled={falta <= 0} className="rounded border border-border bg-card py-2 text-xs font-bold transition-all active:scale-95 disabled:opacity-30">{v} €</button>
                 ))}
               </div>
             )}
-            <div className={`flex min-h-14 flex-none items-center justify-between rounded-md px-4 text-white ${falta > 0 ? "bg-warning" : "bg-success"}`}>
+            <div className={`flex min-h-13 flex-none items-center justify-between rounded-md px-4 text-white ${falta > 0 ? "bg-warning" : "bg-success"}`}>
               <span className="text-[13.5px] font-semibold opacity-90">{falta > 0 ? "Falta por cobrar" : "A devolver"}</span>
               <b className="text-2xl font-extrabold tabular-nums tracking-tight">{eur(falta > 0 ? falta : aDevolver)}</b>
             </div>

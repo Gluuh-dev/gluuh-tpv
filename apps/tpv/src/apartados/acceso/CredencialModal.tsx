@@ -17,10 +17,12 @@ const PUNTOS = ["p0", "p1", "p2", "p3"]; // claves estables de los puntos del PI
 // y habilita la pulsera simulada; sin demo la pulsera se oculta hasta que haya
 // lector. Sin `usuarios`, queda solo el teclado (modal estrecho).
 export function CredencialModal({
-  titulo, Icono, requiere, usuarios, demo, onOk, onCancelar, onValidar,
+  titulo, Icono, color, requiere, usuarios, demo, onOk, onCancelar, onValidar,
 }: Readonly<{
   titulo: string;
   Icono: LucideIcon;
+  /** Fondo de la placa del icono (el color del apartado). */
+  color: string;
   requiere: Rol;
   usuarios?: Usuario[];
   /** El equipo enseñado es de ejemplo (sin emparejar): avisa y simula pulsera. */
@@ -86,7 +88,7 @@ export function CredencialModal({
 
   return (
     <Modal onCerrar={onCancelar} ancho={conGente ? "2xl" : "sm"} className="overflow-hidden">
-      <CabeceraModal Icono={Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} tono="suave" />
+      <CabeceraModal Icono={Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} tono="suave" color={color} />
 
       {demo && (
         <p className="border-b border-amber/30 bg-amber/10 px-6 py-2 text-[12px] font-semibold text-paper">
@@ -121,19 +123,17 @@ export function CredencialModal({
             </div>
           </div>
 
-          <div className="pt-3">
-            <TecladoNumerico
-              onDigito={pulsa}
-              onBorrar={() => { setError(false); setPin((p) => p.slice(0, -1)); }}
-              deshabilitado={verificando}
-              botonIzquierda={
-                <button type="button" onClick={onCancelar}
-                  className="rounded-2xl border border-line bg-paper/5 py-4 text-sm font-semibold text-muted transition-transform active:scale-90">
-                  Cancelar
-                </button>
-              }
-            />
-          </div>
+          <TecladoNumerico
+            onDigito={pulsa}
+            onBorrar={() => { setError(false); setPin((p) => p.slice(0, -1)); }}
+            deshabilitado={verificando}
+            botonIzquierda={
+              <button type="button" onClick={onCancelar}
+                className="rounded-2xl border border-line bg-paper/5 py-4 text-sm font-semibold text-muted transition-transform active:scale-90">
+                Cancelar
+              </button>
+            }
+          />
         </div>
       </div>
 
