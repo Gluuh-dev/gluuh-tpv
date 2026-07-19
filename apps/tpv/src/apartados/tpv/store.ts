@@ -16,6 +16,7 @@ export interface Cliente { id: string; nombre: string; telefono?: string; deuda?
 
 export interface VentaState {
   contexto: string;
+  sala: string;
   comensales: number;
   alias: string;
   cliente: Cliente | null;
@@ -33,7 +34,7 @@ export interface VentaState {
   modo: ModoTeclado;
   editando: boolean;
 
-  iniciar: (contexto: string, comensales?: number) => void;
+  iniciar: (contexto: string, comensales?: number, sala?: string) => void;
   addProd: (id: string) => void;
   seleccionar: (id: string) => void;
   setComensales: (n: number) => void;
@@ -82,6 +83,7 @@ function aplicar(s: VentaState, buffer: string): Partial<VentaState> {
 
 export const useVenta = create<VentaState>((set, get) => ({
   contexto: "",
+  sala: "",
   comensales: 1,
   alias: "",
   cliente: null,
@@ -96,8 +98,8 @@ export const useVenta = create<VentaState>((set, get) => ({
   modo: "UND",
   editando: false,
 
-  iniciar: (contexto, comensales = 1) => set({
-    contexto, comensales, alias: "", cliente: null,
+  iniciar: (contexto, comensales = 1, sala = "") => set({
+    contexto, sala, comensales, alias: "", cliente: null,
     comanda: {}, precios: {}, descuentos: {}, invitadas: {},
     lineaSel: null, buffer: "", modo: "UND", editando: false, busqueda: "",
   }),

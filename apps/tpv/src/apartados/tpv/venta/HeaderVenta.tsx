@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useState } from "react";
 import { Search, Minus, Plus, Tag, Keyboard } from "lucide-react";
+import { TecladoTexto } from "../../../ui";
 import { useVenta } from "../store";
 
 // Chip compacto de una sola línea (estilo del PAX): etiqueta pequeña + valor.
@@ -17,17 +18,21 @@ function Chip({ label, children }: Readonly<{ label: string; children: React.Rea
 // vistas es por el rail de la derecha (sin flecha de volver ni home).
 export function HeaderVenta() {
   const contexto = useVenta((s) => s.contexto);
+  const sala = useVenta((s) => s.sala);
   const comensales = useVenta((s) => s.comensales);
   const setComensales = useVenta((s) => s.setComensales);
   const alias = useVenta((s) => s.alias);
   const setAlias = useVenta((s) => s.setAlias);
   const busqueda = useVenta((s) => s.busqueda);
   const setBusqueda = useVenta((s) => s.setBusqueda);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [osk, setOsk] = useState<null | "alias" | "buscar">(null);
 
   return (
+    <>
     <header className="flex h-14 flex-none items-center gap-2 bg-brand px-3 text-white">
       <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-8 w-auto flex-none" draggable={false} />
+
+      {sala && <Chip label="Sala">{sala}</Chip>}
 
       <Chip label="Mesa">{contexto || "—"}</Chip>
 
@@ -42,16 +47,21 @@ export function HeaderVenta() {
       <label className={`flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm font-semibold ${alias ? "bg-white/25" : "bg-white/10"}`}>
         <Tag size={13} className="opacity-80" />
         <input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Alias" className="w-24 bg-transparent text-white outline-none placeholder:text-white/50" />
+        <button type="button" onClick={() => setOsk("alias")} aria-label="Teclado" className="grid h-6 w-6 flex-none place-items-center rounded bg-white/15 transition-transform active:scale-90"><Keyboard size={14} /></button>
       </label>
 
       <label className="relative ml-1 flex h-9 flex-1 items-center">
         <Search size={16} className="absolute left-3 opacity-80" />
-        <input ref={inputRef} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar producto o código de barras…"
+        <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar producto o código de barras…"
           className="h-9 w-full rounded-md bg-white/15 pl-9 pr-3 text-sm text-white outline-none placeholder:text-white/60" />
       </label>
 
-      <button type="button" onClick={() => inputRef.current?.focus()} aria-label="Sacar teclado"
+      <button type="button" onClick={() => setOsk("buscar")} aria-label="Sacar teclado"
         className="grid h-9 w-9 flex-none place-items-center rounded-md bg-white/15 transition-transform active:scale-90"><Keyboard size={18} /></button>
     </header>
+
+    {osk === "alias" && <TecladoTexto titulo="Alias de la cuenta" valor={alias} onCambio={setAlias} onCerrar={() => setOsk(null)} />}
+    {osk === "buscar" && <TecladoTexto titulo="Buscar producto" valor={busqueda} onCambio={setBusqueda} onCerrar={() => setOsk(null)} />}
+    </>
   );
 }

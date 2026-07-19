@@ -56,8 +56,8 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
   }, [cobrado]);
 
   const cambiarZurdo = (v: boolean) => { setZurdo(v); localStorage.setItem("gluuh_zurdo", v ? "1" : "0"); };
-  const abrirMesa = (mesa: Mesa) => { iniciar(`Mesa ${mesa.nombre}`, mesa.comensales ?? 1); setVista("ticket"); };
-  const nuevaBarra = () => { iniciar("Barra", 1); setVista("ticket"); };
+  const abrirMesa = (mesa: Mesa) => { iniciar(`Mesa ${mesa.nombre}`, mesa.comensales ?? 1, SALAS_DEMO.find((s) => s.id === vista)?.nombre ?? ""); setVista("ticket"); };
+  const nuevaBarra = () => { iniciar("Barra", 1, "Barra"); setVista("ticket"); };
   const cobrar = (metodo: string) => { setCobrado(`Cobrado ${eur(total)} · ${metodo === "EFECTIVO" ? "Contado" : metodo}`); vaciar(); setModal(null); setVista(SALAS_DEMO[0]!.id); };
   const onFuncion = (f: string) => setModal(f);
 

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  Delete, Mail, Pencil, Printer, Split, X, XCircle,
+  Delete, Keyboard, Mail, Printer, Split, X, XCircle,
 } from "lucide-react";
-import { Modal, CabeceraModal } from "../../../ui";
+import { Modal, CabeceraModal, TecladoTexto } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo, desglosarCambio } from "./efectivo";
 import { useVenta } from "../store";
@@ -67,6 +67,7 @@ export function CobrarModal({
   const [display, setDisplay] = useState("");
   const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
+  const [oskNotas, setOskNotas] = useState(false);
   const [tipoDoc, setTipoDoc] = useState(tiposDoc[0]!);
   const [enviarFactura, setEnviarFactura] = useState(false);
   const [zonasImpresion, setZonasImpresion] = useState(true);
@@ -196,7 +197,7 @@ export function CobrarModal({
           <div className="flex min-h-0 min-w-0 flex-col gap-2.5">
             <div className="flex flex-none items-center gap-2 rounded-xl border border-border bg-card p-2.5">
               <input type="text" value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={90} placeholder="Notas del ticket…" className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-              <span aria-hidden className="grid h-11 w-12 flex-none place-items-center rounded-md border border-success bg-success/10 text-success"><Pencil size={18} /></span>
+              <button type="button" onClick={() => setOskNotas(true)} aria-label="Teclado en pantalla" className="grid h-11 w-12 flex-none place-items-center rounded-md border border-success bg-success/10 text-success transition-transform active:scale-95"><Keyboard size={18} /></button>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card p-3">
@@ -246,7 +247,7 @@ export function CobrarModal({
             </div>
             <div className="grid min-h-0 flex-1 grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border">
               {teclas.map((k) => (
-                <button key={k} type="button" onClick={() => pulsar(k)} className="grid min-h-13 place-items-center bg-card text-2xl font-semibold text-success transition-colors active:bg-success/10">
+                <button key={k} type="button" onClick={() => pulsar(k)} className="grid min-h-13 place-items-center bg-surface-overlay text-2xl font-semibold text-foreground transition-transform active:scale-[.97]">
                   {k === "borrar" ? <Delete size={24} /> : k === "." ? "," : k}
                 </button>
               ))}
@@ -293,6 +294,8 @@ export function CobrarModal({
           <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-warning px-6 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">Cobrar (F12)</button>
         </footer>
       </div>
+
+      {oskNotas && <TecladoTexto titulo="Notas del ticket" valor={notas} onCambio={(v) => setNotas(v.slice(0, 90))} onCerrar={() => setOskNotas(false)} />}
     </Modal>
   );
 }

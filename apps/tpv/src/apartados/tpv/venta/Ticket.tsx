@@ -47,7 +47,7 @@ export function Ticket() {
               <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="truncate font-bold text-foreground">{nombreDe(id)}</span>
                 {inv && <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success"><Gift size={9} /> Invitado</span>}
-                {manual && <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground tabular-nums">P:{eur(precios[id]!)}</span>}
+                {manual && <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground tabular-nums">P:{eur(precios[id]!)}</span>}
                 {desc && <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-brand tabular-nums">{desc.tipo === "PCT" ? `-${desc.valor}%` : `-${eur(desc.valor)}`}</span>}
               </span>
               <span className="text-center font-semibold tabular-nums text-foreground">

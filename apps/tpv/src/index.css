@@ -99,9 +99,11 @@
   --color-brand-foreground: #ffffff;
   --color-danger: #e0554a;
   --color-destructive: #e0554a;
-  /* Vocabulario del TPV Next (para portar la venta 1:1) */
+  /* Vocabulario del TPV Next (para portar la venta 1:1).
+     ⚠ `--color-muted` aquí es TEXTO (arriba, var(--muted)) — NO redefinirlo como
+     lavado de fondo: dejaba todos los `text-muted` al 10% de opacidad. Para el
+     `bg-muted` del Next usar `bg-surface-muted` (12% de paper). */
   --color-surface-2: color-mix(in srgb, var(--paper) 6%, var(--panel));
-  --color-muted: color-mix(in srgb, var(--paper) 10%, transparent);
   --color-accent: color-mix(in srgb, var(--paper) 8%, transparent);
   --color-accent-foreground: var(--paper);
   --color-accent-soft: color-mix(in srgb, var(--brand) 16%, transparent);

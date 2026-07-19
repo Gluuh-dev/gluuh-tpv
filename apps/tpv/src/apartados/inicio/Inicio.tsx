@@ -31,7 +31,7 @@ function Tarjeta({
         )}
       </h3>
       <p className="max-w-[34ch] text-[13.5px] leading-relaxed text-muted">{m.desc}</p>
-      <span className="mt-auto font-mono text-[11.5px] tracking-wide text-muted/80">{meta}</span>
+      <span className="mt-auto font-mono text-[11.5px] tracking-wide text-muted">{meta}</span>
     </button>
   );
 }
