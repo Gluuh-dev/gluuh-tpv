@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  Delete, Euro, Mail, Percent, Split, Tag, X, XCircle,
+  Delete, Euro, Mail, Percent, Split, X, XCircle,
 } from "lucide-react";
 import { Modal, Select, CampoTexto } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -26,6 +26,7 @@ const FORMAS_PAGO: FormaPago[] = [
   { id: "bizum", nombre: "Bizum", tipo: "BIZUM" },
   { id: "qr", nombre: "Pago QR", tipo: "QR" },
 ];
+// F1 (factura completa) exige destinatario identificado; F2 (simplificada) no.
 const esCompleta = (t: string) => t.toLowerCase().includes("completa");
 
 type Objetivo = { tipo: "pago" } | { tipo: "descuento" } | { tipo: "propina" };
@@ -91,7 +92,6 @@ export function CobrarModal({
   const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
   const [tipoDoc, setTipoDoc] = useState<string>(tiposDoc[0]!);
-  const [enviarFactura, setEnviarFactura] = useState(false);
   const [ahora] = useState(() => new Date());
 
   const importeACobrar = Math.max(0, Math.round((total + propina - descuento) * 100) / 100);
@@ -122,7 +122,11 @@ export function CobrarModal({
   }
   function elegirModoDescuento(modo: "PCT" | "EUR") {
     setDescModo(modo);
-    setObjetivo({ tipo: "descuento" }); setDisplay(""); setReemplazar(true);
+    setObjetivo({ tipo: "descuento" });
+    // Conserva el importe: al pasar € → % NO reinterpreta lo tecleado, muestra el %
+    // que esos euros suponen sobre el total (y viceversa). El valor en € no cambia.
+    setDisplay(descuento > 0 ? String(modo === "PCT" ? pctDesc : descuento).replace(".", ",") : "");
+    setReemplazar(true);
   }
 
   function pulsar(tecla: string) {
@@ -248,11 +252,6 @@ export function CobrarModal({
               <Campo label="Importe" numero><span className="text-[15px] font-bold">{eur(importeACobrar)}</span></Campo>
             </div>
           </div>
-          <label className={`mt-2 flex items-center gap-2 ${cliente ? "" : "opacity-40"}`}>
-            <input type="checkbox" checked={enviarFactura} disabled={!cliente} onChange={(e) => setEnviarFactura(e.target.checked)} className="h-4 w-4 accent-(--brand)" />
-            <span className="text-[12.5px] font-medium">Enviar factura al cliente por email</span>
-            {descuento > 0 && <span className="ml-auto text-[12px] font-semibold text-brand tabular-nums">Descuento aplicado − {eur(descuento)}</span>}
-          </label>
         </div>
 
         {/* Cuerpo */}
@@ -286,7 +285,6 @@ export function CobrarModal({
               {/* Descuento: un botón con selector €/% integrado y el valor a la vista. */}
               <div className={`flex min-h-13 flex-1 items-center gap-2 rounded-lg border px-2.5 transition-colors ${descActivo ? "border-brand ring-1 ring-brand/40" : "border-border"} bg-card`}>
                 <button type="button" onClick={activarDescuento} className="flex min-w-0 flex-1 items-center gap-1.5 py-2 text-left transition-transform active:scale-[.99]">
-                  <Tag size={15} className="flex-none text-brand" />
                   <span className="text-sm font-bold text-foreground">Descuento</span>
                   {descuento > 0 && (
                     <span className="truncate text-[13px] font-semibold tabular-nums text-muted-foreground">
@@ -301,10 +299,10 @@ export function CobrarModal({
                     className={`grid h-8 w-8 place-items-center text-sm font-bold transition-transform active:scale-90 ${descModo === "PCT" ? "bg-brand text-white" : "bg-surface text-muted-foreground"}`}><Percent size={15} /></button>
                 </div>
               </div>
-              {/* Propina: más pequeña, para que la fila quepa siempre. */}
+              {/* Propina */}
               <button type="button" onClick={() => seleccionar(objetivo.tipo === "propina" ? { tipo: "pago" } : { tipo: "propina" })}
-                className={`flex min-h-13 w-32 flex-none flex-col items-center justify-center rounded-lg border text-sm font-bold transition-transform active:scale-[.97] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                <span className="flex items-center gap-1.5"><Coins size={14} /> Propina</span>
+                className={`flex min-h-13 w-40 flex-none flex-col items-center justify-center rounded-lg border text-sm font-bold transition-transform active:scale-[.97] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                <span>Propina</span>
                 {propina > 0 && <span className="text-[13px] tabular-nums opacity-85">{eur(propina)}</span>}
               </button>
             </div>
@@ -362,13 +360,13 @@ export function CobrarModal({
           </button>
           <span className="flex-1" />
           {/* Mismo tamaño de botón; solo la tecla (F10/F11/F12) va pequeña y tenue. */}
-          <button type="button" onClick={onCerrar} className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95">
+          <button type="button" onClick={onCerrar} className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95">
             <Mail size={16} /> Enviar por email
           </button>
-          <button type="button" onClick={() => imprimir(true)} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95">
+          <button type="button" onClick={() => imprimir(true)} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95">
             Imprimir cuenta <span className="text-[11px] font-normal opacity-55">(F10)</span>
           </button>
-          <button type="button" onClick={() => { imprimir(false); cobrar(); }} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-warning transition-transform active:scale-95 disabled:text-muted-foreground">
+          <button type="button" onClick={() => { imprimir(false); cobrar(); }} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95 disabled:text-muted-foreground">
             Cobrar e imprimir <span className="text-[11px] font-normal opacity-55">(F11)</span>
           </button>
           <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-cobro px-5 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">
