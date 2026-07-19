@@ -1,7 +1,8 @@
-import { Gift } from "lucide-react";
+import { Gift, ChefHat } from "lucide-react";
 import { eur } from "../../../lib/dinero";
 import { PRODUCTOS_DEMO } from "../datos";
 import { useVenta } from "../store";
+import { marcharPendientes } from "./ticket-impresion";
 
 const nombreDe = (id: string) => PRODUCTOS_DEMO.find((p) => p.id === id.split("|")[0])?.nombre ?? "Producto";
 
@@ -15,6 +16,7 @@ function Buffer({ valor }: { valor: string }) {
 export function Ticket() {
   const comanda = useVenta((s) => s.comanda);
   const lineaSel = useVenta((s) => s.lineaSel);
+  const marchado = useVenta((s) => s.marchado);
   const invitadas = useVenta((s) => s.invitadas);
   const descuentos = useVenta((s) => s.descuentos);
   const precios = useVenta((s) => s.precios);
@@ -41,25 +43,39 @@ export function Ticket() {
           const desc = descuentos[id];
           const manual = precios[id] != null;
           const editandoEsta = sel && editando;
+          const mq = marchado[id] ?? 0;          // uds ya enviadas a cocina
+          const pend = q - mq;                   // uds sin marchar (nuevas)
+          const enCocina = mq >= q && q > 0;     // todo lo de esta línea ya salió
           return (
-            <button key={id} type="button" onClick={() => seleccionar(id)}
-              className={`grid w-full grid-cols-[1fr_2.4rem_4.2rem_4.8rem] items-center gap-1 border-l-[3px] px-3 py-2 text-left text-xs ${sel ? "border-foreground/40 bg-surface-muted text-foreground" : "border-transparent"}`}>
-              <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <span className="truncate font-bold text-foreground">{nombreDe(id)}</span>
-                {inv && <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success"><Gift size={9} /> Invitado</span>}
-                {manual && <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground tabular-nums">P:{eur(precios[id]!)}</span>}
-                {desc && <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-brand tabular-nums">{desc.tipo === "PCT" ? `-${desc.valor}%` : `-${eur(desc.valor)}`}</span>}
-              </span>
-              <span className="text-center font-semibold tabular-nums text-foreground">
-                {editandoEsta && modo === "UND" ? <Buffer valor={buffer} /> : q}
-              </span>
-              <span className="text-right tabular-nums text-muted-foreground">
-                {editandoEsta && modo === "PREC" ? <Buffer valor={buffer} /> : eur(precioEfectivo(id))}
-              </span>
-              <span className={`text-right font-semibold tabular-nums ${inv ? "text-success" : "text-foreground"}`}>
-                {inv ? "Inv." : eur(precioEfectivo(id) * q)}
-              </span>
-            </button>
+            <div key={id} className="relative">
+              <button type="button" onClick={() => seleccionar(id)}
+                className={`grid w-full grid-cols-[1fr_2.4rem_4.2rem_4.8rem] items-center gap-1 border-l-[3px] px-3 py-2 text-left text-xs ${sel ? "border-foreground/40 bg-surface-muted text-foreground" : "border-transparent"} ${enCocina ? "opacity-55" : ""}`}>
+                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="truncate font-bold text-foreground">{nombreDe(id)}</span>
+                  {inv && <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success"><Gift size={9} /> Invitado</span>}
+                  {manual && <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground tabular-nums">P:{eur(precios[id]!)}</span>}
+                  {desc && <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-brand tabular-nums">{desc.tipo === "PCT" ? `-${desc.valor}%` : `-${eur(desc.valor)}`}</span>}
+                  {enCocina && <span className="inline-flex items-center gap-0.5 rounded-full bg-surface-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground"><ChefHat size={9} /> En cocina</span>}
+                  {mq > 0 && pend > 0 && <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-warning tabular-nums">+{pend} nuevo</span>}
+                </span>
+                <span className="text-center font-semibold tabular-nums text-foreground">
+                  {editandoEsta && modo === "UND" ? <Buffer valor={buffer} /> : q}
+                </span>
+                <span className="text-right tabular-nums text-muted-foreground">
+                  {editandoEsta && modo === "PREC" ? <Buffer valor={buffer} /> : eur(precioEfectivo(id))}
+                </span>
+                <span className={`text-right font-semibold tabular-nums ${inv ? "text-success" : "text-foreground"}`}>
+                  {inv ? "Inv." : eur(precioEfectivo(id) * q)}
+                </span>
+              </button>
+              {/* Marchar SOLO esta línea (lo pendiente de ella): botón hermano, sin anidar. */}
+              {sel && pend > 0 && (
+                <button type="button" onClick={() => marcharPendientes({ ids: [id] })}
+                  className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-md bg-brand px-2 py-1 text-[10px] font-bold uppercase text-white transition-transform active:scale-95">
+                  <ChefHat size={11} /> Marchar
+                </button>
+              )}
+            </div>
           );
         })}
       </div>

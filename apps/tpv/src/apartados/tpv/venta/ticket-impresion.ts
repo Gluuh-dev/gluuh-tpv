@@ -1,5 +1,6 @@
 import { PRODUCTOS_DEMO } from "../datos";
 import { useVenta } from "../store";
+import { imprimirComanda } from "../../../lib/impresion";
 import type { TicketImpresion, DisenoTicket, ComandaImpresion } from "../../../lib/impresion";
 
 // Construye el TicketImpresion a partir del carrito de la venta (store) para
@@ -63,17 +64,34 @@ export function estacionDeCategoria(categoria: string): Estacion {
   return CATEGORIAS_BARRA.has(categoria) ? "BARRA" : "COCINA";
 }
 
-/** Comanda(s) a marchar desde el carrito, una por estación con productos. */
-export function construirComandas(contexto: string, operario?: string): { estacion: Estacion; comanda: ComandaImpresion }[] {
-  const s = useVenta.getState();
+/** Comanda(s) a marchar desde unas líneas pendientes, una por estación. */
+export function construirComandas(
+  contexto: string,
+  operario: string | undefined,
+  pendientes: readonly { id: string; cantidad: number }[],
+): { estacion: Estacion; comanda: ComandaImpresion }[] {
   const porEstacion: Record<Estacion, ComandaImpresion["lineas"]> = { COCINA: [], BARRA: [] };
-  for (const [id, q] of Object.entries(s.comanda)) {
-    if (q <= 0) continue;
+  for (const { id, cantidad } of pendientes) {
+    if (cantidad <= 0) continue;
     const base = id.split("|")[0]!;
     const p = PRODUCTOS_DEMO.find((x) => x.id === base);
-    porEstacion[estacionDeCategoria(p?.categoria ?? "")].push({ cantidad: q, nombre: p?.nombre ?? base });
+    porEstacion[estacionDeCategoria(p?.categoria ?? "")].push({ cantidad, nombre: p?.nombre ?? base });
   }
   return (["COCINA", "BARRA"] as Estacion[])
     .filter((e) => porEstacion[e].length > 0)
     .map((e) => ({ estacion: e, comanda: { contexto: contexto || "Barra", operario, lineas: porEstacion[e] } }));
+}
+
+// MARCHAR: imprime la comanda de lo PENDIENTE (entero, o solo `ids`) por estación y
+// marca esas líneas como marchadas. Devuelve las estaciones a las que fue (para
+// el aviso). No cobra ni vacía: la cuenta sigue abierta.
+export function marcharPendientes(opts: Readonly<{ ids?: string[]; operario?: string }> = {}): Estacion[] {
+  const s = useVenta.getState();
+  let pend = s.pendientes();
+  if (opts.ids) { const sel = new Set(opts.ids); pend = pend.filter((p) => sel.has(p.id)); }
+  if (!pend.length) return [];
+  const comandas = construirComandas(s.contexto, opts.operario ?? "María Ruiz", pend);
+  for (const { estacion, comanda } of comandas) void imprimirComanda(comanda, `COMANDA · ${estacion}`);
+  s.marcarMarchado(pend.map((p) => p.id));
+  return comandas.map((c) => c.estacion);
 }
