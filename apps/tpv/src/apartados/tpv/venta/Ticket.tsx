@@ -43,15 +43,12 @@ export function Ticket() {
           const editandoEsta = sel && editando;
           return (
             <button key={id} type="button" onClick={() => seleccionar(id)}
-              className={`grid w-full grid-cols-[1fr_2.4rem_4.2rem_4.8rem] items-center gap-1 border-l-[3px] px-3 py-2 text-left text-xs ${sel ? "border-[#0e8fa2] bg-accent-soft text-foreground" : "border-transparent"}`}>
+              className={`grid w-full grid-cols-[1fr_2.4rem_4.2rem_4.8rem] items-center gap-1 border-l-[3px] px-3 py-2 text-left text-xs ${sel ? "border-foreground/40 bg-surface-muted text-foreground" : "border-transparent"}`}>
               <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="truncate font-bold text-foreground">{nombreDe(id)}</span>
                 {inv && <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success"><Gift size={9} /> Invitado</span>}
-                {(desc || manual) && (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground tabular-nums">
-                    {manual && `P:${eur(precios[id]!)}`}{desc && ` ${desc.tipo === "PCT" ? `-${desc.valor}%` : `-${eur(desc.valor)}`}`}
-                  </span>
-                )}
+                {manual && <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground tabular-nums">P:{eur(precios[id]!)}</span>}
+                {desc && <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-brand tabular-nums">{desc.tipo === "PCT" ? `-${desc.valor}%` : `-${eur(desc.valor)}`}</span>}
               </span>
               <span className="text-center font-semibold tabular-nums text-foreground">
                 {editandoEsta && modo === "UND" ? <Buffer valor={buffer} /> : q}
