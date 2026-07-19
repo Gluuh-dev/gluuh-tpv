@@ -247,7 +247,7 @@ export function CobrarModal({
             </div>
             <div className="grid min-h-0 flex-1 grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border">
               {teclas.map((k) => (
-                <button key={k} type="button" onClick={() => pulsar(k)} className="grid min-h-13 place-items-center bg-surface-overlay text-2xl font-semibold text-foreground transition-transform active:scale-[.97]">
+                <button key={k} type="button" onClick={() => pulsar(k)} className="grid min-h-13 place-items-center bg-card text-2xl font-semibold text-success transition-colors active:bg-success/10">
                   {k === "borrar" ? <Delete size={24} /> : k === "." ? "," : k}
                 </button>
               ))}
@@ -283,15 +283,27 @@ export function CobrarModal({
           </div>
         </div>
 
-        {/* Barra inferior (botones compactos, como el footer de Utilidades) */}
-        <footer className="flex flex-none flex-wrap items-center gap-2.5 border-t border-border bg-surface-2 px-3 py-2.5">
-          <button type="button" onClick={onCerrar} className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-danger transition-transform active:scale-95"><XCircle size={16} /> Cancelar</button>
-          <button type="button" onClick={onDividir} className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold transition-transform active:scale-95"><Split size={16} /> Dividir</button>
+        {/* Barra inferior — igual que Next (Cancelar apilado · Dividir · email · F10/F11/F12) */}
+        <footer className="flex flex-none flex-wrap items-center gap-2.5 border-t border-border bg-card px-3 py-2.5">
+          <button type="button" onClick={onCerrar} className="flex min-h-13 flex-col items-center justify-center gap-0.5 px-4 text-xs font-semibold text-danger transition-transform active:scale-95">
+            <XCircle size={24} /> Cancelar
+          </button>
+          <button type="button" onClick={onDividir} className="flex min-h-13 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-semibold transition-transform active:scale-[.98]">
+            <Split size={16} /> Dividir
+          </button>
           <span className="flex-1" />
-          <button type="button" onClick={onCerrar} className="flex items-center gap-2 rounded-md border border-warning bg-surface px-4 py-2 text-sm font-bold text-warning transition-transform active:scale-95"><Mail size={16} /> Enviar por email</button>
-          <button type="button" onClick={onCerrar} className="rounded-md border border-warning bg-surface px-4 py-2 text-sm font-bold text-warning transition-transform active:scale-95">Imprimir cuenta (F10)</button>
-          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md border border-warning bg-surface px-4 py-2 text-sm font-bold text-warning transition-transform active:scale-95 disabled:border-border disabled:text-muted-foreground">Cobrar e imprimir (F11)</button>
-          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-warning px-6 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">Cobrar (F12)</button>
+          <button type="button" onClick={onCerrar} className="flex min-h-13 items-center gap-2 rounded-md border border-warning bg-card px-4 text-sm font-bold text-warning transition-transform active:scale-[.98]">
+            <Mail size={16} /> Enviar por email
+          </button>
+          <button type="button" onClick={onCerrar} className="min-h-13 rounded-md border border-warning bg-card px-4 text-sm font-bold text-warning transition-transform active:scale-[.98]">
+            Imprimir cuenta (F10)
+          </button>
+          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="min-h-13 rounded-md border border-warning bg-card px-4 text-sm font-bold text-warning transition-transform active:scale-[.98] disabled:border-border disabled:bg-surface disabled:text-muted-foreground">
+            Cobrar e imprimir (F11)
+          </button>
+          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="min-h-13 rounded-md bg-warning px-8 text-[17px] font-bold text-white shadow-sm shadow-warning/25 transition-transform active:scale-[.98] disabled:bg-surface disabled:text-muted-foreground disabled:shadow-none">
+            Cobrar (F12)
+          </button>
         </footer>
       </div>
 
