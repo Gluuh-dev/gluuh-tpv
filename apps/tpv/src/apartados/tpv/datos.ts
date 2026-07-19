@@ -79,6 +79,31 @@ export function colorCategoria(id: string): string {
   return CATEGORIAS_DEMO.find((c) => c.id === id)?.color ?? "#64748b";
 }
 
+// Modificadores demo (extras con precio + comentarios) por producto. Al tocar un
+// producto con modificadores se abre el modal en vez de añadirlo directo.
+export interface GrupoMod { titulo: string; tipo: "comentario" | "extra"; opciones: { nombre: string; precio?: number }[] }
+
+const EXTRAS_BURGER: GrupoMod[] = [
+  { titulo: "Punto de la carne", tipo: "comentario", opciones: [{ nombre: "Poco hecha" }, { nombre: "Al punto" }, { nombre: "Muy hecha" }] },
+  { titulo: "Extras", tipo: "extra", opciones: [{ nombre: "Bacon", precio: 1 }, { nombre: "Extra queso", precio: 0.8 }, { nombre: "Huevo", precio: 1 }, { nombre: "Cebolla caramelizada", precio: 0.6 }] },
+  { titulo: "Quitar", tipo: "comentario", opciones: [{ nombre: "Sin cebolla" }, { nombre: "Sin tomate" }, { nombre: "Sin salsa" }] },
+];
+
+export const MODIFICADORES: Record<string, GrupoMod[]> = {
+  h1: EXTRAS_BURGER, h2: EXTRAS_BURGER, h3: EXTRAS_BURGER,
+  pop6: EXTRAS_BURGER,
+  ra1: [{ titulo: "Salsa", tipo: "extra", opciones: [{ nombre: "Alioli", precio: 0.5 }, { nombre: "Brava extra", precio: 0.5 }] }],
+  co1: [{ titulo: "Con qué", tipo: "comentario", opciones: [{ nombre: "Tónica" }, { nombre: "Limón" }, { nombre: "Pepino" }] }],
+  co3: [{ titulo: "Con qué", tipo: "comentario", opciones: [{ nombre: "Coca-Cola" }, { nombre: "Coca-Cola Zero" }, { nombre: "Limón" }] }],
+};
+
+export function tieneMods(id: string): boolean {
+  return !!MODIFICADORES[id.split(/[#|]/)[0] ?? ""];
+}
+export function modsDe(id: string): GrupoMod[] {
+  return MODIFICADORES[id.split(/[#|]/)[0] ?? ""] ?? [];
+}
+
 // Clientes demo (para el ClienteModal). Se reemplazan por los del nodo.
 export interface ClienteDemo { id: string; nombre: string; telefono?: string; deuda?: number; alergias?: string }
 export const CLIENTES_DEMO: ClienteDemo[] = [

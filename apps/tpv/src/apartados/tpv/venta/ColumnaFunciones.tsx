@@ -8,7 +8,7 @@ import {
 function Boton({ Icono, label, tono = "accion", onClick }: Readonly<{ Icono: LucideIcon; label: string; tono?: "accion" | "util"; onClick: () => void }>) {
   return (
     <button type="button" onClick={onClick}
-      className={`flex h-14 w-full flex-col items-center justify-center gap-1 rounded-[7px] border text-[.62rem] font-semibold leading-tight transition-transform active:scale-95 ${tono === "util" ? "border-border bg-muted text-muted-foreground" : "border-border bg-surface-2 text-muted-foreground"}`}>
+      className={`flex h-14 w-full flex-col items-center justify-center gap-1 rounded-[7px] border text-[.62rem] font-semibold leading-tight transition-transform active:scale-95 ${tono === "util" ? "border-border bg-surface-overlay text-muted-foreground" : "border-border bg-surface-2 text-foreground"}`}>
       <Icono size={19} /> <span className="px-0.5 text-center">{label}</span>
     </button>
   );

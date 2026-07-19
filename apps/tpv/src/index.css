@@ -101,6 +101,9 @@
   --color-destructive: #e0554a;
   /* Vocabulario del TPV Next (para portar la venta 1:1) */
   --color-surface-2: color-mix(in srgb, var(--paper) 6%, var(--panel));
+  --color-muted: color-mix(in srgb, var(--paper) 10%, transparent);
+  --color-accent: color-mix(in srgb, var(--paper) 8%, transparent);
+  --color-accent-foreground: var(--paper);
   --color-accent-soft: color-mix(in srgb, var(--brand) 16%, transparent);
   --color-success: var(--mint);
   --color-warning: var(--amber);
