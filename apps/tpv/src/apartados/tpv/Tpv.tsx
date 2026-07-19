@@ -6,11 +6,11 @@ import { Venta } from "./Venta";
 import { RailSalas } from "./RailSalas";
 import { BarraEstado } from "./venta/BarraEstado";
 import { CobrarModal } from "./venta/CobrarModal";
+import { DividirCuenta } from "./venta/DividirCuenta";
 import { InvitacionesModal } from "./venta/InvitacionesModal";
 import { ClienteModal } from "./venta/ClienteModal";
 import { UtilidadesModal } from "./venta/UtilidadesModal";
-import { imprimirComanda } from "../../lib/impresion";
-import { construirComandas } from "./venta/ticket-impresion";
+import { marcharPendientes } from "./venta/ticket-impresion";
 import { useVenta } from "./store";
 import { SALAS_DEMO, type Mesa } from "./datos";
 
@@ -49,6 +49,7 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const iniciar = useVenta((s) => s.iniciar);
   const vaciar = useVenta((s) => s.vaciar);
   const contexto = useVenta((s) => s.contexto);
+  const comensales = useVenta((s) => s.comensales);
   const total = useVenta((s) => s.total());
 
   useEffect(() => {
@@ -61,14 +62,14 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const abrirMesa = (mesa: Mesa) => { iniciar(`Mesa ${mesa.nombre}`, mesa.comensales ?? 1, SALAS_DEMO.find((s) => s.id === vista)?.nombre ?? ""); setVista("ticket"); };
   const nuevaBarra = () => { iniciar("Barra", 1, "Barra"); setVista("ticket"); };
   const cobrar = (metodo: string) => { setCobrado(`Cobrado ${eur(total)} · ${metodo === "EFECTIVO" ? "Contado" : metodo}`); vaciar(); setModal(null); setVista(SALAS_DEMO[0]!.id); };
+  // Mesa saldada tras dividir (todas las partes cobradas): cierra la mesa y vuelve al plano.
+  const mesaSaldada = () => { setCobrado("Mesa cobrada · cuenta dividida"); vaciar(); setModal(null); setVista(SALAS_DEMO[0]!.id); };
 
-  // Marchar: manda la comanda a cocina/barra (una impresión por estación, según
-  // la estación de cada producto). NO cobra ni vacía: la cuenta sigue abierta.
+  // Marchar: manda a cocina/barra SOLO lo pendiente (lo añadido desde la última
+  // vez), una impresión por estación. NO cobra ni vacía: la cuenta sigue abierta.
   const marchar = () => {
-    const comandas = construirComandas(contexto, OPERARIO);
-    if (!comandas.length) { setCobrado("No hay nada que marchar"); return; }
-    for (const { estacion, comanda } of comandas) void imprimirComanda(comanda, `COMANDA · ${estacion}`);
-    setCobrado(`Marchado a ${comandas.map((c) => c.estacion).join(" y ")}`);
+    const est = marcharPendientes({ operario: OPERARIO });
+    setCobrado(est.length ? `Marchado a ${est.join(" y ")}` : "No hay nada nuevo que marchar");
   };
   const onFuncion = (f: string) => { if (f === "marchar") { marchar(); return; } setModal(f); };
 
@@ -93,7 +94,9 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
       {modal === "invitar" && <InvitacionesModal onCerrar={() => setModal(null)} />}
       {modal === "cliente" && <ClienteModal onCerrar={() => setModal(null)} />}
       {modal === "utilidades" && <UtilidadesModal onCerrar={() => setModal(null)} onFuncion={onFuncion} />}
-      {modal && !["cobrar", "invitar", "cliente", "utilidades"].includes(modal) && (
+      {/* Dividir cuenta: centro de mando del reparto; el cobro de cada parte se abre encima. */}
+      {modal === "dividir" && <DividirCuenta contexto={contexto} comensales={comensales} onCerrar={() => setModal(null)} onSaldada={mesaSaldada} />}
+      {modal && !["cobrar", "invitar", "cliente", "utilidades", "dividir"].includes(modal) && (
         <Modal onCerrar={() => setModal(null)} ancho="md" className="p-7">
           <div className="flex min-h-[220px] flex-col">
             <h2 className="mb-1 font-display text-xl font-bold">{TITULO_FUNCION[modal] ?? modal}</h2>

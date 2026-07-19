@@ -25,6 +25,8 @@ export interface VentaState {
   precios: Record<string, number>;
   descuentos: Record<string, Descuento>;
   invitadas: Record<string, boolean>;
+  /** Uds YA marchadas (enviadas a cocina) por línea; el resto está "pendiente". */
+  marchado: Record<string, number>;
   lineaSel: string | null;
 
   catSel: string | null;
@@ -45,7 +47,13 @@ export interface VentaState {
   invitarLinea: (id: string) => void;
   invitarTodo: (v: boolean) => void;
   anularLinea: (id: string) => void;
+  /** Resta unidades ya cobradas de la comanda (dividir por productos: salen de la mesa). */
+  descontarLineas: (sel: { id: string; uds: number }[]) => void;
   vaciar: () => void;
+  /** Marca esas líneas como marchadas hasta su cantidad actual. */
+  marcarMarchado: (ids: string[]) => void;
+  /** Líneas con uds sin marchar (lo que saldría en la próxima comanda). */
+  pendientes: () => { id: string; cantidad: number }[];
 
   pulsarModo: (m: ModoTeclado) => void;
   pulsarDigito: (d: string) => void;
@@ -91,6 +99,7 @@ export const useVenta = create<VentaState>((set, get) => ({
   precios: {},
   descuentos: {},
   invitadas: {},
+  marchado: {},
   lineaSel: null,
   catSel: null,
   busqueda: "",
@@ -100,7 +109,7 @@ export const useVenta = create<VentaState>((set, get) => ({
 
   iniciar: (contexto, comensales = 1, sala = "") => set({
     contexto, sala, comensales, alias: "", cliente: null,
-    comanda: {}, precios: {}, descuentos: {}, invitadas: {},
+    comanda: {}, precios: {}, descuentos: {}, invitadas: {}, marchado: {},
     lineaSel: null, buffer: "", modo: "UND", editando: false, busqueda: "",
   }),
 
@@ -124,10 +133,35 @@ export const useVenta = create<VentaState>((set, get) => ({
     const precios = { ...s.precios }; delete precios[id];
     const descuentos = { ...s.descuentos }; delete descuentos[id];
     const invitadas = { ...s.invitadas }; delete invitadas[id];
-    return { comanda, precios, descuentos, invitadas, lineaSel: s.lineaSel === id ? null : s.lineaSel };
+    const marchado = { ...s.marchado }; delete marchado[id];
+    return { comanda, precios, descuentos, invitadas, marchado, lineaSel: s.lineaSel === id ? null : s.lineaSel };
   }),
 
-  vaciar: () => set({ comanda: {}, precios: {}, descuentos: {}, invitadas: {}, lineaSel: null, buffer: "", editando: false }),
+  descontarLineas: (sel) => set((s) => {
+    const comanda = { ...s.comanda };
+    const precios = { ...s.precios };
+    const descuentos = { ...s.descuentos };
+    const invitadas = { ...s.invitadas };
+    const marchado = { ...s.marchado };
+    for (const { id, uds } of sel) {
+      const q = (comanda[id] ?? 0) - uds;
+      if (q > 0) comanda[id] = q;
+      else { delete comanda[id]; delete precios[id]; delete descuentos[id]; delete invitadas[id]; delete marchado[id]; }
+    }
+    return { comanda, precios, descuentos, invitadas, marchado, lineaSel: null };
+  }),
+
+  vaciar: () => set({ comanda: {}, precios: {}, descuentos: {}, invitadas: {}, marchado: {}, lineaSel: null, buffer: "", editando: false }),
+
+  marcarMarchado: (ids) => set((s) => {
+    const marchado = { ...s.marchado };
+    for (const id of ids) if (s.comanda[id]) marchado[id] = s.comanda[id]!;
+    return { marchado };
+  }),
+
+  pendientes: () => Object.entries(get().comanda)
+    .map(([id, q]) => ({ id, cantidad: q - (get().marchado[id] ?? 0) }))
+    .filter((p) => p.cantidad > 0),
 
   // Pulsar un modo: si ya estabas en él, sales; si no, entras (empieza vacío; el
   // valor de la línea no cambia hasta que teclees).
