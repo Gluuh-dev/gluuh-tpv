@@ -4,7 +4,7 @@ import {
   FileText, Gift, Tags, SlidersHorizontal, Percent, Scale, CreditCard, Mail, PackageOpen, LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
-import { Modal } from "../../../ui";
+import { Modal, CabeceraModal } from "../../../ui";
 
 type Tono = "normal" | "caja" | "alerta";
 interface Util { label: string; Icono: LucideIcon; tono?: Tono; off?: boolean }
@@ -66,10 +66,7 @@ export function UtilidadesModal({ onCerrar, onFuncion }: Readonly<{ onCerrar: ()
 
   return (
     <Modal onCerrar={onCerrar} ancho="3xl" className="overflow-hidden p-0">
-      <header className="flex items-center gap-3 bg-brand px-5 py-3.5 text-white">
-        <LayoutGrid size={20} />
-        <div><h2 className="font-display text-lg font-extrabold leading-none">Utilidades</h2><p className="text-[11px] opacity-80">Terminal</p></div>
-      </header>
+      <CabeceraModal Icono={LayoutGrid} titulo="Utilidades" subtitulo="Terminal" onCerrar={onCerrar} />
 
       <div className="grid grid-cols-4 gap-2 p-4 sm:grid-cols-5">
         {UTILES.map((u) => (

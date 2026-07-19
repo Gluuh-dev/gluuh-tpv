@@ -3,7 +3,7 @@ import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
   Delete, Mail, Pencil, Printer, Split, X, XCircle,
 } from "lucide-react";
-import { Modal } from "../../../ui";
+import { Modal, CabeceraModal } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo, desglosarCambio } from "./efectivo";
 import { useVenta } from "../store";
@@ -154,16 +154,13 @@ export function CobrarModal({
 
   return (
     <Modal onCerrar={onCerrar} ancho="5xl" className="overflow-hidden p-0">
-      {/* Cabecera morada */}
-      <header className="flex items-center gap-3 bg-brand px-5 py-3 text-white">
-        <CreditCard size={20} />
-        <div className="mr-auto">
-          <h2 className="font-display text-lg font-extrabold leading-none">Cobrar{contexto ? ` ${contexto}` : ""}</h2>
-          <p className="mt-0.5 text-[11px] opacity-80">{[empleado, terminal].filter(Boolean).join(" · ")}</p>
-        </div>
-        <div className="text-right"><div className="text-[9px] font-bold uppercase tracking-wider text-white/70">A cobrar</div><b className="text-lg tabular-nums">{eur(importeACobrar)}</b></div>
-        <button type="button" onClick={onCerrar} aria-label="Cerrar" className="ml-2 grid h-8 w-8 place-items-center rounded-md bg-white/10 transition-transform active:scale-90"><X size={18} /></button>
-      </header>
+      <CabeceraModal
+        Icono={CreditCard}
+        titulo={`Cobrar${contexto ? ` ${contexto}` : ""}`}
+        subtitulo={[empleado, terminal].filter(Boolean).join(" · ")}
+        derecha={<div className="text-right"><div className="text-[9px] font-bold uppercase tracking-wider text-white/70">A cobrar</div><b className="text-lg tabular-nums">{eur(importeACobrar)}</b></div>}
+        onCerrar={onCerrar}
+      />
 
       <div className="flex h-[80vh] max-h-[820px] min-h-0 flex-col bg-background text-foreground">
         {/* Franja de datos */}

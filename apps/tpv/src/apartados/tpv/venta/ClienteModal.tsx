@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { UserRound, Search, Check, TriangleAlert, Coins, Building2, X } from "lucide-react";
-import { Modal } from "../../../ui";
+import { Modal, CabeceraModal } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { CLIENTES_DEMO } from "../datos";
 import { useVenta } from "../store";
@@ -20,10 +20,7 @@ export function ClienteModal({ onCerrar }: Readonly<{ onCerrar: () => void }>) {
 
   return (
     <Modal onCerrar={onCerrar} ancho="3xl" className="overflow-hidden p-0">
-      <header className="flex items-center gap-3 bg-brand px-5 py-3.5 text-white">
-        <UserRound size={20} />
-        <h2 className="font-display text-lg font-extrabold leading-none">Cliente del ticket</h2>
-      </header>
+      <CabeceraModal Icono={UserRound} titulo="Cliente del ticket" onCerrar={onCerrar} />
 
       <div className="grid gap-0 sm:grid-cols-[1fr_300px]">
         {/* Lista */}

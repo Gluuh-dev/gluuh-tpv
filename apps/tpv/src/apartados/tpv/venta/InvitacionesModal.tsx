@@ -1,5 +1,5 @@
 import { Gift, Check } from "lucide-react";
-import { Modal } from "../../../ui";
+import { Modal, CabeceraModal } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { PRODUCTOS_DEMO } from "../datos";
 import { useVenta } from "../store";
@@ -20,11 +20,7 @@ export function InvitacionesModal({ onCerrar }: Readonly<{ onCerrar: () => void 
 
   return (
     <Modal onCerrar={onCerrar} ancho="2xl" className="overflow-hidden p-0">
-      <header className="flex items-center gap-3 bg-brand px-5 py-3.5 text-white">
-        <Gift size={20} />
-        <h2 className="font-display text-lg font-extrabold leading-none">Invitaciones</h2>
-        <span className="ml-auto text-sm opacity-80">{nInv} de {ids.length} invitadas</span>
-      </header>
+      <CabeceraModal Icono={Gift} titulo="Invitaciones" derecha={<span className="text-sm text-white/80">{nInv} de {ids.length} invitadas</span>} onCerrar={onCerrar} />
 
       <div className="max-h-[52vh] overflow-auto p-4">
         {ids.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No hay líneas en la comanda.</p>}
