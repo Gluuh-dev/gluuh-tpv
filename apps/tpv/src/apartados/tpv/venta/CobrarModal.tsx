@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
   Delete, Keyboard, Mail, Split, X, XCircle,
 } from "lucide-react";
-import { Modal, CabeceraModal, TecladoTexto } from "../../../ui";
+import { Modal, CabeceraModal, abrirTeclado } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo, desglosarCambio } from "./efectivo";
 import { useVenta } from "../store";
@@ -67,7 +67,7 @@ export function CobrarModal({
   const [display, setDisplay] = useState("");
   const [reemplazar, setReemplazar] = useState(true);
   const [notas, setNotas] = useState("");
-  const [oskNotas, setOskNotas] = useState(false);
+  const notasRef = useRef<HTMLInputElement>(null);
   const [tipoDoc, setTipoDoc] = useState(tiposDoc[0]!);
   const [enviarFactura, setEnviarFactura] = useState(false);
   const [ahora] = useState(() => new Date());
@@ -195,8 +195,8 @@ export function CobrarModal({
           {/* Izquierda */}
           <div className="flex min-h-0 min-w-0 flex-col gap-2.5">
             <div className="flex flex-none items-center gap-2 rounded-xl border border-border bg-card p-2.5">
-              <input type="text" value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={90} placeholder="Notas del ticket…" className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-              <button type="button" onClick={() => setOskNotas(true)} aria-label="Teclado en pantalla" className="grid h-11 w-12 flex-none place-items-center rounded-md border border-success bg-success/10 text-success transition-transform active:scale-95"><Keyboard size={18} /></button>
+              <input ref={notasRef} type="text" value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={90} placeholder="Notas del ticket…" className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { notasRef.current?.focus(); abrirTeclado(); }} aria-label="Teclado en pantalla" className="grid h-11 w-12 flex-none place-items-center rounded-md border border-success bg-success/10 text-success transition-transform active:scale-95"><Keyboard size={18} /></button>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card p-3">
@@ -298,8 +298,6 @@ export function CobrarModal({
           </button>
         </footer>
       </div>
-
-      {oskNotas && <TecladoTexto titulo="Notas del ticket" valor={notas} onCambio={(v) => setNotas(v.slice(0, 90))} onCerrar={() => setOskNotas(false)} />}
     </Modal>
   );
 }

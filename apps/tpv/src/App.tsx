@@ -8,6 +8,7 @@ import { VisorNode } from "./apartados/nodo/VisorNode";
 import { CredencialModal } from "./apartados/acceso/CredencialModal";
 import { AyudaModal } from "./apartados/ayuda/AyudaModal";
 import { APARTADOS } from "./apartados/meta";
+import { TecladoEnPantalla } from "./ui";
 import type { Usuario } from "./apartados/acceso/tipos";
 import { TECLA_A_VISTA, type Vista, type Apartado } from "./lib/nav";
 
@@ -88,6 +89,10 @@ export function App() {
       {ayuda && (
         <AyudaModal licencia="LA-ALAMEDA-0417" terminal="T01" version="v3.2.0" onCerrar={() => setAyuda(false)} />
       )}
+
+      {/* Teclado en pantalla global (flotante, arrastrable). Se abre por evento
+          desde cualquier botón de teclado (abrirTeclado); escribe en el campo enfocado. */}
+      <TecladoEnPantalla />
     </>
   );
 }
