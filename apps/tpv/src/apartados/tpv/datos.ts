@@ -115,6 +115,12 @@ export const CLIENTES_DEMO: ClienteDemo[] = [
   { id: "cl6", nombre: "Familia Pérez", telefono: "644 555 666" },
 ];
 
+// Tipos de documento de cobro POR DEFECTO del TPV de ejemplo (AEAT):
+//  · Factura simplificada (F2, el "ticket"): la que sale por defecto, sin exigir cliente.
+//  · Factura completa (F1, ordinaria): requiere destinatario identificado (NIF).
+// Al cablear el nodo esto vendrá de la config fiscal del local; la forma no cambia.
+export const TIPOS_DOC_DEMO = ["Factura simplificada", "Factura completa"] as const;
+
 export const PRODUCTOS_DEMO: Producto[] = [
   // Populares (favoritos)
   { id: "pop1", nombre: "Alhambra 1925", precio: 1.4, categoria: "populares" },

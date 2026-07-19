@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  Delete, Keyboard, Mail, Split, X, XCircle,
+  ChevronDown, Delete, Keyboard, Mail, Split, X, XCircle,
 } from "lucide-react";
 import { Modal, CabeceraModal, abrirTeclado } from "../../../ui";
 import { eur } from "../../../lib/dinero";
-import { sugerenciasEfectivo, desglosarCambio } from "./efectivo";
+import { sugerenciasEfectivo } from "./efectivo";
+import { TIPOS_DOC_DEMO } from "../datos";
 import { useVenta } from "../store";
 
 // Modal COBRAR — portado 1:1 del TPV de Next (apps/web/app/tpv/components/CobrarModal).
@@ -13,7 +14,6 @@ import { useVenta } from "../store";
 // cuerpo en 3 columnas (notas + 3 huecos de pago + dto/propina/zonas · teclado con
 // visor y "A devolver" · formas de pago), y barra F10/F11/F12. Datos desde el store.
 
-const fmtDenom = (v: number) => (v % 1 === 0 ? String(v) : v.toFixed(2).replace(".", ","));
 
 interface FormaPago { id: string; nombre: string; tipo: string }
 interface LineaPago { formaPagoId: string; importe: number }
@@ -24,7 +24,6 @@ const FORMAS_PAGO: FormaPago[] = [
   { id: "bizum", nombre: "Bizum", tipo: "BIZUM" },
   { id: "qr", nombre: "Pago QR", tipo: "QR" },
 ];
-const TIPOS_DOC_DEF = ["Factura simplificada", "Factura completa"];
 const esCompleta = (t: string) => t.toLowerCase().includes("completa");
 
 type Objetivo = { tipo: "pago" } | { tipo: "descuento" } | { tipo: "propina" };
@@ -58,7 +57,7 @@ export function CobrarModal({
   const baseImponible = Math.round((total / 1.1) * 100) / 100;
   const impuesto = Math.round((total - baseImponible) * 100) / 100;
   const formasPago = FORMAS_PAGO;
-  const tiposDoc = TIPOS_DOC_DEF;
+  const tiposDoc = TIPOS_DOC_DEMO;
 
   const [pagos, setPagos] = useState<LineaPago[]>([]);
   const [objetivo, setObjetivo] = useState<Objetivo>({ tipo: "pago" });
@@ -176,9 +175,13 @@ export function CobrarModal({
           <div className="flex flex-col gap-1.5">
             <div className="grid grid-cols-[92px_1fr] items-center gap-1.5">
               <span className="rounded-md border border-border bg-surface px-2.5 py-2.5 text-xs font-semibold text-muted-foreground">Tipo doc</span>
-              <select value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value)} className="min-h-11 rounded-md border border-border bg-card px-2 text-right text-[13.5px] font-semibold outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/40">
-                {tiposDoc.map((t) => <option key={t} value={t} disabled={esCompleta(t) && !cliente}>{esCompleta(t) && !cliente ? `${t} (asigna cliente)` : t}</option>)}
-              </select>
+              <div className="relative">
+                <FileText size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <select value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value)} className="min-h-11 w-full cursor-pointer appearance-none rounded-md border border-border bg-card pl-8 pr-8 text-left text-[13.5px] font-semibold outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/40">
+                  {tiposDoc.map((t) => <option key={t} value={t} disabled={esCompleta(t) && !cliente}>{esCompleta(t) && !cliente ? `${t} (asigna cliente)` : t}</option>)}
+                </select>
+                <ChevronDown size={16} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              </div>
             </div>
             <FilaDato label="Fecha" gris>{ahora.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" })}</FilaDato>
             <FilaDato label="Importe"><span className="text-[17px] font-bold tabular-nums">{eur(importeACobrar)}</span></FilaDato>
@@ -256,11 +259,6 @@ export function CobrarModal({
               <span className="text-[13.5px] font-semibold opacity-90">{falta > 0 ? "Falta por cobrar" : "A devolver"}</span>
               <b className="text-2xl font-extrabold tabular-nums tracking-tight">{eur(falta > 0 ? falta : aDevolver)}</b>
             </div>
-            {aDevolver > 0 && (
-              <div className="flex-none text-right text-[11px] font-semibold tabular-nums text-success">
-                {desglosarCambio(aDevolver).map((d) => `${d.n}×${fmtDenom(d.valor)}`).join("  ·  ")}
-              </div>
-            )}
           </div>
 
           {/* Derecha: formas de pago */}
