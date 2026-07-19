@@ -25,7 +25,7 @@ export function Modal({
     <button
       type="button"
       aria-label="Cerrar"
-      className="gl-velo fixed inset-0 z-50 grid cursor-default place-items-center bg-[#0a040e]/72 p-4 backdrop-blur-md"
+      className="gl-velo fixed inset-0 z-50 grid cursor-default place-items-center bg-black/25 p-4 backdrop-blur-[1.5px]"
       onClick={cerrarFuera ? onCerrar : undefined}
     >
       <div

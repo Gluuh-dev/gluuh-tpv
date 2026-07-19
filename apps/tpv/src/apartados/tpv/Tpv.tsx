@@ -81,7 +81,7 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
       {modal === "cobrar" && <CobrarModal total={total} contexto={contexto} onCerrar={() => setModal(null)} onCobrado={cobrar} />}
       {modal === "invitar" && <InvitacionesModal onCerrar={() => setModal(null)} />}
       {modal === "cliente" && <ClienteModal onCerrar={() => setModal(null)} />}
-      {modal === "utilidades" && <UtilidadesModal onCerrar={() => setModal(null)} />}
+      {modal === "utilidades" && <UtilidadesModal onCerrar={() => setModal(null)} onFuncion={onFuncion} />}
       {modal && !["cobrar", "invitar", "cliente", "utilidades"].includes(modal) && (
         <Modal onCerrar={() => setModal(null)} ancho="md" className="p-7">
           <div className="flex min-h-[220px] flex-col">
