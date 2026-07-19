@@ -1,7 +1,7 @@
 import {
   CookingPot, Users, UtensilsCrossed, FileSearch, Settings2, ReceiptText, Banknote,
   ArchiveRestore, CircleDollarSign, CalendarDays, Tag, ContactRound, PackagePlus, LogOut,
-  FileText, Gift, Tags, SlidersHorizontal, Percent, Scale, CreditCard, Mail, PackageOpen,
+  FileText, Gift, Tags, SlidersHorizontal, Percent, Scale, CreditCard, Mail, PackageOpen, LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import { Modal } from "../../../ui";
@@ -67,7 +67,7 @@ export function UtilidadesModal({ onCerrar, onFuncion }: Readonly<{ onCerrar: ()
   return (
     <Modal onCerrar={onCerrar} ancho="3xl" className="overflow-hidden p-0">
       <header className="flex items-center gap-3 bg-brand px-5 py-3.5 text-white">
-        <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-7 w-auto" draggable={false} />
+        <LayoutGrid size={20} />
         <div><h2 className="font-display text-lg font-extrabold leading-none">Utilidades</h2><p className="text-[11px] opacity-80">Terminal</p></div>
       </header>
 

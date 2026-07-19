@@ -78,7 +78,7 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contenido}</div>
       <BarraEstado operario={OPERARIO} terminal="TERMINAL 01" contexto={contexto} zurdo={zurdo} onZurdo={cambiarZurdo} />
 
-      {modal === "cobrar" && <CobrarModal total={total} contexto={contexto} onCerrar={() => setModal(null)} onCobrado={cobrar} />}
+      {modal === "cobrar" && <CobrarModal total={total} contexto={contexto} onCerrar={() => setModal(null)} onCobrado={cobrar} onDividir={() => setModal("dividir")} />}
       {modal === "invitar" && <InvitacionesModal onCerrar={() => setModal(null)} />}
       {modal === "cliente" && <ClienteModal onCerrar={() => setModal(null)} />}
       {modal === "utilidades" && <UtilidadesModal onCerrar={() => setModal(null)} onFuncion={onFuncion} />}
