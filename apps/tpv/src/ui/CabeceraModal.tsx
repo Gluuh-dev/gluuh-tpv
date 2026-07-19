@@ -9,7 +9,7 @@ export function CabeceraModal({
   return (
     <header className="flex items-center gap-3 bg-brand px-4 py-3 text-white">
       <span className="grid h-9 w-9 flex-none place-items-center rounded-md bg-white/15"><Icono size={18} /></span>
-      <div className="mr-auto min-w-0 leading-tight">
+      <div className="mr-auto flex min-w-0 flex-col items-start text-left leading-tight">
         <h2 className="font-display text-[17px] font-extrabold leading-tight">{titulo}</h2>
         {subtitulo && <p className="truncate text-[11px] leading-tight text-white/75">{subtitulo}</p>}
       </div>
