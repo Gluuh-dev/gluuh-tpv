@@ -126,7 +126,10 @@ export function CredencialModal({
     </button>
   ) : null;
 
-  const cabecera = <CabeceraModal Icono={Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} tono="suave" color={color} />;
+  // La placa del icono se vuelve una FLECHA ATRÁS pulsable cuando `atras` está
+  // (en el paso del PIN del modo "pasos": vuelve a elegir trabajador).
+  const cabecera = (atras?: () => void) =>
+    <CabeceraModal Icono={atras ? ArrowLeft : Icono} titulo={`Acceso a ${titulo}`} subtitulo={sub} onCerrar={onCancelar} tono="suave" color={color} onIcono={atras} />;
   const banner = demo ? (
     <p className="border-b border-amber/30 bg-amber/10 px-6 py-2 text-[12px] font-semibold text-paper">
       Equipo de ejemplo — terminal sin emparejar
@@ -146,7 +149,7 @@ export function CredencialModal({
   if (modoEf === "pin") {
     return (
       <Modal onCerrar={onCancelar} ancho="sm" className="overflow-hidden">
-        {cabecera}
+        {cabecera()}
         {banner}
         <div className="p-6">
           {encabezadoPin}
@@ -161,14 +164,10 @@ export function CredencialModal({
   if (modoEf === "pasos") {
     return (
       <Modal onCerrar={onCancelar} ancho="sm" className="flex h-160 flex-col overflow-hidden">
-        {cabecera}
+        {elegido ? cabecera(volver) : cabecera()}
         {banner}
         {elegido ? (
           <div key="pin" className="gl-aparecer flex min-h-0 flex-1 flex-col p-6">
-            <button type="button" onClick={volver}
-              className="flex items-center gap-1.5 self-start rounded-full border border-line bg-paper/5 px-3 py-1.5 text-[12px] font-semibold text-muted transition-transform active:scale-95">
-              <ArrowLeft size={13} /> Cambiar de trabajador
-            </button>
             <div className="flex flex-1 flex-col items-center justify-center gap-2 py-2">
               <span className="grid h-12 w-12 place-items-center rounded-full text-[15px] font-bold text-white"
                 style={{ background: elegido.color ?? "linear-gradient(150deg,var(--brand-lit),var(--brand))" }}>
@@ -197,7 +196,7 @@ export function CredencialModal({
   // ── modo "lado" (por defecto): la gente y el teclado a la vez ──
   return (
     <Modal onCerrar={onCancelar} ancho="2xl" className="overflow-hidden">
-      {cabecera}
+      {cabecera()}
       {banner}
       <div className={`flex items-stretch gap-6 px-6 pt-5 ${demo ? "" : "pb-6"}`}>
         <div className="flex min-w-0 flex-1 flex-col">
