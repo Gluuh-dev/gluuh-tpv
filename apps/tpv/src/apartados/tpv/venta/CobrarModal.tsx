@@ -41,6 +41,48 @@ function IconoForma({ tipo, nombre, size = 20 }: Readonly<{ tipo: string; nombre
   return <Coins size={size} />;
 }
 
+// QR decorativo para el demo de "Pago QR". ponytail: patrón fijo; el QR real se
+// genera del link de pago (Stripe/Redsys) cuando se integre la pasarela.
+function QrDemo({ size = 150 }: Readonly<{ size?: number }>) {
+  const n = 21, cs = size / n, celdas: React.ReactNode[] = [];
+  const finder = (x: number, y: number) => (x === 0 || x === 6 || y === 0 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4));
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const enFinder = (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+    const on = enFinder ? finder(x % (n - 7), y % (n - 7)) : ((x * 3 + y * 7 + x * y) % 5 < 2);
+    if (on) celdas.push(<rect key={`${x}-${y}`} x={x * cs} y={y * cs} width={cs} height={cs} />);
+  }
+  return <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded bg-white p-1.5" fill="#150a1b" aria-label="Código QR de pago">{celdas}</svg>;
+}
+
+// Overlay de procesamiento de pago con TARJETA / BIZUM / QR (no efectivo). Simula
+// el diálogo del datáfono/pasarela; al integrar el nodo, "Pago confirmado" se
+// dispara con la respuesta real (OK del datáfono, webhook de la pasarela).
+function PagoProcesando({ tipo, importe, onConfirmar, onCancelar }: Readonly<{ tipo: string; importe: number; onConfirmar: () => void; onCancelar: () => void }>) {
+  const esQR = tipo === "QR";
+  const esBizum = tipo === "BIZUM";
+  const Icono = esQR ? QrCode : esBizum ? Smartphone : CreditCard;
+  const titulo = esQR ? "Pago con QR" : esBizum ? "Cobro por Bizum" : "Cobro con tarjeta";
+  const instruccion = esQR ? "El cliente escanea el código para pagar." : esBizum ? "El cliente confirma el pago en su móvil." : "Inserta o acerca la tarjeta al datáfono…";
+  return (
+    <div className="gl-velo absolute inset-0 z-30 flex items-center justify-center bg-black/45 p-4">
+      <div className="gl-aparecer w-full max-w-sm rounded-lg bg-panel p-5 text-center shadow-xl">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand/15 text-brand"><Icono size={24} /></div>
+        <h3 className="mt-3 font-display text-lg font-extrabold">{titulo}</h3>
+        <div className="mt-1 text-3xl font-extrabold tabular-nums tracking-tight text-brand">{eur(importe)}</div>
+        {esQR
+          ? <div className="mt-3 flex justify-center"><QrDemo /></div>
+          : <div className="mt-4 flex justify-center"><span className="block h-2 w-28 overflow-hidden rounded-full bg-border"><span className="block h-full w-1/2 animate-pulse rounded-full bg-brand" /></span></div>}
+        <p className="mt-3 text-sm text-muted-foreground">{instruccion}</p>
+        <div className="mt-4 flex gap-2.5">
+          <button type="button" onClick={onCancelar} className="min-h-12 flex-1 rounded-md border border-border bg-surface text-sm font-semibold text-danger transition-transform active:scale-95">Cancelar</button>
+          <button type="button" onClick={onConfirmar} className="min-h-12 flex-1 rounded-md bg-success text-sm font-bold text-white transition-transform active:scale-95">Pago confirmado</button>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">Demo — la confirmación real llega del datáfono/pasarela (nodo).</p>
+      </div>
+    </div>
+  );
+}
+
 // Cifra de la cabecera (A cobrar / Pagado / Pendiente).
 function CifraHdr({ label, valor, tono }: Readonly<{ label: string; valor: string; tono?: string }>) {
   return (
@@ -93,6 +135,8 @@ export function CobrarModal({
   const [notas, setNotas] = useState("");
   const [tipoDoc, setTipoDoc] = useState<string>(tiposDoc[0]!);
   const [ahora] = useState(() => new Date());
+  // Pago en curso con tarjeta/bizum/QR (overlay de "esperando confirmación").
+  const [procesando, setProcesando] = useState<{ forma: FormaPago; importe: number } | null>(null);
 
   const importeACobrar = Math.max(0, Math.round((total + propina - descuento) * 100) / 100);
   const pagado = useMemo(() => pagos.reduce((s, p) => s + (p.importe || 0), 0), [pagos]);
@@ -147,28 +191,52 @@ export function CobrarModal({
     setReemplazar(false);
   }
 
-  function registrarPago(formaPagoId: string) {
-    if (pagos.length >= MAX_PAGOS) return;
-    const tecleado = Number(display) || 0;
-    const forma = formasPago.find((f) => f.id === formaPagoId);
-    const esTarjeta = forma?.tipo === "TARJETA";
-    let importe = objetivo.tipo === "pago" && tecleado > 0 ? tecleado : falta;
-    if (esTarjeta) importe = Math.min(importe, falta);
-    if (importe <= 0) return;
-    setPagos((prev) => [...prev, { formaPagoId, importe }]);
+  // Cierre real de la venta: imprime el ticket y avisa a la mesa (vacía + cierra).
+  function finalizar(metodo: string) {
+    imprimir(false);
+    onCobrado(metodo);
+  }
+
+  // Añade una línea de pago. Si con ella se cubre el importe SIN cambio pendiente,
+  // la cuenta queda saldada → imprime el ticket y cierra (lo que pediste).
+  function anadirPago(formaPagoId: string, importe: number) {
+    if (importe <= 0 || pagos.length >= MAX_PAGOS) return;
+    const nuevos = [...pagos, { formaPagoId, importe }];
+    setPagos(nuevos);
     setDisplay(""); setReemplazar(true); setObjetivo({ tipo: "pago" });
+    const pagadoNuevo = nuevos.reduce((s, p) => s + p.importe, 0);
+    const cambio = Math.round((pagadoNuevo - importeACobrar) * 100) / 100;
+    if (pagadoNuevo >= importeACobrar - 0.005 && cambio <= 0.005) finalizar(nombreForma[formaPagoId] ?? "Contado");
+  }
+
+  // Pulsar una forma de pago = la acción. Sin teclear nada, cobra LO QUE FALTA (un
+  // toque). Efectivo puede exceder (da cambio); tarjeta/bizum/QR abren su overlay.
+  function pedirPago(formaPagoId: string) {
+    if (pagos.length >= MAX_PAGOS) return;
+    const forma = formasPago.find((f) => f.id === formaPagoId);
+    if (!forma) return;
+    const tecleado = Number(display) || 0;
+    const importe = objetivo.tipo === "pago" && tecleado > 0 ? tecleado : falta;
+    if (importe <= 0) return;
+    if (forma.tipo === "CONTADO") { anadirPago(forma.id, importe); return; } // efectivo: puede exceder (cambio)
+    setProcesando({ forma, importe: Math.min(importe, falta) });             // tarjeta/bizum/qr: nunca de más
+  }
+
+  function confirmarProcesando() {
+    if (!procesando) return;
+    const { forma, importe } = procesando;
+    setProcesando(null);
+    anadirPago(forma.id, importe);
   }
 
   function registrarEfectivoRapido(importe: number) {
-    if (!formaEfectivo || pagos.length >= MAX_PAGOS || importe <= 0) return;
-    setPagos((prev) => [...prev, { formaPagoId: formaEfectivo.id, importe }]);
-    setDisplay(""); setReemplazar(true); setObjetivo({ tipo: "pago" });
+    if (!formaEfectivo) return;
+    anadirPago(formaEfectivo.id, importe);
   }
 
   function cobrar() {
     if (!puedeCobrar) return;
-    const metodo = pagos[0] ? (nombreForma[pagos[0].formaPagoId] ?? "Contado") : "Contado";
-    onCobrado(metodo);
+    finalizar(pagos[0] ? (nombreForma[pagos[0].formaPagoId] ?? "Contado") : "Contado");
   }
 
   // Imprime el ticket de PRUEBA (proforma = cuenta sin cobrar; si no, ticket de
@@ -187,8 +255,7 @@ export function CobrarModal({
       const t = e.target as HTMLElement | null;
       const enCampo = !!t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName);
       if (e.key === "F10") { e.preventDefault(); imprimir(true); return; }
-      if (e.key === "F11") { e.preventDefault(); imprimir(false); cobrar(); return; }
-      if (e.key === "F12") { e.preventDefault(); cobrar(); return; }
+      if (e.key === "F11" || e.key === "F12") { e.preventDefault(); cobrar(); return; }
       if (e.key === "Escape") { e.preventDefault(); onCerrar(); return; }
       if (e.key === "Enter" && puedeCobrar && !enCampo) { e.preventDefault(); cobrar(); return; }
       if (enCampo) return;
@@ -218,7 +285,15 @@ export function CobrarModal({
         {chipCuenta && <span className="rounded-md bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">{chipCuenta}</span>}
         <span className="text-[12px] text-white/75">Ticket nº {ticketN}</span>
         <div className="ml-auto flex items-center gap-4">
-          <CifraHdr label="A cobrar" valor={eur(importeACobrar)} />
+          <div className="text-right leading-tight">
+            <div className="text-[9px] font-bold uppercase tracking-wider text-white/70">A cobrar</div>
+            <b className="text-[17px] tabular-nums">{eur(importeACobrar)}</b>
+            {(propina > 0 || descuento > 0) && (
+              <div className="text-[9px] tabular-nums text-white/65">
+                {descuento > 0 && <>− dto {eur(descuento)}</>}{descuento > 0 && propina > 0 && " · "}{propina > 0 && <>+ propina {eur(propina)}</>}
+              </div>
+            )}
+          </div>
           <span className="h-7 w-px bg-white/20" />
           <CifraHdr label="Pagado" valor={eur(pagado)} />
           <span className="h-7 w-px bg-white/20" />
@@ -227,7 +302,7 @@ export function CobrarModal({
         </div>
       </header>
 
-      <div className="flex h-[80vh] max-h-[820px] min-h-0 flex-col bg-background text-foreground">
+      <div className="relative flex h-[80vh] max-h-[820px] min-h-0 flex-col bg-background text-foreground">
         {/* Franja de datos (3 columnas × 3 filas, estilo profesional) */}
         <div className="flex-none border-b border-border bg-card px-3 py-2.5">
           <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 lg:grid-cols-3">
@@ -258,9 +333,7 @@ export function CobrarModal({
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 p-2.5 lg:grid-cols-[minmax(0,1fr)_330px_240px]">
           {/* Izquierda */}
           <div className="flex min-h-0 min-w-0 flex-col gap-2.5">
-            <div className="flex-none rounded-xl border border-border bg-card p-2.5">
-              <CampoTexto value={notas} onChange={(v) => setNotas(v.slice(0, 90))} placeholder="Notas del ticket…" />
-            </div>
+            <CampoTexto value={notas} onChange={(v) => setNotas(v.slice(0, 90))} placeholder="Notas del ticket…" className="flex-none" />
 
             <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card p-3">
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Importe · formas de pago</h3>
@@ -341,7 +414,7 @@ export function CobrarModal({
           {/* Derecha: formas de pago */}
           <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-success/10" role="group" aria-label="Formas de pago">
             {formasPago.map((f, i) => (
-              <button key={f.id} type="button" onClick={() => registrarPago(f.id)} disabled={pagos.length >= MAX_PAGOS}
+              <button key={f.id} type="button" onClick={() => pedirPago(f.id)} disabled={pagos.length >= MAX_PAGOS}
                 className={`flex min-h-16 flex-none items-center justify-center gap-2.5 border-b border-card text-[17px] font-semibold transition-colors active:bg-success active:text-white disabled:opacity-40 ${i === 0 || f.tipo === "CONTADO" ? "bg-success/20 font-bold text-success" : "text-muted-foreground"}`}>
                 <IconoForma tipo={f.tipo} nombre={f.nombre} /> {f.nombre}
               </button>
@@ -366,13 +439,18 @@ export function CobrarModal({
           <button type="button" onClick={() => imprimir(true)} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95">
             Imprimir cuenta <span className="text-[11px] font-normal opacity-55">(F10)</span>
           </button>
-          <button type="button" onClick={() => { imprimir(false); cobrar(); }} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95 disabled:text-muted-foreground">
+          <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95 disabled:text-muted-foreground">
             Cobrar e imprimir <span className="text-[11px] font-normal opacity-55">(F11)</span>
           </button>
           <button type="button" onClick={cobrar} disabled={!puedeCobrar} className="rounded-md bg-cobro px-5 py-2 text-sm font-bold text-white transition-transform active:scale-95 disabled:bg-surface disabled:text-muted-foreground">
             Cobrar <span className="text-[11px] font-normal opacity-70">(F12)</span>
           </button>
         </footer>
+
+        {/* Overlay de tarjeta/bizum/QR: al confirmar, registra el pago (y cierra si salda). */}
+        {procesando && (
+          <PagoProcesando tipo={procesando.forma.tipo} importe={procesando.importe} onConfirmar={confirmarProcesando} onCancelar={() => setProcesando(null)} />
+        )}
       </div>
     </Modal>
   );

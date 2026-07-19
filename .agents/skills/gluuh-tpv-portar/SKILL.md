@@ -72,6 +72,18 @@ Se creó tras devolver el teclado del modal Cobrar a su verde original después 
 - **Lógica fiscal y guardas**: factura completa exige NIF, la tarjeta no da
   cambio, MAX_PAGOS=3, base/impuesto "hacia atrás"… se portan tal cual.
 
+## Convención de footers de modal (unificada con Cobrar)
+
+Todos los modales de la operativa comparten el **mismo pie** que `CobrarModal`:
+
+- Contenedor: `border-t border-border bg-surface-2 px-4 py-2.5`, `flex flex-wrap items-center gap-3`.
+- Botones secundarios: `rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold … transition-transform active:scale-95` (color del texto según la acción: `text-danger` cancelar, `text-foreground` neutro).
+- Botón primario (acción principal): relleno del color de la acción — `bg-cobro` (cobrar/dinero) o `bg-success` (confirmar/volver) — con `px-5 py-2 text-sm font-bold text-white`.
+- Teclas de función `(F10/F11/F12)`: en `<span className="text-[11px] font-normal opacity-55">`, para que no destaquen.
+- Sin `hover`, solo `active:scale-95`. Sombras al mínimo.
+
+Al crear un modal nuevo, **copia este footer**; no inventes tamaños ni colores propios.
+
 ## Después
 
 - `pnpm --filter @gluuh/tpv build` verde antes de commit.
