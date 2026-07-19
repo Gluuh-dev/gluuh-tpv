@@ -2,21 +2,30 @@ import { Lock, Nfc } from "lucide-react";
 import { cumpleRol, ETIQUETA_ROL, type Rol } from "../../lib/nav";
 import { iniciales, type Usuario } from "./tipos";
 
-// Elegir "quién eres" antes de meter el PIN — o pasar la pulsera/tarjeta y entrar
-// directo sin elegir (si hay lector). Quien no llega al rol exigido sale ATENUADO
-// con candado: se ve que existe, se ve por qué no entra. Reglas del TPV: sin
-// hover, animación al pulsar.
+// La gente del terminal, para tocar "quién eres" (opcional: tocar otra vez
+// des-elige) — o pasar la pulsera/tarjeta y entrar directo (si hay lector).
+// Quien no llega al rol exigido sale ATENUADO con candado: se ve que existe y
+// se ve por qué no entra. Reglas del TPV: sin hover, animación al pulsar.
 export function ListaUsuarios({
-  usuarios, requiere, onElegir, onPulsera,
-}: Readonly<{ usuarios: Usuario[]; requiere: Rol; onElegir: (u: Usuario) => void; onPulsera?: () => void }>) {
+  usuarios, requiere, elegido, onElegir, onPulsera,
+}: Readonly<{
+  usuarios: Usuario[];
+  requiere: Rol;
+  elegido?: Usuario | null;
+  onElegir: (u: Usuario) => void;
+  onPulsera?: () => void;
+}>) {
   return (
     <div>
-      <div className="grid max-h-96 grid-cols-3 gap-3 overflow-y-auto">
+      <div className="grid max-h-85 grid-cols-2 gap-2.5 overflow-y-auto">
         {usuarios.map((u) => {
           const puede = cumpleRol(u.rol, requiere);
+          const activo = elegido?.id === u.id;
           return (
             <button key={u.id} type="button" disabled={!puede} onClick={() => onElegir(u)}
-              className={`flex items-center gap-3 rounded-2xl border border-line bg-paper/5 p-3.5 text-left transition-transform ${puede ? "active:scale-95" : "opacity-45"}`}>
+              className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-transform ${
+                activo ? "border-brand-lit bg-accent-soft" : "border-line bg-paper/5"
+              } ${puede ? "active:scale-95" : "opacity-45"}`}>
               <span className="grid h-11 w-11 flex-none place-items-center rounded-full text-[15px] font-bold text-white"
                 style={{ background: u.color ?? "linear-gradient(150deg,var(--brand-lit),var(--brand))" }}>
                 {iniciales(u.nombre)}

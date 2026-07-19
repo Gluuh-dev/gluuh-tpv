@@ -95,8 +95,7 @@ export function App() {
       {pendiente && meta && (
         <CredencialModal
           titulo={meta.titulo}
-          icono={<meta.Icono size={22} />}
-          color={meta.color}
+          Icono={meta.Icono}
           requiere={meta.requiere}
           usuarios={equipo.usuarios}
           demo={equipo.demo}
