@@ -146,6 +146,12 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
    días sin dar señales, se ve en el panel. Y la serie de facturación se parte (A el nodo,
    B la nube) para que no puedan chocar nunca.
 2. **Impresión por IP** (ESC/POS sobre TCP 9100). Hoy la impresión depende de Electron.
+   *(19-07: la SPA `apps/tpv` ya imprime DE PRUEBA — ticket de cliente al cobrar (F10/F11) y
+   comanda al marchar (parcial, solo lo nuevo, por estación). En navegador cae a **PDF con
+   logo de Gluuh** (`apps/tpv/src/lib/impresion.ts`, jspdf); en Electron irá por la térmica.
+   Falta la config real de impresoras + `print_route` por zona.)*
+   **Formas de pago y división** analizadas → `docs/plan/formas-de-pago-y-division.md`
+   (pago múltiple, `payment_method`, los 3 modos de división, y las decisiones abiertas).
 3. **Envío a la AEAT desde la nube.** El nodo ya le manda la factura, su desglose y su huella
    (`prueba-sync-fiscal.mjs` lo demuestra). Falta que la nube las remita.
 4. **Un nodo por LOCAL, no por empresa.** Hoy `provisionar.mjs` se baja el `tenant` entero.
