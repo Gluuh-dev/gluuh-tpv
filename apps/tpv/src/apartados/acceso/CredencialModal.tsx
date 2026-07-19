@@ -160,7 +160,7 @@ export function CredencialModal({
   // ── modo "pasos": gente → (al pulsar) teclado, en un modal de tamaño fijo ──
   if (modoEf === "pasos") {
     return (
-      <Modal onCerrar={onCancelar} ancho="sm" className="flex h-136 flex-col overflow-hidden">
+      <Modal onCerrar={onCancelar} ancho="sm" className="flex h-160 flex-col overflow-hidden">
         {cabecera}
         {banner}
         {elegido ? (
@@ -169,17 +169,17 @@ export function CredencialModal({
               className="flex items-center gap-1.5 self-start rounded-full border border-line bg-paper/5 px-3 py-1.5 text-[12px] font-semibold text-muted transition-transform active:scale-95">
               <ArrowLeft size={13} /> Cambiar de trabajador
             </button>
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-3">
-              <span className="grid h-14 w-14 place-items-center rounded-full text-lg font-bold text-white"
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-2">
+              <span className="grid h-12 w-12 place-items-center rounded-full text-[15px] font-bold text-white"
                 style={{ background: elegido.color ?? "linear-gradient(150deg,var(--brand-lit),var(--brand))" }}>
                 {iniciales(elegido.nombre)}
               </span>
               <div className="text-center">
-                <b className="block font-display text-[17px] font-bold leading-tight">{elegido.nombre}</b>
+                <b className="block font-display text-[16px] font-bold leading-tight">{elegido.nombre}</b>
                 <small className="capitalize text-muted">{ETIQUETA_ROL[elegido.rol]}</small>
               </div>
-              <div className="pt-1">{puntos}</div>
-              <p className={`text-[13px] font-medium ${error ? "text-danger" : "text-transparent"}`}>PIN incorrecto</p>
+              <div className="pt-0.5">{puntos}</div>
+              <p className={`text-[12px] font-medium ${error ? "text-danger" : "text-transparent"}`}>PIN incorrecto</p>
             </div>
             {teclado}
           </div>
