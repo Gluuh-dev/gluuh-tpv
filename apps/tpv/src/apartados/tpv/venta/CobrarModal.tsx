@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
-  Delete, Mail, Split, X, XCircle,
+  Delete, Euro, Mail, Percent, Split, X, XCircle,
 } from "lucide-react";
-import { Modal, CabeceraModal, Select, CampoTexto } from "../../../ui";
+import { Modal, Select, CampoTexto } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo } from "./efectivo";
 import { TIPOS_DOC_DEMO } from "../datos";
@@ -38,6 +38,16 @@ function IconoForma({ tipo, nombre, size = 20 }: Readonly<{ tipo: string; nombre
   return <Coins size={size} />;
 }
 
+// Cifra de la cabecera (A cobrar / Pagado / Pendiente).
+function CifraHdr({ label, valor, tono }: Readonly<{ label: string; valor: string; tono?: string }>) {
+  return (
+    <div className="text-right leading-tight">
+      <div className="text-[9px] font-bold uppercase tracking-wider text-white/70">{label}</div>
+      <b className={`text-[17px] tabular-nums ${tono ?? "text-white"}`}>{valor}</b>
+    </div>
+  );
+}
+
 function FilaDato({ label, children, gris }: Readonly<{ label: string; children: React.ReactNode; gris?: boolean }>) {
   return (
     <div className="grid grid-cols-[92px_1fr] items-center gap-1.5">
@@ -52,8 +62,9 @@ export function CobrarModal({
 }: Readonly<{ total: number; contexto: string; onCerrar: () => void; onCobrado: (metodo: string) => void; onDividir: () => void }>) {
   const clienteObj = useVenta((s) => s.cliente);
   const cliente = clienteObj?.nombre;
+  const sala = useVenta((s) => s.sala);
+  const comensales = useVenta((s) => s.comensales);
   const empleado = "María Ruiz";
-  const terminal = "TERMINAL 01";
   const baseImponible = Math.round((total / 1.1) * 100) / 100;
   const impuesto = Math.round((total - baseImponible) * 100) / 100;
   const formasPago = FORMAS_PAGO;
@@ -62,6 +73,7 @@ export function CobrarModal({
   const [pagos, setPagos] = useState<LineaPago[]>([]);
   const [objetivo, setObjetivo] = useState<Objetivo>({ tipo: "pago" });
   const [descuento, setDescuento] = useState(0);   // SIEMPRE en euros (lo que se resta)
+  const [descValor, setDescValor] = useState(0);   // lo TECLEADO (el % si es PCT, los € si es EUR)
   const [descModo, setDescModo] = useState<"PCT" | "EUR">("EUR");
   const [propina, setPropina] = useState(0);
   const [display, setDisplay] = useState("");
@@ -91,13 +103,19 @@ export function CobrarModal({
   // Descuento en € o en %: como el teclado de la venta (DTO€ / DTO%). Pulsar el
   // modo activo lo desactiva; cambiar de modo empieza a teclear de cero.
   function elegirDescuento(modo: "PCT" | "EUR") {
-    if (objetivo.tipo === "descuento" && descModo === modo) { seleccionar({ tipo: "pago" }); return; }
+    // Pulsar el modo activo lo DESACTIVA y borra el descuento (re-habilita el otro).
+    if (objetivo.tipo === "descuento" && descModo === modo) {
+      setDescuento(0); setDescValor(0); seleccionar({ tipo: "pago" });
+      return;
+    }
     setDescModo(modo);
     setObjetivo({ tipo: "descuento" });
     setDisplay("");
     setReemplazar(true);
   }
   const descActivo = (modo: "PCT" | "EUR") => objetivo.tipo === "descuento" && descModo === modo;
+  // El otro modo de descuento se DESACTIVA mientras haya un descuento puesto.
+  const descBloqueado = (modo: "PCT" | "EUR") => descuento > 0 && descModo !== modo;
 
   function pulsar(tecla: string) {
     setDisplay((prev) => {
@@ -109,7 +127,9 @@ export function CobrarModal({
       const n = Number(base) || 0;
       if (objetivo.tipo === "descuento") {
         // Dto € = importe directo; Dto % = porcentaje sobre el total (máx 100 %).
-        const euros = descModo === "PCT" ? Math.round(total * Math.min(n, 100)) / 100 : n;
+        const pct = Math.min(n, 100);
+        const euros = descModo === "PCT" ? Math.round(total * pct) / 100 : n;
+        setDescValor(descModo === "PCT" ? pct : n);
         setDescuento(Math.min(euros, total));
       } else if (objetivo.tipo === "propina") setPropina(n);
       return base;
@@ -159,6 +179,10 @@ export function CobrarModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [puedeCobrar, pagos, objetivo, reemplazar, display, propina, descuento, descModo, notas, tipoDoc]);
 
+  // Cabecera: nº de ticket (demo; vendrá del nodo) y chip mesa · sala · comensales.
+  const ticketN = String((ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds()) % 1000000).padStart(6, "0");
+  const chipCuenta = [contexto, sala, comensales ? `${comensales} comensales` : ""].filter(Boolean).join(" · ");
+
   const teclas = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "borrar"];
   let etiquetaVisor = "Importe a aplicar";
   if (objetivo.tipo === "descuento") etiquetaVisor = descModo === "PCT" ? "Porcentaje de descuento" : "Importe del descuento";
@@ -166,13 +190,20 @@ export function CobrarModal({
 
   return (
     <Modal onCerrar={onCerrar} ancho="5xl" className="overflow-hidden p-0">
-      <CabeceraModal
-        Icono={CreditCard}
-        titulo={`Cobrar${contexto ? ` ${contexto}` : ""}`}
-        subtitulo={[empleado, terminal].filter(Boolean).join(" · ")}
-        derecha={<div className="text-right"><div className="text-[9px] font-bold uppercase tracking-wider text-white/70">A cobrar</div><b className="text-lg tabular-nums">{eur(importeACobrar)}</b></div>}
-        onCerrar={onCerrar}
-      />
+      {/* Cabecera del cobro (sin logo): título · cuenta · nº ticket · cifras · cerrar */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-brand px-4 py-2.5 text-white">
+        <h2 className="font-display text-[18px] font-extrabold leading-none">Cobrar</h2>
+        {chipCuenta && <span className="rounded-md bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">{chipCuenta}</span>}
+        <span className="text-[12px] text-white/75">Ticket nº {ticketN}</span>
+        <div className="ml-auto flex items-center gap-4">
+          <CifraHdr label="A cobrar" valor={eur(importeACobrar)} />
+          <span className="h-7 w-px bg-white/20" />
+          <CifraHdr label="Pagado" valor={eur(pagado)} />
+          <span className="h-7 w-px bg-white/20" />
+          <CifraHdr label="Pendiente" valor={eur(falta)} tono={falta > 0 ? "text-[#ffd27a]" : "text-white"} />
+          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="ml-1 grid h-8 w-8 flex-none place-items-center rounded-md bg-white/10 transition-transform active:scale-90"><X size={17} /></button>
+        </div>
+      </header>
 
       <div className="flex h-[80vh] max-h-[820px] min-h-0 flex-col bg-background text-foreground">
         {/* Franja de datos */}
@@ -229,17 +260,26 @@ export function CobrarModal({
             </div>
 
             <div className="grid flex-none grid-cols-3 gap-2.5">
-              <button type="button" onClick={() => elegirDescuento("PCT")}
-                className={`min-h-13 rounded-md border text-sm font-bold transition-transform active:scale-[.98] ${descActivo("PCT") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                Dto %{descActivo("PCT") && descuento > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(descuento)}</span>}
+              <button type="button" onClick={() => elegirDescuento("PCT")} disabled={descBloqueado("PCT")}
+                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-transform active:scale-[.97] disabled:opacity-35 ${descActivo("PCT") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                <span className="flex items-center gap-1.5 text-sm"><Percent size={15} /> Descuento</span>
+                {descModo === "PCT" && descuento > 0
+                  ? <span className="text-[15px] tabular-nums">{descValor} %</span>
+                  : <span className="text-[11px] font-semibold opacity-60">En porcentaje</span>}
               </button>
-              <button type="button" onClick={() => elegirDescuento("EUR")}
-                className={`min-h-13 rounded-md border text-sm font-bold transition-transform active:scale-[.98] ${descActivo("EUR") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                Dto €{descActivo("EUR") && descuento > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(descuento)}</span>}
+              <button type="button" onClick={() => elegirDescuento("EUR")} disabled={descBloqueado("EUR")}
+                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-transform active:scale-[.97] disabled:opacity-35 ${descActivo("EUR") ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                <span className="flex items-center gap-1.5 text-sm"><Euro size={15} /> Descuento</span>
+                {descModo === "EUR" && descuento > 0
+                  ? <span className="text-[15px] tabular-nums">{eur(descuento)}</span>
+                  : <span className="text-[11px] font-semibold opacity-60">En euros</span>}
               </button>
               <button type="button" onClick={() => seleccionar(objetivo.tipo === "propina" ? { tipo: "pago" } : { tipo: "propina" })}
-                className={`min-h-13 rounded-md border text-sm font-bold transition-transform active:scale-[.98] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
-                Propina{propina > 0 && <span className="ml-1.5 tabular-nums opacity-85">{eur(propina)}</span>}
+                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-transform active:scale-[.97] ${objetivo.tipo === "propina" ? "border-brand bg-brand text-white" : "border-border bg-card text-foreground"}`}>
+                <span className="flex items-center gap-1.5 text-sm"><Coins size={15} /> Propina</span>
+                {propina > 0
+                  ? <span className="text-[15px] tabular-nums">{eur(propina)}</span>
+                  : <span className="text-[11px] font-semibold opacity-60">Opcional</span>}
               </button>
             </div>
 
