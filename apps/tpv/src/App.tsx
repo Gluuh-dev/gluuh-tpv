@@ -98,6 +98,7 @@ export function App() {
           Icono={meta.Icono}
           color={meta.color}
           requiere={meta.requiere}
+          modo="pasos"
           usuarios={equipo.usuarios}
           demo={equipo.demo}
           onValidar={validar}
