@@ -27,7 +27,32 @@ const bd = new pg.Client({ connectionString: "postgres://postgres:gluuh@127.0.0.
 await bd.connect();
 
 // ── 1. Un bar que YA EXISTE en la nube (así nace un nodo real: provisionado de allí) ──
-const [tenant] = await nube("tenant?select=id,nombre&limit=1");
+//
+// TIENE QUE SER EL MISMO BAR QUE SINCRONIZA EL NODO. Antes se cogía uno cualquiera
+// de la nube (`tenant?…&limit=1`); desde que `elBarDeEsteNodo()` es determinista
+// (excluye la plantilla y para si hay duda), podían no coincidir: la venta se creaba
+// para un bar y el sincronizador subía el de otro → 0 filas, y la prueba concluía
+// «se ha duplicado» sin que se hubiera subido nada.
+const { rows: [barNodo] } = await bd.query(
+  `select id, nombre from public.tenant
+    where ($1::uuid is null or id = $1::uuid)
+      and coalesce(es_plantilla, false) = false
+    order by created_at limit 1`,
+  [process.env.NODO_TENANT ?? null],
+);
+if (!barNodo) {
+  console.error("\n⚠️  Este nodo no tiene ningún bar (solo la plantilla, que no se toca).");
+  console.error("   Crea uno:  node scripts/sembrar-restaurante.mjs");
+  await bd.end();
+  process.exit(2);
+}
+const [tenant] = await nube(`tenant?select=id,nombre&id=eq.${barNodo.id}`);
+if (!tenant) {
+  console.error(`\n⚠️  «${barNodo.nombre}» no existe en la NUBE, y el nodo no crea empresas allí`);
+  console.error("   (un bar se provisiona desde la nube). Sin eso, todo rebota con FK.");
+  await bd.end();
+  process.exit(2);
+}
 const [local] = await nube(`location?select=id&tenant_id=eq.${tenant.id}&limit=1`);
 if (!local) throw new Error("ese tenant no tiene local en la nube");
 console.log(`Bar de la nube: ${tenant.nombre}`);

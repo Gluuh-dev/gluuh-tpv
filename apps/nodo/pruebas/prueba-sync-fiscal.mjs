@@ -37,8 +37,27 @@ await bd.connect();
 
 // El bar que tiene el nodo (el que se provisionó). Su tenant existe en la nube, así que
 // las claves foráneas resuelven — como en una instalación real.
-const { rows: [local] } = await bd.query("select id, tenant_id from public.location limit 1");
-if (!local) throw new Error("el nodo no tiene local: provisiona primero");
+//
+// Tiene que ser EL MISMO que sincroniza el nodo: antes era `location limit 1` (uno
+// cualquiera; con varios bares en la base salía el de la PLANTILLA) y entonces el
+// sincronizador subía otro bar. La jornada de esta venta no llegaba a la nube y, sin
+// ella, caía en cascada todo lo demás: sales_order → invoice → desglose → huella.
+// Resultado: «no se podría declarar a la AEAT» cuando lo que fallaba era la prueba.
+const { rows: [local] } = await bd.query(
+  `select l.id, l.tenant_id
+     from public.location l
+     join public.tenant t on t.id = l.tenant_id
+    where ($1::uuid is null or t.id = $1::uuid)
+      and coalesce(t.es_plantilla, false) = false
+    order by t.created_at, l.created_at limit 1`,
+  [process.env.NODO_TENANT ?? null],
+);
+if (!local) {
+  console.error("\n⚠️  Este nodo no tiene ningún bar (solo la plantilla, que no se toca).");
+  console.error("   Crea uno:  node scripts/sembrar-restaurante.mjs");
+  await bd.end();
+  process.exit(2);
+}
 
 const clientId = crypto.randomUUID();
 const serie = "PRUEBA";

@@ -1,6 +1,7 @@
 // "El dueño cambia la foto de un producto un martes que se ha caído la línea."
 // Se guarda en el nodo, se ve al instante, y queda en cola para subirla a Supabase.
 import pg from "pg";
+import { firmar } from "../secreto.mjs";
 
 const NODO = "http://127.0.0.1:54321";
 const RUTA = "tenant-de-prueba/productos/cana.png";
@@ -12,9 +13,12 @@ const PNG = Buffer.from(
 );
 
 console.log("1. El dueño sube la foto (SIN internet) →", RUTA);
+// Subir EXIGE token del nodo desde que se cerró la superficie LAN: sin él son 401
+// (y así lo comprueba `prueba-superficie-lan`: «subida sin token → 401»). Esta
+// prueba se había quedado atrás y fallaba en el primer paso.
 const subida = await fetch(`${NODO}/storage/v1/object/media/${RUTA}`, {
   method: "POST",
-  headers: { "content-type": "image/png" },
+  headers: { "content-type": "image/png", authorization: `Bearer ${firmar("authenticated")}` },
   body: PNG,
 });
 if (!subida.ok) throw new Error(`subida falló: HTTP ${subida.status}`);
