@@ -80,6 +80,17 @@ export interface ParametrosArticulo {
   esAnadido: boolean;
   esAlcohol: boolean;
   agotado: boolean;
+  /** Al venderlo abre solo el modal de extras (si los tiene). */
+  solicitarAnadidos: boolean;
+  /** Al venderlo pide la nota de preparación. */
+  solicitarNotas: boolean;
+  /** Pide la cantidad al añadirlo (hielo, pan, doce cafés). */
+  preguntarCantidad: boolean;
+  /**
+   * Puede aparecer como opción DENTRO de un menú, con su suplemento.
+   * ⚠ No significa que el artículo sea un menú: un menú es `menu` + sus pasos.
+   */
+  esArticuloMenu: boolean;
 }
 
 export const PARAMETROS_POR_DEFECTO: ParametrosArticulo = {
@@ -87,6 +98,7 @@ export const PARAMETROS_POR_DEFECTO: ParametrosArticulo = {
   descripcionLibre: false, preguntarPrecio: false, eCommerce: false, cartaDigital: false,
   esMenuDelDia: false, alPeso: false, combinable: false,
   esPrincipal: true, esAnadido: false, esAlcohol: false, agotado: false,
+  solicitarAnadidos: true, solicitarNotas: true, preguntarCantidad: false, esArticuloMenu: false,
 };
 
 export interface Articulo {
@@ -120,6 +132,8 @@ export interface Articulo {
   color?: string;
   /** Nombre de icono (ver `lib/iconos`). Solo se pinta si NO hay foto. */
   icono?: string;
+  /** Merma en % sobre el coste teórico, para que el margen no salga optimista. */
+  descuentoEscandallo?: number;
 }
 
 export const IMPUESTOS = [

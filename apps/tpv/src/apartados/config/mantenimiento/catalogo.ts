@@ -25,6 +25,8 @@ interface FilaProducto {
   es_principal: boolean; es_anadido: boolean;
   controla_stock: boolean; no_imprimir_si_cero: boolean; descripcion_libre: boolean;
   preguntar_precio: boolean; ecommerce: boolean; carta_digital: boolean; es_menu_del_dia: boolean;
+  solicitar_anadidos: boolean; solicitar_notas: boolean; preguntar_cantidad: boolean;
+  es_articulo_menu: boolean; descuento_escandallo: number | string | null;
   product_format: FilaFormato[] | null;
   product_category: { category_id: string }[] | null;
 }
@@ -40,6 +42,7 @@ const COLUMNAS =
   "foto_url,color,icono,disponible,agotado_hasta,vendido_por_peso,combinable," +
   "es_alcohol,es_principal,es_anadido,controla_stock,no_imprimir_si_cero," +
   "descripcion_libre,preguntar_precio,ecommerce,carta_digital,es_menu_del_dia," +
+  "solicitar_anadidos,solicitar_notas,preguntar_cantidad,es_articulo_menu,descuento_escandallo," +
   "product_format(id,nombre,precio,orden,coste,raciones)," +
   "product_category(category_id)";
 
@@ -109,6 +112,10 @@ export function aArticulo(p: FilaProducto): Articulo {
       eCommerce: p.ecommerce,
       cartaDigital: p.carta_digital,
       esMenuDelDia: p.es_menu_del_dia,
+      solicitarAnadidos: p.solicitar_anadidos,
+      solicitarNotas: p.solicitar_notas,
+      preguntarCantidad: p.preguntar_cantidad,
+      esArticuloMenu: p.es_articulo_menu,
     },
     estacion: aEstacion(p.estacion),
     tiempoPrep: p.tiempo_preparacion_min ?? 0,
@@ -120,6 +127,7 @@ export function aArticulo(p: FilaProducto): Articulo {
     ...(p.foto_url ? { foto: p.foto_url } : {}),
     ...(p.color ? { color: p.color } : {}),
     ...(p.icono ? { icono: p.icono } : {}),
+    ...(p.descuento_escandallo === null ? {} : { descuentoEscandallo: num(p.descuento_escandallo) }),
   };
 }
 
@@ -160,6 +168,11 @@ export function aFila(a: Articulo): Record<string, unknown> {
     ecommerce: a.parametros.eCommerce,
     carta_digital: a.parametros.cartaDigital,
     es_menu_del_dia: a.parametros.esMenuDelDia,
+    solicitar_anadidos: a.parametros.solicitarAnadidos,
+    solicitar_notas: a.parametros.solicitarNotas,
+    preguntar_cantidad: a.parametros.preguntarCantidad,
+    es_articulo_menu: a.parametros.esArticuloMenu,
+    descuento_escandallo: a.descuentoEscandallo ?? null,
     updated_at: new Date().toISOString(),
   };
 }

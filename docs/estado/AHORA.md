@@ -170,7 +170,17 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0134`.**
+**Siguiente número libre: `0135`.**
+
+- `0134` — **RESERVADA 20-07 (sesión chat, opciones del artículo que faltaban)**:
+  `articulo_opciones_agora` — los campos de la ficha de Ágora que no teníamos:
+  `product.descuento_escandallo` (Dto. de escandallo fijo), `es_articulo_menu`
+  (puede formar parte de un menú — NO «es un menú»), `preguntar_cantidad`,
+  `solicitar_anadidos` y `solicitar_notas` (el «Solicitar automáticamente…» de
+  Ágora, que decide si al vender se abre solo el modal de extras/notas).
+  Los dos últimos tienen consumidor desde el primer día: hoy el modal de
+  modificadores se abre SIEMPRE que el artículo tenga grupos, y no hay forma de
+  decir «este no, que ralentiza la barra».
 
 - `0133` — **RESERVADA 20-07 (sesión chat, menús como en Ágora)**:
   `menu_grupo_categoria_y_pase` — de la pantalla «Editar Menú» de Ágora salen

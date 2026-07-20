@@ -5,7 +5,7 @@ import type { GluuhSupabaseClient } from "@gluuh/supabase";
 // Tipos del catálogo (compartidos por TPV, kiosko, KDS…).
 export interface Family { id: string; nombre: string; color: string; combinable?: boolean }
 export interface Cat    { id: string; nombre: string; orden: number; family_id: string | null; foto_url?: string | null; mostrar_venta?: boolean; color?: string | null; texto_boton?: string | null; categoria_padre_id?: string | null }
-export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null; family_id?: string | null; texto_boton?: string | null; combinable?: boolean | null; no_imprimir_si_cero?: boolean | null }
+export interface Prod   { id: string; nombre: string; precio: number; tipo_impositivo: number; category_id: string | null; estacion: string | null; foto_url: string | null; agotado_hasta: string | null; vendido_por_peso: boolean; nombre_ticket?: string | null; nombre_cocina?: string | null; family_id?: string | null; texto_boton?: string | null; combinable?: boolean | null; no_imprimir_si_cero?: boolean | null; solicitar_anadidos?: boolean | null }
 export interface Formato { id: string; product_id: string; nombre: string; precio: number }
 export interface ModOpcion { id: string; nombre: string; precio_extra: number }
 export interface ModGrupo  { id: string; product_id: string | null; nombre: string; min_sel: number; max_sel: number; tipo?: "EXTRA" | "COMENTARIO"; opciones: ModOpcion[] }
@@ -65,7 +65,7 @@ export const useCatalogo = create<CatalogoState>()(
           // existir aún (p. ej. un nodo sin la última migración). Cada tier añade una columna
           // opcional; combinable va en su PROPIO tier para no arrastrar a family_id si falta
           // (TRAMPAS §2: la nube va delante del nodo).
-          const r0 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id,texto_boton,combinable,no_imprimir_si_cero`).eq("disponible", true).order("nombre");
+          const r0 = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id,texto_boton,combinable,no_imprimir_si_cero,solicitar_anadidos`).eq("disponible", true).order("nombre");
           if (!r0.error) return r0;
           const r0b = await sb.from("product").select(`${PROD_COLS},nombre_ticket,nombre_cocina,family_id,texto_boton`).eq("disponible", true).order("nombre");
           if (!r0b.error) return r0b;

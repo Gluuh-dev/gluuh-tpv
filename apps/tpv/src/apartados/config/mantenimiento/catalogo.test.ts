@@ -16,6 +16,8 @@ const fila = {
   es_principal: true, es_anadido: false,
   controla_stock: true, no_imprimir_si_cero: false, descripcion_libre: false,
   preguntar_precio: false, ecommerce: true, carta_digital: false, es_menu_del_dia: false,
+  solicitar_anadidos: true, solicitar_notas: true, preguntar_cantidad: false,
+  es_articulo_menu: false, descuento_escandallo: null,
   product_format: [
     { id: "f2", nombre: "Doble", precio: "2.60", orden: 2, coste: "0.70", raciones: "2" },
     { id: "f1", nombre: "Caña", precio: "1.40", orden: 1, coste: "0.35", raciones: "1" },

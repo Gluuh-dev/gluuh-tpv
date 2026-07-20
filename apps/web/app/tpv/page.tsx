@@ -2202,7 +2202,11 @@ export default function TPV() {
     if (estaAgotado(p)) return;
     if (p.vendido_por_peso) { setPesoInput(""); setPesoPop(p); return; }       // por peso
     if ((formatos[p.id] ?? []).length) { setFormatoPop(p); return; }          // 1º: formato
-    if ((gruposMod[p.id] ?? []).length) { abrirModificadores(p); return; }    // 2º: modificadores
+    // 2º: modificadores. `solicitar_anadidos` (0134) decide si se abren SOLOS.
+    // Apagado, el artículo entra directo y los extras se piden a mano desde la
+    // línea: en una barra a las dos, un modal de más por cada caña es lo que
+    // hace que el camarero deje de usar bien el TPV.
+    if ((gruposMod[p.id] ?? []).length && p.solicitar_anadidos !== false) { abrirModificadores(p); return; }
     addProd(p.id);
     // Combinado (7.1): si la copa es combinable y hay categoría de "con qué"
     // configurada, tras añadirla se pregunta el refresco. (Copas con formato/

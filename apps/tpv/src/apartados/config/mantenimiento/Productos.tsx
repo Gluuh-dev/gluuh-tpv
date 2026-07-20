@@ -94,6 +94,7 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
       { clave: "alPeso", texto: "Venta por peso", ayuda: "Al venderlo pide los kilos y calcula el importe." },
       { clave: "preguntarPrecio", texto: "Preguntar precio", ayuda: "Sin precio fijo: lo teclea el camarero al añadirlo." },
       { clave: "descripcionLibre", texto: "Descripción libre", ayuda: "Pide un texto al vender (para «otros» o platos fuera de carta)." },
+      { clave: "preguntarCantidad", texto: "Preguntar cantidad", ayuda: "Pide cuántos al añadirlo: hielo, pan, doce cafés de una mesa." },
     ],
   },
   // ⚠ Aquí NO hay «Menú del día». Un menú no es un artículo: vive en `menu` +
@@ -108,6 +109,7 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
       { clave: "esAnadido", texto: "Es un añadido", ayuda: "Va pegado a otro artículo (extras, guarniciones)." },
       { clave: "combinable", texto: "Se puede combinar", ayuda: "Copas: al añadirlo pregunta con qué refresco va." },
       { clave: "esAlcohol", texto: "Contiene alcohol", ayuda: "Lo necesita el desglose fiscal y el tipo de impuesto." },
+      { clave: "esArticuloMenu", texto: "Puede ir en un menú", ayuda: "Sale como opción dentro de un menú, con su suplemento. NO lo convierte en menú." },
     ],
   },
   {
@@ -117,6 +119,13 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
       { clave: "noImprimirSiCero", texto: "No imprimir si vale 0", ayuda: "Las invitaciones no ensucian la comanda de cocina." },
       { clave: "eCommerce", texto: "Se pide por internet", ayuda: "Sale en la tienda: el cliente lo pide desde casa." },
       { clave: "cartaDigital", texto: "Sale en la carta QR", ayuda: "El cliente lo ve al escanear el código en la mesa." },
+    ],
+  },
+  {
+    titulo: "Qué se pregunta al venderlo",
+    campos: [
+      { clave: "solicitarAnadidos", texto: "Ofrecer los extras solos", ayuda: "Al añadirlo abre el modal de extras. Apagado: la barra va más rápida." },
+      { clave: "solicitarNotas", texto: "Pedir nota de cocina", ayuda: "Al añadirlo pregunta el punto, el «sin cebolla»… Apagado: no molesta." },
     ],
   },
 ];

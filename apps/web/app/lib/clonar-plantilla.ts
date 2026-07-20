@@ -33,6 +33,7 @@ export async function clonarCatalogo(
   const mapC = new Map<string, string>();
   const mapP = new Map<string, string>();
   const mapG = new Map<string, string>();
+  const mapT = new Map<string, string>();
 
   // Familias (se aplana jerarquía y grupo mayor: null para no arrastrar deps).
   const fams = (await admin.from("family").select("*").eq("tenant_id", origen)).data as Fila[] | null;
@@ -80,6 +81,32 @@ export async function clonarCatalogo(
     .filter((pf) => mapP.get(pf.product_id as string))
     .map((pf) => ({ ...sinMeta(pf), tenant_id: destino, product_id: remap(mapP, pf.product_id) }));
   if (filasPF.length) await admin.from("product_format").insert(filasPF);
+
+  // TARIFAS y sus precios (0131/0132).
+  //
+  // ⚠ Esto FALTABA, y era una trampa de las que no dan error: hoy la plantilla
+  // no tiene tarifas, así que no se notaba. El día que alguien le ponga un
+  // «precio de terraza» a la plantilla, cada bar nuevo nacería SIN él y cobraría
+  // el precio normal en la terraza — sin que nadie viera un fallo, porque desde
+  // la 0131 la regla es justo esa: sin precio de tarifa se cobra el normal.
+  const tars = (await admin.from("tarifa").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasT = (tars ?? []).map((t) => {
+    const id = randomUUID();
+    mapT.set(t.id as string, id);
+    return { ...sinMeta(t), id, tenant_id: destino };
+  });
+  if (filasT.length) await admin.from("tarifa").insert(filasT);
+
+  // Precios por tarifa. Solo los que tengan las DOS puntas remapeadas: un precio
+  // que apunte a una tarifa que no se clonó no se cobraría nunca.
+  const pps = (await admin.from("product_price").select("*").eq("tenant_id", origen)).data as Fila[] | null;
+  const filasPP = (pps ?? [])
+    .filter((pp) => mapP.get(pp.product_id as string) && mapT.get(pp.tarifa_id as string))
+    .map((pp) => ({
+      ...sinMeta(pp), tenant_id: destino,
+      product_id: remap(mapP, pp.product_id), tarifa_id: remap(mapT, pp.tarifa_id),
+    }));
+  if (filasPP.length) await admin.from("product_price").insert(filasPP);
 
   // Grupos de modificadores (product_id null = grupo de biblioteca; se conserva).
   const mgs = (await admin.from("modifier_group").select("*").eq("tenant_id", origen)).data as Fila[] | null;
