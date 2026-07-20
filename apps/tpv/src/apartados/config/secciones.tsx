@@ -63,7 +63,7 @@ export const GRUPOS: Grupo[] = [
         ],
       },
       { // ← (panel)/familias + grupos-mayores + setting tpv.combinados.categoria_id
-        id: "familias", titulo: "Familias", Icono: Layers,
+        id: "familias", titulo: "Familias", Icono: Layers, funcional: true,
         desc: "Familias y grupos mayores: lo que heredan sus productos.",
         alcance: [
           "Nombre, color y grupo mayor de cada familia",
@@ -73,7 +73,7 @@ export const GRUPOS: Grupo[] = [
         ],
       },
       { // ← (panel)/categorias + categorias/[id]
-        id: "categorias", titulo: "Categorías", Icono: LayoutGrid,
+        id: "categorias", titulo: "Categorías", Icono: LayoutGrid, funcional: true,
         desc: "La rejilla que ve el camarero en el TPV.",
         alcance: [
           "Qué categorías existen y qué productos contiene cada una",
