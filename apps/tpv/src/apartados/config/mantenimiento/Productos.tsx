@@ -5,7 +5,7 @@ import {
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
   Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy,
 } from "lucide-react";
-import { Modal, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
+import { Modal, BarraVentana, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { BotonProducto } from "../../tpv/venta/BotonProducto";
 import { AspectoArticulo } from "./AspectoArticulo";
@@ -854,9 +854,12 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       )}
 
       {params && (
-        <Modal onCerrar={cerrarVentana} ancho="3xl">
-          <CabeceraModal Icono={SlidersHorizontal} titulo="Parámetros del artículo"
-            subtitulo={`${art.codigo} · ${art.nombre || "Sin descripción"}`} onCerrar={cerrarVentana} />
+        <Modal onCerrar={cerrarVentana} ancho="3xl" className="overflow-hidden">
+          {/* Mismo cromo que el buscador de familias: barra de título fina, sin
+              placa de icono ni subtítulo. Es una ventana de herramienta, y ese
+              cabezón morado se comía media pantalla para no decir nada nuevo —
+              qué artículo es ya se ve detrás, en la ficha. */}
+          <BarraVentana titulo="Parámetros del artículo" onCerrar={cerrarVentana} />
           <Desplazable fuera="max-h-[70vh]" className="p-4">
             {ro && (
               <p className="mb-3 rounded-[5px] border border-line bg-paper/3 px-3 py-2 text-[12.5px] text-muted">
