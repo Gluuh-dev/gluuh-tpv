@@ -12,3 +12,4 @@ export { TecladoNumerico } from "./TecladoNumerico";
 export { TecladoEnPantalla, abrirTeclado, getTecladoAuto, setTecladoAuto } from "./TecladoEnPantalla";
 export { EnObras } from "./EnObras";
 export { MarcoApartado } from "./MarcoApartado";
+export { ShellApartado, BarraSeccion, Caja, type SeccionShell } from "./ShellApartado";
