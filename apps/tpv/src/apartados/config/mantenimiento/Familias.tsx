@@ -23,7 +23,7 @@ const mensaje = (e: unknown) => (e instanceof Error ? e.message : "fallo descono
 
 const DEMO: Familia[] = CATEGORIAS_DEMO.map((c, i) => ({
   id: c.id, nombre: c.nombre, color: c.color, orden: i + 1,
-  combinable: false, mostrarVenta: true, mostrarMenus: true,
+  combinable: false, mostrarVenta: true, mostrarMenus: true, textoBoton: "", ordenImpresion: i + 1,
 }));
 
 export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
@@ -66,6 +66,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setBorrador({
       id: crypto.randomUUID(), nombre: "", color: "#2f7fd0",
       orden: familias.length + 1, combinable: false, mostrarVenta: true, mostrarMenus: true,
+      textoBoton: "", ordenImpresion: familias.length + 1,
     });
   };
 
@@ -179,10 +180,20 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   <input id="f-nom" value={fam.nombre} readOnly={ro} placeholder="Bebidas, Cocina, Postres…"
                     onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro)} />
                 </Campo>
-                <Campo etiqueta="Orden en la carta" htmlFor="f-ord">
-                  <input id="f-ord" type="number" min="0" step="1" value={fam.orden} readOnly={ro}
-                    onChange={(e) => set("orden", Number(e.target.value))} className={claseEntrada(ro, "w-28 text-right font-mono")} />
-                </Campo>
+                <div className="grid gap-3.5 sm:grid-cols-3">
+                  <Campo etiqueta="Orden en la venta" htmlFor="f-ord">
+                    <input id="f-ord" type="number" min="0" step="1" value={fam.orden} readOnly={ro}
+                      onChange={(e) => set("orden", Number(e.target.value))} className={claseEntrada(ro, "text-right font-mono")} />
+                  </Campo>
+                  <Campo etiqueta="Orden en la factura" htmlFor="f-oi">
+                    <input id="f-oi" type="number" min="0" step="1" value={fam.ordenImpresion} readOnly={ro}
+                      onChange={(e) => set("ordenImpresion", Number(e.target.value))} className={claseEntrada(ro, "text-right font-mono")} />
+                  </Campo>
+                  <Campo etiqueta="Texto del botón" htmlFor="f-tb">
+                    <input id="f-tb" value={fam.textoBoton} readOnly={ro} placeholder={fam.nombre || "Igual que el nombre"}
+                      onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
+                  </Campo>
+                </div>
                 <Campo etiqueta="Color">
                   <PaletaColor valor={fam.color} soloLectura={ro} onCambio={(c) => set("color", c)} />
                 </Campo>

@@ -30,6 +30,7 @@ const ESTACIONES = [
 const DEMO: Categoria[] = CATEGORIAS_DEMO.map((c, i) => ({
   id: c.id, nombre: c.nombre, color: c.color, orden: i + 1,
   familyId: null, estacion: "COCINA", icono: "", mostrarVenta: true, mostrarMenus: true,
+  textoBoton: "", cartaNombre: "", cartaDescripcion: "",
 }));
 
 export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
@@ -77,6 +78,7 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
       id: crypto.randomUUID(), nombre: "", color: "#2f7fd0", orden: categorias.length + 1,
       familyId: familias[0]?.id ?? null, estacion: "COCINA", icono: "",
       mostrarVenta: true, mostrarMenus: true,
+      textoBoton: "", cartaNombre: "", cartaDescripcion: "",
     });
   };
 
@@ -239,6 +241,20 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   </div>
                 </Campo>
 
+                <Campo etiqueta="Texto del botón" htmlFor="c-tb">
+                  <input id="c-tb" value={cat.textoBoton} readOnly={ro} placeholder={cat.nombre || "Igual que el nombre"}
+                    onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
+                </Campo>
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <Campo etiqueta="Nombre en la carta QR" htmlFor="c-cn">
+                    <input id="c-cn" value={cat.cartaNombre} readOnly={ro} placeholder={cat.nombre || "El nombre normal"}
+                      onChange={(e) => set("cartaNombre", e.target.value)} className={claseEntrada(ro)} />
+                  </Campo>
+                  <Campo etiqueta="Descripción en la carta QR" htmlFor="c-cd">
+                    <input id="c-cd" value={cat.cartaDescripcion} readOnly={ro}
+                      onChange={(e) => set("cartaDescripcion", e.target.value)} className={claseEntrada(ro)} />
+                  </Campo>
+                </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <InterruptorSN etiqueta="Sale en la venta" activo={cat.mostrarVenta} soloLectura={ro}
                     onToggle={() => set("mostrarVenta", !cat.mostrarVenta)} />

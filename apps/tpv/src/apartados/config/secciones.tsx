@@ -81,7 +81,7 @@ export const GRUPOS: Grupo[] = [
         ],
       },
       { // ← (panel)/modificadores
-        id: "modificadores", titulo: "Extras y comentarios", Icono: ListPlus,
+        id: "modificadores", titulo: "Extras y comentarios", Icono: ListPlus, funcional: true,
         desc: "Biblioteca de extras con precio y comentarios a cocina.",
         alcance: [
           "Grupos de extras con precio (doble ración, sin lactosa…)",

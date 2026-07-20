@@ -163,3 +163,28 @@ Por valor y por riesgo, no por lo vistoso.
 
 **Regla de las cuatro fases:** nada llega a la pantalla si no lo lee alguien al
 vender, imprimir o cobrar. Si no, se añade a la lista de mentiras.
+
+---
+
+## 7 · Familias y Categorías — lo que aún NO tienen modelo
+
+De la ficha de Ágora y del panel Next (inventario 20-07), lo que un TPV serio
+configura de familia/categoría y que aquí **falta modelo o consumidor** (no se
+mete a ciegas — es la skill `gluuh-pantalla-config`):
+
+- **Jerarquía padre/subfamilia** (`family.familia_padre_id`, `category.categoria_padre_id`):
+  columnas existen, **0 datos**, y la UI es un árbol (trabajo aparte). Pendiente.
+- **Grupo mayor** (`family.grupo_mayor_id` + tabla `grupo_mayor`, 0 filas): para el
+  desglose Bebida/Comida del ticket. Falta CRUD del grupo mayor primero.
+- **Imágenes de familia/categoría** (`foto_url`, 0 datos las dos): subida como en
+  el aspecto del artículo. Hoy el botón usa color/icono, que basta.
+- **Horario de disponibilidad por categoría** (`category_horario`) y **visibilidad
+  por centro** (`category_sales_center`): tablas + editor en Next YA existen, pero
+  **0 filas** — funcionalidad sin estrenar. Portar cuando haga falta.
+- **Etiquetas de categoría** (`tag`/`entity_tag`, `modelo-de-datos.md:461`): [NUEVO],
+  sin construir.
+
+✅ Lo que SÍ está en la pantalla nueva: nombre, color, orden (venta + factura en
+familia), combinable, mostrar en venta/menús, texto de botón; y en categoría
+además familia, **estación**, **icono** (que el Next NI edita — se rellenaba por
+SQL) y nombre/descripción de carta QR.

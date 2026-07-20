@@ -10,6 +10,7 @@ import { Impresoras } from "./mantenimiento/Impresoras";
 import { Menus } from "./mantenimiento/Menus";
 import { Familias } from "./mantenimiento/Familias";
 import { Categorias } from "./mantenimiento/Categorias";
+import { Extras } from "./mantenimiento/Extras";
 
 // CONFIGURACIÓN del TPV. El mapa de secciones vive en `secciones.tsx` (inventario
 // del panel Next); aquí se sirve con el shell de gestión, en modo TÁCTIL, porque
@@ -29,6 +30,7 @@ const PANTALLAS: Record<string, (p: Readonly<{ onSalir: () => void }>) => ReactN
   menus: Menus,
   familias: Familias,
   categorias: Categorias,
+  modificadores: Extras,
 };
 
 const GENERAL = "__general__";

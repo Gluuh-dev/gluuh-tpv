@@ -251,3 +251,61 @@ export function modificadoresDemo(
   }
   return { propios, biblioteca: [], asignaciones: [] };
 }
+
+// ── BIBLIOTECA (grupos compartidos) y sus asignaciones ──────────────────────
+// La pantalla «Extras y comentarios» de Configuración gestiona los grupos de
+// biblioteca (`product_id` NULL) y a quién se asignan (familia/categoría). Es lo
+// que hace que «punto de la carne» se diga UNA vez y lo hereden todas las
+// hamburguesas (ver `gruposEfectivos`).
+
+/** Guarda un grupo de BIBLIOTECA (product_id null) con sus opciones. */
+export async function guardarGrupoBiblioteca(g: GrupoModificador): Promise<void> {
+  const tenant_id = bar();
+  await escribir("modifier_group?on_conflict=id", "POST", [{
+    id: g.id, tenant_id, product_id: null, nombre: g.nombre,
+    min_sel: g.min, max_sel: g.max, tipo: g.tipo,
+    updated_at: new Date().toISOString(),
+  }]);
+  // Opciones enteras: pocas, y así una quitada no se queda viva.
+  await escribir(`modifier?modifier_group_id=eq.${g.id}`, "DELETE");
+  if (g.opciones.length === 0) return;
+  await escribir("modifier", "POST", g.opciones.map((o) => ({
+    id: o.id, tenant_id, modifier_group_id: g.id,
+    nombre: o.nombre, precio_extra: o.precioExtra,
+    updated_at: new Date().toISOString(),
+  })));
+}
+
+/**
+ * Borra un grupo de biblioteca. Sus asignaciones se van con él: dejar una
+ * asignación apuntando a un grupo que ya no existe es una herencia fantasma que
+ * no da error y confunde («¿por qué sale este extra?»).
+ */
+export async function borrarGrupoBiblioteca(id: string): Promise<void> {
+  await escribir(`modifier_group_asignacion?modifier_group_id=eq.${id}`, "DELETE");
+  await escribir(`modifier?modifier_group_id=eq.${id}`, "DELETE");
+  await escribir(`modifier_group?id=eq.${id}`, "DELETE");
+}
+
+/**
+ * Reescribe las asignaciones de un grupo A FAMILIAS y CATEGORÍAS (no toca las de
+ * producto, que se manejan en la ficha del artículo). Cada asignación es
+ * INCLUIR: «esta familia lleva este grupo».
+ */
+export async function guardarAsignacionesDeGrupo(
+  grupoId: string,
+  familias: readonly string[],
+  categorias: readonly string[],
+): Promise<void> {
+  const tenant_id = bar();
+  // Solo las de familia/categoría de ESTE grupo; las de producto se respetan.
+  await escribir(
+    `modifier_group_asignacion?modifier_group_id=eq.${grupoId}&or=(family_id.not.is.null,category_id.not.is.null)`,
+    "DELETE",
+  );
+  const filas = [
+    ...familias.map((family_id) => ({ tenant_id, modifier_group_id: grupoId, family_id, category_id: null, product_id: null, modo: "INCLUIR" })),
+    ...categorias.map((category_id) => ({ tenant_id, modifier_group_id: grupoId, family_id: null, category_id, product_id: null, modo: "INCLUIR" })),
+  ];
+  if (filas.length > 0) await escribir("modifier_group_asignacion", "POST", filas.map((f) => ({ ...f, updated_at: new Date().toISOString() })));
+}

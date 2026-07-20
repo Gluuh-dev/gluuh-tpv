@@ -21,6 +21,10 @@ export interface Familia {
   combinable: boolean;
   mostrarVenta: boolean;
   mostrarMenus: boolean;
+  /** Rótulo del botón si difiere del nombre (vacío = usa el nombre). */
+  textoBoton: string;
+  /** Orden de la familia en el ticket/factura. */
+  ordenImpresion: number;
 }
 
 export interface Categoria {
@@ -36,6 +40,10 @@ export interface Categoria {
   icono: string;
   mostrarVenta: boolean;
   mostrarMenus: boolean;
+  textoBoton: string;
+  /** Nombre en la carta por QR (vacío = el nombre normal). */
+  cartaNombre: string;
+  cartaDescripcion: string;
 }
 
 const num = (v: number | string | null | undefined): number => {
@@ -54,17 +62,19 @@ function bar(): string {
 interface FilaFamilia {
   id: string; nombre: string; color: string | null; orden: number | null;
   combinable: boolean | null; mostrar_venta: boolean | null; mostrar_menus: boolean | null;
+  texto_boton: string | null; orden_impresion: number | null;
 }
 
 export async function cargarFamilias(): Promise<Familia[] | null> {
   if (!haySesion()) return null;
   const filas = await leer<FilaFamilia>(
-    "family?select=id,nombre,color,orden,combinable,mostrar_venta,mostrar_menus&order=orden");
+    "family?select=id,nombre,color,orden,combinable,mostrar_venta,mostrar_menus,texto_boton,orden_impresion&order=orden");
   return filas?.map((f) => ({
     id: f.id, nombre: f.nombre, color: f.color ?? "#64748b", orden: num(f.orden),
     combinable: f.combinable ?? false,
     mostrarVenta: f.mostrar_venta ?? true,
     mostrarMenus: f.mostrar_menus ?? true,
+    textoBoton: f.texto_boton ?? "", ordenImpresion: num(f.orden_impresion),
   })) ?? null;
 }
 
@@ -72,6 +82,7 @@ export async function guardarFamilia(f: Familia): Promise<void> {
   await escribir("family?on_conflict=id", "POST", [{
     id: f.id, tenant_id: bar(), nombre: f.nombre, color: f.color, orden: f.orden,
     combinable: f.combinable, mostrar_venta: f.mostrarVenta, mostrar_menus: f.mostrarMenus,
+    texto_boton: f.textoBoton || null, orden_impresion: f.ordenImpresion,
     updated_at: new Date().toISOString(),
   }]);
 }
@@ -93,6 +104,7 @@ interface FilaCategoria {
   id: string; nombre: string; color: string | null; orden: number | null;
   family_id: string | null; estacion: string | null; icono: string | null;
   mostrar_venta: boolean | null; mostrar_menus: boolean | null;
+  texto_boton: string | null; carta_nombre: string | null; carta_descripcion: string | null;
 }
 
 const ESTACIONES = ["COCINA", "BARRA", "CAMARERO", "NINGUNA"];
@@ -101,12 +113,13 @@ const aEstacion = (v: string | null): string => (ESTACIONES.includes(v ?? "") ? 
 export async function cargarCategorias(): Promise<Categoria[] | null> {
   if (!haySesion()) return null;
   const filas = await leer<FilaCategoria>(
-    "category?select=id,nombre,color,orden,family_id,estacion,icono,mostrar_venta,mostrar_menus&order=orden");
+    "category?select=id,nombre,color,orden,family_id,estacion,icono,mostrar_venta,mostrar_menus,texto_boton,carta_nombre,carta_descripcion&order=orden");
   return filas?.map((c) => ({
     id: c.id, nombre: c.nombre, color: c.color ?? "#64748b", orden: num(c.orden),
     familyId: c.family_id, estacion: aEstacion(c.estacion), icono: c.icono ?? "",
     mostrarVenta: c.mostrar_venta ?? true,
     mostrarMenus: c.mostrar_menus ?? true,
+    textoBoton: c.texto_boton ?? "", cartaNombre: c.carta_nombre ?? "", cartaDescripcion: c.carta_descripcion ?? "",
   })) ?? null;
 }
 
@@ -115,6 +128,7 @@ export async function guardarCategoria(c: Categoria): Promise<void> {
     id: c.id, tenant_id: bar(), nombre: c.nombre, color: c.color, orden: c.orden,
     family_id: c.familyId, estacion: c.estacion, icono: c.icono || null,
     mostrar_venta: c.mostrarVenta, mostrar_menus: c.mostrarMenus,
+    texto_boton: c.textoBoton || null, carta_nombre: c.cartaNombre || null, carta_descripcion: c.cartaDescripcion || null,
     updated_at: new Date().toISOString(),
   }]);
 }
