@@ -207,45 +207,71 @@ export function Donut({
 // partido por las dos medias. Aquí sí hay escala uniforme, así que el texto no
 // se deforma y se pueden poner los nombres.
 export function Dispersion({
-  puntos, alto = 260,
+  puntos, alto = 300,
 }: Readonly<{
   puntos: readonly { nombre: string; x: number; y: number; clase: string }[];
   alto?: number;
 }>) {
   if (puntos.length === 0) return <Vacio alto={alto} texto="Sin artículos con escandallo" />;
 
-  const W = 420, H = 260, M = 4;                       // margen interior, en unidades del viewBox
-  const maxX = Math.max(...puntos.map((p) => p.x), 1);
-  const ys = puntos.map((p) => p.y);
-  const minY = Math.min(...ys, 0), maxY = Math.max(...ys, 1);
-  const rangoY = maxY - minY || 1;
-  const px = (x: number) => M + (x / maxX) * (W - M * 2);
-  const py = (y: number) => H - M - ((y - minY) / rangoY) * (H - M * 2);
-  const medX = px(puntos.reduce((a, p) => a + p.x, 0) / puntos.length);
-  const medY = py(ys.reduce((a, y) => a + y, 0) / puntos.length);
+  // El viewBox lleva el aspecto: `w-full` + alto automático hace que el dibujo
+  // LLENE la tarjeta. Con alto fijo y `meet`, el SVG se dibujaba a su tamaño
+  // natural centrado y dejaba media tarjeta en blanco a los lados.
+  const W = 1000, H = 340;
+  const M = { i: 46, d: 16, arr: 16, ab: 34 };          // sitio para los rótulos de los ejes
+
+  // La escala se ajusta A LOS DATOS con un margen, no arranca en 0: los márgenes
+  // de hostelería viven todos entre el 60 % y el 85 %, y forzar el 0 los apelotona
+  // en una franja de dos píxeles donde no se distingue el bueno del malo.
+  const holgura = (vs: number[]): [number, number] => {
+    const min = Math.min(...vs), max = Math.max(...vs);
+    const r = max - min || Math.abs(max) || 1;
+    return [min - r * 0.18, max + r * 0.18];
+  };
+  const [x0, x1] = holgura(puntos.map((p) => p.x));
+  const [y0, y1] = holgura(puntos.map((p) => p.y));
+  const px = (x: number) => M.i + ((x - x0) / (x1 - x0)) * (W - M.i - M.d);
+  const py = (y: number) => H - M.ab - ((y - y0) / (y1 - y0)) * (H - M.arr - M.ab);
+
+  const media = (vs: number[]) => vs.reduce((a, v) => a + v, 0) / vs.length;
+  const mx = px(media(puntos.map((p) => p.x)));
+  const my = py(media(puntos.map((p) => p.y)));
+  const izq = M.i, der = W - M.d, arr = M.arr, ab = H - M.ab;
 
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: alto }} role="img"
-        aria-label="Unidades vendidas frente a porcentaje de margen">
-        <rect x={medX} y={0} width={W - medX} height={medY} className="fill-mint/8" />
-        <rect x={0} y={0} width={medX} height={medY} className="fill-amber/8" />
-        <line x1={medX} y1={0} x2={medX} y2={H} strokeWidth={1} strokeDasharray="4 4" className="stroke-line" />
-        <line x1={0} y1={medY} x2={W} y2={medY} strokeWidth={1} strokeDasharray="4 4" className="stroke-line" />
-        {puntos.map((p) => (
-          <g key={p.nombre}>
-            <circle cx={px(p.x)} cy={py(p.y)} r={5} className={p.clase} />
-            <text x={px(p.x)} y={py(p.y) - 9} textAnchor="middle" className="fill-muted" style={{ fontSize: 9 }}>
-              {p.nombre}
-            </text>
-          </g>
-        ))}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+        aria-label="Unidades vendidas frente a porcentaje de margen, partido por las dos medias">
+        {/* Los cuatro cuadrantes, del color de su etiqueta: el sitio en el que
+            cae un punto ya dice de qué tipo es, sin ir a mirar la leyenda. */}
+        <rect x={mx} y={arr} width={der - mx} height={my - arr} className="fill-mint/10" />
+        <rect x={izq} y={arr} width={mx - izq} height={my - arr} className="fill-amber/10" />
+        <rect x={mx} y={my} width={der - mx} height={ab - my} className="fill-brand/10" />
+        <rect x={izq} y={my} width={mx - izq} height={ab - my} className="fill-danger/8" />
+
+        <line x1={mx} y1={arr} x2={mx} y2={ab} strokeWidth={1} strokeDasharray="5 5" className="stroke-line" />
+        <line x1={izq} y1={my} x2={der} y2={my} strokeWidth={1} strokeDasharray="5 5" className="stroke-line" />
+        <line x1={izq} y1={arr} x2={izq} y2={ab} strokeWidth={1} className="stroke-line" />
+        <line x1={izq} y1={ab} x2={der} y2={ab} strokeWidth={1} className="stroke-line" />
+
+        <text x={izq} y={arr - 4} className="fill-muted" style={{ fontSize: 11 }}>% de margen</text>
+        <text x={der} y={ab + 24} textAnchor="end" className="fill-muted" style={{ fontSize: 11 }}>unidades vendidas →</text>
+        <text x={izq - 8} y={py(y1) + 4} textAnchor="end" className="fill-muted" style={{ fontSize: 11 }}>{Math.round(y1)} %</text>
+        <text x={izq - 8} y={py(y0) + 4} textAnchor="end" className="fill-muted" style={{ fontSize: 11 }}>{Math.round(y0)} %</text>
+
+        {puntos.map((p, i) => {
+          // El nombre va arriba o abajo según la posición en la lista: con todos
+          // arriba, dos artículos parecidos se tapaban el uno al otro.
+          const arriba = i % 2 === 0;
+          return (
+            <g key={p.nombre}>
+              <circle cx={px(p.x)} cy={py(p.y)} r={6} className={p.clase} />
+              <text x={px(p.x)} y={py(p.y) + (arriba ? -13 : 21)} textAnchor="middle"
+                className="fill-paper" style={{ fontSize: 12 }}>{p.nombre}</text>
+            </g>
+          );
+        })}
       </svg>
-      <div className="mt-1 flex justify-between text-[10.5px] text-muted">
-        <span>← vende menos</span>
-        <span>unidades vendidas · % de margen ↑</span>
-        <span>vende más →</span>
-      </div>
     </div>
   );
 }

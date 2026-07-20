@@ -77,7 +77,9 @@ export function Segmento<T extends string>({ valor, opciones, onCambio }: Readon
     <div className="flex h-8 items-center gap-0.5 rounded-md border border-line bg-paper/5 p-0.5">
       {opciones.map((o) => (
         <button key={o.id} type="button" onClick={() => onCambio(o.id)}
-          className={`h-full rounded-[3px] px-2.5 text-[12px] font-medium transition-transform active:scale-[.97] ${
+          // Radio interior = radio del marco − su padding (6 − 2): con menos, el
+          // chip deja una esquina de aire; con más, se come el borde.
+          className={`h-full rounded-[4px] px-2.5 text-[12px] font-medium transition-transform active:scale-[.97] ${
             valor === o.id ? "bg-brand text-white" : "text-muted"
           }`}>
           {o.label}
