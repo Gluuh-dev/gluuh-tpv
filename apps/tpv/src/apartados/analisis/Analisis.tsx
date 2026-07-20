@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark, FileText, Receipt,
-  Percent, AlertTriangle,
+  Percent, AlertTriangle, Wheat,
 } from "lucide-react";
+import {
+  alergenosDe, sinDeclarar, asistenciaDe, horasDe, ETIQUETA_NO_VENTA,
+  type FilaAlergeno, type Fichaje, type NoVenta,
+} from "./extras";
 import { CatalogoInformes } from "./CatalogoInformes";
 import { disponibles, totalInformes } from "./informes";
 import {
@@ -74,6 +78,7 @@ const SECCIONES: readonly SeccionShell[] = [
   { id: "diario", label: "Diario de tickets", Icono: Receipt },
   { id: "productos", label: "Productos", Icono: Package },
   { id: "margenes", label: "Márgenes", Icono: Percent },
+  { id: "alergenos", label: "Alérgenos", Icono: Wheat },
   { id: "camareros", label: "Camareros", Icono: Users },
   { id: "caja", label: "Caja y cierres", Icono: Banknote },
   { id: "impuestos", label: "Impuestos", Icono: Landmark },
@@ -108,6 +113,36 @@ const FICHA: Record<string, Ficha> = {
   "Vino de la casa": { coste: 1.1, iva: 7 },
   "Tarta de queso": { iva: 3 },
 };
+
+// Alérgenos de cada plato (`product.alergenos[]`). Los que no salen aquí están
+// SIN DECLARAR, que es el caso real de un bar recién dado de alta y lo que el
+// informe tiene que cantar.
+const ALERGENOS: Record<string, string[]> = {
+  "Menú del día": ["Gluten", "Lácteos", "Huevos"],
+  "Croquetas caseras": ["Gluten", "Lácteos", "Huevos"],
+  "Caña": ["Gluten"],
+  "Tortilla": ["Huevos"],
+  "Tarta de queso": ["Gluten", "Lácteos", "Huevos"],
+  "Vino de la casa": ["Sulfitos"],
+};
+
+// Fichajes (`shift`). El de Berto sigue abierto: está trabajando ahora mismo.
+const FICHAJES: Fichaje[] = [
+  { operario: "María Ruiz", entrada: "2026-07-20T08:02", salida: "2026-07-20T16:10" },
+  { operario: "María Ruiz", entrada: "2026-07-19T08:00", salida: "2026-07-19T15:45" },
+  { operario: "Lucía Gil", entrada: "2026-07-20T12:00", salida: "2026-07-20T17:30" },
+  { operario: "Lucía Gil", entrada: "2026-07-19T20:00", salida: "2026-07-19T02:15" },   // turno de noche
+  { operario: "Berto Sanz", entrada: "2026-07-20T19:55", salida: null },
+];
+
+// Operaciones que NO son venta (`tipo_operacion` + `motivo_no_venta`).
+const NO_VENTAS: NoVenta[] = [
+  { tipo: "INVITACION", concepto: "Menú del día", operario: "María Ruiz", motivo: "Cliente habitual", importe: 13 },
+  { tipo: "INVITACION", concepto: "2 cafés", operario: "Berto Sanz", motivo: "Queja por espera", importe: 2.6 },
+  { tipo: "MERMA", concepto: "Croquetas caseras", operario: "Lucía Gil", motivo: "Se cayó la bandeja", importe: 8.4 },
+  { tipo: "AUTOCONSUMO", concepto: "Comida de personal", operario: "María Ruiz", motivo: "Turno partido", importe: 26 },
+  { tipo: "FORMACION", concepto: "Caña", operario: "Berto Sanz", motivo: "Prueba de tirador", importe: 2.5 },
+];
 
 const CIERRES = [
   { cuando: "Ayer · 23:48", ventas: 1370.2, efectivo: 442.2, tarjeta: 806, descuadre: -2.15 },
@@ -389,6 +424,10 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const cuad = useMemo(() => cuadrantes(margenes), [margenes]);
   // El diario se deriva del periodo (mismo nº de tickets y mismo total que los KPI).
   const diario = useMemo(() => diarioDe(d.tickets, d.ventas, 1000), [d.tickets, d.ventas]);
+  const alergenos = useMemo(() => alergenosDe(d.top, ALERGENOS), [d.top]);
+  const faltanAlergenos = sinDeclarar(alergenos);
+  const asistencia = useMemo(() => asistenciaDe(FICHAJES), []);
+  const noVentaTotal = suma(NO_VENTAS, (n) => n.importe);
 
   // ── Columnas. Se declaran UNA vez: de aquí salen la celda, el orden, la
   // búsqueda, el total y lo que se descarga. `valor` devuelve el dato CRUDO
@@ -492,6 +531,58 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     { titulo: "Importe", valor: (p) => p.importe, tipo: "euro", total: (fs) => suma(fs, (p) => p.importe) },
     { titulo: "% del total", valor: (p) => pct(p.importe, totalPagos), tipo: "numero", celda: (p) => `${pct(p.importe, totalPagos)} %` },
   ];
+  const COL_ALERGENOS: ColumnaTabla<FilaAlergeno>[] = [
+    { titulo: "Artículo", valor: (a) => a.nombre },
+    { titulo: "Familia", valor: (a) => a.familia },
+    {
+      titulo: "Alérgenos declarados",
+      // Se exporta la lista en texto: el PDF de alérgenos se cuelga en la pared
+      // y tiene que poder leerse sin la aplicación delante.
+      valor: (a) => (a.declarado ? a.alergenos.join(", ") : "SIN DECLARAR"),
+      celda: (a) => (a.declarado ? (
+        <span className="flex flex-wrap gap-1">
+          {a.alergenos.map((x) => (
+            <span key={x} className="rounded-[3px] bg-brand/12 px-1.5 py-0.5 text-[11.5px] text-brand-lit">{x}</span>
+          ))}
+        </span>
+      ) : (
+        <span className="flex items-center gap-1.5 text-amber">
+          <AlertTriangle size={13} /> Sin declarar
+        </span>
+      )),
+    },
+    { titulo: "Nº", valor: (a) => (a.declarado ? a.alergenos.length : null), tipo: "numero" },
+  ];
+  const COL_ASISTENCIA: ColumnaTabla<typeof asistencia[number]>[] = [
+    { titulo: "Operario", valor: (a) => a.operario, total: () => "Total" },
+    { titulo: "Turnos", valor: (a) => a.turnos, tipo: "numero", total: (fs) => suma(fs, (a) => a.turnos) },
+    { titulo: "Horas", valor: (a) => a.horas, tipo: "numero", total: (fs) => suma(fs, (a) => a.horas) },
+    {
+      titulo: "Media por turno", tipo: "numero",
+      valor: (a) => (a.turnos - a.abiertos > 0 ? r2(a.horas / (a.turnos - a.abiertos)) : null),
+    },
+    {
+      titulo: "Sin cerrar", valor: (a) => a.abiertos, tipo: "numero",
+      celda: (a) => (a.abiertos === 0 ? <span className="text-muted">—</span> : (
+        <span className="rounded-[3px] bg-amber/15 px-1.5 py-0.5 text-[11.5px] font-medium text-amber">
+          {a.abiertos} en curso
+        </span>
+      )),
+    },
+  ];
+  const COL_FICHAJES: ColumnaTabla<Fichaje>[] = [
+    { titulo: "Operario", valor: (f) => f.operario },
+    { titulo: "Entrada", valor: (f) => f.entrada.replace("T", " ") },
+    { titulo: "Salida", valor: (f) => f.salida?.replace("T", " ") ?? null, celda: (f) => (f.salida ? f.salida.replace("T", " ") : <span className="text-amber">En curso</span>) },
+    { titulo: "Horas", valor: (f) => horasDe(f), tipo: "numero" },
+  ];
+  const COL_NOVENTA: ColumnaTabla<NoVenta>[] = [
+    { titulo: "Tipo", valor: (n) => ETIQUETA_NO_VENTA[n.tipo] },
+    { titulo: "Concepto", valor: (n) => n.concepto },
+    { titulo: "Motivo", valor: (n) => n.motivo },
+    { titulo: "Operario", valor: (n) => n.operario },
+    { titulo: "Importe (PVP)", valor: (n) => n.importe, tipo: "euro", total: (fs) => suma(fs, (n) => n.importe) },
+  ];
   const COL_IMPUESTOS: ColumnaTabla<typeof d.impuestos[number]>[] = [
     { titulo: "Tipo", valor: (i) => i.tipo, total: () => "Total" },
     { titulo: "Base imponible", valor: (i) => r2(i.base), tipo: "euro", total: (fs) => suma(fs, (i) => i.base) },
@@ -503,10 +594,11 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     informes: `${disponibles} de ${totalInformes} informes disponibles`,
     resumen: `${etiquetaPeriodo} · ${d.tickets} tickets`,
     diario: `${etiquetaPeriodo} · ticket a ticket`,
-    ventas: `${etiquetaPeriodo} · detalle por franja`,
     productos: `${etiquetaPeriodo} · ${d.top.length} artículos en ${porFamilia(d.top).length} familias`,
     margenes: `${etiquetaPeriodo} · margen sobre base y menú engineering`,
-    camareros: `${etiquetaPeriodo} · rendimiento por operario`,
+    alergenos: `${d.top.length - faltanAlergenos} de ${d.top.length} artículos con alérgenos declarados`,
+    camareros: `${etiquetaPeriodo} · rendimiento, asistencia y fichajes`,
+    ventas: `${etiquetaPeriodo} · franjas y ${eur(noVentaTotal)} sin cobrar`,
     caja: `${etiquetaPeriodo} · formas de pago y cierres Z`,
     impuestos: `${etiquetaPeriodo} · desglose IGIC (Canarias)`,
   };
@@ -576,6 +668,15 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
 
           <Tabla titulo="Detalle por franja" columnas={COL_FRANJAS} filas={d.franjas}
             clave={(f) => f.etiqueta} ordenPor="Ventas" periodo={etiquetaPeriodo} porPagina={12} />
+
+          {/* Lo que salió sin cobrar. Va en su PROPIA tabla y con su propio total
+              a propósito: no es venta y no puede sumar a la caja. */}
+          <Tabla titulo="Invitaciones y otras no-ventas" columnas={COL_NOVENTA} filas={NO_VENTAS}
+            clave={(n) => `${n.tipo}-${n.concepto}-${n.operario}`} ordenPor="Importe (PVP)"
+            periodo={etiquetaPeriodo} porPagina={0}
+            vacio="No ha salido nada sin cobrar en este periodo."
+            nota={<>Estas operaciones <b className="font-medium text-paper">no suman a las ventas</b> ni al arqueo:
+              se miden aparte porque son el agujero que conviene vigilar, no ingresos.</>} />
         </div>
       )}
 
@@ -643,10 +744,39 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
         </div>
       )}
 
+      {seccion === "alergenos" && (
+        <div className="space-y-3 p-4">
+          {faltanAlergenos > 0 && (
+            <p className={`${RC} flex items-start gap-2 border border-amber/30 bg-amber/10 px-3.5 py-2.5 text-[12px] leading-relaxed`}>
+              <AlertTriangle size={14} className="mt-0.5 flex-none text-amber" />
+              <span>
+                {faltanAlergenos === 1 ? "Hay 1 artículo" : `Hay ${faltanAlergenos} artículos`} sin alérgenos
+                declarados. La ficha vacía <b className="font-medium text-paper">no significa que no lleven ninguno</b>:
+                significa que nadie lo ha rellenado, y no hay forma de distinguirlo. Informar de los 14 alérgenos
+                del reglamento UE 1169/2011 es obligatorio y la inspección lo pide.
+              </span>
+            </p>
+          )}
+          <Tabla titulo="Alérgenos por artículo" columnas={COL_ALERGENOS} filas={alergenos}
+            clave={(a) => a.nombre} ordenPor="Artículo" descPorDefecto={false}
+            periodo={etiquetaPeriodo} porPagina={20}
+            nota="Descárgalo en PDF para tenerlo a la vista en la barra y en la carta." />
+        </div>
+      )}
+
       {seccion === "camareros" && (
-        <div className="p-4">
+        <div className="space-y-3 p-4">
           <Tabla titulo="Ventas por operario" columnas={COL_CAMAREROS} filas={d.camareros}
             clave={(c) => c.nombre} ordenPor="Ventas" periodo={etiquetaPeriodo} porPagina={0} />
+
+          <Tabla titulo="Asistencia" columnas={COL_ASISTENCIA} filas={asistencia}
+            clave={(a) => a.operario} ordenPor="Horas" periodo={etiquetaPeriodo} porPagina={0}
+            vacio="Todavía no hay fichajes."
+            nota="Un turno sin cerrar no cuenta cero horas: se marca aparte para no hundir la media de quien está trabajando ahora." />
+
+          <Tabla titulo="Fichajes" columnas={COL_FICHAJES} filas={FICHAJES}
+            clave={(f) => `${f.operario}-${f.entrada}`} ordenPor="Entrada"
+            periodo={etiquetaPeriodo} porPagina={20} vacio="Todavía no hay fichajes." />
         </div>
       )}
 

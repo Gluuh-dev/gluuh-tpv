@@ -8,7 +8,7 @@
 
 /** Secciones del Análisis a las que puede llevar un informe (las que existen). */
 export type SeccionInforme =
-  | "resumen" | "ventas" | "diario" | "productos" | "margenes" | "camareros" | "caja" | "impuestos";
+  | "resumen" | "ventas" | "diario" | "productos" | "margenes" | "alergenos" | "camareros" | "caja" | "impuestos";
 
 export interface Informe {
   id: string;
@@ -45,7 +45,7 @@ export const CATALOGO: GrupoInformes[] = [
       { id: "ve-evolucion", nombre: "Evolución de Ventas", va: "ventas" },
       { id: "ve-comparativa", nombre: "Comparativa Interanual", falta: PEND_HIST },
       { id: "ve-fiscal", nombre: "Resumen Fiscal", va: "impuestos" },
-      { id: "ve-invitaciones", nombre: "Invitaciones", falta: "Necesita registrar las invitaciones al cobrar" },
+      { id: "ve-invitaciones", nombre: "Invitaciones", va: "ventas" },
       { id: "ve-reservas", nombre: "Reservas", falta: "Necesita el módulo de reservas" },
       { id: "ve-347", nombre: "Documento 347", falta: PEND_CLIENTES },
       { id: "ve-diario", nombre: "Diario de Ventas", va: "diario" },
@@ -60,7 +60,7 @@ export const CATALOGO: GrupoInformes[] = [
       { id: "ca-margenes-cat", nombre: "Márgenes por Categorías", falta: "Necesita los productos repartidos en categorías" },
       { id: "ca-menu-eng", nombre: "Menú Engineering", va: "margenes" },
       { id: "ca-historico", nombre: "Histórico de Ventas", va: "diario" },
-      { id: "ca-alergenos", nombre: "Alérgenos por Producto", falta: "Necesita los alérgenos rellenos en la ficha" },
+      { id: "ca-alergenos", nombre: "Alérgenos por Producto", va: "alergenos" },
       { id: "ca-promos", nombre: "Promociones y Productos", falta: "Necesita promociones activas" },
       { id: "ca-ventas-diarias", nombre: "Ventas Diarias", va: "ventas" },
     ],
@@ -73,7 +73,7 @@ export const CATALOGO: GrupoInformes[] = [
       { id: "us-productos", nombre: "Productos por Usuario", falta: "Necesita la venta detallada por operario" },
       { id: "us-desc-prod", nombre: "Descuentos por Usuario y Producto", falta: "Necesita registrar quién aplica cada descuento" },
       { id: "us-cancel", nombre: "Cancelaciones por Usuario", falta: "Necesita registrar el motivo de cancelación" },
-      { id: "us-asistencia", nombre: "Asistencia por Usuario", falta: "Necesita fichajes (entrada/salida)" },
+      { id: "us-asistencia", nombre: "Asistencia por Usuario", va: "camareros" },
     ],
   },
   {
