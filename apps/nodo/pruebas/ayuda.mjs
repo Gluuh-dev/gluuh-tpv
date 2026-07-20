@@ -121,6 +121,16 @@ export async function barDePrueba(bd, nombre) {
   if (!r.ok) throw new Error(`no se pudo iniciar sesión en el bar de prueba: HTTP ${r.status}`);
   const sesion = await r.json();
 
+  // ENLAZAR la ficha de empleado con el usuario de auth recién creado.
+  //
+  // Sin esto el `app_user` queda con `auth_user_id` NULL, y entonces
+  // `operario_permite()` NO ENCUENTRA a quien pregunta: como es fail-closed (0113),
+  // devuelve false y la RLS deniega hasta escribir en SU PROPIO bar (403 en el
+  // `category_ins_cat`). Las pruebas parecían destapar un fallo de permisos cuando
+  // lo que fallaba era el andamiaje: un empleado de verdad SIEMPRE está enlazado.
+  const sub = JSON.parse(Buffer.from(sesion.access_token.split(".")[1], "base64url")).sub;
+  await bd.query("update public.app_user set auth_user_id = $2 where tenant_id = $1", [t.id, sub]);
+
   return { tenantId: t.id, locationId: l.id, email, sesion };
 }
 
