@@ -72,10 +72,12 @@ export function Segmento<T extends string>({ valor, opciones, onCambio }: Readon
   valor: T; opciones: readonly { id: T; label: string }[]; onCambio: (v: T) => void;
 }>) {
   return (
-    <div className={`flex gap-0.5 ${R} border border-line bg-panel p-0.5`}>
+    // Mismo marco que los campos de fecha (`h-8`, `rounded-md`, `bg-paper/5`): en
+    // una misma barra, un selector y un input tienen que parecer la misma pieza.
+    <div className="flex h-8 items-center gap-0.5 rounded-md border border-line bg-paper/5 p-0.5">
       {opciones.map((o) => (
         <button key={o.id} type="button" onClick={() => onCambio(o.id)}
-          className={`h-7 rounded-[3px] px-2.5 text-[12px] font-medium transition-transform active:scale-[.97] ${
+          className={`h-full rounded-[3px] px-2.5 text-[12px] font-medium transition-transform active:scale-[.97] ${
             valor === o.id ? "bg-brand text-white" : "text-muted"
           }`}>
           {o.label}
