@@ -627,7 +627,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
       {buscaFam && (
         <BuscadorRegistros
-          titulo="Buscador de familias de venta"
+          titulo="Familias"
           registros={familias}
           seleccionado={art.familia}
           etiquetaNuevo="Nueva familia"

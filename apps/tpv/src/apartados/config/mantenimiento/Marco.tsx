@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown, Search, PlusCircle, type LucideIcon } from "lucide-react";
-import { Modal, CabeceraModal } from "../../../ui";
+import { Modal, BarraVentana } from "../../../ui";
 
 // ============================================================================
 // MARCO DE MANTENIMIENTO — el patrón clásico de los TPV de hostelería (Ágora,
@@ -242,7 +242,7 @@ export function BuscadorRegistros({
 
   return (
     <Modal onCerrar={onCerrar} ancho="lg" className="overflow-hidden">
-      <CabeceraModal Icono={Search} titulo={titulo} tono="suave" onCerrar={onCerrar} />
+      <BarraVentana titulo={titulo} onCerrar={onCerrar} />
 
       <div className="flex flex-col gap-3 p-4">
         <div className="relative">

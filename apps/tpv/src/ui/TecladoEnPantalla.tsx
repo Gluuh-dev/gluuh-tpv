@@ -221,16 +221,22 @@ export function TecladoEnPantalla() {
 
   return (
     <div ref={panelRef} style={{ ...panel, left: x, top: y }} role="group" aria-label="Teclado en pantalla">
-      <div role="toolbar" aria-label="Campo en edición · arrastra para mover el teclado"
+      {/* Barra de título: el asa para mover y la ✕. Mismo cromo que las ventanas
+          emergentes, para que el teclado se lea como una ventana más. */}
+      <div role="toolbar" aria-label="Teclado en pantalla · arrastra para moverlo"
         style={{ ...barra, cursor: "grab", touchAction: "none" }}
         onMouseDown={noRobarFoco} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar}
         title="Arrastra la barra para mover el teclado">
-        <span style={etiquetaCampo}>{campo}</span>
+        <span style={etiquetaCampo}>{campo || "Teclado"}</span>
+        <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
+      </div>
+
+      {/* Lo que se está escribiendo, a lo ancho: se lee de un vistazo. */}
+      <div style={filaVisor}>
         <div style={visor}>
           {texto ? <span>{texto}</span> : <span style={{ opacity: 0.5 }}>Escribe…</span>}
           <span style={cursor} />
         </div>
-        <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
       </div>
 
       <div style={teclas}>
@@ -293,28 +299,31 @@ const panel: React.CSSProperties = {
   boxShadow: "0 30px 80px -20px rgba(0,0,0,.35)", color: "var(--paper)",
   fontFamily: 'var(--font-sans), system-ui, "Segoe UI", sans-serif', userSelect: "none",
 };
+// BARRA DE TÍTULO morada, igual que la de las ventanas emergentes: es el asa
+// para mover y lleva la ✕. El visor del campo va DEBAJO, en su propia fila.
 const barra: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 8,
-  padding: "7px 8px 7px 12px", borderBottom: "1px solid var(--line)",
-  fontSize: 12, color: "var(--muted)",
+  display: "flex", alignItems: "center", gap: 8, height: 36,
+  padding: "0 6px 0 12px", background: "var(--brand)", color: "#fff",
+  borderTopLeftRadius: 13, borderTopRightRadius: 13,
 };
 const etiquetaCampo: React.CSSProperties = {
-  flexShrink: 0, textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700, fontSize: 10, opacity: 0.75,
+  flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  fontWeight: 600, fontSize: 13,
+};
+const filaVisor: React.CSSProperties = {
+  padding: "8px 10px", borderBottom: "1px solid var(--line)",
 };
 const visor: React.CSSProperties = {
-  flex: 1, minWidth: 0, display: "flex", alignItems: "center", overflow: "hidden", whiteSpace: "nowrap",
-  height: 30, padding: "0 10px", borderRadius: 8,
-  background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--paper)", fontSize: 14, fontWeight: 600,
+  width: "100%", display: "flex", alignItems: "center", overflow: "hidden", whiteSpace: "nowrap",
+  height: 38, padding: "0 12px", borderRadius: 8,
+  background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--paper)", fontSize: 15, fontWeight: 500,
 };
 const cursor: React.CSSProperties = {
   width: 1, height: 16, marginLeft: 1, background: "var(--paper)", animation: "gl-velo 1s steps(1) infinite alternate",
 };
 const cerrar: React.CSSProperties = {
-  background: "transparent", border: 0, color: "var(--paper)", fontSize: 16, cursor: "pointer", padding: "2px 8px", borderRadius: 6, flexShrink: 0,
-};
-const agarre: React.CSSProperties = {
-  flexShrink: 0, cursor: "move", touchAction: "none", padding: "2px 10px", borderRadius: 8,
-  background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--muted)", fontSize: 18, lineHeight: 1,
+  background: "transparent", border: 0, color: "#fff", fontSize: 16, cursor: "pointer",
+  padding: "4px 10px", borderRadius: 4, flexShrink: 0, lineHeight: 1,
 };
 const teclas: React.CSSProperties = { padding: 8, display: "flex", flexDirection: "column", gap: 6, height: 8 + 5 * 48 + 4 * 6 + 8 };
 const fila: React.CSSProperties = { display: "flex", gap: 6, flex: 1 };
