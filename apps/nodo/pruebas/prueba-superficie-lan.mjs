@@ -8,6 +8,7 @@
 // (estado→401 sin token) hay que probarla una vez desde un segundo equipo:
 //   curl http://<ip-del-nodo>:54321/nodo/estado   → 401
 import { firmar } from "../secreto.mjs";
+import { noConcluyente } from "./ayuda.mjs";
 
 const BASE = process.env.NODO_URL ?? "http://127.0.0.1:54321";
 let fallos = 0;
@@ -45,6 +46,21 @@ const pedir = (ruta, opciones) => fetch(BASE + ruta, opciones).catch(() => null)
   ok("subida con token de OTRO secreto → 401", falso?.status === 401);
 
   const token = firmar("authenticated"); // firmado con el secreto real del nodo
+
+  // CONTROL, antes de dar por buenos los bloqueos: si la subida LEGÍTIMA no pasa,
+  // todo lo demás sale "bloqueado" por el motivo equivocado y la prueba mentiría
+  // (un 401 a todo hace que hasta «token ajeno → 401» pase por casualidad).
+  const control = await pedir("/storage/v1/object/media/prueba-lan.png", {
+    method: "POST", body: Buffer.from([0x89, 0x50, 0x4e, 0x47]), headers: { authorization: `Bearer ${token}` },
+  });
+  if (control?.status === 401 || control?.status === 403) {
+    noConcluyente(
+      `el servicio de media RECHAZA el token del propio nodo (HTTP ${control.status})`,
+      "Corre con un secreto JWT distinto del de .nodo/nodo.env (servicios elevados del\n"
+      + "instalado anterior). Reinicia Windows o relanza arrancar-nodo.ps1 y repite.",
+    );
+  }
+
   const exe = await pedir("/storage/v1/object/media/troyano.exe", {
     method: "POST", body: "MZ", headers: { authorization: `Bearer ${token}` },
   });

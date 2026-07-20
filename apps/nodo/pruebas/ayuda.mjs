@@ -36,6 +36,59 @@ export async function conectar() {
 }
 
 /**
+ * Corta la prueba dejando claro que NO ha comprobado nada. Sale con código 2
+ * (≠ 1, que es un fallo de verdad) para que un script sepa distinguirlos.
+ */
+export function noConcluyente(motivo, pista) {
+  console.log("\n" + "═".repeat(64));
+  console.log("⚠️  PRUEBA NO CONCLUYENTE — no ha llegado a comprobar nada.");
+  console.log(`   ${motivo}`);
+  if (pista) for (const l of pista.split("\n")) console.log(`   ${l}`);
+  console.log("═".repeat(64));
+  process.exit(2);
+}
+
+/**
+ * Exige que el nodo responda a peticiones AUTENTICADAS antes de dar por válida
+ * ninguna prueba que vaya por HTTP.
+ *
+ * Por qué existe: si PostgREST rechaza la sesión, TODAS las lecturas devuelven 0
+ * filas — y una prueba de aislamiento interpreta ese 0 como «no veo lo del otro»
+ * y canta ✅, o como «no veo lo mío» y canta ❌ FUGA. Las dos conclusiones son
+ * mentira: no ha podido leer. Un test de seguridad que miente es peor que ninguno.
+ */
+export async function exigirNodoVivo() {
+  let r;
+  try {
+    r = await fetch(`${NODO}/rest/v1/tenant?select=id&limit=1`, {
+      headers: { apikey: SERVICIO, authorization: `Bearer ${SERVICIO}` },
+    });
+  } catch (e) {
+    noConcluyente(
+      `no se puede hablar con el nodo (${NODO}): ${e.message}`,
+      "¿Está arrancado?  .\\supabase\\nodo\\arrancar-nodo.ps1",
+    );
+    return;
+  }
+  if (r.status === 401 || r.status === 403) {
+    const cuerpo = await r.text().catch(() => "");
+    const jwt = /PGRST301|decode the JWT|wrong key/i.test(cuerpo);
+    noConcluyente(
+      `el nodo RECHAZA la sesión (HTTP ${r.status})${jwt ? " — no puede decodificar el JWT" : ""}`,
+      jwt
+        ? "PostgREST corre con un secreto JWT DISTINTO del de .nodo/nodo.env.\n"
+          + "Pasa tras reinstalar: quedan servicios ELEVADOS con el secreto viejo.\n"
+          + "Arréglalo reiniciando Windows (mueren solos) o relanzando arrancar-nodo.ps1."
+        : cuerpo.slice(0, 200),
+    );
+    return;
+  }
+  if (!r.ok) {
+    noConcluyente(`el nodo responde HTTP ${r.status} a una lectura de servicio`, "Revisa los servicios del nodo.");
+  }
+}
+
+/**
  * Un bar de prueba: empresa + local + dueño con contraseña, y su sesión ya iniciada
  * contra la auth del nodo. Es lo que deja el provisionador, en pequeño.
  */

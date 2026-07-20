@@ -12,6 +12,10 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 import pg from "pg";
+import { exigirNodoVivo, noConcluyente } from "./ayuda.mjs";
+
+// Si el nodo no atiende peticiones autenticadas, nada de lo de abajo concluye.
+await exigirNodoVivo();
 
 const NODO = "http://127.0.0.1:54321";
 const bd = new pg.Client({ connectionString: "postgres://postgres:gluuh@127.0.0.1:55432/gluuh" });
@@ -59,6 +63,15 @@ comprobar(rVale.ok && !!vale, "el nodo emite el vale");
 const rEntrar = await post("/auth/v1/token?grant_type=password", { email: "x@codigo.gluuh.local", password: vale });
 const sesion = await rEntrar.json();
 comprobar(rEntrar.ok && !!sesion.access_token, "el vale se canjea por una sesión");
+
+// Sin token no hay claims que mirar: cortar con un motivo, no reventar con un
+// TypeError que hace pensar que la prueba está rota cuando lo está el nodo.
+if (!sesion.access_token) {
+  noConcluyente(
+    `el nodo no devolvió sesión al canjear el vale (HTTP ${rEntrar.status}): ${JSON.stringify(sesion).slice(0, 160)}`,
+    "Revisa la auth del nodo y su secreto JWT.",
+  );
+}
 
 const claims = JSON.parse(Buffer.from(sesion.access_token.split(".")[1], "base64url"));
 comprobar(claims.tenant_id === op.tenant_id, `el token lleva SU bar (${claims.tenant_id?.slice(0, 8)}…)`);

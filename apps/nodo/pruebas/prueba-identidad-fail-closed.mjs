@@ -82,8 +82,11 @@ try {
   ok("clave ausente = denegado", permisoInventado[0].p === false);
 
   console.log("3) RPC privilegiadas acotadas por tenant (0114)");
+  // `cif` y `razon_social` son NOT NULL en el esquema: hay que darlos (la prueba
+  // se había quedado vieja y reventaba con 23502 antes de comprobar nada).
   const { rows: [locB] } = await c.query(
-    "insert into public.location (tenant_id, nombre) values ($1,'Local B') returning id", [tB.id],
+    `insert into public.location (tenant_id, nombre, cif, razon_social)
+     values ($1,'Local B','B00000000','Local B') returning id`, [tB.id],
   );
   let cruzo = false;
   try {
