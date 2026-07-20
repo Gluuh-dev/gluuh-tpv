@@ -106,8 +106,18 @@ description: >-
 | Backup local | RPC `export_tenant_csv(tabla)` security definer acotada al tenant del token de dispositivo | 03 |
 | Tarifas reales (P1-3) | `product_price` (producto × tarifa) + programación horaria — diseño en `modelo-de-datos.md` | plan |
 | Permisos finos (P2) | `role`/`permission`/`role_permission` — diseño en `modelo-de-datos.md` | plan |
+| Alérgenos: declarado ≠ vacío | `product ADD alergenos_declarados_at timestamptz` (o hacer `alergenos` NULLABLE) | 25 |
 
 Notas de diseño ya decididas:
+- **Alérgenos, el hueco que no se puede leer (20-07)**: `product.alergenos` es
+  `text[] NOT NULL DEFAULT '{}'` (0016), así que un array vacío significa a la vez
+  «este plato no lleva ninguno de los 14» y «nadie ha rellenado la ficha», y **no
+  hay forma de distinguirlas**. El informe de alérgenos del Análisis resuelve por el
+  lado seguro (vacío ⇒ «SIN DECLARAR») porque decirle a un bar que su plato está
+  limpio cuando nadie lo ha mirado es un problema legal, no cosmético — el
+  reglamento UE 1169/2011 obliga a informar. Efecto secundario: un bar que declare
+  de verdad que el agua no lleva ninguno seguirá viendo el aviso. Se arregla con
+  una marca de «alguien lo rellenó», no cambiando el informe.
 - **Ficha Glop/Ágora (0065, Fase 3a)**: `product.family_id` = familia DIRECTA
   del producto (modelo Glop; el resolver de herencia la prefiere sobre la
   derivada de la categoría principal). `familia_padre_id`/`categoria_padre_id`

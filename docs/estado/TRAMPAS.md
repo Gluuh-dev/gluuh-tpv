@@ -362,6 +362,45 @@ menus.ts   + Menus.tsx        ❌ revienta
 No se nota al escribirlo: se nota al compilar, y el mensaje habla de ficheros
 "ya incluidos" que parece que no tienen nada que ver.
 
+## 16 · `toISOString()` fecha los informes de AYER
+
+`new Date().toISOString()` convierte a **UTC**. En España (UTC+1/+2) la medianoche cae en el
+día **anterior**, así que:
+
+```js
+new Date(2026, 6, 20).toISOString().slice(0, 10)   // "2026-07-19"  ← el bar dice 20
+```
+
+Un informe de «Hoy» sale fechado ayer y el atajo «Mes» arranca el **28 del mes pasado**. No da
+ningún error: da cifras que casi cuadran, que es peor. Y en un cierre de caja o un libro de
+facturación, «casi» es un problema con Hacienda.
+
+La fecha del bar se arma **con las partes locales**, nunca con UTC:
+
+```js
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+```
+
+Lo cazaron los tests de `rangoDe` (`apps/tpv/src/apartados/analisis/rango.test.ts`): 7 de 9
+fallaban. Aplica a **cualquier** sitio que fabrique una fecha de negocio, no solo al Análisis.
+
+**Primo hermano**: un turno que cruza medianoche (entrar a las 20:00 y salir a las 02:30, lo
+normal en hostelería) restado en crudo da **−17,5 h**. Ver `horasDe()` en `analisis/extras.ts`.
+
+---
+
+## 17 · Antes de dar un informe por imposible, MIRA la base de datos
+
+El catálogo de informes marcaba tres como «no se puede, falta el dato»: escandallo, alérgenos
+y fichajes. Los tres **ya estaban** en el esquema — `product_format.coste` (0128),
+`product.alergenos[]` (0016, con **110 productos rellenos**) y `shift(entrada, salida)` (0001).
+El «falta» era una suposición de quien escribió la lista, y se quedó ahí congelada.
+
+Cuesta 30 segundos comprobarlo (`grep` en `supabase/migrations/` o `list_tables` del MCP) y
+evita dar por perdida una pantalla que ya se podía servir.
+
+---
+
 ## 15 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.
