@@ -78,7 +78,7 @@ export const CATALOGO: GrupoInformes[] = [
   {
     titulo: "Caja",
     informes: [
-      { id: "cj-formas", nombre: "Formas de Pago", va: "resumen" },
+      { id: "cj-formas", nombre: "Formas de Pago", va: "caja" },
       { id: "cj-cierres", nombre: "Cierres de Caja (Z)", va: "caja" },
       { id: "cj-movimientos", nombre: "Movimientos de Caja", falta: "Necesita apuntes de caja (entradas/salidas)" },
       { id: "cj-pendientes", nombre: "Cobros Pendientes", falta: PEND_CLIENTES },

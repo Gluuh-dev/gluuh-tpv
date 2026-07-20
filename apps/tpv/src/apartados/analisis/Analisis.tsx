@@ -135,6 +135,22 @@ export function diarioDe(tickets: number, ventasTotal: number, serie: number): T
   return filas.sort((a, b) => b.hora.localeCompare(a.hora));   // lo último, arriba
 }
 
+// ── Familias ────────────────────────────────────────────────────────────────
+// «¿Cuánto pesa la cocina frente a la barra?» — la pregunta con la que se decide
+// una carta. Se AGRUPA el ranking que ya está en pantalla en vez de traer otra
+// lista: así el total por familias y el total por artículos no pueden discrepar.
+export interface FilaFamilia { familia: string; articulos: number; uds: number; importe: number }
+
+export function porFamilia(top: readonly { familia: string; uds: number; importe: number }[]): FilaFamilia[] {
+  const m = new Map<string, FilaFamilia>();
+  for (const t of top) {
+    const f = m.get(t.familia) ?? { familia: t.familia, articulos: 0, uds: 0, importe: 0 };
+    f.articulos += 1; f.uds += t.uds; f.importe = Math.round((f.importe + t.importe) * 100) / 100;
+    m.set(t.familia, f);
+  }
+  return [...m.values()].sort((a, b) => b.importe - a.importe);
+}
+
 // IGIC canario (7 % general, 3 % reducido): el desglose sale hacia atrás del PVP.
 const impuestosDe = (ventas: number) => {
   const baseG = (ventas * 0.82) / 1.07, baseR = (ventas * 0.18) / 1.03;
@@ -144,7 +160,7 @@ const impuestosDe = (ventas: number) => {
   ];
 };
 
-const DEMO: Record<Periodo, Datos> = {
+export const DEMO: Record<Periodo, Datos> = {
   hoy: {
     ventas: 1486.3, tickets: 63, propinas: 41.5, comensales: 148, variacion: 8.4,
     franjas: [
@@ -295,6 +311,14 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const camareros = useMemo(() => filtrar(d.camareros, busq, (c) => [c.nombre]), [d.camareros, busq]);
   const cierres = useMemo(() => filtrar(d.cierres, busq, (c) => [c.cuando]), [d.cierres, busq]);
   const impuestos = useMemo(() => filtrar(d.impuestos, busq, (i) => [i.tipo]), [d.impuestos, busq]);
+  // Las formas de pago NO se filtran con el buscador de la sección: son tres filas
+  // y buscar un cierre no debe hacer desaparecer el efectivo del cuadre.
+  const pagos = d.pagos;
+  // El % de una familia se mide sobre el ranking, no sobre las ventas del día:
+  // el top es una parte de la venta, y dividir por el total daría porcentajes
+  // que no suman 100 y parecen un error de cuentas.
+  const familias = useMemo(() => filtrar(porFamilia(top), busq, (f) => [f.familia]), [top, busq]);
+  const ventaTop = top.reduce((a, t) => a + t.importe, 0);
   // El diario se deriva del periodo (mismo nº de tickets y mismo total que los KPI).
   const diarioTodo = useMemo(() => diarioDe(d.tickets, d.ventas, 1000), [d.tickets, d.ventas]);
   const diario = useMemo(
@@ -339,6 +363,18 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     { titulo: "Pax", valor: (t) => t.comensales, derecha: true },
     { titulo: "Total", valor: (t) => num(t.total), derecha: true },
   ];
+  const COL_FAMILIAS: ColumnaInforme<FilaFamilia>[] = [
+    { titulo: "Familia", valor: (f) => f.familia },
+    { titulo: "Artículos", valor: (f) => f.articulos, derecha: true },
+    { titulo: "Uds", valor: (f) => f.uds, derecha: true },
+    { titulo: "Importe", valor: (f) => num(f.importe), derecha: true },
+    { titulo: "% del total", valor: (f) => pct(f.importe, ventaTop), derecha: true },
+  ];
+  const COL_PAGOS: ColumnaInforme<typeof d.pagos[number]>[] = [
+    { titulo: "Forma de pago", valor: (p) => p.nombre },
+    { titulo: "Importe", valor: (p) => num(p.importe), derecha: true },
+    { titulo: "% del total", valor: (p) => pct(p.importe, totalPagos), derecha: true },
+  ];
   const COL_IMPUESTOS: ColumnaInforme<typeof d.impuestos[number]>[] = [
     { titulo: "Tipo", valor: (i) => i.tipo },
     { titulo: "Base imponible", valor: (i) => num(i.base), derecha: true },
@@ -351,9 +387,9 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     resumen: `${etiquetaPeriodo} · ${d.tickets} tickets`,
     diario: `${etiquetaPeriodo} · ticket a ticket`,
     ventas: `${etiquetaPeriodo} · detalle por franja`,
-    productos: `${etiquetaPeriodo} · ${d.top.length} artículos con venta`,
+    productos: `${etiquetaPeriodo} · ${d.top.length} artículos en ${porFamilia(d.top).length} familias`,
     camareros: `${etiquetaPeriodo} · rendimiento por operario`,
-    caja: "Cierres Z con su descuadre",
+    caja: `${etiquetaPeriodo} · formas de pago y cierres Z`,
     impuestos: `${etiquetaPeriodo} · desglose IGIC (Canarias)`,
   };
 
@@ -506,7 +542,7 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
       )}
 
       {seccion === "productos" && (
-        <div className="p-4">
+        <div className="space-y-3 p-4">
           <Tarjeta titulo="Ranking de artículos"
             extra={<Segmento valor={ordenProd} onCambio={setOrdenProd}
               opciones={[{ id: "importe" as const, label: "Por importe" }, { id: "uds" as const, label: "Por unidades" }]} />}>
@@ -525,6 +561,34 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
                     <td className={`${TD} text-right tabular-nums`}>{t.uds}</td>
                     <td className={`${TD} text-right font-medium tabular-nums`}>{eur(t.importe)}</td>
                     <td className={`${TD} text-right tabular-nums text-muted`}>{((t.importe / d.ventas) * 100).toFixed(1)} %</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Tarjeta>
+
+          <Tarjeta titulo="Por familia">
+            <BarraInforme titulo={`Familias y productos · ${etiquetaPeriodo}`} columnas={COL_FAMILIAS}
+              filas={familias} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Importe", valor: eur(familias.reduce((a, f) => a + f.importe, 0)) },
+                        { etiqueta: "Unidades", valor: String(familias.reduce((a, f) => a + f.uds, 0)) }]} />
+            <table className="w-full border-collapse">
+              <thead><tr><th className={TH}>Familia</th><th className={`${TH} text-right`}>Artículos</th><th className={`${TH} text-right`}>Uds</th><th className={`${TH} text-right`}>Importe</th><th className={`${TH} text-right`}>% del ranking</th></tr></thead>
+              <tbody>
+                {familias.map((f) => (
+                  <tr key={f.familia} className="border-b border-line">
+                    <td className={`${TD} font-medium`}>{f.familia}</td>
+                    <td className={`${TD} text-right tabular-nums text-muted`}>{f.articulos}</td>
+                    <td className={`${TD} text-right tabular-nums`}>{f.uds}</td>
+                    <td className={`${TD} text-right font-medium tabular-nums`}>{eur(f.importe)}</td>
+                    <td className={`${TD} text-right`}>
+                      <span className="flex items-center justify-end gap-2">
+                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-paper/10">
+                          <span className="block h-full rounded-full bg-brand" style={{ width: `${(f.importe / (ventaTop || 1)) * 100}%` }} />
+                        </span>
+                        <span className="w-11 tabular-nums text-muted">{((f.importe / (ventaTop || 1)) * 100).toFixed(1)} %</span>
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -559,7 +623,31 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
       )}
 
       {seccion === "caja" && (
-        <div className="p-4">
+        <div className="space-y-3 p-4">
+          <Tarjeta titulo="Formas de pago">
+            {/* Lo primero que se cuadra al cerrar: cuánto entró por cada vía. */}
+            <BarraInforme titulo={`Formas de pago · ${etiquetaPeriodo}`} columnas={COL_PAGOS}
+              filas={pagos} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Cobrado", valor: eur(pagos.reduce((a, p) => a + p.importe, 0)) }]} />
+            <table className="w-full border-collapse">
+              <thead><tr><th className={TH}>Forma de pago</th><th className={`${TH} text-right`}>Importe</th><th className={`${TH} text-right`}>% del total</th></tr></thead>
+              <tbody>
+                {pagos.map((p) => (
+                  <tr key={p.nombre} className="border-b border-line">
+                    <td className={`${TD} font-medium`}>{p.nombre}</td>
+                    <td className={`${TD} text-right font-medium tabular-nums`}>{eur(p.importe)}</td>
+                    <td className={`${TD} text-right tabular-nums text-muted`}>{((p.importe / totalPagos) * 100).toFixed(1)} %</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className={`${TD} font-semibold`}>Total cobrado</td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(pagos.reduce((a, p) => a + p.importe, 0))}</td>
+                  <td className={TD} />
+                </tr>
+              </tbody>
+            </table>
+          </Tarjeta>
+
           <Tarjeta titulo="Últimos cierres (Z)">
             <BarraInforme titulo="Cierres de caja (Z)" columnas={COL_CIERRES}
               filas={cierres} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
