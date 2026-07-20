@@ -14,7 +14,7 @@ import { marcharPendientes } from "./venta/ticket-impresion";
 import { VeloBloqueo } from "./VeloBloqueo";
 import { AutorizacionModal } from "./AutorizacionModal";
 import { SesionTpvProvider } from "./sesion-contexto";
-import { reducirSesion, operarioActivo, DORMIDO, type Operario } from "./sesion";
+import { reducirSesion, operarioActivo, DORMIDO, type Operario, type EstadoTerminal } from "./sesion";
 import { puede as puedeAccion, type Accion, type EstadoPerfil } from "./permisos";
 import { cargarOperarios, validarPin } from "../acceso/operarios";
 import { EQUIPO_DEMO } from "../acceso/demo";
@@ -60,17 +60,19 @@ function VistaSimple({ titulo, vista, onVista, onInicio, onConfig }: Readonly<{ 
 // La OPERATIVA: shell con la barra de estado COMÚN a todas las páginas y el rail
 // persistente. `vista` = "ticket" (venta) · "aparcado" · id de sala (plano) ·
 // "llevar" · "reservas". Catálogo y cobro demo; se cablean al nodo por fases.
-export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
+export function Tpv({ onVolver, operarioInicial }: Readonly<{ onVolver: () => void; operarioInicial?: Operario }>) {
   const [vista, setVista] = useState<string>(SALAS_DEMO[0]!.id);
   const [zurdo, setZurdo] = useState(() => (typeof localStorage !== "undefined" && localStorage.getItem("gluuh_zurdo") === "1"));
   const [modal, setModal] = useState<string | null>(null);
   const [cobrado, setCobrado] = useState<string | null>(null);
 
   // ── Sesión del terminal: quién opera, y el velo ──────────────────────────
-  // Arranca DORMIDO: al entrar al TPV se pide PIN (el login por operario ocurre
-  // AQUÍ dentro, no en la puerta del Inicio). El velo tapa la venta mientras no
-  // haya operario activo, pero la cuenta sigue viva debajo.
-  const [sesion, despachar] = useReducer(reducirSesion, DORMIDO);
+  // Hereda el operario del hub (`operarioInicial`): entras ya identificado. Si
+  // llegas sin sesión (deep-link directo al TPV), arranca DORMIDO y el velo pide
+  // PIN. El velo tapa la venta mientras no haya operario activo, pero la cuenta
+  // sigue viva debajo.
+  const inicial: EstadoTerminal = operarioInicial ? { fase: "activo", operario: operarioInicial } : DORMIDO;
+  const [sesion, despachar] = useReducer(reducirSesion, inicial);
   const activo = operarioActivo(sesion);
   const nombreOp = activo?.nombre ?? "";
   const [equipo, setEquipo] = useState<{ usuarios: Usuario[]; demo: boolean }>({ usuarios: EQUIPO_DEMO, demo: true });
