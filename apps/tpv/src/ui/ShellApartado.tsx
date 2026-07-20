@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { PanelLeftClose, Home, type LucideIcon } from "lucide-react";
+import { PanelLeftClose, Home, ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 
 // SHELL de los apartados de GESTIÓN (Análisis, Administrador, Visor Node).
 // Lenguaje "Supabase/Notion" validado en el piloto de Administrador:
@@ -18,6 +18,8 @@ export const TH = "border-b border-line px-3 py-2 text-left text-[11px] font-med
 export const TD = "px-3 py-2 text-[12.5px]";
 
 export interface SeccionShell { id: string; label: string; Icono: LucideIcon }
+/** Dominio con sus secciones (Configuración: Carta, Precios, Salas…). */
+export interface GrupoShell { titulo: string; Icono?: LucideIcon; secciones: readonly SeccionShell[] }
 
 /** Placa de marca: el SVG monocolor es BLANCO, así que necesita fondo de marca. */
 export function PlacaMarca() {
@@ -83,11 +85,14 @@ export function Segmento<T extends string>({ valor, opciones, onCambio }: Readon
 }
 
 export function ShellApartado({
-  app, secciones, seccion, onSeccion, onVolver, claveLateral, subtitulo, acciones, children,
+  app, secciones, grupos, seccion, onSeccion, onVolver, claveLateral, subtitulo, acciones, tactil, children,
 }: Readonly<{
   /** Nombre del apartado bajo "Gluuh" en la cabecera del lateral. */
   app: string;
-  secciones: readonly SeccionShell[];
+  /** Lista plana (Análisis, Administrador, Visor Node). */
+  secciones?: readonly SeccionShell[];
+  /** …o agrupada por dominios, con grupos plegables (Configuración). */
+  grupos?: readonly GrupoShell[];
   seccion: string;
   onSeccion: (id: string) => void;
   onVolver: () => void;
@@ -97,12 +102,16 @@ export function ShellApartado({
   subtitulo?: string;
   /** Controles a la derecha de la barra. */
   acciones?: ReactNode;
+  /** Se maneja con el dedo (Configuración desde el TPV): targets ≥44px. */
+  tactil?: boolean;
   children: ReactNode;
 }>) {
   const [abierto, setAbierto] = useState(() => {
     if (typeof localStorage === "undefined") return true;
     return localStorage.getItem(`gluuh_lateral_${claveLateral}`) !== "0";
   });
+  // Grupos plegados (solo en modo agrupado). Por defecto, todos abiertos.
+  const [cerrados, setCerrados] = useState<Record<string, boolean>>({});
 
   const plegar = () => setAbierto((v) => {
     const n = !v;
@@ -110,12 +119,32 @@ export function ShellApartado({
     return n;
   });
 
-  const meta = secciones.find((s) => s.id === seccion) ?? secciones[0]!;
+  // Una sola lista para resolver la sección activa, venga plana o agrupada.
+  const todas: readonly SeccionShell[] = grupos ? grupos.flatMap((g) => [...g.secciones]) : (secciones ?? []);
+  const meta = todas.find((s) => s.id === seccion) ?? todas[0]!;
+
+  // Táctil: filas y controles suben a ≥44px; ratón: densidad de consola.
+  const alturaFila = tactil ? "min-h-11" : "h-9";
+  const textoFila = tactil ? "text-[14px]" : "text-[13px]";
+  const anchoAbierto = tactil ? "w-64" : "w-56";
+
+  const fila = (s: SeccionShell) => {
+    const activa = s.id === seccion;
+    return (
+      <button key={s.id} type="button" onClick={() => onSeccion(s.id)} title={abierto ? undefined : s.label}
+        className={`flex ${alturaFila} w-full items-center gap-2.5 ${R} text-left ${textoFila} transition-colors ${
+          activa ? "bg-paper/8 font-semibold text-paper" : "font-medium text-muted"
+        } ${abierto ? "px-2.5" : "justify-center px-0"}`}>
+        <s.Icono size={tactil ? 17 : 16} className={`flex-none ${activa ? "text-brand-lit" : ""}`} />
+        {abierto && <span className="truncate">{s.label}</span>}
+      </button>
+    );
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* ── LATERAL a toda la altura: al plegar se desplazan barra y página ── */}
-      <aside className={`flex flex-none flex-col border-r border-line bg-panel transition-[width] duration-150 ${abierto ? "w-56" : "w-13"}`}>
+      <aside className={`flex flex-none flex-col border-r border-line bg-panel transition-[width] duration-150 ${abierto ? anchoAbierto : "w-13"}`}>
         <div className="flex h-15 flex-none items-center gap-2.5 border-b border-line px-3">
           {abierto ? (
             <>
@@ -139,18 +168,28 @@ export function ShellApartado({
         </div>
 
         <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
-          {secciones.map((s) => {
-            const activa = s.id === seccion;
-            return (
-              <button key={s.id} type="button" onClick={() => onSeccion(s.id)} title={abierto ? undefined : s.label}
-                className={`flex h-9 w-full items-center gap-2.5 ${R} text-left text-[13px] transition-colors ${
-                  activa ? "bg-paper/8 font-semibold text-paper" : "font-medium text-muted"
-                } ${abierto ? "px-2.5" : "justify-center px-0"}`}>
-                <s.Icono size={16} className={`flex-none ${activa ? "text-brand-lit" : ""}`} />
-                {abierto && <span className="truncate">{s.label}</span>}
-              </button>
-            );
-          })}
+          {grupos
+            ? grupos.map((g) => {
+              // Plegado: sin sitio para cabeceras de grupo, se listan seguidas.
+              if (!abierto) return g.secciones.map(fila);
+              const cerrado = !!cerrados[g.titulo];
+              const tieneActiva = g.secciones.some((s) => s.id === seccion);
+              return (
+                <div key={g.titulo} className="pb-1">
+                  <button type="button"
+                    onClick={() => setCerrados((c) => ({ ...c, [g.titulo]: !c[g.titulo] }))}
+                    className={`flex ${tactil ? "min-h-10" : "h-8"} w-full items-center gap-1.5 ${R} px-2.5 text-left text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                      tieneActiva ? "text-paper/70" : "text-muted"
+                    }`}>
+                    {cerrado ? <ChevronRight size={13} className="flex-none" /> : <ChevronDown size={13} className="flex-none" />}
+                    <span className="truncate">{g.titulo}</span>
+                    <span className="ml-auto text-[10.5px] font-medium tabular-nums opacity-70">{g.secciones.length}</span>
+                  </button>
+                  {!cerrado && <div className="space-y-0.5">{g.secciones.map(fila)}</div>}
+                </div>
+              );
+            })
+            : (secciones ?? []).map(fila)}
         </nav>
 
         <div className="flex-none border-t border-line p-2">

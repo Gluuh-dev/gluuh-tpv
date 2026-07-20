@@ -15,5 +15,5 @@ export { MarcoApartado } from "./MarcoApartado";
 // Lenguaje de los apartados de GESTIÓN (Análisis, Administrador, Visor Node).
 export {
   ShellApartado, PlacaMarca, Boton, Tarjeta, Campo, Segmento,
-  R, RC, TH, TD, type SeccionShell,
+  R, RC, TH, TD, type SeccionShell, type GrupoShell,
 } from "./ShellApartado";
