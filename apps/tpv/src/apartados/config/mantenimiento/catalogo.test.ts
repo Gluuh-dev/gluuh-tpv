@@ -49,9 +49,19 @@ describe("aArticulo", () => {
     expect(a.categorias).toEqual(["cat-1", "cat-9"]);
   });
 
-  it("una estación desconocida no rompe la ficha: cae a BARRA", () => {
-    expect(aArticulo({ ...fila, estacion: "MARCIANOS" }).estacion).toBe("BARRA");
-    expect(aArticulo({ ...fila, estacion: null }).estacion).toBe("BARRA");
+  it("respeta TODAS las estaciones del panel, también CAMARERO y NINGUNA", () => {
+    // Regresión: la lista de válidas era la de esta pantalla
+    // (BARRA/COCINA/PLANCHA), así que un artículo guardado por el panel como
+    // CAMARERO se abría como BARRA y al pulsar Aceptar se guardaba como BARRA.
+    // El dato se perdía sin que nadie viera un error.
+    for (const e of ["COCINA", "BARRA", "CAMARERO", "NINGUNA"]) {
+      expect(aArticulo({ ...fila, estacion: e }).estacion).toBe(e);
+    }
+  });
+
+  it("una estación desconocida o vacía cae a COCINA, igual que el panel", () => {
+    expect(aArticulo({ ...fila, estacion: "MARCIANOS" }).estacion).toBe("COCINA");
+    expect(aArticulo({ ...fila, estacion: null }).estacion).toBe("COCINA");
   });
 
   it("aguanta los nulos de un artículo recién creado por otra vía", () => {

@@ -51,9 +51,19 @@ const num = (v: number | string | null | undefined, pordefecto = 0): number => {
   return typeof n === "number" && Number.isFinite(n) ? n : pordefecto;
 };
 
-const ESTACIONES_VALIDAS = ["BARRA", "COCINA", "PLANCHA"] as const;
+const ESTACIONES_VALIDAS = ["COCINA", "BARRA", "CAMARERO", "NINGUNA"] as const;
+
+/**
+ * Estación de la fila, o COCINA si viene vacía (mismo criterio que el panel).
+ *
+ * ⚠ Esto ANTES normalizaba a "BARRA" cualquier valor que no conociera, y la
+ * lista de conocidos era la de esta pantalla (BARRA/COCINA/PLANCHA). Un
+ * artículo que el panel hubiera guardado como CAMARERO se abría aquí como
+ * barra, y al pulsar Aceptar se guardaba como barra: el dato se perdía sin que
+ * nadie viera un error. Ahora la lista es la MISMA que la del panel.
+ */
 const aEstacion = (v: string | null): Estacion =>
-  (ESTACIONES_VALIDAS as readonly string[]).includes(v ?? "") ? (v as Estacion) : "BARRA";
+  (ESTACIONES_VALIDAS as readonly string[]).includes(v ?? "") ? (v as Estacion) : "COCINA";
 
 /** Fila del nodo → ficha de la pantalla. */
 export function aArticulo(p: FilaProducto): Articulo {

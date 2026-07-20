@@ -9,7 +9,11 @@ import { CATEGORIAS_DEMO, PRODUCTOS_DEMO, modsDe } from "../../tpv/datos";
 // ponytail: precios y costes derivados con factores fijos, no hay tabla de
 // tarifas todavía. Cuando exista `tarifa`/`product_price`, este fichero muere.
 
-export type Estacion = "BARRA" | "COCINA" | "PLANCHA";
+// Las MISMAS que el panel (`apps/web/app/lib/estaciones.ts`), ni una más.
+// «PLANCHA» era invención de esta pantalla: no existe en la BD ni la entiende
+// el enrutado de impresión, así que un artículo guardado con ella no habría
+// salido por ninguna impresora — y sin dar ningún error.
+export type Estacion = "COCINA" | "BARRA" | "CAMARERO" | "NINGUNA";
 
 export interface FormatoVenta {
   id: string;
@@ -116,9 +120,10 @@ export const IMPUESTOS = [
 ];
 
 export const ESTACIONES: { valor: Estacion; texto: string }[] = [
-  { valor: "BARRA", texto: "Barra" },
   { valor: "COCINA", texto: "Cocina" },
-  { valor: "PLANCHA", texto: "Plancha" },
+  { valor: "BARRA", texto: "Barra" },
+  { valor: "CAMARERO", texto: "Lo prepara el camarero" },
+  { valor: "NINGUNA", texto: "No se manda a preparar" },
 ];
 
 export const ALERGENOS = [
