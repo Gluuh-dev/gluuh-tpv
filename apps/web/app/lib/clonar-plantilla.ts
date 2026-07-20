@@ -1,5 +1,6 @@
 import type { GluuhSupabaseClient, TablaPublica } from "@gluuh/supabase";
 import { randomUUID } from "node:crypto";
+import { ivaAuto } from "@gluuh/core";
 
 // Clona el CATÁLOGO de un tenant plantilla a una empresa nueva (consola de
 // plataforma, Fase 3). Server-only: recibe el cliente service-role (salta RLS).
@@ -19,6 +20,14 @@ export async function clonarCatalogo(
   admin: GluuhSupabaseClient,
   origen: string,
   destino: string,
+  /**
+   * Territorio fiscal del DESTINO. Si se pasa, cada producto clonado recalcula su
+   * `tipo_impositivo` con `ivaAuto(clase, territorio)` en vez de arrastrar el % de
+   * la plantilla. Sin esto, clonar una plantilla canaria (IGIC 7/3) a un bar
+   * peninsular deja los productos al 7 % con el local al 21 %: no da ningún error,
+   * y se descubre facturando mal.
+   */
+  territorioDestino?: string | null,
 ): Promise<void> {
   const mapF = new Map<string, string>();
   const mapC = new Map<string, string>();
@@ -48,7 +57,13 @@ export async function clonarCatalogo(
   const filasP = (prods ?? []).map((p) => {
     const id = randomUUID();
     mapP.set(p.id as string, id);
-    return { ...sinMeta(p), id, tenant_id: destino, category_id: remap(mapC, p.category_id), family_id: remap(mapF, p.family_id) };
+    const fila: Fila = { ...sinMeta(p), id, tenant_id: destino, category_id: remap(mapC, p.category_id), family_id: remap(mapF, p.family_id) };
+    // El % lo manda el territorio del destino, no el de la plantilla.
+    if (territorioDestino) {
+      const clase = typeof p.clase_fiscal === "string" ? p.clase_fiscal : "REDUCIDO";
+      fila.tipo_impositivo = ivaAuto(clase, territorioDestino);
+    }
+    return fila;
   });
   if (filasP.length) await admin.from("product").insert(filasP);
 

@@ -268,7 +268,39 @@ select nombre, codigo_instalacion from public.tenant;
 
 ---
 
-## 13 · Cosas sueltas que muerden
+## 13 · El TERRITORIO FISCAL se asumía, y el % del producto se quedaba del otro sitio
+
+**Encontrado el 20-07-2026** por `scripts/verificar-empresa.mjs`, en la primera pasada.
+
+`handle_new_user` (`0078`) creaba el `location` con `territorio_fiscal = 'PENINSULA_BALEARES'`
+**a fuego**, y la pantalla de alta **no preguntaba el territorio**. Además, el alta **clona la
+plantilla base**, cuyos 75 productos están sembrados con tipos **canarios** (GENERAL 7 %,
+REDUCIDO 3 %). Resultado en la nube, ahora mismo:
+
+> «Plantilla base»: local en `PENINSULA_BALEARES` (donde GENERAL son **21 %**) con
+> **75 de 75 productos** guardando **7 % y 3 %**. Y **cada empresa nueva heredaba el descuadre.**
+
+**Por qué es de las caras**: no da **ningún** error. Se descubre facturando mal — un bar canario
+al 21 % o uno peninsular al 7 %. Y como el `tipo_impositivo` viaja **copiado** en el producto,
+cambiar el territorio del local después **no arregla los productos ya creados**.
+
+**Cómo está resuelto** (20-07):
+- El territorio **se deduce de la dirección fiscal**, no se asume: `territorioDesdeDireccion()`
+  en `@gluuh/core` (`fiscal/tax-rates.ts`, 12 tests). Manda el **CP** (2 primeras cifras =
+  provincia: 35/38 → CANARIAS, 51/52 → CEUTA_MELILLA, 01/20/48 → FORAL_PV, 31 → FORAL_NAVARRA);
+  si no hay CP legible, el nombre de la provincia; fuera de España, `null`.
+- `crear-empresa` guarda ese territorio en el `location` del alta.
+- **`clonarCatalogo` recalcula** `tipo_impositivo` con `ivaAuto(clase, territorioDestino)`:
+  clonar una plantilla canaria a un bar peninsular ya sale bien (y al revés).
+
+**Lo que sigue pendiente**: los datos **ya creados** (plantilla y empresas existentes) siguen
+descuadrados; hay que decidir si la plantilla es canaria (cambiar su `territorio_fiscal`) o
+peninsular (recalcular sus 75 productos). Pasa `verificar-empresa.mjs` antes de dar por buena
+cualquier empresa.
+
+---
+
+## 14 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.
   La cuenta la lleva `nodo_migracion`.

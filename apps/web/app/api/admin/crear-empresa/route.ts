@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { GluuhContractDatabase, GluuhSupabaseClient, TablaPublica } from "@gluuh/supabase";
 import { randomInt } from "node:crypto";
+import { territorioDesdeDireccion } from "@gluuh/core";
 import { PERFILES_RECOMENDADOS } from "@/app/lib/permisos";
 import { hostPlataforma, mfaPlataformaInsuficiente } from "@/app/lib/plataforma";
 import { clonarCatalogo, clonarTabla } from "@/app/lib/clonar-plantilla";
@@ -64,7 +65,16 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
   // email_admin = email de CONTACTO (avisos de caducidad), no de login. El
   // trigger lo dejó con el email sintético; se sobrescribe si se indicó uno real.
   await admin.from("tenant").update(conValor({ cif: datos.cif, email_admin: datos.emailContacto, licencia_hasta: hasta, licencia_modulos: hasta ? mods : null })).eq("id", tid);
-  const loc = conValor({ direccion: datos.direccion, poblacion: datos.poblacion, provincia: datos.provincia, codigo_postal: datos.codigoPostal, telefono: datos.telefono, cif: datos.cif });
+  // El TERRITORIO FISCAL se deduce de la dirección (CP → provincia; si no, el
+  // nombre de la provincia). El trigger 0078 deja PENINSULA_BALEARES a fuego, y
+  // asumirlo es el fallo caro: un bar canario facturaría al 21 % en vez de al
+  // 7 % de IGIC sin dar ningún error. Fuera de España devuelve null → no se toca.
+  const territorio = territorioDesdeDireccion({ codigoPostal: datos.codigoPostal, provincia: datos.provincia });
+  const loc = conValor({
+    direccion: datos.direccion, poblacion: datos.poblacion, provincia: datos.provincia,
+    codigo_postal: datos.codigoPostal, telefono: datos.telefono, cif: datos.cif,
+    territorio_fiscal: territorio,
+  });
   if (Object.keys(loc).length) await admin.from("location").update(loc).eq("tenant_id", tid);
 
   // Clave técnica de la "Zona técnica" (RPC 0045); se devuelve UNA VEZ.
@@ -83,7 +93,7 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
 
   // Clonado desde la PLANTILLA BASE de lo marcado en el alta.
   const grupos = Array.isArray(datos.importar) ? datos.importar.filter((g): g is string => typeof g === "string") : [];
-  await clonarDesdePlantilla(admin, tid, grupos);
+  await clonarDesdePlantilla(admin, tid, grupos, territorio);
 
   // Formas de pago por defecto (Efectivo/Tarjeta/Bizum), SIEMPRE — como semilla, no de la
   // plantilla (0106). Va después del clonado y es idempotente: si el admin marcó "importar
@@ -102,14 +112,16 @@ async function aprovisionar(admin: Admin, tid: string, datos: {
 // Clona de la plantilla base (tenant es_plantilla) los grupos marcados: carta,
 // impuestos, formas de pago, tickets. Best-effort por grupo: un fallo no aborta
 // el alta (la empresa queda creada aunque falte un grupo).
-async function clonarDesdePlantilla(admin: Admin, tid: string, grupos: string[]): Promise<void> {
+async function clonarDesdePlantilla(admin: Admin, tid: string, grupos: string[], territorio?: string | null): Promise<void> {
   if (!grupos.length) return;
   const { data: pl } = await admin.from("tenant").select("id").eq("es_plantilla", true).maybeSingle();
   const origen = (pl as { id: string } | null)?.id;
   if (!origen || origen === tid) return;
   for (const g of grupos) {
     try {
-      if (g === "catalogo") await clonarCatalogo(admin, origen, tid);
+      // El catálogo se clona recalculando el % al territorio del destino: la
+      // plantilla puede ser de otro territorio que el bar que se da de alta.
+      if (g === "catalogo") await clonarCatalogo(admin, origen, tid, territorio);
       else {
         const tabla = TABLA_GRUPO[g];
         if (tabla) await clonarTabla(admin, tabla, origen, tid);
