@@ -17,7 +17,7 @@ import { cargarOperarios, validarPin } from "./apartados/acceso/operarios";
 import { EQUIPO_DEMO } from "./apartados/acceso/demo";
 import type { Usuario } from "./apartados/acceso/tipos";
 import { cumpleRol, TECLA_A_VISTA, type Vista, type Apartado, type Rol } from "./lib/nav";
-import { useRuta, navegar, rutaDeUrl } from "./lib/rutas";
+import { useRuta, navegar } from "./lib/rutas";
 
 // Datos DEMO. Se reemplazan por los reales del nodo (identidad del local + jornada
 // + operarios del terminal) al cablear la SPA; la forma no cambia.
@@ -60,32 +60,34 @@ export function App() {
     return !!op && cumpleRol(op.rol, ctx.requiere) && (!ctx.usuario || ctx.usuario.id === op.id);
   }
 
+  // Cambiar de vista = cambiar el estado Y la URL, en el MISMO gesto. Es lo que
+  // rompe el bucle que había: antes un efecto ponía vista según la URL y OTRO la
+  // URL según la vista, y al arrancar desincronizados (URL en /tpv, vista aún en
+  // "inicio") se pisaban en cada render leyendo el valor viejo. Ahora la URL solo
+  // la mueve una acción, nunca un efecto "de corrección".
+  const irVista = (v: Vista) => { setVista(v); navegar({ vista: v }); };
+
   // «Abrir TPV» entra DIRECTO (el login por operario ocurre dentro del TPV, por
   // acción); el resto pide credencial CADA vez.
-  const abrir = (v: Apartado) => (v === "tpv" ? setVista("tpv") : setPendiente(v));
+  const abrir = (v: Apartado) => (v === "tpv" ? irVista("tpv") : setPendiente(v));
 
   // ── La URL manda para PEDIR, nunca para entrar ────────────────────────────
-  // Escribir /admin o recargar allí pide la credencial igual que pulsar el
-  // botón. Si la URL fuera la que abre, un acceso directo se saltaría el PIN
-  // del bar: por eso lo que se renderiza sigue siendo `vista`, que solo cambia
-  // tras validar.
+  // Un ÚNICO efecto, y solo url→vista: reacciona al Atrás del navegador y al
+  // deep-link inicial. NO escribe la URL (eso lo hace `irVista`), así que no
+  // puede entrar en bucle consigo mismo. Escribir /admin o recargar allí sigue
+  // pidiendo credencial: la URL PIDE, `vista` solo cambia tras validar.
   useEffect(() => {
     if (ruta.vista === vista) return;
     if (ruta.vista === "inicio") { setVista("inicio"); setPendiente(null); return; }
     abrir(ruta.vista);
-    // `abrir` se recrea cada render y meterlo aquí relanzaría el efecto en bucle.
+    // `abrir` se recrea cada render; con él en deps el efecto se relanzaría.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ruta.vista]);
-
-  // Y al revés: lo que se está viendo se refleja en la barra de direcciones.
-  useEffect(() => {
-    if (rutaDeUrl(window.location.pathname).vista !== vista) navegar({ vista });
-  }, [vista]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (pendiente || ayuda) return; // el modal gestiona su propio teclado
-      if (e.key === "Escape") { setVista("inicio"); return; }
+      if (e.key === "Escape") { irVista("inicio"); return; }
       const v = TECLA_A_VISTA[e.key];
       if (v) { e.preventDefault(); abrir(v); }
     };
@@ -103,7 +105,7 @@ export function App() {
           // Sin pantalla de carga: el fallback es el fondo del apartado. Un
           // "Cargando…" que parpadea 80 ms es más ruido que información.
           <Suspense fallback={<div className="min-h-dvh bg-background" />}>
-            <Pantalla onVolver={() => setVista("inicio")} />
+            <Pantalla onVolver={() => irVista("inicio")} />
           </Suspense>
         )
         : (
@@ -111,7 +113,7 @@ export function App() {
             local={DEMO.local}
             turno={DEMO.turno}
             onNavegar={abrir}
-            onSalir={() => setVista("inicio")}
+            onSalir={() => irVista("inicio")}
             onAyuda={() => setAyuda(true)}
           />
         )}
@@ -126,7 +128,7 @@ export function App() {
           usuarios={equipo.usuarios}
           demo={equipo.demo}
           onValidar={validar}
-          onOk={() => { setVista(pendiente); setPendiente(null); }}
+          onOk={() => { irVista(pendiente); setPendiente(null); }}
           onCancelar={() => setPendiente(null)}
         />
       )}

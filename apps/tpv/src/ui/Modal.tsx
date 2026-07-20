@@ -46,9 +46,8 @@ export function Modal({
     const t = e.target as HTMLElement;
     const cabecera = t.closest("[data-arrastrar]");
     if (!cabecera) return;                       // solo se coge por la cabecera
-    // OJO: el velo de fuera ES un <button>, así que `closest("button")` a secas
-    // SIEMPRE encontraba algo y el arrastre no arrancaba nunca. Solo cuenta el
-    // control si está DENTRO de la cabecera (la X).
+    // Solo cuenta el control (botón, input…) si está DENTRO de la cabecera —la
+    // X—, para que arrastrar por la barra no se confunda con pulsarla.
     const control = t.closest("button, input, select, textarea, a");
     if (control && cabecera.contains(control)) return;
     origen.current = { x: e.clientX - (pos?.x ?? 0), y: e.clientY - (pos?.y ?? 0) };
@@ -82,27 +81,24 @@ export function Modal({
   };
 
   return (
-    <button
-      type="button"
-      aria-label="Cerrar"
-      className="gl-velo fixed inset-0 z-50 grid cursor-default place-items-center bg-black/25 p-4 backdrop-blur-[1.5px]"
-      onClick={cerrarFuera ? onCerrar : undefined}
-    >
-      {/*
-        `text-left` NO es decorativo: el velo de arriba es un <button>, y los
-        botones traen `text-align:center` del navegador, y eso se HEREDA hacia
-        dentro. Sin esto, cualquier celda o texto sin alineación propia sale
-        centrado (se veía en las tablas de los buscadores).
-      */}
+    <div className="gl-velo fixed inset-0 z-50 grid place-items-center bg-black/25 p-4 backdrop-blur-[1.5px]">
+      {/* El velo clicable va DETRÁS y es HERMANO del contenido, no lo envuelve.
+          Antes era un <button> que contenía todo, y los botones de dentro (una
+          lista de usuarios, la X…) quedaban «botón dentro de botón»: HTML
+          inválido y warning de hidratación de React. El cierre por teclado ya lo
+          da el Esc de arriba; esto es solo el clic fuera. */}
+      {cerrarFuera && (
+        <button type="button" aria-label="Cerrar" tabIndex={-1}
+          className="absolute inset-0 cursor-default" onClick={onCerrar} />
+      )}
       <div
         ref={caja}
         style={pos ? { transform: `translate(${pos.x}px, ${pos.y}px)` } : undefined}
-        className={`gl-aparecer w-full text-left ${ANCHOS[ancho]} rounded-md bg-panel text-paper shadow-xl ${className}`}
-        onClick={(e) => e.stopPropagation()}
+        className={`relative gl-aparecer w-full text-left ${ANCHOS[ancho]} rounded-md bg-panel text-paper shadow-xl ${className}`}
         onPointerDown={empezarArrastre}
       >
         {children}
       </div>
-    </button>
+    </div>
   );
 }
