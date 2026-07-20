@@ -18,11 +18,31 @@
 
 create table if not exists public.nodo_sync_estado (
   tabla        text primary key,
-  hasta        timestamptz,     -- todo lo anterior o igual a esto ya está en la nube
+  hasta        text,            -- todo lo anterior o igual a esto ya está en la nube
   ultimo_pase  timestamptz,
   filas_subidas bigint not null default 0,
   ultimo_error text
 );
 
+-- `hasta` era `timestamptz`, pero desde los CURSORES COMPUESTOS (0120) la marca ya
+-- no es una fecha suelta: es `{"t":<fecha>,"k":[<pk>]}` — hace falta la pk para que
+-- un lote con todas las filas al mismo microsegundo no se quede a medias.
+--
+-- Los nodos ya instalados se quedaron con la columna vieja, y CADA checkpoint del
+-- catálogo moría con «la sintaxis de entrada no es válida para tipo timestamp with
+-- time zone: {"t":…}». Sin poder guardar la marca, el catálogo no bajaba ni subía
+-- NADA — y el pase terminaba diciendo «Listo». Por eso hace falta este alter.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'nodo_sync_estado'
+       and column_name = 'hasta' and data_type <> 'text'
+  ) then
+    alter table public.nodo_sync_estado alter column hasta type text using hasta::text;
+  end if;
+end $$;
+
 comment on table public.nodo_sync_estado is
-  'Por dónde iba el sincronizador. La marca `hasta` sólo avanza cuando la nube confirma.';
+  'Por dónde iba el sincronizador. La marca `hasta` sólo avanza cuando la nube confirma. '
+  'Es TEXT: guarda el cursor compuesto {"t":fecha,"k":[pk]} (0120), o una fecha suelta si viene de antes.';
