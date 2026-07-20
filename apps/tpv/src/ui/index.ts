@@ -14,6 +14,8 @@ export { TecladoNumerico } from "./TecladoNumerico";
 export { TecladoEnPantalla, abrirTeclado, getTecladoAuto, setTecladoAuto } from "./TecladoEnPantalla";
 export { EnObras } from "./EnObras";
 export { MarcoApartado } from "./MarcoApartado";
+export { BarraInforme } from "./BarraInforme";
+export { descargarCSV, imprimirInforme, type ColumnaInforme } from "../lib/exportar";
 // Lenguaje de los apartados de GESTIÓN (Análisis, Administrador, Visor Node).
 export {
   ShellApartado, PlacaMarca, Boton, Tarjeta, Campo, Segmento,

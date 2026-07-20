@@ -1,9 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark, Download,
+  LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark,
 } from "lucide-react";
-import { ShellApartado, Boton, Tarjeta, Segmento, RC, TH, TD, type SeccionShell } from "../../ui";
+import {
+  ShellApartado, Tarjeta, Segmento, BarraInforme, RC, TH, TD,
+  type SeccionShell, type ColumnaInforme,
+} from "../../ui";
 import { eur } from "../../lib/dinero";
+
+// Los informes se descargan con el MISMO número que se ve en pantalla: los
+// importes van con coma decimal (formato español) para que Excel los sume.
+const num = (n: number) => n.toFixed(2).replace(".", ",");
+const pct = (parte: number, total: number) => `${((parte / (total || 1)) * 100).toFixed(1)} %`;
+
+/** Filtro de texto sin acentos (buscar "cana" encuentra "Caña"). */
+const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+function filtrar<T>(filas: T[], busq: string, campos: (f: T) => string[]): T[] {
+  const q = sinAcentos(busq.trim());
+  if (!q) return filas;
+  return filas.filter((f) => campos(f).some((c) => sinAcentos(c).includes(q)));
+}
 
 // ANÁLISIS — cuadro de mando del local con el lenguaje de gestión (lateral a
 // toda altura, barra de 60px, tablas densas). Datos DEMO con la forma que traerá
@@ -166,6 +182,9 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const [periodo, setPeriodo] = useState<Periodo>("hoy");
   const [seccion, setSeccion] = useState("resumen");
   const [ordenProd, setOrdenProd] = useState<"importe" | "uds">("importe");
+  // Un buscador por sección: lo que se escribe filtra la tabla Y lo que se exporta.
+  const [busq, setBusq] = useState("");
+  const irA = (s: string) => { setSeccion(s); setBusq(""); };
   const d = DEMO[periodo];
 
   const etiquetaPeriodo = PERIODOS.find((p) => p.id === periodo)?.label ?? "";
@@ -175,6 +194,49 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const cuotaTotal = d.impuestos.reduce((a, i) => a + i.cuota, 0);
   const baseTotal = d.impuestos.reduce((a, i) => a + i.base, 0);
   const porDia = periodo === "semana" || periodo === "mes";
+
+  // ── Los informes: filas ya filtradas + columnas. Las mismas columnas alimentan
+  // la tabla que se ve y el CSV/PDF que se descarga, así no pueden desfasarse.
+  const franjas = useMemo(() => filtrar(d.franjas, busq, (f) => [f.etiqueta]), [d.franjas, busq]);
+  const productos = useMemo(() => filtrar(top, busq, (t) => [t.nombre, t.familia]), [top, busq]);
+  const camareros = useMemo(() => filtrar(d.camareros, busq, (c) => [c.nombre]), [d.camareros, busq]);
+  const cierres = useMemo(() => filtrar(d.cierres, busq, (c) => [c.cuando]), [d.cierres, busq]);
+  const impuestos = useMemo(() => filtrar(d.impuestos, busq, (i) => [i.tipo]), [d.impuestos, busq]);
+
+  const COL_FRANJAS: ColumnaInforme<typeof d.franjas[number]>[] = [
+    { titulo: "Franja", valor: (f) => f.etiqueta },
+    { titulo: "Tickets", valor: (f) => f.tickets, derecha: true },
+    { titulo: "Ventas", valor: (f) => num(f.ventas), derecha: true },
+    { titulo: "Ticket medio", valor: (f) => num(f.ventas / Math.max(f.tickets, 1)), derecha: true },
+    { titulo: "% del total", valor: (f) => pct(f.ventas, d.ventas), derecha: true },
+  ];
+  const COL_PRODUCTOS: ColumnaInforme<typeof top[number]>[] = [
+    { titulo: "Artículo", valor: (t) => t.nombre },
+    { titulo: "Familia", valor: (t) => t.familia },
+    { titulo: "Uds", valor: (t) => t.uds, derecha: true },
+    { titulo: "Importe", valor: (t) => num(t.importe), derecha: true },
+    { titulo: "% del total", valor: (t) => pct(t.importe, d.ventas), derecha: true },
+  ];
+  const COL_CAMAREROS: ColumnaInforme<typeof d.camareros[number]>[] = [
+    { titulo: "Operario", valor: (c) => c.nombre },
+    { titulo: "Tickets", valor: (c) => c.tickets, derecha: true },
+    { titulo: "Ventas", valor: (c) => num(c.ventas), derecha: true },
+    { titulo: "Ticket medio", valor: (c) => num(c.ventas / Math.max(c.tickets, 1)), derecha: true },
+    { titulo: "Propinas", valor: (c) => num(c.propinas), derecha: true },
+  ];
+  const COL_CIERRES: ColumnaInforme<typeof d.cierres[number]>[] = [
+    { titulo: "Cierre", valor: (c) => c.cuando },
+    { titulo: "Ventas", valor: (c) => num(c.ventas), derecha: true },
+    { titulo: "Efectivo", valor: (c) => num(c.efectivo), derecha: true },
+    { titulo: "Tarjeta", valor: (c) => num(c.tarjeta), derecha: true },
+    { titulo: "Descuadre", valor: (c) => (Math.abs(c.descuadre) < 0.005 ? "Cuadra" : num(c.descuadre)), derecha: true },
+  ];
+  const COL_IMPUESTOS: ColumnaInforme<typeof d.impuestos[number]>[] = [
+    { titulo: "Tipo", valor: (i) => i.tipo },
+    { titulo: "Base imponible", valor: (i) => num(i.base), derecha: true },
+    { titulo: "Cuota", valor: (i) => num(i.cuota), derecha: true },
+    { titulo: "Total", valor: (i) => num(i.base + i.cuota), derecha: true },
+  ];
 
   const SUB: Record<string, string> = {
     resumen: `${etiquetaPeriodo} · ${d.tickets} tickets`,
@@ -241,11 +303,15 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
 
       {seccion === "ventas" && (
         <div className="p-4">
-          <Tarjeta titulo="Detalle por franja" extra={<Boton><Download size={14} /> Exportar</Boton>}>
+          <Tarjeta titulo="Detalle por franja">
+            <BarraInforme titulo={`Ventas por franja · ${etiquetaPeriodo}`} columnas={COL_FRANJAS}
+              filas={franjas} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Ventas", valor: eur(franjas.reduce((a, f) => a + f.ventas, 0)) },
+                        { etiqueta: "Tickets", valor: String(franjas.reduce((a, f) => a + f.tickets, 0)) }]} />
             <table className="w-full border-collapse">
               <thead><tr><th className={TH}>Franja</th><th className={`${TH} text-right`}>Tickets</th><th className={`${TH} text-right`}>Ventas</th><th className={`${TH} text-right`}>Ticket medio</th><th className={`${TH} text-right`}>% del total</th></tr></thead>
               <tbody>
-                {d.franjas.map((f) => (
+                {franjas.map((f) => (
                   <tr key={f.etiqueta} className="border-b border-line">
                     <td className={`${TD} font-medium`}>{f.etiqueta}</td>
                     <td className={`${TD} text-right tabular-nums`}>{f.tickets}</td>
@@ -256,8 +322,8 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
                 ))}
                 <tr>
                   <td className={`${TD} font-semibold`}>Total</td>
-                  <td className={`${TD} text-right font-semibold tabular-nums`}>{d.franjas.reduce((a, f) => a + f.tickets, 0)}</td>
-                  <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(d.franjas.reduce((a, f) => a + f.ventas, 0))}</td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{franjas.reduce((a, f) => a + f.tickets, 0)}</td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(franjas.reduce((a, f) => a + f.ventas, 0))}</td>
                   <td className={TD} /><td className={TD} />
                 </tr>
               </tbody>
@@ -271,10 +337,14 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
           <Tarjeta titulo="Ranking de artículos"
             extra={<Segmento valor={ordenProd} onCambio={setOrdenProd}
               opciones={[{ id: "importe" as const, label: "Por importe" }, { id: "uds" as const, label: "Por unidades" }]} />}>
+            <BarraInforme titulo={`Ranking de artículos · ${etiquetaPeriodo}`} columnas={COL_PRODUCTOS}
+              filas={productos} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Importe", valor: eur(productos.reduce((a, t) => a + t.importe, 0)) },
+                        { etiqueta: "Unidades", valor: String(productos.reduce((a, t) => a + t.uds, 0)) }]} />
             <table className="w-full border-collapse">
               <thead><tr><th className={TH}>#</th><th className={TH}>Artículo</th><th className={TH}>Familia</th><th className={`${TH} text-right`}>Uds</th><th className={`${TH} text-right`}>Importe</th><th className={`${TH} text-right`}>% del total</th></tr></thead>
               <tbody>
-                {top.map((t, i) => (
+                {productos.map((t, i) => (
                   <tr key={t.nombre} className="border-b border-line">
                     <td className={`${TD} tabular-nums text-muted`}>{i + 1}</td>
                     <td className={`${TD} font-medium`}>{t.nombre}</td>
@@ -293,10 +363,14 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
       {seccion === "camareros" && (
         <div className="p-4">
           <Tarjeta titulo="Ventas por operario">
+            <BarraInforme titulo={`Rendimiento por operario · ${etiquetaPeriodo}`} columnas={COL_CAMAREROS}
+              filas={camareros} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Ventas", valor: eur(camareros.reduce((a, c) => a + c.ventas, 0)) },
+                        { etiqueta: "Propinas", valor: eur(camareros.reduce((a, c) => a + c.propinas, 0)) }]} />
             <table className="w-full border-collapse">
               <thead><tr><th className={TH}>Operario</th><th className={`${TH} text-right`}>Tickets</th><th className={`${TH} text-right`}>Ventas</th><th className={`${TH} text-right`}>Ticket medio</th><th className={`${TH} text-right`}>Propinas</th></tr></thead>
               <tbody>
-                {d.camareros.map((c) => (
+                {camareros.map((c) => (
                   <tr key={c.nombre} className="border-b border-line">
                     <td className={`${TD} font-medium`}>{c.nombre}</td>
                     <td className={`${TD} text-right tabular-nums`}>{c.tickets}</td>
@@ -314,11 +388,15 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
       {seccion === "caja" && (
         <div className="p-4">
           <Tarjeta titulo="Últimos cierres (Z)">
-            {d.cierres.length === 0 ? <p className="py-6 text-center text-[12.5px] text-muted">Aún no hay cierres en este periodo.</p> : (
+            <BarraInforme titulo="Cierres de caja (Z)" columnas={COL_CIERRES}
+              filas={cierres} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Ventas", valor: eur(cierres.reduce((a, c) => a + c.ventas, 0)) },
+                        { etiqueta: "Descuadre", valor: eur(cierres.reduce((a, c) => a + c.descuadre, 0)) }]} />
+            {cierres.length === 0 ? <p className="py-6 text-center text-[12.5px] text-muted">Aún no hay cierres en este periodo.</p> : (
               <table className="w-full border-collapse">
                 <thead><tr><th className={TH}>Cierre</th><th className={`${TH} text-right`}>Ventas</th><th className={`${TH} text-right`}>Efectivo</th><th className={`${TH} text-right`}>Tarjeta</th><th className={`${TH} text-right`}>Descuadre</th></tr></thead>
                 <tbody>
-                  {d.cierres.map((c) => {
+                  {cierres.map((c) => {
                     const cuadra = Math.abs(c.descuadre) < 0.005;
                     return (
                       <tr key={c.cuando} className="border-b border-line">
@@ -344,10 +422,14 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
       {seccion === "impuestos" && (
         <div className="p-4">
           <Tarjeta titulo="Desglose por tipo">
+            {/* El informe que pide el gestor: base y cuota por tipo, con su periodo. */}
+            <BarraInforme titulo={`Desglose de impuestos · ${etiquetaPeriodo}`} columnas={COL_IMPUESTOS}
+              filas={impuestos} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[{ etiqueta: "Base", valor: eur(baseTotal) }, { etiqueta: "Cuota", valor: eur(cuotaTotal) }]} />
             <table className="w-full border-collapse">
               <thead><tr><th className={TH}>Tipo</th><th className={`${TH} text-right`}>Base imponible</th><th className={`${TH} text-right`}>Cuota</th><th className={`${TH} text-right`}>Total</th></tr></thead>
               <tbody>
-                {d.impuestos.map((i) => (
+                {impuestos.map((i) => (
                   <tr key={i.tipo} className="border-b border-line">
                     <td className={`${TD} font-medium`}>{i.tipo}</td>
                     <td className={`${TD} text-right tabular-nums`}>{eur(i.base)}</td>
