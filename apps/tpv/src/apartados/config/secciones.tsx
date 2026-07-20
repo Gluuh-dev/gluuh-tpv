@@ -270,7 +270,7 @@ export const GRUPOS: Grupo[] = [
     Icono: Printer,
     secciones: [
       { // ← (panel)/impresoras (tablas printer/print_route + probar)
-        id: "impresoras", titulo: "Impresoras", Icono: Printer,
+        id: "impresoras", titulo: "Impresoras", Icono: Printer, funcional: true,
         desc: "Las impresoras del local y qué imprime cada una.",
         alcance: [
           "Impresoras: nombre, papel (tickets, cocina, barra, etiquetas) e IP",
