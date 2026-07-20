@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { useRuta, navegar } from "../../lib/rutas";
 import { House, Search, Sun, Moon } from "lucide-react";
 import { ShellApartado, Tarjeta, R, type GrupoShell } from "../../ui";
 import { useTema } from "../../lib/tema";
@@ -123,7 +124,17 @@ function VistaGeneral({ onIr }: Readonly<{ onIr: (id: string) => void }>) {
 }
 
 export function Configuracion({ onVolver }: Readonly<{ onVolver: () => void }>) {
-  const [selId, setSelId] = useState<string>(GENERAL);
+  // La sección VIVE EN LA URL: `/config/impresoras` se puede dictar por teléfono,
+  // dejar como acceso directo en el terminal de cocina, y el botón Atrás hace lo
+  // que todo el mundo espera. Una sección desconocida cae a la vista general.
+  const ruta = useRuta();
+  // La vista general es `/config` a secas: no tiene por qué asomar un
+  // `__general__` en la barra de direcciones.
+  const selId = ruta.seccion && TODAS.some((s) => s.id === ruta.seccion) ? ruta.seccion : GENERAL;
+  // `reemplazar` al elegir sección: si cada clic del menú apilara historial,
+  // salir de Configuración pediría catorce veces Atrás.
+  const setSelId = (id: string) =>
+    navegar(id === GENERAL ? { vista: "config" } : { vista: "config", seccion: id }, true);
   const [q, setQ] = useState("");
 
   // El buscador FILTRA el lateral (no abre un desplegable aparte): escribes

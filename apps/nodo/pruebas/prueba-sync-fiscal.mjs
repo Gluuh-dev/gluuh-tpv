@@ -103,7 +103,12 @@ try {
 
   console.log("\n2. Sincronizar DOS veces (como si se cortara la línea y reintentara)");
   for (const pase of [1, 2]) {
-    const salida = execSync("node apps/nodo/sincronizar.mjs", { encoding: "utf8" });
+    // Se le dice cuál es su bar: con más de uno en la base (uno suelto de otra
+    // prueba) el sincronizador para en seco (fail-closed) y esto fallaba por el vecino.
+    const salida = execSync("node apps/nodo/sincronizar.mjs", {
+      encoding: "utf8",
+      env: { ...process.env, NODO_TENANT: local.tenant_id },
+    });
     const linea = (t) => (salida.split("\n").find((l) => l.includes(t)) ?? "").trim();
     console.log(`   pase ${pase}: ${linea("invoice ")} | ${linea("invoice_tax_line")} | ${linea("verifactu_record")}`);
     if (/FALLÓ/.test(salida)) {

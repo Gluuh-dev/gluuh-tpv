@@ -169,7 +169,14 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0129`.**
+**Siguiente número libre: `0130`.**
+
+- `0129` — **RESERVADA 20-07 (sesión chat, columnas de la lista estilo Glop)**:
+  `producto_carta_digital` — separa **ECOM** (pedidos por internet) de
+  **C_DIGITAL** (la carta por QR de la mesa), que en Glop son dos casillas
+  distintas y aquí estaban fundidas en `ecommerce`. Aditiva: `product.carta_digital`,
+  y se **arranca copiando** `ecommerce` para que ningún artículo que ya salía en
+  la carta QR desaparezca de ella al desplegar.
 
 - `0128` — **RESERVADA 20-07 (sesión chat, ficha de artículo del TPV nuevo)**:
   `articulo_aspecto_y_parametros` — cierra el hueco entre la ficha de artículo de

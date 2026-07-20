@@ -67,6 +67,15 @@ await bd.query(`insert into public.tenant (${cols(tFull)}) values (${ph(tFull)})
 await bd.query(`insert into public.location (${cols(lFull)}) values (${ph(lFull)}) on conflict (id) do nothing`, vals(lFull));
 
 // ── 2. Una venta CERRADA en el nodo, como si el bar estuviera sin internet ──────────
+// Se le DICE al sincronizador cuál es su bar. Si no, con más de uno en la base
+// (un bar de otra prueba que quedó suelto) para en seco — fail-closed, y bien —
+// y esta prueba fallaba por el vecino, no por lo suyo.
+const sincronizar = () =>
+  execSync("node apps/nodo/sincronizar.mjs", {
+    encoding: "utf8",
+    env: { ...process.env, NODO_TENANT: tenant.id },
+  }).trim();
+
 const clientId = crypto.randomUUID();
 const { rows: [pedido] } = await bd.query(
   `insert into public.sales_order (tenant_id, location_id, estado, total, client_id)
@@ -82,9 +91,9 @@ console.log(`Venta cerrada en el nodo: 12,50 EUR  (client_id ${clientId.slice(0,
 
 // ── 3. Sincronizar DOS VECES (como si se cortara la linea y reintentara) ────────────
 console.log("\n--- pase 1 ---");
-console.log(execSync("node apps/nodo/sincronizar.mjs", { encoding: "utf8" }).trim());
+console.log(sincronizar());
 console.log("\n--- pase 2 (el reintento) ---");
-console.log(execSync("node apps/nodo/sincronizar.mjs", { encoding: "utf8" }).trim());
+console.log(sincronizar());
 
 // ── 4. ¿Cuantas veces esta esa venta en la nube? ────────────────────────────────────
 const enNube = await nube(`sales_order?select=id,total,estado&client_id=eq.${clientId}`);

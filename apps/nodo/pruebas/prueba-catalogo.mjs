@@ -43,7 +43,12 @@ const nube = async (ruta, init) => {
 };
 
 const sincronizar = () =>
-  execFileSync("node", ["apps/nodo/sincronizar.mjs"], { encoding: "utf8" });
+  execFileSync("node", ["apps/nodo/sincronizar.mjs"], {
+    encoding: "utf8",
+    // Se le dice cuál es su bar: con otro suelto en la base el sincronizador para
+    // en seco (fail-closed) y esta prueba fallaba por el vecino, no por lo suyo.
+    env: { ...process.env, NODO_TENANT: tenantId },
+  });
 
 // El bar contra el que se prueba. Antes era `select id from tenant limit 1`: sin
 // ORDER BY y sin filtro, cogía UNO CUALQUIERA — y si el nodo tiene el tenant

@@ -54,7 +54,10 @@ export interface ParametrosArticulo {
   noImprimirSiCero: boolean;
   descripcionLibre: boolean;
   preguntarPrecio: boolean;
+  /** Se puede pedir por internet (tienda). En Glop, la columna ECOM. */
   eCommerce: boolean;
+  /** Sale en la carta por QR de la mesa. En Glop, C_DIGITAL. Son cosas distintas. */
+  cartaDigital: boolean;
   esMenuDelDia: boolean;
   alPeso: boolean;
   combinable: boolean;
@@ -66,7 +69,7 @@ export interface ParametrosArticulo {
 
 export const PARAMETROS_POR_DEFECTO: ParametrosArticulo = {
   vendible: true, controlaStock: false, noImprimirSiCero: false,
-  descripcionLibre: false, preguntarPrecio: false, eCommerce: false,
+  descripcionLibre: false, preguntarPrecio: false, eCommerce: false, cartaDigital: false,
   esMenuDelDia: false, alPeso: false, combinable: false,
   esPrincipal: true, esAnadido: false, esAlcohol: false, agotado: false,
 };

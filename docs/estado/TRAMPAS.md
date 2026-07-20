@@ -330,6 +330,20 @@ Para probar, `node scripts/sembrar-restaurante.mjs` crea uno aparte.
 
 ---
 
+## 15 bis · La SPA del TPV tiene RUTAS: quien sirva el build necesita fallback
+
+Desde que `apps/tpv` navega con rutas de verdad (`/config/productos/<id>`,
+`lib/rutas.ts`), **quien sirva `apps/tpv/dist` tiene que devolver `index.html`
+para cualquier ruta que no sea un fichero**. Sin ese fallback, entrar por un
+acceso directo o **recargar** dentro de Configuración da un 404 del servidor.
+
+Y por lo mismo, **`vite.config.ts` va con `base: "/"` y no se puede volver a
+`"./"`**: con base relativa, recargar en `/config/productos` pide los assets como
+`/config/assets/index-xxx.js` → 404 y **pantalla blanca**.
+
+Las dos muerden igual: **en dev no se ven** (Vite sirve desde la raíz y ya trae
+el fallback). Se verían en el bar, que es donde no hay nadie para diagnosticarlo.
+
 ## 15 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.

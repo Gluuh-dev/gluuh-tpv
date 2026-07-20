@@ -15,7 +15,7 @@ const fila = {
   vendido_por_peso: false, combinable: false, es_alcohol: true,
   es_principal: true, es_anadido: false,
   controla_stock: true, no_imprimir_si_cero: false, descripcion_libre: false,
-  preguntar_precio: false, ecommerce: true, es_menu_del_dia: false,
+  preguntar_precio: false, ecommerce: true, carta_digital: false, es_menu_del_dia: false,
   product_format: [
     { id: "f2", nombre: "Doble", precio: "2.60", orden: 2, coste: "0.70", raciones: "2" },
     { id: "f1", nombre: "Caña", precio: "1.40", orden: 1, coste: "0.35", raciones: "1" },
@@ -83,7 +83,10 @@ describe("aFila", () => {
     expect(f.color).toBe("#2f7fd0");
     expect(f.icono).toBe("beer");
     expect(f.controla_stock).toBe(true);
+    // ECOM y carta QR son casillas DISTINTAS (0129): un bar quiere media carta
+    // en el QR y nada en la tienda.
     expect(f.ecommerce).toBe(true);
+    expect(f.carta_digital).toBe(false);
     expect(f.es_alcohol).toBe(true);
     expect(f.tipo_impositivo).toBe(10);
   });

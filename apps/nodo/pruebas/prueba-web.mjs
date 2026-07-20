@@ -52,9 +52,26 @@ comprobar(cfgHttp.clave === cfg?.clave, "coincide con la que sirve /nodo/config"
 console.log("\n4. Con esa clave (la que usaría el navegador), ¿funciona el TPV?");
 const bd = new pg.Client({ connectionString: "postgres://postgres:gluuh@127.0.0.1:55432/gluuh" });
 await bd.connect();
+// Un operario de un bar CON CARTA. Antes era `... limit 1` a secas y salía el de la
+// PLANTILLA, que no tiene productos: «ve su carta (0 productos)» fallaba por falta de
+// datos, no porque el TPV estuviera roto.
+// (El vale solo necesita un `app_user` activo; da igual si entra por PIN o por
+// clave. Lo que importa aquí es que su bar TENGA carta.)
 const { rows: [op] } = await bd.query(
-  "select id, nombre from public.app_user where email is null and clave_hash is not null limit 1",
+  `select u.id, u.nombre
+     from public.app_user u
+     join public.tenant t on t.id = u.tenant_id
+    where u.activo
+      and coalesce(t.es_plantilla, false) = false
+      and exists (select 1 from public.product p where p.tenant_id = u.tenant_id)
+    order by u.created_at limit 1`,
 );
+if (!op) {
+  console.error("\n⚠️  No hay ningún operario en un bar CON CARTA (la plantilla no cuenta).");
+  console.error("   Crea uno:  node scripts/sembrar-restaurante.mjs");
+  await bd.end();
+  process.exit(2);
+}
 
 // Un camarero entra: el TPV valida el PIN (aquí lo damos por hecho) y canjea un vale.
 const rVale = await fetch(`${NODO}/auth/v1/vale`, {

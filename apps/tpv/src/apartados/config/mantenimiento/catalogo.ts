@@ -26,7 +26,7 @@ interface FilaProducto {
   vendido_por_peso: boolean; combinable: boolean; es_alcohol: boolean;
   es_principal: boolean; es_anadido: boolean;
   controla_stock: boolean; no_imprimir_si_cero: boolean; descripcion_libre: boolean;
-  preguntar_precio: boolean; ecommerce: boolean; es_menu_del_dia: boolean;
+  preguntar_precio: boolean; ecommerce: boolean; carta_digital: boolean; es_menu_del_dia: boolean;
   product_format: FilaFormato[] | null;
   product_category: { category_id: string }[] | null;
 }
@@ -41,7 +41,7 @@ const COLUMNAS =
   "nombre_ticket,nombre_cocina,estacion,tiempo_preparacion_min,alergenos," +
   "foto_url,color,icono,disponible,agotado_hasta,vendido_por_peso,combinable," +
   "es_alcohol,es_principal,es_anadido,controla_stock,no_imprimir_si_cero," +
-  "descripcion_libre,preguntar_precio,ecommerce,es_menu_del_dia," +
+  "descripcion_libre,preguntar_precio,ecommerce,carta_digital,es_menu_del_dia," +
   "product_format(id,nombre,precio,orden,coste,raciones)," +
   "product_category(category_id)";
 
@@ -103,6 +103,7 @@ export function aArticulo(p: FilaProducto): Articulo {
       descripcionLibre: p.descripcion_libre,
       preguntarPrecio: p.preguntar_precio,
       eCommerce: p.ecommerce,
+      cartaDigital: p.carta_digital,
       esMenuDelDia: p.es_menu_del_dia,
     },
     estacion: aEstacion(p.estacion),
@@ -153,6 +154,7 @@ export function aFila(a: Articulo): Record<string, unknown> {
     descripcion_libre: a.parametros.descripcionLibre,
     preguntar_precio: a.parametros.preguntarPrecio,
     ecommerce: a.parametros.eCommerce,
+    carta_digital: a.parametros.cartaDigital,
     es_menu_del_dia: a.parametros.esMenuDelDia,
     updated_at: new Date().toISOString(),
   };

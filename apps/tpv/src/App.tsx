@@ -12,6 +12,7 @@ import { TecladoEnPantalla } from "./ui";
 import { cargarOperarios, validarPin } from "./apartados/acceso/operarios";
 import type { Usuario } from "./apartados/acceso/tipos";
 import { cumpleRol, TECLA_A_VISTA, type Vista, type Apartado, type Rol } from "./lib/nav";
+import { useRuta, navegar, rutaDeUrl } from "./lib/rutas";
 
 // Datos DEMO. Se reemplazan por los reales del nodo (identidad del local + jornada
 // + operarios del terminal) al cablear la SPA; la forma no cambia.
@@ -37,6 +38,7 @@ const PANTALLAS: Record<Apartado, ComponentType<{ onVolver: () => void }>> = {
 
 export function App() {
   const [vista, setVista] = useState<Vista>("inicio");
+  const ruta = useRuta();
   // Apartado que se quiere abrir pero AÚN no autorizado: mientras esté aquí se
   // muestra la credencial. No guardamos "autorizado" a propósito: salir y volver
   // a entrar SIEMPRE vuelve a pedir PIN/pulsera (control de acceso del bar).
@@ -63,6 +65,24 @@ export function App() {
   // «Abrir TPV» entra DIRECTO (el login por operario ocurre dentro del TPV, por
   // acción); el resto pide credencial CADA vez.
   const abrir = (v: Apartado) => (v === "tpv" ? setVista("tpv") : setPendiente(v));
+
+  // ── La URL manda para PEDIR, nunca para entrar ────────────────────────────
+  // Escribir /admin o recargar allí pide la credencial igual que pulsar el
+  // botón. Si la URL fuera la que abre, un acceso directo se saltaría el PIN
+  // del bar: por eso lo que se renderiza sigue siendo `vista`, que solo cambia
+  // tras validar.
+  useEffect(() => {
+    if (ruta.vista === vista) return;
+    if (ruta.vista === "inicio") { setVista("inicio"); setPendiente(null); return; }
+    abrir(ruta.vista);
+    // `abrir` se recrea cada render y meterlo aquí relanzaría el efecto en bucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruta.vista]);
+
+  // Y al revés: lo que se está viendo se refleja en la barra de direcciones.
+  useEffect(() => {
+    if (rutaDeUrl(window.location.pathname).vista !== vista) navegar({ vista });
+  }, [vista]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
