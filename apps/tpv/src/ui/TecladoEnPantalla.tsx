@@ -81,7 +81,10 @@ export function TecladoEnPantalla() {
       if (!esEditable(e.target as Element)) return;
       objetivo.current = e.target as HTMLInputElement;
       refrescar();
-      if (autoRef.current) setAbierto(true); // auto-teclado: aparece al enfocar un input
+      // `data-sin-teclado` (en el input o en un ancestro) exime del auto-teclado:
+      // el sitio pone su propio botón «Teclado» y decide cuándo abrirlo. El input
+      // sigue siendo el objetivo, así que ese botón escribe donde toca.
+      if (autoRef.current && !(e.target as Element).closest("[data-sin-teclado]")) setAbierto(true);
     };
     document.addEventListener("focusin", alEnfocar);
     return () => document.removeEventListener("focusin", alEnfocar);

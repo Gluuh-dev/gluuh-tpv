@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown, Search, PlusCircle, type LucideIcon } from "lucide-react";
-import { Modal, BarraVentana } from "../../../ui";
+import { ChevronLeft, ChevronRight, ChevronDown, Search, PlusCircle, Keyboard, type LucideIcon } from "lucide-react";
+import { Modal, BarraVentana, abrirTeclado } from "../../../ui";
 
 // ============================================================================
 // MARCO DE MANTENIMIENTO — el patrón clásico de los TPV de hostelería (Ágora,
@@ -244,11 +244,21 @@ export function BuscadorRegistros({
     <Modal onCerrar={onCerrar} ancho="lg" className="overflow-hidden">
       <BarraVentana titulo={titulo} onCerrar={onCerrar} />
 
-      <div className="flex flex-col gap-3 p-4">
-        <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…"
-            className={claseEntrada(false, "pl-9")} />
+      {/* `data-sin-teclado`: aquí el teclado NO sale solo aunque el auto-teclado esté
+          activo — tapaba la lista justo al abrir la ventana. Sale con el botón. */}
+      <div data-sin-teclado className="flex flex-col gap-3 p-4">
+        <div className="flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…"
+              className={claseEntrada(false, "w-full pl-9")} />
+          </div>
+          {/* `preventDefault` en mousedown: sin esto el botón roba el foco al input
+              y el teclado se abriría sin saber dónde escribir. */}
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={abrirTeclado}
+            className="flex min-h-11 flex-none items-center gap-2 rounded-[5px] border border-line px-3 text-[13px] font-medium text-muted transition-transform active:scale-95">
+            <Keyboard size={15} /> Teclado
+          </button>
         </div>
 
         {creando && (
