@@ -260,13 +260,21 @@ if ($Parar) {
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
     Where-Object { $_.CommandLine -match 'gateway\.mjs|realtime\.mjs|media\.mjs|sincronizar\.mjs|auth\.mjs|web\.mjs' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-  Get-Process postgrest -ErrorAction SilentlyContinue | Stop-Process -Force
+  # OJO con dónde va el `-ErrorAction`: aquí estaba en **Get-Process**, no en
+  # Stop-Process. Con `$ErrorActionPreference = "Stop"` (arriba), si el proceso no
+  # se dejaba matar —«Acceso denegado», porque lo arrancó una sesión ELEVADA— el
+  # Stop-Process lanzaba EXCEPCIÓN y el script MORÍA AQUÍ MISMO: no se paraba el
+  # GoTrue viejo, ni Postgres, y el desinstalador se iba tan tranquilo dejando
+  # medio nodo vivo. Era la causa de «desinstalo Gluuh y no se paran los servicios».
+  Get-Process postgrest -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
 
   # Y el GoTrue de las versiones viejas. Ya no lo arrancamos, pero un nodo que se
   # ACTUALIZA lo tiene corriendo: si no se le mata, se queda ocupando el 55434, responde
   # al chequeo de salud (el vigilante lo da por vivo) y nuestro firmador NO PUEDE ARRANCAR.
   # El nodo se quedaría con el auth viejo para siempre, y nadie sabría por qué.
-  Get-Process gotrue -ErrorAction SilentlyContinue | Stop-Process -Force
+  Get-Process gotrue -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
 
   if ($MantenerBd) {
     Write-Host "Servicios parados (la base de datos sigue en marcha)." -ForegroundColor Yellow
@@ -278,6 +286,38 @@ if ($Parar) {
     Start-Process -FilePath "$nodo\pgsql\bin\pg_ctl.exe" `
       -ArgumentList "-D `"$nodo\pgdata`" stop -m fast" -Wait -WindowStyle Hidden
     Write-Host "Nodo parado." -ForegroundColor Yellow
+  }
+
+  # ── COMPROBAR QUE DE VERDAD SE HAN PARADO ──────────────────────────────────
+  #
+  # Todo lo de arriba usa `-ErrorAction SilentlyContinue`, así que un «Acceso
+  # denegado» NO SE VE. Y pasa de verdad: si los servicios se arrancaron desde una
+  # sesión ELEVADA (un instalador, otra consola de admin), una consola normal no
+  # puede matarlos — se los traga el silencio y aquí se decía «Nodo parado».
+  #
+  # Consecuencia real, y cara: al REINSTALAR quedan vivos los procesos VIEJOS, con
+  # el secreto JWT ANTIGUO. El nodo nuevo parece arrancar, pero PostgREST devuelve
+  # 401 a todo («None of the keys was able to decode the JWT») y el bar no puede ni
+  # leer su carta. Nadie relaciona una cosa con la otra.
+  #
+  # Así que se mira quién sigue escuchando y se dice EN ALTO.
+  # (Gateway incluido: es el que ven los TPV, y sin él no hay nodo.)
+  $puertos = @{ 55433 = "PostgREST"; 55434 = "Auth"; 55435 = "Realtime"; 54321 = "Gateway" }
+  $vivos = @()
+  foreach ($p in $puertos.Keys) {
+    $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
+    foreach ($x in $c) { $vivos += [pscustomobject]@{ Puerto = $p; Servicio = $puertos[$p]; ProcId = $x.OwningProcess } }
+  }
+  if ($vivos.Count) {
+    Write-Host ""
+    Write-Host "AVISO: hay servicios que NO se han podido parar:" -ForegroundColor Red
+    foreach ($v in $vivos) { Write-Host ("  {0,-10} puerto {1}  PID {2}" -f $v.Servicio, $v.Puerto, $v.ProcId) -ForegroundColor Red }
+    Write-Host ""
+    Write-Host "Casi siempre es que se arrancaron ELEVADOS y esta consola no lo esta." -ForegroundColor Yellow
+    Write-Host "Vuelve a lanzarlo desde PowerShell COMO ADMINISTRADOR, o reinicia el equipo." -ForegroundColor Yellow
+    Write-Host "Si se quedan vivos y reinstalas, el nodo nuevo hablara con los servicios" -ForegroundColor Yellow
+    Write-Host "VIEJOS (secreto JWT antiguo) y todo respondera 401 sin explicar por que." -ForegroundColor Yellow
+    exit 1   # que el desinstalador/instalador se entere: parar NO salio bien
   }
   return
 }
