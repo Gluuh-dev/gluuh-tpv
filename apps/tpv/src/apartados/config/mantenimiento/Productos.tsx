@@ -14,6 +14,7 @@ import {
 } from "./catalogo";
 import { duplicarArticulo } from "./duplicar";
 import { ExtrasArticulo } from "./ExtrasArticulo";
+import { StockArticulo } from "./StockArticulo";
 import {
   cargarModificadores, gruposEfectivos, guardarGruposPropios, guardarAsignacionesDeArticulo,
   modificadoresDemo,
@@ -45,7 +46,7 @@ import {
 // pierden al recargar.
 // ────────────────────────────────────────────────────────────────────────────
 
-const SUBS = ["Datos generales", "Comentarios y extras", "Categorías", "Cocina y ticket"] as const;
+const SUBS = ["Datos generales", "Comentarios y extras", "Categorías", "Stock y compras", "Cocina y ticket"] as const;
 type Sub = (typeof SUBS)[number];
 
 // «cafe» debe encontrar «Café»: fuera acentos y mayúsculas (igual que en Configuracion).
@@ -831,6 +832,11 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             grupos={gruposDelArticulo} soloLectura={ro}
             onCambiar={cambiarGrupo} onQuitarHeredado={quitarGrupo} onNuevo={nuevoGrupo}
           />
+        )}
+
+        {pestana === "Ficha" && sub === "Stock y compras" && (
+          <StockArticulo articuloId={art.id} nombre={art.nombre} real={real}
+            controlaStock={art.parametros.controlaStock} onAviso={notificar} />
         )}
 
         {pestana === "Ficha" && sub === "Categorías" && (
