@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { EnObras, Modal } from "../../ui";
 import { eur } from "../../lib/dinero";
 import { PlanoMesas } from "./PlanoMesas";
@@ -12,12 +12,23 @@ import { ClienteModal } from "./venta/ClienteModal";
 import { UtilidadesModal } from "./venta/UtilidadesModal";
 import { marcharPendientes } from "./venta/ticket-impresion";
 import { VeloBloqueo } from "./VeloBloqueo";
-import { reducirSesion, operarioActivo, DORMIDO } from "./sesion";
+import { AutorizacionModal } from "./AutorizacionModal";
+import { SesionTpvProvider } from "./sesion-contexto";
+import { reducirSesion, operarioActivo, DORMIDO, type Operario } from "./sesion";
+import { puede as puedeAccion, type Accion, type EstadoPerfil } from "./permisos";
 import { cargarOperarios, validarPin } from "../acceso/operarios";
 import { EQUIPO_DEMO } from "../acceso/demo";
 import type { Usuario } from "../acceso/tipos";
 import { useVenta } from "./store";
 import { SALAS_DEMO, type Mesa } from "./datos";
+
+// Perfil de permisos del operario, en DEMO. En real lo trae el nodo
+// (`app_user.perfil.permisos`, 0048). Aquí, para enseñar el flujo: el admin puede
+// todo; un trabajador normal no descuenta ni anula sin que un responsable autorice.
+function perfilDemo(op: Operario): EstadoPerfil {
+  if (op.rol === "admin") return { estado: "sin-perfil" };
+  return { estado: "cargado", permisos: { descuento: false, borrar: false } };
+}
 
 // Cuándo baja el velo. Valores de FÁBRICA; al cablear Configuración vendrán de
 // getSetting("tpv.bloqueo"). Default: por inactividad y botón, NO tras cada cobro
@@ -83,6 +94,20 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
       for (const ev of ["pointerdown", "keydown"] as const) window.removeEventListener(ev, rearmar);
     };
   }, [activo]);
+
+  // ── Permisos y autorización de un responsable ────────────────────────────
+  const perfil = activo ? perfilDemo(activo) : null;
+  // Acción sensible esperando el PIN de un responsable (o null si no hay ninguna).
+  const [autoriz, setAutoriz] = useState<{ accion: Accion; alConceder: () => void } | null>(null);
+  const sesionTpv = useMemo(() => ({
+    puede: (accion: Accion) => !!activo && puedeAccion(activo.rol, perfil ?? { estado: "sin-cargar" }, accion),
+    // Hace la acción si el operario puede; si no, guarda el callback y abre la
+    // puerta de autorización — la acción NO ocurre hasta que un admin mete el PIN.
+    hacer: (accion: Accion, alConceder: () => void) => {
+      if (activo && puedeAccion(activo.rol, perfil ?? { estado: "sin-cargar" }, accion)) alConceder();
+      else setAutoriz({ accion, alConceder });
+    },
+  }), [activo, perfil]);
   const iniciar = useVenta((s) => s.iniciar);
   const vaciar = useVenta((s) => s.vaciar);
   const contexto = useVenta((s) => s.contexto);
@@ -128,6 +153,7 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
   }
 
   return (
+    <SesionTpvProvider value={sesionTpv}>
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{contenido}</div>
       <BarraEstado operario={nombreOp} terminal="TERMINAL 01" contexto={contexto} zurdo={zurdo} onZurdo={cambiarZurdo}
@@ -166,6 +192,20 @@ export function Tpv({ onVolver }: Readonly<{ onVolver: () => void }>) {
           onSalir={() => { despachar({ tipo: "salir" }); onVolver(); }}
         />
       )}
+
+      {/* Autorización de un responsable para una acción que el operario no puede.
+          Al conceder, se ejecuta la acción; el operario activo NO cambia. */}
+      {autoriz && (
+        <AutorizacionModal
+          accion={autoriz.accion}
+          usuarios={equipo.usuarios}
+          demo={equipo.demo}
+          validarPin={validarPin}
+          onConcedido={() => { autoriz.alConceder(); setAutoriz(null); }}
+          onCancelar={() => setAutoriz(null)}
+        />
+      )}
     </div>
+    </SesionTpvProvider>
   );
 }

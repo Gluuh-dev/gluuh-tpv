@@ -1,5 +1,6 @@
 import { Ban, Combine, MessageSquarePlus, Gift, type LucideIcon } from "lucide-react";
 import { useVenta } from "../store";
+import { useSesionTpv } from "../sesion-contexto";
 
 function Accion({ Icono, label, disabled, onClick }: Readonly<{ Icono: LucideIcon; label: string; disabled?: boolean; onClick: () => void }>) {
   return (
@@ -15,14 +16,17 @@ function Accion({ Icono, label, disabled, onClick }: Readonly<{ Icono: LucideIco
 export function FilaAcciones({ onFuncion }: Readonly<{ onFuncion: (f: string) => void }>) {
   const lineaSel = useVenta((s) => s.lineaSel);
   const anular = useVenta((s) => s.anularLinea);
+  const { hacer } = useSesionTpv();
   const hay = !!lineaSel;
 
   return (
     <div className="flex flex-none items-stretch gap-1 px-2 pb-1">
-      <Accion Icono={Ban} label="Anular" disabled={!hay} onClick={() => lineaSel && anular(lineaSel)} />
+      {/* Anular e invitar salen dinero de la caja: si el operario no tiene el
+          permiso, `hacer` pide el PIN de un responsable antes de ejecutarlas. */}
+      <Accion Icono={Ban} label="Anular" disabled={!hay} onClick={() => lineaSel && hacer("borrar", () => anular(lineaSel))} />
       <Accion Icono={Combine} label="Comp. menú" disabled={!hay} onClick={() => onFuncion("menu")} />
       <Accion Icono={MessageSquarePlus} label="Com. y extra" disabled={!hay} onClick={() => onFuncion("extra")} />
-      <Accion Icono={Gift} label="Invitar" onClick={() => onFuncion("invitar")} />
+      <Accion Icono={Gift} label="Invitar" onClick={() => hacer("invitar", () => onFuncion("invitar"))} />
     </div>
   );
 }

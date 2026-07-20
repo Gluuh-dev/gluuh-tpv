@@ -1,6 +1,7 @@
 import { Delete, CreditCard } from "lucide-react";
 import { eur } from "../../../lib/dinero";
 import { useVenta, type ModoTeclado } from "../store";
+import { useSesionTpv } from "../sesion-contexto";
 
 const MODOS: ReadonlyArray<{ m: ModoTeclado; label: string }> = [
   { m: "UND", label: "Und." },
@@ -18,6 +19,12 @@ export function Teclado({ onCobrar }: Readonly<{ onCobrar: () => void }>) {
   const editando = useVenta((s) => s.editando);
   const pulsarDigito = useVenta((s) => s.pulsarDigito);
   const pulsarModo = useVenta((s) => s.pulsarModo);
+  const { hacer } = useSesionTpv();
+  // El descuento es una acción con permiso: si el operario no lo tiene, `hacer`
+  // pide el PIN de un responsable antes de entrar en modo DTO (no descuenta a
+  // escondidas). El resto de modos (Und/Precio) pasan directos.
+  const entrarModo = (m: ModoTeclado) =>
+    (m === "DTO%" || m === "DTO€") ? hacer("descuento", () => pulsarModo(m)) : pulsarModo(m);
   const borrar = useVenta((s) => s.borrar);
   const limpiar = useVenta((s) => s.limpiar);
   const unidades = useVenta((s) => s.unidades());
@@ -39,7 +46,7 @@ export function Teclado({ onCobrar }: Readonly<{ onCobrar: () => void }>) {
         {MODOS.map(({ m, label }) => {
           const act = m === modo && editando;
           return (
-            <button key={m} type="button" onClick={() => pulsarModo(m)}
+            <button key={m} type="button" onClick={() => entrarModo(m)}
               className={`flex-1 rounded-[10px] border text-xs font-bold transition-transform active:scale-95 ${act ? "border-brand bg-brand text-brand-foreground" : "border-border bg-surface-overlay text-foreground"}`}>
               {label}
             </button>
