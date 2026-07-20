@@ -344,6 +344,24 @@ Y por lo mismo, **`vite.config.ts` va con `base: "/"` y no se puede volver a
 Las dos muerden igual: **en dev no se ven** (Vite sirve desde la raíz y ya trae
 el fallback). Se verían en el bar, que es donde no hay nadie para diagnosticarlo.
 
+## 15 ter · En Windows, `Menus.tsx` y `menus.ts` son el MISMO fichero
+
+Ya ha pasado **tres veces** (`Ticket`, `Compras`, `Menus`): se crea la pantalla
+`Algo.tsx` y su capa de datos `algo.ts`, y TypeScript revienta con
+*«differs only in casing»*. El disco de Windows no distingue mayúsculas, así que
+para él son el mismo nombre.
+
+**Convención**: la capa de datos va en **singular** y la pantalla en plural.
+
+```
+compra.ts  + Compras.tsx      ✅
+menu.ts    + Menus.tsx        ✅
+menus.ts   + Menus.tsx        ❌ revienta
+```
+
+No se nota al escribirlo: se nota al compilar, y el mensaje habla de ficheros
+"ya incluidos" que parece que no tienen nada que ver.
+
 ## 15 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.

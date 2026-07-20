@@ -7,6 +7,7 @@ import { GRUPOS, type Seccion } from "./secciones";
 import { Productos } from "./mantenimiento/Productos";
 import { Compras } from "./mantenimiento/Compras";
 import { Impresoras } from "./mantenimiento/Impresoras";
+import { Menus } from "./mantenimiento/Menus";
 
 // CONFIGURACIÓN del TPV. El mapa de secciones vive en `secciones.tsx` (inventario
 // del panel Next); aquí se sirve con el shell de gestión, en modo TÁCTIL, porque
@@ -23,6 +24,7 @@ const PANTALLAS: Record<string, (p: Readonly<{ onSalir: () => void }>) => ReactN
   productos: Productos,
   compras: Compras,
   impresoras: Impresoras,
+  menus: Menus,
 };
 
 const GENERAL = "__general__";

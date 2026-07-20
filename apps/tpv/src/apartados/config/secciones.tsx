@@ -91,7 +91,7 @@ export const GRUPOS: Grupo[] = [
         ],
       },
       { // ← (panel)/menus
-        id: "menus", titulo: "Menús", Icono: BookOpen,
+        id: "menus", titulo: "Menús", Icono: BookOpen, funcional: true,
         desc: "Menú del día con precio cerrado.",
         alcance: [
           "Nombre, precio cerrado y clase fiscal del menú",
