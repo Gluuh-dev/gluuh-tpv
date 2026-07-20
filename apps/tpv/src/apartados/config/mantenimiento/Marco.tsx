@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Search, PlusCircle, type LucideIcon } from "lucide-react";
+import { Modal, CabeceraModal } from "../../../ui";
 
 // ============================================================================
 // MARCO DE MANTENIMIENTO — el patrón clásico de los TPV de hostelería (Ágora,
@@ -188,6 +189,128 @@ export function Selector({ id, value, onChange, disabled, children, extra = "" }
       <ChevronDown size={15} aria-hidden
         className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${disabled ? "text-muted/50" : "text-muted"}`} />
     </div>
+  );
+}
+
+/**
+ * BUSCADOR de registros (familias, categorías, tarifas…), el patrón de la lupa
+ * de Glop. Lo importante no es la búsqueda: es el botón **Nuevo**.
+ *
+ * Sin él, dar de alta un artículo cuya familia no existe obliga a: cancelar el
+ * artículo → ir a Familias → crearla → volver → empezar de cero. Con él, se crea
+ * ahí mismo y queda seleccionada al Aceptar. Es la diferencia entre meter una
+ * carta de 200 artículos de un tirón o pelearse con la pantalla.
+ *
+ * Genérico a propósito: la misma ventana vale para cualquier maestro.
+ */
+export interface RegistroBuscable { id: string; codigo?: string; nombre: string }
+
+export function BuscadorRegistros({
+  titulo, registros, seleccionado, onAceptar, onCrear, onCerrar, etiquetaNuevo = "Nueva",
+}: Readonly<{
+  titulo: string;
+  registros: readonly RegistroBuscable[];
+  seleccionado?: string;
+  onAceptar: (id: string) => void;
+  /** Crea el registro y devuelve su id; sin esto, no sale el botón «Nuevo». */
+  onCrear?: (nombre: string) => string;
+  onCerrar: () => void;
+  etiquetaNuevo?: string;
+}>) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState<string | undefined>(seleccionado);
+  const [creando, setCreando] = useState(false);
+  const [nombreNuevo, setNombreNuevo] = useState("");
+
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const nq = norm(q.trim());
+  const vistos = nq
+    ? registros.filter((r) => norm(`${r.codigo ?? ""} ${r.nombre}`).includes(nq))
+    : registros;
+
+  const crear = () => {
+    const nombre = nombreNuevo.trim();
+    if (!nombre || !onCrear) return;
+    const id = onCrear(nombre);
+    setSel(id);                    // queda elegida: es lo que venías a hacer
+    setCreando(false);
+    setNombreNuevo("");
+    setQ("");
+  };
+
+  const aceptar = () => { if (sel) { onAceptar(sel); onCerrar(); } };
+
+  return (
+    <Modal onCerrar={onCerrar} ancho="lg" className="overflow-hidden">
+      <CabeceraModal Icono={Search} titulo={titulo} tono="suave" onCerrar={onCerrar} />
+
+      <div className="flex flex-col gap-3 p-4">
+        <div className="relative">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…"
+            className={claseEntrada(false, "pl-9")} />
+        </div>
+
+        {creando && (
+          <div className="flex gap-2 rounded-[5px] border border-brand-lit/40 bg-accent-soft p-2">
+            <input autoFocus value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") crear(); }}
+              placeholder={`Nombre de la ${etiquetaNuevo.toLowerCase()}`}
+              className={claseEntrada(false, "min-w-0 flex-1")} />
+            <button type="button" onClick={crear} disabled={!nombreNuevo.trim()}
+              className="min-h-11 flex-none rounded-[5px] bg-brand px-4 text-[13px] font-semibold text-white transition-transform active:scale-95 disabled:opacity-40">
+              Crear
+            </button>
+            <button type="button" onClick={() => { setCreando(false); setNombreNuevo(""); }}
+              className="min-h-11 flex-none rounded-[5px] border border-line px-3 text-[13px] font-medium text-muted transition-transform active:scale-95">
+              Cancelar
+            </button>
+          </div>
+        )}
+
+        <div className="max-h-[46vh] min-h-40 overflow-y-auto rounded-[5px] border border-line">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:border-b [&>th]:border-line [&>th]:bg-panel [&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted">
+                <th className="w-24">Código</th><th>Descripción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vistos.map((r, i) => (
+                <tr key={r.id} onClick={() => setSel(r.id)} onDoubleClick={() => { onAceptar(r.id); onCerrar(); }}
+                  className={`cursor-pointer border-b border-line ${r.id === sel ? "bg-accent-soft" : ""}`}>
+                  <td className="px-3 py-2.5 font-mono text-[12.5px] text-muted">{r.codigo ?? i + 1}</td>
+                  <td className="px-3 py-2.5 text-[13px] font-medium">{r.nombre}</td>
+                </tr>
+              ))}
+              {vistos.length === 0 && (
+                <tr><td colSpan={2} className="px-3 py-8 text-center text-[13px] text-muted">
+                  {q ? `Nada que se llame «${q.trim()}».` : "No hay registros."}
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <footer className="flex flex-none items-center gap-2 border-t border-line px-4 py-3">
+        {onCrear && !creando && (
+          <button type="button" onClick={() => { setCreando(true); setNombreNuevo(q.trim()); }}
+            className="flex min-h-11 items-center gap-1.5 rounded-[5px] border border-line bg-panel px-3.5 text-[13px] font-medium text-paper/85 transition-transform active:scale-95">
+            <PlusCircle size={16} /> {etiquetaNuevo}
+          </button>
+        )}
+        <span className="flex-1" />
+        <button type="button" onClick={onCerrar}
+          className="min-h-11 rounded-[5px] border border-line px-4 text-[13px] font-medium text-muted transition-transform active:scale-95">
+          Cancelar
+        </button>
+        <button type="button" onClick={aceptar} disabled={!sel}
+          className="min-h-11 rounded-[5px] bg-brand px-5 text-[13px] font-semibold text-white transition-transform active:scale-95 disabled:opacity-40">
+          Aceptar
+        </button>
+      </footer>
+    </Modal>
   );
 }
 

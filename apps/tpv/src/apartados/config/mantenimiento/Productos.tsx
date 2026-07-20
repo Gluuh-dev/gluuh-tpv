@@ -8,6 +8,7 @@ import { Modal, CabeceraModal } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
+  BuscadorRegistros,
 } from "./Marco";
 import {
   ARTICULOS_DEMO, FAMILIAS, IMPUESTOS, ESTACIONES, ALERGENOS, PARAMETROS_POR_DEFECTO,
@@ -117,6 +118,21 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const [fmtSel, setFmtSel] = useState<string | null>(null);
   const [borrar, setBorrar] = useState(false);
   const [params, setParams] = useState(false);   // ventana «Parámetros del artículo»
+  const [buscaFam, setBuscaFam] = useState(false);
+  // Las familias son ESTADO, no constante: desde el buscador se pueden crear sin
+  // abandonar el artículo que estás dando de alta.
+  const [familias, setFamilias] = useState(FAMILIAS.map((f, i) => ({ ...f, codigo: String(i + 1) })));
+
+  const nombreDeFamilia = (id: string) => familias.find((f) => f.id === id)?.nombre ?? id;
+  const codigoDeFamilia = (id: string) => familias.find((f) => f.id === id)?.codigo ?? "";
+
+  const crearFamilia = (nombre: string) => {
+    const id = `fam-${Date.now().toString(36)}`;
+    const codigo = String(familias.length + 1);
+    setFamilias((fs) => [...fs, { id, nombre, codigo, color: "#64748b" }]);
+    notificar(`Familia «${nombre}» creada.`);
+    return id;
+  };
   const [aviso, setAviso] = useState("");
   const temporizador = useRef<number | undefined>(undefined);
 
@@ -127,8 +143,10 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     const nq = norm(q.trim());
     if (!nq) return articulos;
     return articulos.filter((a) =>
-      norm(`${a.codigo} ${a.nombre} ${nombreFamilia(a.familia)} ${a.barras}`).includes(nq));
-  }, [articulos, q]);
+      norm(`${a.codigo} ${a.nombre} ${nombreDeFamilia(a.familia)} ${a.barras}`).includes(nq));
+    // `familias` entra porque el nombre de la familia se busca también.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articulos, q, familias]);
 
   // Un solo temporizador vivo: si no, el de un aviso anterior borraba el nuevo
   // antes de tiempo (guardar dos veces seguidas y el segundo "OK" no se leía).
@@ -305,7 +323,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                         <td className="px-2.5 py-2 font-mono text-[13px] text-muted">{a.codigo}</td>
                         <td className="px-2.5 py-2 font-semibold">{a.nombre}</td>
                         <td className="px-2.5 py-2">
-                          <span className="rounded-full border border-line bg-panel-2 px-2.5 py-1 text-[11px] font-bold">{nombreFamilia(a.familia)}</span>
+                          <span className="rounded-full border border-line bg-panel-2 px-2.5 py-1 text-[11px] font-bold">{nombreDeFamilia(a.familia)}</span>
                         </td>
                         <td className="px-2.5 py-2 text-right font-mono">{f ? eur(f.barra) : "—"}</td>
                         <td className="px-2.5 py-2 text-right font-mono">{f ? eur(f.salon) : "—"}</td>
@@ -343,10 +361,20 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                         onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro, "min-w-0 flex-1")} />
                     </div>
                   </Campo>
+                  {/* Como en Glop: código + descripción en solo lectura y la
+                      LUPA, que además deja crear la familia sin salir de aquí. */}
                   <Campo etiqueta="Familia de venta" htmlFor="a-fam">
-                    <Selector id="a-fam" value={art.familia} disabled={ro} onChange={(v) => set("familia", v)}>
-                      {FAMILIAS.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                    </Selector>
+                    <div className="flex gap-1.5">
+                      <input value={codigoDeFamilia(art.familia)} readOnly
+                        className={claseEntrada(true, "w-16 flex-none text-center font-mono")} />
+                      <input id="a-fam" value={nombreDeFamilia(art.familia)} readOnly
+                        placeholder="Sin familia" className={claseEntrada(true, "min-w-0 flex-1")} />
+                      <button type="button" disabled={ro} onClick={() => setBuscaFam(true)}
+                        aria-label="Buscar familia de venta"
+                        className="grid min-h-11 w-11 flex-none place-items-center rounded-[5px] border border-line bg-panel text-brand-lit transition-transform active:scale-95 disabled:opacity-40">
+                        <Search size={16} />
+                      </button>
+                    </div>
                   </Campo>
                   <Campo etiqueta="Descripción para pedidos y comanda" htmlFor="a-cmd">
                     <input id="a-cmd" value={art.nombreComanda} readOnly={ro}
@@ -547,7 +575,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             <Caja crecer titulo="Categorías donde aparece" contador={art.categorias.length}>
               <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
                 <div className="flex flex-wrap gap-2">
-                  {FAMILIAS.map((c) => (
+                  {familias.map((c) => (
                     <ChipSel key={c.id} texto={c.nombre} disabled={ro}
                       activo={art.categorias.includes(c.id)} onToggle={() => alternar("categorias", c.id)} />
                   ))}
@@ -596,6 +624,18 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           </Caja>
         )}
       </MarcoMantenimiento>
+
+      {buscaFam && (
+        <BuscadorRegistros
+          titulo="Buscador de familias de venta"
+          registros={familias}
+          seleccionado={art.familia}
+          etiquetaNuevo="Nueva familia"
+          onCrear={crearFamilia}
+          onAceptar={(id) => set("familia", id)}
+          onCerrar={() => setBuscaFam(false)}
+        />
+      )}
 
       {params && (
         <Modal onCerrar={() => setParams(false)} ancho="xl">
