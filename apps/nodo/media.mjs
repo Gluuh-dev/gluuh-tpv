@@ -99,25 +99,27 @@ const servidor = http.createServer(async (req, res) => {
     const trozos = [];
     let bytes = 0;
     let excedido = false;
+    // OJO: aquí había un `break` al pasarse del tope. Salir de un `for await`
+    // DESTRUYE el stream de la petición, y con él la conexión — que es keep-alive
+    // y el gateway reutiliza. Resultado: la petición SIGUIENTE de ese TPV moría con
+    // ECONNRESET (subes una foto grande, se rechaza bien, y lo siguiente falla).
+    //
+    // Para poder responder y que la conexión siga sirviendo hay que CONSUMIR el
+    // cuerpo entero, aunque se tire. Se sigue leyendo y descartando, con un tope
+    // duro por si alguien manda sin parar: a ése sí se le corta.
+    const TOPE_DRENAJE = MAX_BYTES * 4;
     for await (const t of req) {
       bytes += t.length;
-      if (bytes > MAX_BYTES) { excedido = true; break; }
+      if (bytes > MAX_BYTES) {
+        if (!excedido) { excedido = true; trozos.length = 0; }   // lo leído ya no sirve: fuera de la RAM
+        if (bytes > TOPE_DRENAJE) { req.destroy(); break; }
+        continue;                                                 // drenar sin guardar
+      }
       trozos.push(t);
     }
     if (excedido) {
-      // ANTES aquí había un `req.destroy()`, y arrancaba el socket de cuajo. Esa
-      // conexión es KEEP-ALIVE y el gateway la reutiliza: la siguiente petición se
-      // la encontraba muerta → ECONNRESET. O sea, alguien subía una foto demasiado
-      // grande, se le rechazaba bien... y **la petición siguiente de ese TPV
-      // fallaba**, sin que nada relacionara una cosa con la otra.
-      //
-      // Para responder y que la conexión SIGA SIRVIENDO hay que consumir el resto
-      // del cuerpo: si no, quedan bytes a medio enviar y lo siguiente que llegue se
-      // interpreta como basura. Se drena con un tope — a un cliente que siga
-      // mandando sin parar sí se le corta (ahí ya no compensa cuidarle la conexión).
-      let sobra = 0;
-      req.on("data", (t) => { sobra += t.length; if (sobra > MAX_BYTES) req.destroy(); });
-      req.resume();
+      // El cuerpo ya se ha consumido entero arriba, así que se puede responder y
+      // dejar la conexión sana (antes se hacía `req.destroy()` y la envenenaba).
       res.writeHead(413, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: `demasiado grande (máx ${MAX_BYTES / 1024 / 1024} MB)` }));
       return;
