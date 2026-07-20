@@ -11,6 +11,8 @@ const fila = {
   estacion: "BARRA", tiempo_preparacion_min: 2,
   alergenos: ["gluten"],
   foto_url: null, color: "#2f7fd0", icono: "beer",
+  descripcion: "Aceituna gordal", carta_nombre: "Aceitunas",
+  product_barcode: [{ codigo: "8410000000017", principal: true }, { codigo: "8410000000024", principal: false }],
   disponible: true, agotado_hasta: null,
   vendido_por_peso: false, combinable: false, es_alcohol: true,
   es_principal: true, es_anadido: false,

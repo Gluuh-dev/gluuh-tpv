@@ -47,7 +47,7 @@ import {
 // pierden al recargar.
 // ────────────────────────────────────────────────────────────────────────────
 
-const SUBS = ["Datos generales", "Comentarios y extras", "Categorías", "Stock y compras", "Cocina y ticket"] as const;
+const SUBS = ["Datos generales", "Comentarios y extras", "Categorías", "Stock y compras", "Cocina y ticket", "Carta digital"] as const;
 type Sub = (typeof SUBS)[number];
 
 // «cafe» debe encontrar «Café»: fuera acentos y mayúsculas (igual que en Configuracion).
@@ -349,7 +349,8 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setBorrador({
       // UUID: `product.id` lo es en la BD, y un `art-0007` reventaría el alta.
       id: crypto.randomUUID(), codigo, nombre: "", nombreComanda: "", nombreTicket: "",
-      familia: FAMILIAS[0]?.id ?? "", impuesto: 10, barras: "", visible: true, alPeso: false,
+      familia: FAMILIAS[0]?.id ?? "", impuesto: 10, barras: "", barrasExtra: [],
+      descripcion: "", cartaNombre: "", visible: true, alPeso: false,
       parametros: { ...PARAMETROS_POR_DEFECTO },
       estacion: "BARRA", tiempoPrep: 1, alergenos: [], categorias: [],
       formatos: [{
@@ -710,10 +711,39 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                       {IMPUESTOS.map((i) => <option key={i.valor} value={i.valor}>{i.texto}</option>)}
                     </Selector>
                   </Campo>
-                  <Campo etiqueta="Código de barras" htmlFor="a-bar">
+                  <Campo etiqueta="Código de barras (principal)" htmlFor="a-bar">
                     <input id="a-bar" value={art.barras} readOnly={ro} inputMode="numeric"
                       onChange={(e) => set("barras", e.target.value)} className={claseEntrada(ro, "font-mono")} />
                   </Campo>
+                  {/* Códigos ADICIONALES (0135): la lata suelta y el pack, dos
+                      proveedores. El escáner reconoce todos; el principal es el
+                      que se imprime en la etiqueta. */}
+                  {(art.barrasExtra.length > 0 || !ro) && (
+                    <Campo etiqueta="Otros códigos del mismo artículo">
+                      <div className="flex flex-col gap-1.5">
+                        {art.barrasExtra.map((c, i) => (
+                          <div key={i} className="flex gap-1.5">
+                            <input value={c} readOnly={ro} inputMode="numeric" aria-label={`Código adicional ${i + 1}`}
+                              onChange={(e) => set("barrasExtra", art.barrasExtra.map((x, j) => (j === i ? e.target.value : x)))}
+                              className={claseEntrada(ro, "min-w-0 flex-1 font-mono")} />
+                            {!ro && (
+                              <button type="button" aria-label="Quitar código"
+                                onClick={() => set("barrasExtra", art.barrasExtra.filter((_, j) => j !== i))}
+                                className="grid h-11 w-11 flex-none place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-90 hover:text-danger">
+                                <X size={15} strokeWidth={2.6} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        {!ro && (
+                          <button type="button" onClick={() => set("barrasExtra", [...art.barrasExtra, ""])}
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-brand-lit text-[12.5px] font-semibold text-brand-lit transition-transform active:scale-95">
+                            <Plus size={14} /> Añadir otro código
+                          </button>
+                        )}
+                      </div>
+                    </Campo>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -853,6 +883,27 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
               </Desplazable>
             </Caja>
           </>
+        )}
+
+        {pestana === "Ficha" && sub === "Carta digital" && (
+          <Caja crecer>
+            <Desplazable className="p-3.5">
+              <Aviso>Esto es lo que ve el cliente en la carta por QR (y en la ficha del artículo). No sale en el TPV.</Aviso>
+              <div className="mt-3 grid gap-3.5">
+                <Campo etiqueta="Nombre en la carta digital" htmlFor="a-cn">
+                  <input id="a-cn" value={art.cartaNombre} readOnly={ro}
+                    placeholder={art.nombre || "Se usa el nombre normal si lo dejas vacío"}
+                    onChange={(e) => set("cartaNombre", e.target.value)} className={claseEntrada(ro)} />
+                </Campo>
+                <Campo etiqueta="Descripción" htmlFor="a-desc">
+                  <textarea id="a-desc" value={art.descripcion} readOnly={ro} rows={5}
+                    placeholder="Ingredientes, procedencia, lo que le cuentas al cliente…"
+                    onChange={(e) => set("descripcion", e.target.value)}
+                    className={claseEntrada(ro, "min-h-28 resize-y py-2 leading-relaxed")} />
+                </Campo>
+              </div>
+            </Desplazable>
+          </Caja>
         )}
 
         {pestana === "Ficha" && sub === "Cocina y ticket" && (

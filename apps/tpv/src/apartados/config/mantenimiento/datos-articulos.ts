@@ -111,7 +111,14 @@ export interface Articulo {
   familia: string;
   /** % de impuesto incluido en el PVP. */
   impuesto: number;
+  /** Código de barras PRINCIPAL (el que va en la etiqueta). */
   barras: string;
+  /** Códigos adicionales del mismo producto (la lata y el pack, dos proveedores). */
+  barrasExtra: string[];
+  /** Descripción larga (ficha y carta digital). */
+  descripcion: string;
+  /** Nombre en la carta por QR; vacío = se usa el nombre normal. */
+  cartaNombre: string;
   /** Atajo de `parametros.vendible`: se ve en la lista y en la cabecera. */
   visible: boolean;
   /** Atajo de `parametros.alPeso` (se muestra en Datos generales). */
@@ -212,6 +219,9 @@ export const ARTICULOS_DEMO: Articulo[] = PRODUCTOS_DEMO.map((p, i) => {
     familia: p.categoria,
     impuesto,
     barras: `840${String(i * 37 + 11).padStart(10, "0")}`,
+    barrasExtra: [],
+    descripcion: "",
+    cartaNombre: "",
     visible: true,
     alPeso: false,
     parametros: {

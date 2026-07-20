@@ -170,7 +170,15 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0135`.**
+**Siguiente número libre: `0136`.**
+
+- `0135` — **RESERVADA 20-07 (sesión chat, códigos de barras múltiples)**:
+  `product_barcode` — Ágora permite N códigos por artículo («el primero será el
+  principal»); nosotros teníamos un solo `product.codigo_barras`. Un mismo
+  producto llega con varios EAN (la lata suelta y el pack, o dos proveedores).
+  Tabla `product_barcode(product_id, codigo, principal)`. `codigo_barras` se
+  queda como el principal (no se rompe nada que lo lea), y se rellena la tabla
+  con los que ya hay.
 
 - `0134` — **RESERVADA 20-07 (sesión chat, opciones del artículo que faltaban)**:
   `articulo_opciones_agora` — los campos de la ficha de Ágora que no teníamos:

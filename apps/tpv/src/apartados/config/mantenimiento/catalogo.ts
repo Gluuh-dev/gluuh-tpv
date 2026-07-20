@@ -20,6 +20,8 @@ interface FilaProducto {
   estacion: string | null; tiempo_preparacion_min: number | null;
   alergenos: string[] | null;
   foto_url: string | null; color: string | null; icono: string | null;
+  descripcion: string | null; carta_nombre: string | null;
+  product_barcode: { codigo: string; principal: boolean }[] | null;
   disponible: boolean; agotado_hasta: string | null;
   vendido_por_peso: boolean; combinable: boolean; es_alcohol: boolean;
   es_principal: boolean; es_anadido: boolean;
@@ -43,8 +45,9 @@ const COLUMNAS =
   "es_alcohol,es_principal,es_anadido,controla_stock,no_imprimir_si_cero," +
   "descripcion_libre,preguntar_precio,ecommerce,carta_digital,es_menu_del_dia," +
   "solicitar_anadidos,solicitar_notas,preguntar_cantidad,es_articulo_menu,descuento_escandallo," +
+  "descripcion,carta_nombre," +
   "product_format(id,nombre,precio,orden,coste,raciones)," +
-  "product_category(category_id)";
+  "product_category(category_id),product_barcode(codigo,principal)";
 
 /** `numeric` de Postgres llega como TEXTO por JSON: sin esto los precios se suman como cadenas. */
 const num = (v: number | string | null | undefined, pordefecto = 0): number => {
@@ -91,7 +94,12 @@ export function aArticulo(p: FilaProducto): Articulo {
     nombreTicket: p.nombre_ticket ?? "",
     familia: p.family_id ?? "",
     impuesto: num(p.tipo_impositivo, 10),
-    barras: p.codigo_barras ?? "",
+    // El principal manda; si por lo que sea no está marcado ninguno, cae a la
+    // columna vieja `codigo_barras`, que es de donde salió la tabla.
+    barras: (p.product_barcode ?? []).find((b) => b.principal)?.codigo ?? p.codigo_barras ?? "",
+    barrasExtra: (p.product_barcode ?? []).filter((b) => !b.principal).map((b) => b.codigo),
+    descripcion: p.descripcion ?? "",
+    cartaNombre: p.carta_nombre ?? "",
     visible: p.disponible,
     alPeso: p.vendido_por_peso,
     parametros: {
@@ -147,6 +155,8 @@ export function aFila(a: Articulo): Record<string, unknown> {
     family_id: a.familia || null,
     plu: a.codigo || null,
     codigo_barras: a.barras || null,
+    descripcion: a.descripcion || null,
+    carta_nombre: a.cartaNombre || null,
     nombre_ticket: a.nombreTicket || null,
     nombre_cocina: a.nombreComanda || null,
     estacion: a.estacion,
@@ -232,6 +242,21 @@ export async function guardarArticulo(a: Articulo): Promise<void> {
   if (a.categorias.length > 0) {
     await escribir("product_category", "POST", a.categorias.map((c, i) => ({
       product_id: a.id, category_id: c, tenant_id, orden: i,
+    })));
+  }
+
+  // Códigos de barras (0135): se reescriben todos. El principal es `barras`; los
+  // demás, `barrasExtra`. Un código vacío no se guarda (una fila en blanco
+  // reservaría el índice único con la cadena vacía y chocaría con el siguiente).
+  await escribir(`product_barcode?product_id=eq.${a.id}`, "DELETE");
+  const codigos = [
+    ...(a.barras.trim() ? [{ codigo: a.barras.trim(), principal: true }] : []),
+    ...a.barrasExtra.map((c) => c.trim()).filter(Boolean).map((codigo) => ({ codigo, principal: false })),
+  ];
+  if (codigos.length > 0) {
+    await escribir("product_barcode", "POST", codigos.map((b) => ({
+      tenant_id, product_id: a.id, codigo: b.codigo, principal: b.principal,
+      updated_at: new Date().toISOString(),
     })));
   }
 }
