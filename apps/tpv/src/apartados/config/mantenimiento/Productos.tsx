@@ -15,7 +15,7 @@ import {
 import { duplicarArticulo } from "./duplicar";
 import { refDeArticulo, indicePorRef } from "./referencia";
 import {
-  MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
+  MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, claseEntrada,
   BuscadorRegistros,
 } from "./Marco";
 import {
@@ -374,6 +374,18 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     })();
   };
 
+  /** Alta de formato: la serie sale del MÁXIMO en uso, no de contar (ver `siguienteNumero`). */
+  const anadirFormato = () =>
+    setBorrador((b) => {
+      if (!b) return b;
+      const n = siguienteNumero(b.formatos.map((f) => Number(f.codigo.split(".")[1]) || 0));
+      return { ...b, formatos: [...b.formatos, {
+        id: crypto.randomUUID(), codigo: `${b.codigo}.${n}`, nombre: "Nuevo formato",
+        barra: 0, salon: 0, terraza: 0, barras: "", combinado: false,
+        modificable: false, raciones: 1, coste: 0,
+      }] };
+    });
+
   const marcar = (id: string) =>
     setMarcados((m) => {
       const s = new Set(m);
@@ -429,14 +441,6 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       <span className="flex-1" />
       {aviso && <span className="rounded-full bg-paper px-4 py-2 text-[12.5px] font-bold text-ink">{aviso}</span>}
       <BotonPie Icono={Keyboard} onClick={abrirTeclado}>Teclado</BotonPie>
-      {/* En consulta el pie NO dice nada: «artículo 1 de 49» no sirve para nada
-          —el contador ya está en la lista— y ocupaba sitio a los botones. El
-          aviso se reserva para cuando SÍ importa: que estás editando. */}
-      {editando && (
-        <EstadoPie editando>
-          {nuevo ? "Nuevo artículo" : `Editando · ${art.codigo}`}
-        </EstadoPie>
-      )}
       <SepPie />
       <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir} disabled={editando}>Salir</BotonPie>
     </>
@@ -612,7 +616,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
               </div>
             </Caja>
 
-            <Caja crecer titulo="Formatos de venta" contador={`${art.formatos.length} formatos`}>
+            <Caja crecer titulo="Formatos de venta" contador={`${art.formatos.length} formatos`}
+              acciones={!ro && (
+                <button type="button" onClick={anadirFormato}
+                  className="flex min-h-8 items-center gap-1.5 rounded-[5px] bg-mint px-2.5 text-[12px] font-semibold text-white transition-transform active:scale-95">
+                  <Plus size={15} strokeWidth={3} /> Añadir
+                </button>
+              )}>
               {real && (
                 <p className="flex flex-none items-center gap-2 border-b border-line bg-amber/8 px-3.5 py-2 text-[12px] font-semibold text-amber">
                   <Info size={15} className="flex-none" />
@@ -621,16 +631,17 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 </p>
               )}
               <Desplazable eje="ambos" className="border-t border-line">
-                <table className="w-full min-w-[980px] border-collapse">
+                <table className="w-full min-w-[920px] border-collapse">
                   {/* Anchos FIJOS en las numéricas: si no, la tabla reparte su
                       ancho mínimo entre todas y un precio de 4 caracteres acaba
                       en una caja de 150px. La flexible es «Formato». */}
                   <thead>
                     <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:border-b [&>th]:border-line [&>th]:bg-panel [&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted">
-                      <th className="w-20">Código</th><th className="min-w-45">Formato</th>
+                      <th className="w-20">Código</th><th className="w-52">Formato</th>
                       <th className="w-26 text-right!">Barra</th><th className="w-26 text-right!">Salón</th><th className="w-26 text-right!">Terraza</th>
                       <th className="w-24 text-center!">Combinado</th><th className="w-24 text-right!">Raciones</th>
                       <th className="w-24 text-right!">Coste</th><th className="w-20 text-right!">Margen</th>
+                      {!ro && <th className="w-12" aria-label="Quitar" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -674,35 +685,32 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                           <td className={`px-2.5 py-1 text-right font-mono text-[13px] font-semibold ${m < 55 ? "text-danger" : "text-mint"}`}>
                             {m.toFixed(0)} %
                           </td>
+                          {/* Quitar la línea DESDE la línea: con un botón único
+                              abajo había que acertar antes con la fila y luego
+                              fiarse de que la seleccionada era la que creías. */}
+                          {!ro && (
+                            <td className="px-1.5 py-1 text-center">
+                              <button type="button" aria-label={`Quitar el formato ${f.nombre}`}
+                                disabled={art.formatos.length <= 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBorrador((b) => b ? { ...b, formatos: b.formatos.filter((x) => x.id !== f.id) } : b);
+                                  if (fmtSel === f.id) setFmtSel(null);
+                                }}
+                                className="grid h-8 w-8 place-items-center rounded-[5px] text-muted transition-transform active:scale-90 hover:text-danger disabled:opacity-25">
+                                <X size={16} strokeWidth={2.6} />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </Desplazable>
-              <div className="flex flex-none items-center gap-1.5 border-t border-line bg-panel-2 px-2.5 py-2">
-                <button type="button" disabled={ro} aria-label="Añadir formato"
-                  onClick={() => setBorrador((b) => {
-                    if (!b) return b;
-                    const n = siguienteNumero(b.formatos.map((f) => Number(f.codigo.split(".")[1]) || 0));
-                    return { ...b, formatos: [...b.formatos, {
-                      id: crypto.randomUUID(), codigo: `${b.codigo}.${n}`, nombre: "Nuevo formato",
-                      barra: 0, salon: 0, terraza: 0, barras: "", combinado: false,
-                      modificable: false, raciones: 1, coste: 0,
-                    }] };
-                  })}
-                  className="grid h-11 w-13 place-items-center rounded-[5px] bg-mint text-[24px] font-extrabold text-white transition-transform active:scale-95 disabled:bg-paper/15 disabled:text-muted">
-                  <Plus size={22} strokeWidth={3} />
-                </button>
-                <button type="button" disabled={ro || !fmtSel || art.formatos.length <= 1} aria-label="Quitar el formato seleccionado"
-                  onClick={() => { setBorrador((b) => b ? { ...b, formatos: b.formatos.filter((f) => f.id !== fmtSel) } : b); setFmtSel(null); }}
-                  className="grid h-11 w-13 place-items-center rounded-[5px] bg-danger text-white transition-transform active:scale-95 disabled:bg-paper/15 disabled:text-muted">
-                  <X size={22} strokeWidth={3} />
-                </button>
-                <span className="ml-auto text-[12px] text-muted">
-                  {ro ? "Pulsa «Modificar» abajo para poder tocar los precios." : "Los precios llevan el impuesto incluido."}
-                </span>
-              </div>
+              <p className="flex-none border-t border-line bg-panel-2 px-3.5 py-1.5 text-[12px] text-muted">
+                {ro ? "Pulsa «Modificar» abajo para poder tocar los precios." : "Los precios llevan el impuesto incluido."}
+              </p>
             </Caja>
           </>
         )}

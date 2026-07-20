@@ -113,20 +113,24 @@ export function MarcoMantenimiento({
 }
 
 /** Caja de contenido: el panel con su título en versalitas y un contador opcional. */
-export function Caja({ titulo, contador, crecer, children }: Readonly<{
-  titulo?: string; contador?: ReactNode; crecer?: boolean; children: ReactNode;
+export function Caja({ titulo, contador, acciones, crecer, children }: Readonly<{
+  titulo?: string; contador?: ReactNode; acciones?: ReactNode; crecer?: boolean; children: ReactNode;
 }>) {
   return (
     <section className={`flex min-h-0 flex-col rounded-[7px] border border-line bg-panel ${crecer ? "flex-1" : "flex-none"}`}>
       {titulo && (
         // Misma cabecera que la `Tarjeta` del shell de gestión: línea inferior y
         // rótulo sobrio (no versalitas gordas), para que no parezcan dos apps.
-        <h3 className="flex flex-none items-center gap-2 border-b border-line px-4 py-2.5 text-[12.5px] font-semibold text-paper">
-          {titulo}
+        <div className="flex flex-none items-center gap-2 border-b border-line px-4 py-2 text-[12.5px] font-semibold text-paper">
+          <h3 className="text-[12.5px] font-semibold">{titulo}</h3>
           {contador !== undefined && (
-            <span className="ml-auto text-[12px] font-medium text-muted">{contador}</span>
+            <span className={`text-[12px] font-medium text-muted ${acciones ? "" : "ml-auto"}`}>{contador}</span>
           )}
-        </h3>
+          {/* Las acciones de la lista van AQUÍ, en su cabecera, no en una barra
+              fija debajo: allí ocupaban sitio a todas horas para algo que solo
+              se puede hacer mientras editas. */}
+          {acciones && <span className="ml-auto flex items-center gap-1.5">{acciones}</span>}
+        </div>
       )}
       {children}
     </section>
