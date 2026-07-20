@@ -109,13 +109,16 @@ const num = (v: number | string | null | undefined): number => {
   return typeof n === "number" && Number.isFinite(n) ? n : 0;
 };
 
+function tipoDe(g: FilaGrupo): TipoGrupo {
+  if (g.tipo === "EXTRA" || g.tipo === "COMENTARIO") return g.tipo;
+  // Sin tipo explícito lo decide el precio: si alguna opción cuesta, es un EXTRA.
+  return (g.modifier ?? []).some((m) => num(m.precio_extra) > 0) ? "EXTRA" : "COMENTARIO";
+}
+
 const aGrupo = (g: FilaGrupo): GrupoModificador => ({
   id: g.id,
   nombre: g.nombre,
-  // Sin tipo explícito lo decide el precio: si alguna opción cuesta, es un EXTRA.
-  tipo: g.tipo === "EXTRA" || g.tipo === "COMENTARIO"
-    ? g.tipo
-    : (g.modifier ?? []).some((m) => num(m.precio_extra) > 0) ? "EXTRA" : "COMENTARIO",
+  tipo: tipoDe(g),
   min: g.min_sel ?? 0,
   max: g.max_sel ?? 1,
   productId: g.product_id,
@@ -170,10 +173,8 @@ export async function guardarGruposPropios(productId: string, grupos: readonly G
   const tenant_id = bar();
   const vivos = grupos.map((g) => g.id);
 
-  await escribir(
-    `modifier_group?product_id=eq.${productId}${vivos.length ? `&id=not.in.(${vivos.join(",")})` : ""}`,
-    "DELETE",
-  );
+  const salvo = vivos.length > 0 ? `&id=not.in.(${vivos.join(",")})` : "";
+  await escribir(`modifier_group?product_id=eq.${productId}${salvo}`, "DELETE");
   if (grupos.length === 0) return;
 
   await escribir("modifier_group?on_conflict=id", "POST", grupos.map((g) => ({
@@ -195,9 +196,58 @@ export async function guardarGruposPropios(productId: string, grupos: readonly G
   }
 }
 
-/** Quita del artículo un grupo HEREDADO, sin tocar la biblioteca ni a sus hermanos. */
-export async function excluirGrupoDelArticulo(productId: string, grupoId: string): Promise<void> {
-  await escribir("modifier_group_asignacion", "POST", [{
-    tenant_id: bar(), modifier_group_id: grupoId, product_id: productId, modo: "EXCLUIR",
-  }]);
+/**
+ * Reescribe las asignaciones DEL ARTÍCULO (su nivel), sin tocar las de su
+ * familia ni las de sus categorías — que son de otros y se las cargaría.
+ *
+ * Borrar y volver a poner en vez de ir una a una: son tres o cuatro por
+ * artículo, y así quitar una exclusión es simplemente no mandarla.
+ */
+export async function guardarAsignacionesDeArticulo(
+  productId: string,
+  asignaciones: readonly Asignacion[],
+): Promise<void> {
+  const tenant_id = bar();
+  await escribir(`modifier_group_asignacion?product_id=eq.${productId}`, "DELETE");
+  const mias = asignaciones.filter((a) => a.productId === productId);
+  if (mias.length === 0) return;
+  await escribir("modifier_group_asignacion", "POST", mias.map((a) => ({
+    tenant_id, modifier_group_id: a.grupoId, product_id: productId, modo: a.modo,
+    updated_at: new Date().toISOString(),
+  })));
+}
+
+/**
+ * Grupos de EJEMPLO derivados de la carta demo, para cuando el terminal no está
+ * emparejado. Sin esto la pestaña saldría vacía y parecería rota, cuando lo que
+ * pasa es que no hay bar detrás.
+ *
+ * Los extras de un artículo se juntan en UN grupo: en la demo son una lista
+ * suelta, y el modelo real siempre agrupa.
+ */
+export function modificadoresDemo(
+  articulos: readonly {
+    id: string;
+    comentarios: readonly { id: string; nombre: string; min: number; max: number; opciones: readonly string[] }[];
+    extras: readonly { id: string; nombre: string; precio: number }[];
+  }[],
+): Modificadores {
+  const propios: GrupoModificador[] = [];
+  for (const a of articulos) {
+    for (const c of a.comentarios) {
+      propios.push({
+        id: c.id, nombre: c.nombre, tipo: "COMENTARIO", min: c.min, max: c.max,
+        productId: a.id,
+        opciones: c.opciones.map((o, i) => ({ id: `${c.id}-${i}`, nombre: o, precioExtra: 0 })),
+      });
+    }
+    if (a.extras.length > 0) {
+      propios.push({
+        id: `${a.id}-extras`, nombre: "Ingredientes extra", tipo: "EXTRA", min: 0,
+        max: a.extras.length, productId: a.id,
+        opciones: a.extras.map((x) => ({ id: x.id, nombre: x.nombre, precioExtra: x.precio })),
+      });
+    }
+  }
+  return { propios, biblioteca: [], asignaciones: [] };
 }

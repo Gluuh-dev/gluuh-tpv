@@ -13,6 +13,12 @@ import {
   cargarCatalogo, guardarArticulo, borrarArticulo, crearFamiliaEnNodo, subirFotoArticulo,
 } from "./catalogo";
 import { duplicarArticulo } from "./duplicar";
+import { ExtrasArticulo } from "./ExtrasArticulo";
+import {
+  cargarModificadores, gruposEfectivos, guardarGruposPropios, guardarAsignacionesDeArticulo,
+  modificadoresDemo,
+  type Modificadores, type GrupoModificador, type GrupoEfectivo, type TipoGrupo,
+} from "./modificadores";
 import { refDeArticulo, indicePorRef } from "./referencia";
 import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, claseEntrada,
@@ -165,6 +171,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   // ejemplo y LO DICE: datos fingidos vendidos como reales es peor que nada.
   const [real, setReal] = useState(false);
   const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set());
+  // Extras y comentarios del bar: grupos propios de cada artículo, biblioteca
+  // compartida y las asignaciones que deciden quién hereda qué.
+  const [mods, setMods] = useState<Modificadores>(() => modificadoresDemo(ARTICULOS_DEMO));
   const [guardando, setGuardando] = useState(false);
   // Las familias son ESTADO, no constante: desde el buscador se pueden crear sin
   // abandonar el artículo que estás dando de alta.
@@ -180,6 +189,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       setFamilias(c.familias);
       setReal(true);
     });
+    void cargarModificadores().then((m) => { if (vivo && m) setMods(m); });
     return () => { vivo = false; };
   }, []);
 
@@ -355,7 +365,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       if (real && ficha.foto?.startsWith("data:")) {
         listo = { ...ficha, foto: await subirFotoArticulo(ficha.id, await (await fetch(ficha.foto)).blob()) };
       }
-      if (real) await guardarArticulo(listo);
+      if (real) {
+        await guardarArticulo(listo);
+        // Los extras van DESPUÉS del artículo: si el artículo es nuevo, sus
+        // grupos tienen una FK a una fila que aún no existía.
+        await guardarGruposPropios(listo.id, mods.propios.filter((g) => g.productId === listo.id));
+        await guardarAsignacionesDeArticulo(listo.id, mods.asignaciones);
+      }
 
       setArticulos((as) => (esNuevo ? [...as, listo] : as.map((a) => (a.id === listo.id ? listo : a))));
       if (esNuevo) abrirArticulo(refDeArticulo(listo));
@@ -431,6 +447,55 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         modificable: false, raciones: 1, coste: 0,
       }] };
     });
+
+  // Los grupos que de verdad se le ofrecen al camarero para ESTE artículo:
+  // los suyos más los que hereda de su familia y sus categorías.
+  const gruposDelArticulo: GrupoEfectivo[] = useMemo(
+    () => art ? gruposEfectivos(
+      { id: art.id, familia: art.familia || null, categorias: art.categorias },
+      mods.propios, mods.biblioteca, mods.asignaciones,
+    ) : [],
+    [art, mods],
+  );
+
+  /** Cambia un grupo propio. Pasa por `editar`, así que entra en el deshacer. */
+  const cambiarGrupo = (id: string, cambio: (g: GrupoModificador) => GrupoModificador) => {
+    setMods((m) => ({ ...m, propios: m.propios.map((g) => (g.id === id ? cambio(g) : g)) }));
+    editar((b) => b);   // marca la ficha como tocada
+  };
+
+  const nuevoGrupo = (tipo: TipoGrupo) => {
+    if (!borrador) return;
+    const g: GrupoModificador = {
+      id: crypto.randomUUID(),
+      nombre: tipo === "EXTRA" ? "Nuevos extras" : "Nuevo comentario",
+      tipo, min: 0, max: 1, opciones: [], productId: borrador.id,
+    };
+    setMods((m) => ({ ...m, propios: [...m.propios, g] }));
+    editar((b) => b);
+  };
+
+  /**
+   * Quitar. Son DOS cosas distintas y por eso no se puede tratar igual:
+   *  · propio    → se borra, y desaparece del todo;
+   *  · heredado  → NO se borra (es de la familia y lo usan sus hermanos): se le
+   *                pone una EXCLUSIÓN a este artículo.
+   */
+  const quitarGrupo = (g: GrupoEfectivo) => {
+    if (!borrador) return;
+    if (g.origen === "propio") {
+      setMods((m) => ({ ...m, propios: m.propios.filter((x) => x.id !== g.id) }));
+    } else {
+      setMods((m) => ({
+        ...m,
+        asignaciones: [
+          ...m.asignaciones.filter((a) => !(a.productId === borrador.id && a.grupoId === g.id)),
+          { grupoId: g.id, familyId: null, categoryId: null, productId: borrador.id, modo: "EXCLUIR" },
+        ],
+      }));
+    }
+    editar((b) => b);
+  };
 
   const marcar = (id: string) =>
     setMarcados((m) => {
@@ -765,63 +830,10 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         )}
 
         {pestana === "Ficha" && sub === "Comentarios y extras" && (
-          <>
-            <Aviso>
-              Esto es lo que verá el camarero al vender el artículo. Un extra a 0,00 € no cobra
-              nada: solo sale impreso en la comanda.
-            </Aviso>
-            <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-2">
-              <Caja crecer titulo="Grupos de comentarios" contador={art.comentarios.length}>
-                <Desplazable className="flex flex-col gap-1.5 px-2.5 pb-2.5">
-                  {art.comentarios.map((g) => (
-                    <div key={g.id} className="flex items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 py-2.5">
-                      <span className="min-w-0 flex-1">
-                        <b className="block truncate text-[13.5px] font-bold">{g.nombre}</b>
-                        <span className="block truncate text-[11.5px] text-muted">{g.opciones.join(" · ")}</span>
-                      </span>
-                      <button type="button" disabled={ro} aria-label={`Quitar ${g.nombre}`}
-                        onClick={() => set("comentarios", art.comentarios.filter((x) => x.id !== g.id))}
-                        className="grid h-9.5 w-9.5 flex-none place-items-center rounded-[5px] border border-line text-danger transition-transform active:scale-90 disabled:opacity-35">
-                        <X size={16} strokeWidth={2.6} />
-                      </button>
-                    </div>
-                  ))}
-                  {art.comentarios.length === 0 && (
-                    <p className="px-1 py-4 text-[13px] text-muted">Sin grupos de comentarios.</p>
-                  )}
-                </Desplazable>
-                <button type="button" disabled={ro}
-                  className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-[6px] border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
-                  <Plus size={16} /> Añadir grupo de comentarios
-                </button>
-              </Caja>
-
-              <Caja crecer titulo="Ingredientes extra" contador={art.extras.length}>
-                <Desplazable className="flex flex-col gap-1.5 px-2.5 pb-2.5">
-                  {art.extras.map((x) => (
-                    <div key={x.id} className="flex items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 py-2.5">
-                      <b className="min-w-0 flex-1 truncate text-[13.5px] font-bold">{x.nombre}</b>
-                      <span className={`min-w-[76px] text-right font-mono text-[13px] font-extrabold ${x.precio > 0 ? "text-cobro" : "text-mint"}`}>
-                        {x.precio > 0 ? eur(x.precio) : "Gratis"}
-                      </span>
-                      <button type="button" disabled={ro} aria-label={`Quitar ${x.nombre}`}
-                        onClick={() => set("extras", art.extras.filter((e) => e.id !== x.id))}
-                        className="grid h-9.5 w-9.5 flex-none place-items-center rounded-[5px] border border-line text-danger transition-transform active:scale-90 disabled:opacity-35">
-                        <X size={16} strokeWidth={2.6} />
-                      </button>
-                    </div>
-                  ))}
-                  {art.extras.length === 0 && (
-                    <p className="px-1 py-4 text-[13px] text-muted">Sin ingredientes extra.</p>
-                  )}
-                </Desplazable>
-                <button type="button" disabled={ro}
-                  className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-[6px] border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
-                  <Plus size={16} /> Añadir ingrediente extra
-                </button>
-              </Caja>
-            </div>
-          </>
+          <ExtrasArticulo
+            grupos={gruposDelArticulo} soloLectura={ro} real={real}
+            onCambiar={cambiarGrupo} onQuitarHeredado={quitarGrupo} onNuevo={nuevoGrupo}
+          />
         )}
 
         {pestana === "Ficha" && sub === "Categorías" && (
