@@ -37,16 +37,16 @@ export function MarcoMantenimiento({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* ── Pestañas principales ── */}
-      <div role="tablist" className="flex flex-none gap-0.5 border-b border-line bg-ink-2/40 px-3">
+      <div role="tablist" className="flex flex-none gap-0.5 border-b border-line bg-background px-3">
         {pestanas.map((p) => {
           const on = p === pestana;
           return (
             <button
               key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
-              className={`-mb-px mt-1.5 flex min-h-11.5 items-center rounded-t-lg border px-7 text-[14.5px] transition-transform active:scale-[.98] ${
+              className={`-mb-px mt-1.5 flex min-h-11.5 items-center rounded-t-[6px] border px-5 text-[13.5px] transition-transform active:scale-[.98] ${
                 on
-                  ? "border-line border-b-panel bg-panel font-extrabold text-brand-lit"
-                  : "border-transparent font-semibold text-muted"
+                  ? "border-line border-b-panel bg-panel font-semibold text-paper"
+                  : "border-transparent font-medium text-muted"
               }`}
             >
               {p}
@@ -64,8 +64,8 @@ export function MarcoMantenimiento({
               return (
                 <button
                   key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
-                  className={`flex min-h-11 flex-none items-center whitespace-nowrap border-b-[3px] px-4 text-[11.5px] font-extrabold uppercase tracking-wider transition-transform active:scale-[.98] ${
-                    on ? "border-brand-lit bg-accent-soft text-brand-lit" : "border-transparent text-muted"
+                  className={`flex min-h-11 flex-none items-center whitespace-nowrap border-b-2 px-4 text-[11px] font-semibold uppercase tracking-wide transition-transform active:scale-[.98] ${
+                    on ? "border-brand-lit text-paper" : "border-transparent text-muted"
                   }`}
                 >
                   {s}
@@ -75,11 +75,11 @@ export function MarcoMantenimiento({
           </div>
           <div className="flex flex-none gap-1 p-1">
             <button type="button" aria-label="Pestaña anterior" onClick={() => desplazar(-1)}
-              className="grid h-9.5 w-9.5 place-items-center rounded-md border border-line text-brand-lit transition-transform active:scale-95">
+              className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
               <ChevronLeft size={16} strokeWidth={2.6} />
             </button>
             <button type="button" aria-label="Pestaña siguiente" onClick={() => desplazar(1)}
-              className="grid h-9.5 w-9.5 place-items-center rounded-md border border-line text-brand-lit transition-transform active:scale-95">
+              className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
               <ChevronRight size={16} strokeWidth={2.6} />
             </button>
           </div>
@@ -102,12 +102,14 @@ export function Caja({ titulo, contador, crecer, children }: Readonly<{
   titulo?: string; contador?: ReactNode; crecer?: boolean; children: ReactNode;
 }>) {
   return (
-    <section className={`flex min-h-0 flex-col rounded-xl border border-line bg-panel ${crecer ? "flex-1" : "flex-none"}`}>
+    <section className={`flex min-h-0 flex-col rounded-[7px] border border-line bg-panel ${crecer ? "flex-1" : "flex-none"}`}>
       {titulo && (
-        <h3 className="flex flex-none items-center gap-2 px-3.5 pb-2 pt-3 text-[11.5px] font-extrabold uppercase tracking-[.07em] text-muted">
+        // Misma cabecera que la `Tarjeta` del shell de gestión: línea inferior y
+        // rótulo sobrio (no versalitas gordas), para que no parezcan dos apps.
+        <h3 className="flex flex-none items-center gap-2 border-b border-line px-4 py-2.5 text-[12.5px] font-semibold text-paper">
           {titulo}
           {contador !== undefined && (
-            <span className="ml-auto text-[12.5px] font-semibold normal-case tracking-normal text-paper/70">{contador}</span>
+            <span className="ml-auto text-[12px] font-medium text-muted">{contador}</span>
           )}
         </h3>
       )}
@@ -122,7 +124,7 @@ export function Campo({ etiqueta, htmlFor, children }: Readonly<{
 }>) {
   return (
     <div className="mb-2.5 last:mb-0">
-      <label htmlFor={htmlFor} className="mb-1 block text-[12px] font-semibold text-paper/70">{etiqueta}</label>
+      <label htmlFor={htmlFor} className="mb-1 block text-[11.5px] font-medium text-muted">{etiqueta}</label>
       {children}
     </div>
   );
@@ -134,13 +136,16 @@ export function Campo({ etiqueta, htmlFor, children }: Readonly<{
  * `min-h-10` en `extra`, porque entre dos utilidades de la misma propiedad gana
  * el orden de la hoja generada, no el del atributo class.
  */
+// La ALTURA se queda táctil (44px / 40px en celda): aquí se toca con el dedo.
+// Lo que baja es el peso visual (radio, tipografía, grosor) para casar con el
+// resto de la gestión.
 export const claseEntrada = (soloLectura?: boolean, extra = "", compacta = false) =>
-  `w-full rounded-md border px-2.5 font-semibold outline-none transition-colors ${
-    compacta ? "min-h-10 text-[13.5px]" : "min-h-11 text-[14.5px]"
+  `w-full rounded-[5px] border px-2.5 font-medium outline-none transition-colors ${
+    compacta ? "min-h-10 text-[13px]" : "min-h-11 text-[13.5px]"
   } ${
     soloLectura
-      ? "border-line bg-paper/[.04] font-medium text-paper/70"
-      : "border-line bg-panel-2 text-paper focus:border-brand-lit"
+      ? "border-line bg-paper/3 text-muted"
+      : "border-line bg-background text-paper focus:border-brand-lit"
   } ${extra}`;
 
 /** Botón de la barra inferior: icono grande arriba, rótulo debajo. */
@@ -152,8 +157,8 @@ export function BotonPie({ Icono, children, tono = "marca", onClick, disabled }:
   const color = { marca: "text-brand-lit", ok: "text-mint", no: "text-danger", neutro: "text-muted" }[tono];
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className="flex min-h-16 min-w-[74px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[11.5px] font-semibold text-paper/80 transition-transform active:scale-95 disabled:opacity-35">
-      <Icono size={22} strokeWidth={1.9} className={disabled ? "text-muted" : color} />
+      className="flex min-h-15 min-w-17.5 flex-col items-center justify-center gap-1 rounded-[6px] px-2 py-1.5 text-[11px] font-medium text-paper/80 transition-transform active:scale-95 disabled:opacity-35">
+      <Icono size={19} strokeWidth={2} className={disabled ? "text-muted" : color} />
       {children}
     </button>
   );
@@ -166,10 +171,10 @@ export function SepPie() {
 /** Píldora de estado a la derecha de la barra: qué modo y qué registro. */
 export function EstadoPie({ editando, children }: Readonly<{ editando?: boolean; children: ReactNode }>) {
   return (
-    <span className={`flex items-center gap-2 rounded-full border px-3.5 py-2 text-[12.5px] font-bold ${
-      editando ? "border-amber/40 bg-amber/10 text-amber" : "border-line bg-paper/5 text-paper/70"
+    <span className={`flex items-center gap-2 rounded-[5px] border px-3 py-1.5 text-[12px] font-medium ${
+      editando ? "border-amber/40 bg-amber/10 text-paper" : "border-line bg-paper/3 text-muted"
     }`}>
-      <span className={`h-2.5 w-2.5 rounded-full ${editando ? "bg-amber" : "bg-muted"}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${editando ? "bg-amber" : "bg-muted"}`} />
       {children}
     </span>
   );

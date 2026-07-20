@@ -40,7 +40,7 @@ function Interruptor({ activo, etiqueta, onToggle, disabled }: Readonly<{
 }>) {
   return (
     <button type="button" aria-pressed={activo} disabled={disabled} onClick={onToggle}
-      className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-md border border-line bg-panel-2 px-3 text-[12.5px] font-bold text-paper/80 transition-transform active:scale-[.98] disabled:opacity-60">
+      className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-[5px] border border-line bg-panel-2 px-3 text-[12.5px] font-bold text-paper/80 transition-transform active:scale-[.98] disabled:opacity-60">
       {etiqueta}
       <span className={`relative h-5.5 w-9.5 flex-none rounded-full transition-colors ${activo ? "bg-mint" : "bg-paper/20"}`}>
         <i className={`absolute top-[3px] h-4 w-4 rounded-full bg-white transition-[left] ${activo ? "left-[19px]" : "left-[3px]"}`} />
@@ -66,7 +66,7 @@ function ChipSel({ texto, activo, onToggle, disabled }: Readonly<{
 
 function Aviso({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <p className="flex flex-none items-center gap-2.5 rounded-lg border border-brand-lit/25 bg-accent-soft px-3.5 py-3 text-[13px] font-semibold leading-snug text-brand-lit">
+    <p className="flex flex-none items-center gap-2.5 rounded-[6px] border border-brand-lit/25 bg-accent-soft px-3.5 py-3 text-[13px] font-semibold leading-snug text-brand-lit">
       <Info size={18} className="flex-none" />
       {children}
     </p>
@@ -323,9 +323,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="relative flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border border-line bg-panel-2 p-3">
+                  <div className="relative flex flex-1 flex-col items-center justify-center gap-1.5 rounded-[6px] border border-line bg-panel-2 p-3">
                     <button type="button" disabled={ro} aria-label="Cambiar la foto del artículo"
-                      className="absolute right-1.5 top-1.5 grid h-8.5 w-8.5 place-items-center rounded-md border border-mint/40 bg-mint/10 text-mint transition-transform active:scale-90 disabled:opacity-35">
+                      className="absolute right-1.5 top-1.5 grid h-8.5 w-8.5 place-items-center rounded-[5px] border border-mint/40 bg-mint/10 text-mint transition-transform active:scale-90 disabled:opacity-35">
                       <Camera size={16} />
                     </button>
                     <span className="grid h-14 w-14 place-items-center rounded-full bg-brand text-[22px] font-extrabold text-white">
@@ -408,12 +408,12 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                       modificable: false, raciones: 1, coste: 0,
                     }] };
                   })}
-                  className="grid h-11 w-13 place-items-center rounded-md bg-mint text-[24px] font-extrabold text-white transition-transform active:scale-95 disabled:bg-paper/15 disabled:text-muted">
+                  className="grid h-11 w-13 place-items-center rounded-[5px] bg-mint text-[24px] font-extrabold text-white transition-transform active:scale-95 disabled:bg-paper/15 disabled:text-muted">
                   <Plus size={22} strokeWidth={3} />
                 </button>
                 <button type="button" disabled={ro || !fmtSel || art.formatos.length <= 1} aria-label="Quitar el formato seleccionado"
                   onClick={() => { setBorrador((b) => b ? { ...b, formatos: b.formatos.filter((f) => f.id !== fmtSel) } : b); setFmtSel(null); }}
-                  className="grid h-11 w-13 place-items-center rounded-md bg-danger text-white transition-transform active:scale-95 disabled:bg-paper/15 disabled:text-muted">
+                  className="grid h-11 w-13 place-items-center rounded-[5px] bg-danger text-white transition-transform active:scale-95 disabled:bg-paper/15 disabled:text-muted">
                   <X size={22} strokeWidth={3} />
                 </button>
                 <span className="ml-auto text-[12px] text-muted">
@@ -434,14 +434,14 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
               <Caja crecer titulo="Grupos de comentarios" contador={art.comentarios.length}>
                 <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 pb-2.5">
                   {art.comentarios.map((g) => (
-                    <div key={g.id} className="flex items-center gap-2.5 rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+                    <div key={g.id} className="flex items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 py-2.5">
                       <span className="min-w-0 flex-1">
                         <b className="block truncate text-[13.5px] font-bold">{g.nombre}</b>
                         <span className="block truncate text-[11.5px] text-muted">{g.opciones.join(" · ")}</span>
                       </span>
                       <button type="button" disabled={ro} aria-label={`Quitar ${g.nombre}`}
                         onClick={() => set("comentarios", art.comentarios.filter((x) => x.id !== g.id))}
-                        className="grid h-9.5 w-9.5 flex-none place-items-center rounded-md border border-line text-danger transition-transform active:scale-90 disabled:opacity-35">
+                        className="grid h-9.5 w-9.5 flex-none place-items-center rounded-[5px] border border-line text-danger transition-transform active:scale-90 disabled:opacity-35">
                         <X size={16} strokeWidth={2.6} />
                       </button>
                     </div>
@@ -451,7 +451,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   )}
                 </div>
                 <button type="button" disabled={ro}
-                  className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-lg border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
+                  className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-[6px] border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
                   <Plus size={16} /> Añadir grupo de comentarios
                 </button>
               </Caja>
@@ -459,14 +459,14 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
               <Caja crecer titulo="Ingredientes extra" contador={art.extras.length}>
                 <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 pb-2.5">
                   {art.extras.map((x) => (
-                    <div key={x.id} className="flex items-center gap-2.5 rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+                    <div key={x.id} className="flex items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 py-2.5">
                       <b className="min-w-0 flex-1 truncate text-[13.5px] font-bold">{x.nombre}</b>
                       <span className={`min-w-[76px] text-right font-mono text-[13px] font-extrabold ${x.precio > 0 ? "text-cobro" : "text-mint"}`}>
                         {x.precio > 0 ? eur(x.precio) : "Gratis"}
                       </span>
                       <button type="button" disabled={ro} aria-label={`Quitar ${x.nombre}`}
                         onClick={() => set("extras", art.extras.filter((e) => e.id !== x.id))}
-                        className="grid h-9.5 w-9.5 flex-none place-items-center rounded-md border border-line text-danger transition-transform active:scale-90 disabled:opacity-35">
+                        className="grid h-9.5 w-9.5 flex-none place-items-center rounded-[5px] border border-line text-danger transition-transform active:scale-90 disabled:opacity-35">
                         <X size={16} strokeWidth={2.6} />
                       </button>
                     </div>
@@ -476,7 +476,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   )}
                 </div>
                 <button type="button" disabled={ro}
-                  className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-lg border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
+                  className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-[6px] border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
                   <Plus size={16} /> Añadir ingrediente extra
                 </button>
               </Caja>
@@ -551,11 +551,11 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             </p>
             <div className="mt-4 flex gap-2">
               <button type="button" onClick={() => setBorrar(false)}
-                className="min-h-12 flex-1 rounded-md border border-line bg-panel-2 text-[14.5px] font-bold transition-transform active:scale-[.98]">
+                className="min-h-12 flex-1 rounded-[5px] border border-line bg-panel-2 text-[14.5px] font-bold transition-transform active:scale-[.98]">
                 Cancelar
               </button>
               <button type="button" onClick={eliminar}
-                className="min-h-12 flex-1 rounded-md bg-danger text-[14.5px] font-bold text-white transition-transform active:scale-[.98]">
+                className="min-h-12 flex-1 rounded-[5px] bg-danger text-[14.5px] font-bold text-white transition-transform active:scale-[.98]">
                 Eliminar
               </button>
             </div>
