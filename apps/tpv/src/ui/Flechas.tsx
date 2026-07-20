@@ -113,8 +113,14 @@ export function Desplazable({ children, fuera = "min-h-0 flex-1", className = ""
   const ref = useRef<HTMLDivElement>(null);
   const sombra = "drop-shadow-[0_2px_6px_rgba(0,0,0,.35)]";
   return (
-    <div className={`relative ${fuera}`}>
-      <div ref={ref} style={estilo} className={`h-full overflow-auto ${className}`}>{children}</div>
+    // `flex flex-col` + `min-h-0 flex-1` dentro, y NO `h-full`: con un tope de
+    // altura relativo (`max-h-[70vh]`) el padre no tiene alto definido, así que
+    // `h-full` no resuelve, el hijo crece hasta el contenido y la lista se
+    // pintaba POR FUERA del modal —encima del pie— en vez de desplazarse.
+    // El `overflow-hidden` es el cinturón: aunque algún hijo se pase, se corta
+    // aquí y no encima de lo de al lado.
+    <div className={`relative flex flex-col overflow-hidden ${fuera}`}>
+      <div ref={ref} style={estilo} className={`min-h-0 flex-1 overflow-auto ${className}`}>{children}</div>
       {/* `pointer-events-none` en el hueco y `auto` en los botones: si no, la
           esquina entera dejaba de recibir toques sobre la lista de debajo. */}
       <span className="pointer-events-none absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1 *:pointer-events-auto">
