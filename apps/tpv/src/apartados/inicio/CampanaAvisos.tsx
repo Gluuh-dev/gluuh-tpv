@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import { Bell, X, TriangleAlert, Info, CircleAlert, Check } from "lucide-react";
+import { Bell, TriangleAlert, Info, CircleAlert, Check } from "lucide-react";
 import { cargarAvisos, type Aviso, type TonoAviso } from "./avisos";
 
 // ────────────────────────────────────────────────────────────────────────────
-// CAMPANA DE AVISOS — el icono en la barra superior + el panel lateral.
+// CAMPANA DE AVISOS — el icono en la barra superior + un POPUP que cuelga de él.
 //
-// El icono lleva un punto con el número de avisos SIN LEER; al pulsarlo, un
-// panel entra por la derecha con la lista. Lo leído se recuerda (localStorage),
-// así que un aviso que ya viste no vuelve a marcar el punto al recargar — pero
-// SIGUE en la lista mientras la causa exista (el stock sigue bajo).
+// Popup, no panel lateral ni modal: no tapa la pantalla, se abre pegado a la
+// campana y se cierra al pulsar fuera. El icono lleva un punto con el número de
+// avisos SIN LEER; lo leído se recuerda (localStorage), así que un aviso que ya
+// viste no vuelve a marcar el punto al recargar — pero SIGUE en la lista
+// mientras la causa exista (el stock sigue bajo).
 // ────────────────────────────────────────────────────────────────────────────
 
 const ESTILO: Record<TonoAviso, { Icono: typeof Info; clase: string; punto: string }> = {
@@ -49,9 +50,12 @@ export function CampanaAvisos() {
     try { localStorage.setItem(CLAVE_LEIDOS, JSON.stringify([...nuevos])); } catch { /* noop */ }
   };
 
+  // `relative` para colgar el popup del propio botón. Al pulsar fuera se cierra:
+  // un click en cualquier sitio que no sea el popup ni la campana.
   return (
-    <>
-      <button type="button" onClick={abrir} aria-label={`Avisos${sinLeer ? ` (${sinLeer} sin leer)` : ""}`}
+    <div className="relative">
+      <button type="button" onClick={() => (abierto ? setAbierto(false) : abrir())}
+        aria-label={sinLeer ? `Avisos (${sinLeer} sin leer)` : "Avisos"} aria-expanded={abierto}
         className="relative grid h-10.5 w-10.5 place-items-center rounded-full border border-line bg-paper/5 text-paper/80 transition-transform active:scale-90">
         <Bell size={17} />
         {sinLeer > 0 && (
@@ -62,51 +66,48 @@ export function CampanaAvisos() {
       </button>
 
       {abierto && (
-        <div className="fixed inset-0 z-50">
-          {/* Velo hermano del panel (no lo envuelve): botón dentro de botón es
-              HTML inválido, la lección de los modales. */}
+        <>
+          {/* Capa invisible para cerrar al pulsar fuera. Sin velo oscuro: es un
+              popup, no un modal — no debe tapar la pantalla. */}
           <button type="button" aria-label="Cerrar avisos" tabIndex={-1}
-            className="gl-velo absolute inset-0 cursor-default bg-black/25 backdrop-blur-[1.5px]"
-            onClick={() => setAbierto(false)} />
-          <aside className="gl-panel-derecha absolute inset-y-0 right-0 flex w-[min(400px,90vw)] flex-col border-l border-line bg-panel shadow-2xl">
-            <header className="flex flex-none items-center gap-2 border-b border-line bg-brand px-4 py-3 text-white">
-              <Bell size={17} />
-              <h2 className="mr-auto text-[14px] font-semibold">Avisos</h2>
-              <button type="button" onClick={() => setAbierto(false)} aria-label="Cerrar"
-                className="grid h-8 w-8 place-items-center rounded-[5px] text-white/90 transition-transform active:scale-90">
-                <X size={17} />
-              </button>
+            className="fixed inset-0 z-40 cursor-default" onClick={() => setAbierto(false)} />
+          <div role="group" aria-label="Avisos"
+            className="gl-aparecer absolute right-0 top-[calc(100%+8px)] z-50 flex max-h-[70vh] w-[min(340px,86vw)] origin-top-right flex-col overflow-hidden rounded-[12px] border border-line bg-panel shadow-2xl">
+            {/* Piquito hacia la campana, para que se lea «esto cuelga de ahí». */}
+            <span className="absolute -top-1.5 right-3.5 h-3 w-3 rotate-45 border-l border-t border-line bg-panel" />
+            <header className="flex flex-none items-center gap-2 border-b border-line px-3.5 py-2.5">
+              <Bell size={15} className="text-brand-lit" />
+              <h2 className="mr-auto text-[13px] font-semibold text-paper">Avisos</h2>
+              {avisos.length > 0 && <span className="text-[11.5px] text-muted">{avisos.length}</span>}
             </header>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto p-2">
               {avisos.length === 0 ? (
-                <div className="grid flex-1 place-items-center p-8 text-center">
-                  <div>
-                    <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-mint/10 text-mint">
-                      <Check size={22} />
-                    </span>
-                    <p className="mt-3 text-[13.5px] font-semibold text-paper">Todo en orden</p>
-                    <p className="mt-1 text-[12.5px] leading-snug text-muted">No hay nada que requiera tu atención.</p>
-                  </div>
+                <div className="flex flex-col items-center gap-1.5 px-4 py-7 text-center">
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-mint/10 text-mint">
+                    <Check size={19} />
+                  </span>
+                  <p className="text-[12.5px] font-semibold text-paper">Todo en orden</p>
+                  <p className="text-[11.5px] leading-snug text-muted">Nada que requiera tu atención.</p>
                 </div>
               ) : (
                 avisos.map((a) => {
                   const e = ESTILO[a.tono];
                   return (
-                    <div key={a.id} className={`flex items-start gap-3 rounded-[8px] border p-3 ${e.clase}`}>
-                      <e.Icono size={18} className="mt-px flex-none" />
+                    <div key={a.id} className={`flex items-start gap-2.5 rounded-[8px] border p-2.5 ${e.clase}`}>
+                      <e.Icono size={16} className="mt-px flex-none" />
                       <div className="min-w-0">
-                        <b className="block text-[13.5px] font-semibold text-paper">{a.titulo}</b>
-                        <span className="block text-[12.5px] leading-snug text-muted">{a.detalle}</span>
+                        <b className="block text-[12.5px] font-semibold text-paper">{a.titulo}</b>
+                        <span className="block text-[11.5px] leading-snug text-muted">{a.detalle}</span>
                       </div>
                     </div>
                   );
                 })
               )}
             </div>
-          </aside>
-        </div>
+          </div>
+        </>
       )}
-    </>
+    </div>
   );
 }
