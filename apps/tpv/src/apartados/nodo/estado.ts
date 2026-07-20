@@ -17,9 +17,10 @@ export interface EstadoNodo {
   copias?: { hay: number; ultima: string | null; ocupa: number; carpeta?: string };
 }
 
-// Servida por el nodo, la SPA habla con su mismo origen (el gateway). En dev, el
-// gateway local.
-const BASE: string = import.meta.env.DEV ? (import.meta.env.VITE_NODO ?? "http://localhost:54321") : "";
+// MISMO ORIGEN que el resto (ver `lib/nodo`): en dev el proxy de Vite reenvía
+// `/nodo` al gateway. Antes esto apuntaba al :54321 absoluto y el navegador lo
+// bloqueaba por CORS — el Visor no podía leer el estado del nodo nunca.
+import { BASE } from "../../lib/nodo";
 
 /** Estado real del nodo, o null si no hay nodo / no autoriza (→ demo). */
 export async function cargarEstadoNodo(): Promise<EstadoNodo | null> {

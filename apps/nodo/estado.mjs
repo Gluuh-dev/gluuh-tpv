@@ -170,9 +170,14 @@ export async function estado() {
         (select count(*) from public.nodo_sync_estado where ultimo_error is not null) as sync_con_error,
         (select count(*) from public.sales_order
           where estado <> 'ABIERTA'
-            and updated_at > coalesce(
-              (select hasta from public.nodo_sync_estado where tabla = 'sales_order'),
-              '-infinity'))                                                     as ventas_por_subir,
+            -- `hasta` es TEXTO: o un timestamp plano ("2026-…+02"), o el JSON del
+            -- cursor compuesto ({"t":"…","k":[…]}). Se saca el instante de los dos
+            -- y se CASTEA — comparar timestamptz con texto crudo revienta la query
+            -- entera (y con ella todo el Visor). Es la trampa §1 del tablero.
+            and updated_at > coalesce((
+              select case when h.hasta ~ '^\s*\{' then (h.hasta::jsonb->>'t') else h.hasta end::timestamptz
+              from public.nodo_sync_estado h where h.tabla = 'sales_order'
+            ), '-infinity'))                                                    as ventas_por_subir,
         pg_database_size(current_database())                                    as bytes_bd
     `),
     // Categorías con su recuento de productos y cuántos llevan foto. Solo consulta, no toca nada.

@@ -17,7 +17,8 @@ import tailwindcss from "@tailwindcss/vite";
 // Así dev se comporta como producción (mismo origen) y el emparejado funciona.
 const NODO = process.env.VITE_NODO_PROXY ?? "http://localhost:54321";
 const proxy = Object.fromEntries(
-  ["/rest", "/auth", "/storage", "/realtime"].map((p) => [p, { target: NODO, changeOrigin: true }]),
+  // `/nodo` es el estado del servidor (Visor Node); el resto, datos y auth.
+  ["/rest", "/auth", "/storage", "/realtime", "/nodo"].map((p) => [p, { target: NODO, changeOrigin: true }]),
 );
 
 export default defineConfig({
