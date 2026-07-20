@@ -260,6 +260,21 @@ const servidor = http.createServer(async (req, res) => {
 
   // Si un servicio del nodo se cae, el TPV debe enterarse — no quedarse colgado.
   destino.on("error", (e) => {
+    // OJO: si las cabeceras YA SE ENVIARON, `writeHead` lanza ERR_HTTP_HEADERS_SENT.
+    // Y al lanzarse DENTRO de un manejador de eventos, nadie la recoge: excepción no
+    // capturada → **se cae el gateway entero**, y con él se queda sin nodo TODO el bar.
+    //
+    // Pasa de verdad y es fácil: el realtime (SSE) es un flujo largo; basta con que se
+    // corte a mitad —el servicio se reinicia, se va la wifi un segundo— para que este
+    // manejador salte con la respuesta ya empezada. Un hipo de un servicio tiraba el
+    // proxy de todos.
+    //
+    // Con la respuesta ya empezada no se puede mandar un 502: sólo cortar limpiamente.
+    if (res.headersSent) {
+      console.error(`[gateway] ${ruta.prefijo} se cortó a mitad de la respuesta: ${e.message}`);
+      res.destroy();
+      return;
+    }
     res.writeHead(502, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: `Servicio del nodo caído (${ruta.prefijo}): ${e.message}` }));
   });
