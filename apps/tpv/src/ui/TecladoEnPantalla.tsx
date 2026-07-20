@@ -178,10 +178,13 @@ export function TecladoEnPantalla() {
   };
   const cancelarLargo = () => { if (tempLargo.current) { clearTimeout(tempLargo.current); tempLargo.current = null; } };
 
+  // Se arrastra por la BARRA ENTERA, no por un asa de 20px: con el dedo, acertar
+  // en el asa es una lotería. Los botones de la barra (la X) siguen funcionando.
   const alBajar = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
     const base = pos ?? { x: window.innerWidth / 2 - 320, y: window.innerHeight - 300 };
     arrastre.current = { dx: e.clientX - base.x, dy: e.clientY - base.y };
-    (e.target as Element).setPointerCapture(e.pointerId);
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
   const alMover = (e: React.PointerEvent) => {
     if (!arrastre.current) return;
@@ -218,14 +221,18 @@ export function TecladoEnPantalla() {
 
   return (
     <div ref={panelRef} style={{ ...panel, left: x, top: y }} role="group" aria-label="Teclado en pantalla">
-      <div style={barra}>
+      <div role="toolbar" aria-label="Campo en edición · arrastra para mover el teclado"
+        style={{ ...barra, cursor: "grab", touchAction: "none" }}
+        onMouseDown={noRobarFoco} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar}
+        title="Arrastra la barra para mover el teclado">
         <span style={etiquetaCampo}>{campo}</span>
         <div style={visor}>
           {texto ? <span>{texto}</span> : <span style={{ opacity: 0.5 }}>Escribe…</span>}
           <span style={cursor} />
         </div>
         <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
-        <button type="button" onMouseDown={noRobarFoco} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar} style={agarre} aria-label="Arrastrar teclado" title="Arrástrame para mover el teclado">⠿</button>
+        {/* Ya no es el asa (arrastra la barra entera): se queda como pista visual. */}
+        <span style={agarre} aria-hidden>⠿</span>
       </div>
 
       <div style={teclas}>

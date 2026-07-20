@@ -20,7 +20,9 @@ export function CabeceraModal({
   const placaClase = `grid h-9 w-9 flex-none place-items-center rounded-md ${placa}`;
   const placaEstilo = color ? { background: color } : undefined;
   return (
-    <header className={`flex items-center gap-3 px-4 py-3 ${suave ? "border-b border-line text-paper" : "bg-brand text-white"}`}>
+    // `data-arrastrar`: por aquí se coge el modal para moverlo (ver Modal.tsx).
+    <header data-arrastrar
+      className={`flex touch-none items-center gap-3 px-4 py-3 select-none ${suave ? "border-b border-line text-paper" : "bg-brand text-white"}`}>
       {onIcono
         ? <button type="button" onClick={onIcono} aria-label="Volver" className={`${placaClase} transition-transform active:scale-90`} style={placaEstilo}><Icono size={18} /></button>
         : <span className={placaClase} style={placaEstilo}><Icono size={18} /></span>}
