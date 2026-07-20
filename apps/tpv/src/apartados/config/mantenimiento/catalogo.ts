@@ -7,10 +7,8 @@ import { PARAMETROS_POR_DEFECTO, type Articulo, type Estacion, type FormatoVenta
 // Sin terminal emparejado no se toca la red: `cargarCatalogo()` devuelve null y
 // la pantalla se queda con el catálogo demo, marcado como ejemplo.
 //
-// ⚠ LO QUE NO VIAJA (y por qué): el precio por SALA (salón/terraza) y los
-// comentarios/extras no tienen modelo todavía — las tarifas piden su propia
-// tabla y no tres columnas con las salas incrustadas. La pantalla lo avisa en
-// su sitio, para que nadie teclee un precio de terraza creyendo que se guarda.
+// El precio por SALA ya no se finge aquí: vive en las TARIFAS (`product_price`
+// + `room.tarifa_id`, migración 0131), que son por artículo, no por formato.
 // ============================================================================
 
 interface FilaProducto {
@@ -74,11 +72,7 @@ export function aArticulo(p: FilaProducto): Articulo {
       id: f.id,
       codigo: String(i + 1).padStart(2, "0"),
       nombre: f.nombre ?? "Unidad",
-      barra: num(f.precio, precio),
-      // Sin tabla de tarifas, las otras salas ARRANCAN igual que barra. No es un
-      // dato inventado: es "no hay diferencia de precio por sala todavía".
-      salon: num(f.precio, precio),
-      terraza: num(f.precio, precio),
+      precio: num(f.precio, precio),
       barras: "",
       combinado: false,
       modificable: true,
@@ -140,7 +134,7 @@ export function aFila(a: Articulo): Record<string, unknown> {
   return {
     id: a.id,
     nombre: a.nombre,
-    precio: a.formatos[0]?.barra ?? 0,
+    precio: a.formatos[0]?.precio ?? 0,
     tipo_impositivo: a.impuesto,
     family_id: a.familia || null,
     plu: a.codigo || null,
@@ -213,7 +207,7 @@ export async function guardarArticulo(a: Articulo): Promise<void> {
 
   if (a.formatos.length > 0) {
     await escribir("product_format?on_conflict=id", "POST", a.formatos.map((f, i) => ({
-      id: f.id, product_id: a.id, tenant_id, nombre: f.nombre, precio: f.barra,
+      id: f.id, product_id: a.id, tenant_id, nombre: f.nombre, precio: f.precio,
       orden: i, coste: f.coste, raciones: f.raciones,
       updated_at: new Date().toISOString(),
     })));
@@ -240,4 +234,44 @@ export async function crearFamiliaEnNodo(id: string, nombre: string, orden: numb
 /** Sube la foto del artículo al nodo y devuelve su URL. */
 export async function subirFotoArticulo(idArticulo: string, datos: Blob): Promise<string> {
   return subirImagen(`productos/${idArticulo}-${Date.now()}.jpg`, datos);
+}
+
+// ── TARIFAS (0131) ──────────────────────────────────────────────────────────
+// El precio por sala vive AQUÍ, no en el formato: la tarifa es del artículo, y
+// la sala elige tarifa (`room.tarifa_id`). Si una tarifa no dice nada de un
+// artículo, se cobra su precio normal — nunca 0.
+
+export interface TarifaCatalogo { id: string; nombre: string }
+
+export interface PrecioTarifa { tarifaId: string; precio: number }
+
+export async function cargarTarifas(): Promise<TarifaCatalogo[] | null> {
+  if (!haySesion()) return null;
+  return leer<TarifaCatalogo>("tarifa?select=id,nombre&order=nombre");
+}
+
+export async function cargarPreciosDeArticulo(productId: string): Promise<PrecioTarifa[] | null> {
+  if (!haySesion()) return null;
+  const filas = await leer<{ tarifa_id: string; precio: number | string | null }>(
+    `product_price?product_id=eq.${productId}&select=tarifa_id,precio`);
+  return filas?.map((f) => ({ tarifaId: f.tarifa_id, precio: num(f.precio) })) ?? null;
+}
+
+/**
+ * Fija (o quita, con `precio` null) el precio de un artículo en una tarifa.
+ *
+ * Quitar borra la fila en vez de guardar 0: un 0 es «regalado» y eso no es lo
+ * que quiere decir «esta tarifa no cambia el precio de esto».
+ */
+export async function fijarPrecioTarifa(
+  productId: string, tarifaId: string, precio: number | null,
+): Promise<void> {
+  if (precio === null) {
+    await escribir(`product_price?product_id=eq.${productId}&tarifa_id=eq.${tarifaId}`, "DELETE");
+    return;
+  }
+  await escribir("product_price?on_conflict=tenant_id,product_id,tarifa_id", "POST", [{
+    tenant_id: bar(), product_id: productId, tarifa_id: tarifaId, precio,
+    updated_at: new Date().toISOString(),
+  }]);
 }

@@ -27,7 +27,7 @@ describe("aArticulo", () => {
   it("convierte los numeric que llegan como texto (si no, los precios se SUMAN como cadenas)", () => {
     const a = aArticulo(fila);
     expect(a.impuesto).toBe(10);
-    expect(a.formatos[0]?.barra).toBe(1.4);
+    expect(a.formatos[0]?.precio).toBe(1.4);
     expect(a.formatos[0]?.coste).toBe(0.35);
     expect(a.formatos[0]?.raciones).toBe(1);
   });

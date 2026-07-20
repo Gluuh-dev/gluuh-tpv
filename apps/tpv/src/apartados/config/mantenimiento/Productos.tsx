@@ -15,6 +15,7 @@ import {
 import { duplicarArticulo } from "./duplicar";
 import { ExtrasArticulo } from "./ExtrasArticulo";
 import { StockArticulo } from "./StockArticulo";
+import { TarifasArticulo } from "./TarifasArticulo";
 import {
   cargarModificadores, gruposEfectivos, guardarGruposPropios, guardarAsignacionesDeArticulo,
   modificadoresDemo,
@@ -337,8 +338,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       estacion: "BARRA", tiempoPrep: 1, alergenos: [], categorias: [],
       formatos: [{
         id: crypto.randomUUID(), codigo: `${codigo}.1`, nombre: "Unidad",
-        barra: 0, salon: 0, terraza: 0, barras: "", combinado: false,
-        modificable: false, raciones: 1, coste: 0,
+        precio: 0, barras: "", combinado: false, modificable: false, raciones: 1, coste: 0,
       }],
       comentarios: [], extras: [],
     });
@@ -446,8 +446,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       const n = siguienteNumero(b.formatos.map((f) => Number(f.codigo.split(".")[1]) || 0));
       return { ...b, formatos: [...b.formatos, {
         id: crypto.randomUUID(), codigo: `${b.codigo}.${n}`, nombre: "Nuevo formato",
-        barra: 0, salon: 0, terraza: 0, barras: "", combinado: false,
-        modificable: false, raciones: 1, coste: 0,
+        precio: 0, barras: "", combinado: false, modificable: false, raciones: 1, coste: 0,
       }] };
     });
 
@@ -600,7 +599,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     <th className="w-20">Código</th>
                     <th className="w-34">C. barras</th>
                     <th>Descripción</th><th>Familia</th>
-                    <th className="text-right!">Barra</th><th className="text-right!">Salón</th>
+                    <th className="text-right!">Precio</th>
                     <th className="text-right!">Coste</th><th className="text-right!">Margen</th>
                     <th className="text-center!">Imp.</th>
                     {/* Las cuatro casillas de Glop. Aquí se MIRAN, no se tocan: se
@@ -633,8 +632,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                         <td className="px-2.5 py-2">
                           <span className="rounded-full border border-line bg-panel-2 px-2.5 py-1 text-[11px] font-bold">{nombreDeFamilia(a.familia)}</span>
                         </td>
-                        <td className="px-2.5 py-2 text-right font-mono">{f ? eur(f.barra) : "—"}</td>
-                        <td className="px-2.5 py-2 text-right font-mono">{f ? eur(f.salon) : "—"}</td>
+                        <td className="px-2.5 py-2 text-right font-mono">{f ? eur(f.precio) : "—"}</td>
                         <td className="px-2.5 py-2 text-right font-mono text-muted">{f ? eur(f.coste) : "—"}</td>
                         <td className={`px-2.5 py-2 text-right font-mono font-extrabold ${m < 55 ? "text-danger" : "text-mint"}`}>
                           {m.toFixed(0)} %
@@ -708,7 +706,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     <span className="text-[10.5px] font-medium uppercase tracking-wide text-muted">Así se verá en el TPV</span>
                     <div className="w-32">
                       <BotonProducto comoPrevia nombre={art.nombre || "Sin nombre"}
-                        precio={art.formatos[0]?.barra ?? 0}
+                        precio={art.formatos[0]?.precio ?? 0}
                         color={art.color ?? colorDeFamilia(art.familia)} foto={art.foto} icono={art.icono} />
                     </div>
                     <button type="button" disabled={ro} onClick={() => abrirVentana("aspecto")}
@@ -735,23 +733,16 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   <Plus size={15} strokeWidth={3} /> Añadir
                 </button>
               )}>
-              {real && (
-                <p className="flex flex-none items-center gap-2 border-b border-line bg-amber/8 px-3.5 py-2 text-[12px] font-semibold text-amber">
-                  <Info size={15} className="flex-none" />
-                  De momento se guarda el precio de <b>Barra</b>. Salón y Terraza son otra
-                  tarifa, y las tarifas todavía no están hechas: no las des por guardadas.
-                </p>
-              )}
               <Desplazable eje="ambos" className="border-t border-line">
-                <table className="w-full min-w-[920px] border-collapse">
+                <table className="w-full min-w-[720px] border-collapse">
                   {/* Anchos FIJOS en las numéricas: si no, la tabla reparte su
                       ancho mínimo entre todas y un precio de 4 caracteres acaba
                       en una caja de 150px. La flexible es «Formato». */}
                   <thead>
                     <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:border-b [&>th]:border-line [&>th]:bg-panel [&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted">
                       <th className="w-20">Código</th><th className="w-52">Formato</th>
-                      <th className="w-26 text-right!">Barra</th><th className="w-26 text-right!">Salón</th><th className="w-26 text-right!">Terraza</th>
-                      <th className="w-24 text-center!">Combinado</th><th className="w-24 text-right!">Raciones</th>
+                      <th className="w-28 text-right!">Precio</th>
+                      <th className="w-24 text-right!">Raciones</th>
                       <th className="w-24 text-right!">Coste</th><th className="w-20 text-right!">Margen</th>
                       {!ro && <th className="w-12" aria-label="Quitar" />}
                     </tr>
@@ -768,21 +759,10 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                             <input value={f.nombre} readOnly={ro} onChange={(e) => setFormato(f.id, "nombre", e.target.value)}
                               className={claseEntrada(ro, "", true)} />
                           </td>
-                          {(["barra", "salon", "terraza"] as const).map((sala) => (
-                            <td key={sala} className="px-1.5 py-1">
-                              <input type="number" step="0.05" min="0" value={f[sala]} readOnly={ro}
-                                onChange={(e) => setFormato(f.id, sala, Number(e.target.value))}
-                                className={claseEntrada(ro, "text-right font-mono", true)} />
-                            </td>
-                          ))}
-                          <td className="px-2.5 py-1 text-center">
-                            <button type="button" disabled={ro} aria-pressed={f.combinado}
-                              onClick={() => setFormato(f.id, "combinado", !f.combinado)}
-                              className={`grid h-6.5 w-6.5 place-items-center rounded border-2 transition-transform active:scale-90 disabled:opacity-50 ${
-                                f.combinado ? "border-mint bg-mint text-white" : "border-line bg-panel-2"
-                              }`}>
-                              {f.combinado && <Check size={14} strokeWidth={3.2} />}
-                            </button>
+                          <td className="px-1.5 py-1">
+                            <input type="number" step="0.05" min="0" value={f.precio} readOnly={ro}
+                              onChange={(e) => setFormato(f.id, "precio", Number(e.target.value))}
+                              className={claseEntrada(ro, "text-right font-mono", true)} />
                           </td>
                           <td className="px-1.5 py-1">
                             <input type="number" step="0.5" min="0" value={f.raciones} readOnly={ro}
@@ -824,6 +804,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 {ro ? "Pulsa «Modificar» abajo para poder tocar los precios." : "Los precios llevan el impuesto incluido."}
               </p>
             </Caja>
+
+            <TarifasArticulo articuloId={art.id} precioNormal={art.formatos[0]?.precio ?? 0}
+              soloLectura={ro} real={real} onAviso={notificar} />
           </>
         )}
 
@@ -909,7 +892,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
       {aspecto && (
         <AspectoArticulo
-          nombre={art.nombre} precio={art.formatos[0]?.barra ?? 0}
+          nombre={art.nombre} precio={art.formatos[0]?.precio ?? 0}
           colorFamilia={colorDeFamilia(art.familia)}
           foto={art.foto} color={art.color} icono={art.icono}
           onCambiar={(campo, valor) => set(campo, valor)}

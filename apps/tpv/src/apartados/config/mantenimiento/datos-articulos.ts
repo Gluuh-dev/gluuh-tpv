@@ -19,10 +19,15 @@ export interface FormatoVenta {
   id: string;
   codigo: string;
   nombre: string;
-  /** PVP con impuesto INCLUIDO, por sala (convención de la casa). */
-  barra: number;
-  salon: number;
-  terraza: number;
+  /**
+   * PVP del formato, con impuesto INCLUIDO (convención de la casa).
+   *
+   * UNO, no tres. Antes había `barra`/`salon`/`terraza` y era mentira: la BD
+   * guarda un solo `product_format.precio`, y el precio por sala vive en las
+   * TARIFAS (`product_price` + `room.tarifa_id`, migración 0131), que son por
+   * artículo y no por formato. Salón y terraza se tecleaban y se perdían.
+   */
+  precio: number;
   barras: string;
   combinado: boolean;
   modificable: boolean;
@@ -164,9 +169,7 @@ function formatosDe(codigo: string, familia: string, precio: number, impuesto: n
       id: `${codigo}-${j}`,
       codigo: `${codigo}.${j + 1}`,
       nombre,
-      barra: base,
-      salon: r5(base * 1.1),
-      terraza: r5(base * 1.18),
+      precio: base,
       barras: "",
       combinado: familia === "cocteles",
       modificable: familia === "cocteles",
@@ -226,7 +229,7 @@ export const FAMILIAS = CATEGORIAS_DEMO;
 
 /** Margen sobre el PVP de barra, en %. Negativo = se vende a pérdida. */
 export function margen(f: FormatoVenta, impuesto: number): number {
-  const sinImpuesto = f.barra / (1 + impuesto / 100);
+  const sinImpuesto = f.precio / (1 + impuesto / 100);
   if (sinImpuesto <= 0) return 0;
   return ((sinImpuesto - f.coste) / sinImpuesto) * 100;
 }

@@ -38,7 +38,7 @@ describe("duplicarArticulo", () => {
     expect(copia.color).toBe("#2f7fd0");
     expect(copia.icono).toBe("beer");
     expect(copia.foto).toBe("https://x/y.jpg");
-    expect(copia.formatos[0]?.barra).toBe(original.formatos[0]?.barra);
+    expect(copia.formatos[0]?.precio).toBe(original.formatos[0]?.precio);
   });
 
   it("no comparte estructuras con el original (tocar la copia no toca el original)", () => {
