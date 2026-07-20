@@ -13,9 +13,11 @@
 
 const SESION = "gluuh_sesion_dispositivo"; // { access_token, device_id? }
 
-export const BASE: string = import.meta.env.DEV
-  ? (import.meta.env.VITE_NODO ?? "http://localhost:54321")
-  : "";
+// MISMO ORIGEN, siempre. En producción lo sirve el nodo; en dev el proxy de Vite
+// (ver `vite.config.ts`) reenvía `/rest` `/auth` `/storage` al nodo. Así no hay
+// CORS ni un caso especial para dev. `VITE_NODO` sigue como override por si
+// alguien apunta a otro nodo a mano.
+export const BASE: string = import.meta.env.VITE_NODO ?? "";
 
 export function token(): string | null {
   try {
