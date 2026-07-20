@@ -1,10 +1,12 @@
-import { Download, Printer, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, FileSpreadsheet, Printer, Search, X } from "lucide-react";
 import { descargarCSV, imprimirInforme, type ColumnaInforme } from "../lib/exportar";
 
 // Barra que convierte cualquier tabla del Análisis en un INFORME: buscador +
-// «CSV» (para el Excel del gestor) e «Imprimir» (de ahí sale el PDF con «Guardar
-// como PDF»). Se le pasan las MISMAS columnas que pinta la tabla, así lo que se
-// descarga es exactamente lo que se ve — no una versión paralela que se desfasa.
+// «Descargar», que abre un popup para elegir formato (hay más de uno: CSV para el
+// Excel del gestor, PDF por el diálogo de impresión). Se le pasan las MISMAS
+// columnas que pinta la tabla, así lo que se descarga es exactamente lo que se ve
+// — no una versión paralela que se desfasa.
 export function BarraInforme<T>({
   titulo, columnas, filas, busqueda, onBusqueda, periodo, local, totales, extra,
 }: Readonly<{
@@ -19,8 +21,21 @@ export function BarraInforme<T>({
   totales?: { etiqueta: string; valor: string }[];
   extra?: React.ReactNode;
 }>) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLDivElement>(null);
   const vacio = filas.length === 0;
-  const btn = "flex items-center gap-1.5 rounded-md border border-line bg-paper/5 px-3 py-1.5 text-[12px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40";
+
+  // Cerrar al tocar fuera o con Escape (si no, el popup se queda colgado sobre la tabla).
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: PointerEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
+    document.addEventListener("pointerdown", fuera);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", fuera); document.removeEventListener("keydown", esc); };
+  }, [abierto]);
+
+  const opcion = "flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[12.5px] text-paper transition-colors active:bg-brand/15";
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
@@ -47,16 +62,35 @@ export function BarraInforme<T>({
         {filas.length} {filas.length === 1 ? "fila" : "filas"}
       </span>
 
-      <button type="button" disabled={vacio} className={btn}
-        onClick={() => descargarCSV(titulo, columnas, filas)}
-        title="Descargar en CSV (se abre en Excel)">
-        <Download size={14} /> CSV
-      </button>
-      <button type="button" disabled={vacio} className={btn}
-        onClick={() => imprimirInforme(titulo, columnas, filas, { periodo, local, totales })}
-        title="Imprimir — desde el diálogo se puede «Guardar como PDF»">
-        <Printer size={14} /> Imprimir / PDF
-      </button>
+      <div ref={caja} className="relative">
+        <button type="button" disabled={vacio} onClick={() => setAbierto((v) => !v)}
+          aria-haspopup="menu" aria-expanded={abierto}
+          className="flex items-center gap-1.5 rounded-md border border-line bg-paper/5 px-3 py-1.5 text-[12px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40">
+          <Download size={14} /> Descargar
+        </button>
+
+        {abierto && (
+          <div role="menu"
+            className="gl-aparecer absolute right-0 top-[calc(100%+4px)] z-30 w-56 overflow-hidden rounded-md border border-line bg-panel shadow-xl">
+            <button type="button" role="menuitem" className={opcion}
+              onClick={() => { setAbierto(false); descargarCSV(titulo, columnas, filas); }}>
+              <FileSpreadsheet size={16} className="flex-none text-mint" />
+              <span className="min-w-0">
+                <b className="block font-semibold">CSV</b>
+                <small className="block text-[11px] text-muted">Se abre en Excel</small>
+              </span>
+            </button>
+            <button type="button" role="menuitem" className={`${opcion} border-t border-line`}
+              onClick={() => { setAbierto(false); imprimirInforme(titulo, columnas, filas, { periodo, local, totales }); }}>
+              <Printer size={16} className="flex-none text-brand-lit" />
+              <span className="min-w-0">
+                <b className="block font-semibold">PDF o impresora</b>
+                <small className="block text-[11px] text-muted">Elige «Guardar como PDF»</small>
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -33,6 +33,33 @@ const PERIODOS = [
   { id: "semana" as const, label: "7 días" }, { id: "mes" as const, label: "Mes" },
 ];
 
+// ── Rango de fechas ─────────────────────────────────────────────────────────
+// El gestor no pide «los últimos 7 días»: pide «del 1 al 31 de marzo». Los cuatro
+// atajos son eso, atajos; el rango es lo que manda y lo que viajará a la consulta
+// del nodo (`created_at between desde and hasta`).
+// OJO: NO se puede usar `toISOString()`. Convierte a UTC, y la medianoche
+// española (UTC+1/+2) cae en el día ANTERIOR: un informe de «hoy» saldría
+// fechado ayer, y el «Mes» empezaría el 28 del mes pasado. Se arma con las
+// partes LOCALES, que es el día que vive el bar.
+const iso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const hoyISO = () => iso(new Date());
+const sumarDias = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+/** Fechas que cubre cada atajo, para que el rango y el atajo digan lo mismo. */
+export function rangoDe(p: Periodo, hoy = new Date()): { desde: string; hasta: string } {
+  if (p === "ayer") { const a = sumarDias(hoy, -1); return { desde: iso(a), hasta: iso(a) }; }
+  if (p === "semana") return { desde: iso(sumarDias(hoy, -6)), hasta: iso(hoy) };
+  if (p === "mes") return { desde: iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: iso(hoy) };
+  return { desde: iso(hoy), hasta: iso(hoy) };
+}
+
+/** «12/03/2026» o «12/03/2026 – 31/03/2026». Un informe sin fechas no vale. */
+export function etiquetaRango(desde: string, hasta: string): string {
+  const f = (s: string) => s.split("-").reverse().join("/");
+  return desde === hasta ? f(desde) : `${f(desde)} – ${f(hasta)}`;
+}
+
 const SECCIONES: readonly SeccionShell[] = [
   { id: "informes", label: "Informes", Icono: FileText },
   { id: "resumen", label: "Resumen", Icono: LayoutDashboard },
@@ -188,9 +215,29 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   // Un buscador por sección: lo que se escribe filtra la tabla Y lo que se exporta.
   const [busq, setBusq] = useState("");
   const irA = (s: string) => { setSeccion(s); setBusq(""); };
+  // El rango manda; los atajos solo lo rellenan. Al tocar una fecha a mano, el
+  // atajo se desmarca (`suelto`) para no decir «Hoy» encima de otro rango.
+  const [rango, setRango] = useState(() => rangoDe("hoy"));
+  const [suelto, setSuelto] = useState(false);
+  const elegirPeriodo = (p: Periodo) => { setPeriodo(p); setRango(rangoDe(p)); setSuelto(false); };
+  const cambiarFecha = (cual: "desde" | "hasta", v: string) => {
+    if (!v) return;
+    setRango((r) => {
+      const n = { ...r, [cual]: v };
+      // Si se cruzan, las dos pasan a la fecha tocada: un rango invertido no da
+      // cero filas, da confusión («no vendí nada en marzo»).
+      return n.desde > n.hasta ? { desde: v, hasta: v } : n;
+    });
+    setSuelto(true);
+  };
   const d = DEMO[periodo];
 
-  const etiquetaPeriodo = PERIODOS.find((p) => p.id === periodo)?.label ?? "";
+  // Lo que se imprime en la cabecera de cada informe: con un atajo, su nombre y
+  // las fechas; con un rango a mano, solo las fechas. Un PDF sin fechas no vale.
+  const fechas = etiquetaRango(rango.desde, rango.hasta);
+  const etiquetaPeriodo = suelto
+    ? fechas
+    : `${PERIODOS.find((p) => p.id === periodo)?.label ?? ""} · ${fechas}`;
   const ticketMedio = d.tickets ? d.ventas / d.tickets : 0;
   const totalPagos = d.pagos.reduce((a, p) => a + p.importe, 0) || 1;
   const top = [...d.top].sort((a, b) => (ordenProd === "importe" ? b.importe - a.importe : b.uds - a.uds));
@@ -254,7 +301,25 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   return (
     <ShellApartado app="Análisis" claveLateral="analisis" secciones={SECCIONES}
       seccion={seccion} onSeccion={setSeccion} onVolver={onVolver} subtitulo={SUB[seccion]}
-      acciones={<Segmento valor={periodo} opciones={PERIODOS} onCambio={setPeriodo} />}>
+      acciones={
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Los atajos rellenan el rango; el rango es lo que manda. */}
+          <Segmento valor={suelto ? ("" as Periodo) : periodo} opciones={PERIODOS} onCambio={elegirPeriodo} />
+          <label className="flex items-center gap-1.5 text-[11.5px] text-muted">
+            <span className="sr-only">Desde</span>
+            <input type="date" value={rango.desde} max={rango.hasta} aria-label="Desde"
+              onChange={(e) => cambiarFecha("desde", e.target.value)}
+              className="h-8 rounded-md border border-line bg-paper/5 px-2 text-[12px] text-paper outline-none focus:border-brand" />
+          </label>
+          <span className="text-[11.5px] text-muted">–</span>
+          <label className="flex items-center gap-1.5 text-[11.5px] text-muted">
+            <span className="sr-only">Hasta</span>
+            <input type="date" value={rango.hasta} min={rango.desde} max={hoyISO()} aria-label="Hasta"
+              onChange={(e) => cambiarFecha("hasta", e.target.value)}
+              className="h-8 rounded-md border border-line bg-paper/5 px-2 text-[12px] text-paper outline-none focus:border-brand" />
+          </label>
+        </div>
+      }>
 
       {seccion === "informes" && <CatalogoInformes onAbrir={irA} />}
 
