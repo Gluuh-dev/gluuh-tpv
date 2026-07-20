@@ -169,7 +169,22 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0130`.**
+**Siguiente número libre: `0131`.**
+
+- `0130` — **RESERVADA 20-07 (sesión chat, compras desde el TPV)**:
+  `compras_y_stock` — lo que falta para poder **gestionar compras**, no solo
+  anotar entradas. Hoy `stock_move` es un apunte suelto (`ingredient_id, tipo,
+  cantidad, motivo`) sin albarán, sin proveedor, sin precio y sin fecha de
+  factura; y las 5 tablas del módulo (`ingredient`, `recipe_item`, `stock_move`,
+  `warehouse`, `supplier`, `unit_of_measure`) están **a cero y sin pantalla**.
+  Añade, todo aditivo: `purchase_doc` (albarán/factura: proveedor, fecha, número,
+  estado, totales) y `purchase_line` (qué, cuánto, a qué precio, qué impuesto),
+  con la línea apuntando **a un artículo O a un ingrediente** — un bar compra
+  cajas de cerveza (que se venden tal cual) *y* kilos de tomate (que se
+  transforman), y obligar a inventarse un ingrediente por cada referencia de
+  vino es papeleo inútil. Más `product.stock`/`stock_minimo` (stock por artículo,
+  que hoy no existe) y `stock_move.purchase_line_id`/`product_id`/`warehouse_id`
+  para poder trazar de dónde salió cada entrada. Ver `docs/plan/17`.
 
 - `0129` — **RESERVADA 20-07 (sesión chat, columnas de la lista estilo Glop)**:
   `producto_carta_digital` — separa **ECOM** (pedidos por internet) de

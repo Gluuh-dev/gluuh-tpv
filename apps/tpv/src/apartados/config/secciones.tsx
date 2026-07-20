@@ -7,7 +7,7 @@ import {
   MonitorSmartphone, Blocks,
   Palette,
   LayoutDashboard, SlidersHorizontal,
-  type LucideIcon,
+  type LucideIcon, Truck, Warehouse, ClipboardList, Contact
 } from "lucide-react";
 
 // ============================================================================
@@ -106,6 +106,51 @@ export const GRUPOS: Grupo[] = [
         alcance: [
           "Orden de familias y categorías",
           "Orden de los productos dentro de cada categoría",
+        ],
+      },
+    ],
+  },
+  {
+    // COMPRAS: el otro lado del negocio. La carta dice lo que entra por caja;
+    // esto, lo que sale — y es de donde sale el COSTE real de cada plato.
+    titulo: "Compras",
+    Icono: Truck,
+    secciones: [
+      {
+        id: "compras", titulo: "Albaranes y facturas", Icono: Truck, funcional: true,
+        desc: "Lo que compras a tus proveedores, y la mercancía que entra",
+        alcance: [
+          "Albaranes y facturas de proveedor, con sus líneas y sus impuestos",
+          "Al RECIBIR un albarán entra la mercancía y se actualiza el stock",
+          "El coste real de cada artículo, que es lo que da el margen de verdad",
+          "Un albarán recibido no se edita: se corrige con otro documento",
+        ],
+      },
+      {
+        id: "proveedores", titulo: "Proveedores", Icono: Contact,
+        desc: "A quién le compras",
+        alcance: [
+          "Datos fiscales del proveedor y forma de contacto",
+          "Referencias del proveedor para cada artículo (qué código usa él)",
+          "Precios de compra pactados",
+        ],
+      },
+      {
+        id: "almacenes", titulo: "Almacenes", Icono: Warehouse,
+        desc: "Dónde está la mercancía",
+        alcance: [
+          "Almacenes del local (barra, bodega, cámara)",
+          "Almacén por defecto al recibir mercancía",
+          "Traspasos entre almacenes",
+        ],
+      },
+      {
+        id: "inventario", titulo: "Inventario y stock", Icono: ClipboardList,
+        desc: "Lo que hay, lo que falta y lo que se ha ido",
+        alcance: [
+          "Existencias por artículo y avisos de stock mínimo",
+          "Recuentos de inventario y ajustes con su motivo",
+          "Mermas y consumo propio",
         ],
       },
     ],

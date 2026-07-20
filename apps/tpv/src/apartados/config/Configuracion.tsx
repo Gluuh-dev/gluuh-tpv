@@ -5,6 +5,7 @@ import { ShellApartado, Tarjeta, R, type GrupoShell } from "../../ui";
 import { useTema } from "../../lib/tema";
 import { GRUPOS, type Seccion } from "./secciones";
 import { Productos } from "./mantenimiento/Productos";
+import { Compras } from "./mantenimiento/Compras";
 
 // CONFIGURACIÓN del TPV. El mapa de secciones vive en `secciones.tsx` (inventario
 // del panel Next); aquí se sirve con el shell de gestión, en modo TÁCTIL, porque
@@ -19,6 +20,7 @@ import { Productos } from "./mantenimiento/Productos";
 // Secciones con pantalla completa propia (mandan sobre la ficha de alcance).
 const PANTALLAS: Record<string, (p: Readonly<{ onSalir: () => void }>) => ReactNode> = {
   productos: Productos,
+  compras: Compras,
 };
 
 const GENERAL = "__general__";
