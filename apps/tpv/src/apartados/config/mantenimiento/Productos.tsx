@@ -1,20 +1,24 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy,
 } from "lucide-react";
 import { Modal, CabeceraModal, abrirTeclado } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { BotonProducto } from "../../tpv/venta/BotonProducto";
 import { AspectoArticulo } from "./AspectoArticulo";
 import {
+  cargarCatalogo, guardarArticulo, borrarArticulo, crearFamiliaEnNodo, subirFotoArticulo,
+} from "./catalogo";
+import { duplicarArticulo } from "./duplicar";
+import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
   BuscadorRegistros,
 } from "./Marco";
 import {
   ARTICULOS_DEMO, FAMILIAS, IMPUESTOS, ESTACIONES, ALERGENOS, PARAMETROS_POR_DEFECTO,
-  nombreFamilia, margen, siguienteNumero,
+  margen, siguienteNumero,
   type Articulo, type FormatoVenta, type Estacion, type ParametrosArticulo,
 } from "./datos-articulos";
 
@@ -27,8 +31,10 @@ import {
 // registros se bloquea y solo quedan Aceptar y Cancelar. Es lo que espera quien
 // viene de Ágora o Glop, y evita el clásico "he cambiado el precio sin querer".
 //
-// ponytail: los cambios viven en memoria (datos-articulos.ts es demo). El día que
-// se cablee el nodo, `guardar()` es el único sitio que toca.
+// DATOS: si el terminal está emparejado, la carta sale del nodo (`catalogo.ts`)
+// y se guarda allí. Si no, se enseña la de ejemplo con su aviso — un catálogo de
+// mentira sin avisar acabaría con alguien dando de alta 40 artículos que se
+// pierden al recargar.
 // ────────────────────────────────────────────────────────────────────────────
 
 const SUBS = ["Datos generales", "Comentarios y extras", "Categorías", "Cocina y ticket"] as const;
@@ -100,6 +106,9 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
   },
 ];
 
+/** El texto de un fallo, venga como venga (el nodo lanza Error; la red, cualquier cosa). */
+const mensaje = (e: unknown) => (e instanceof Error ? e.message : "fallo desconocido");
+
 function Aviso({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <p className="flex flex-none items-center gap-2.5 rounded-[6px] border border-brand-lit/25 bg-accent-soft px-3.5 py-3 text-[13px] font-semibold leading-snug text-brand-lit">
@@ -122,19 +131,43 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const [params, setParams] = useState(false);   // ventana «Parámetros del artículo»
   const [aspecto, setAspecto] = useState(false); // ventana «Aspecto en el TPV»
   const [buscaFam, setBuscaFam] = useState(false);
+  // `real` = los datos salen del nodo. Si no, la pantalla enseña el catálogo de
+  // ejemplo y LO DICE: datos fingidos vendidos como reales es peor que nada.
+  const [real, setReal] = useState(false);
+  const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set());
+  const [guardando, setGuardando] = useState(false);
   // Las familias son ESTADO, no constante: desde el buscador se pueden crear sin
   // abandonar el artículo que estás dando de alta.
   const [familias, setFamilias] = useState(FAMILIAS.map((f, i) => ({ ...f, codigo: String(i + 1) })));
+
+  // El catálogo del bar, si este terminal está emparejado. `null` (sin nodo, sin
+  // sesión o red caída) deja la demo puesta, que es más útil que una tabla vacía.
+  useEffect(() => {
+    let vivo = true;
+    void cargarCatalogo().then((c) => {
+      if (!vivo || !c) return;
+      setArticulos(c.articulos);
+      setFamilias(c.familias);
+      setReal(true);
+    });
+    return () => { vivo = false; };
+  }, []);
 
   const nombreDeFamilia = (id: string) => familias.find((f) => f.id === id)?.nombre ?? id;
   const codigoDeFamilia = (id: string) => familias.find((f) => f.id === id)?.codigo ?? "";
   const colorDeFamilia = (id: string) => familias.find((f) => f.id === id)?.color ?? "#64748b";
 
   const crearFamilia = (nombre: string) => {
-    const id = `fam-${Date.now().toString(36)}`;
+    const id = crypto.randomUUID();
     const codigo = String(familias.length + 1);
     setFamilias((fs) => [...fs, { id, nombre, codigo, color: "#64748b" }]);
-    notificar(`Familia «${nombre}» creada.`);
+    if (real) {
+      void crearFamiliaEnNodo(id, nombre, familias.length + 1)
+        .then(() => notificar(`Familia «${nombre}» creada.`))
+        .catch((e: unknown) => notificar(`No se ha podido crear la familia: ${mensaje(e)}`));
+    } else {
+      notificar(`Familia «${nombre}» creada.`);
+    }
     return id;
   };
   const [aviso, setAviso] = useState("");
@@ -196,12 +229,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     const codigo = String(siguienteNumero(articulos.map((a) => Number(a.codigo) || 0))).padStart(4, "0");
     setNuevo(true);
     setBorrador({
-      id: `art-${codigo}`, codigo, nombre: "", nombreComanda: "", nombreTicket: "",
+      // UUID: `product.id` lo es en la BD, y un `art-0007` reventaría el alta.
+      id: crypto.randomUUID(), codigo, nombre: "", nombreComanda: "", nombreTicket: "",
       familia: FAMILIAS[0]?.id ?? "", impuesto: 10, barras: "", visible: true, alPeso: false,
       parametros: { ...PARAMETROS_POR_DEFECTO },
       estacion: "BARRA", tiempoPrep: 1, alergenos: [], categorias: [],
       formatos: [{
-        id: `${codigo}-f1`, codigo: `${codigo}.1`, nombre: "Unidad",
+        id: crypto.randomUUID(), codigo: `${codigo}.1`, nombre: "Unidad",
         barra: 0, salon: 0, terraza: 0, barras: "", combinado: false,
         modificable: false, raciones: 1, coste: 0,
       }],
@@ -212,26 +246,97 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   };
 
   const guardar = () => {
-    if (!borrador) return;
+    if (!borrador || guardando) return;
     if (!borrador.nombre.trim()) { notificar("El artículo necesita una descripción."); return; }
-    if (nuevo) {
-      setArticulos((as) => [...as, borrador]);
-      setIdx(articulos.length);
-    } else {
-      setArticulos((as) => as.map((a) => (a.id === borrador.id ? borrador : a)));
+    void aplicar(borrador, nuevo);
+  };
+
+  /**
+   * La ficha ENTERA en un paso: primero la foto (si es nueva), después la fila.
+   *
+   * La foto se sube AQUÍ y no al elegirla: si se subiera al elegirla, cancelar
+   * la ficha dejaría la imagen tirada en el disco del nodo para siempre.
+   */
+  const aplicar = async (ficha: Articulo, esNuevo: boolean) => {
+    setGuardando(true);
+    try {
+      let listo = ficha;
+      if (real && ficha.foto?.startsWith("data:")) {
+        listo = { ...ficha, foto: await subirFotoArticulo(ficha.id, await (await fetch(ficha.foto)).blob()) };
+      }
+      if (real) await guardarArticulo(listo);
+
+      setArticulos((as) => (esNuevo ? [...as, listo] : as.map((a) => (a.id === listo.id ? listo : a))));
+      if (esNuevo) setIdx(articulos.length);
+      setBorrador(null); setNuevo(false);
+      notificar(esNuevo ? "Artículo creado." : "Cambios guardados.");
+    } catch (e: unknown) {
+      // El borrador se QUEDA: si el nodo falla, lo último que quiere el dueño es
+      // volver a teclear la ficha entera.
+      notificar(`No se ha guardado: ${mensaje(e)}`);
+    } finally {
+      setGuardando(false);
     }
-    setBorrador(null); setNuevo(false);
-    notificar(nuevo ? "Artículo creado." : "Cambios guardados.");
   };
 
   const cancelar = () => { setBorrador(null); setNuevo(false); notificar("Cambios descartados."); };
 
   const eliminar = () => {
-    setArticulos((as) => as.filter((_, i) => i !== idx));
-    irA(idx > 0 ? idx - 1 : 0);
+    const victima = articulos[idx];
     setBorrar(false);
-    notificar("Artículo eliminado.");
+    if (!victima) return;
+    const seguir = () => {
+      setArticulos((as) => as.filter((a) => a.id !== victima.id));
+      irA(idx > 0 ? idx - 1 : 0);
+      setMarcados((m) => { const s = new Set(m); s.delete(victima.id); return s; });
+      notificar("Artículo eliminado.");
+    };
+    if (!real) { seguir(); return; }
+    void borrarArticulo(victima.id).then(seguir)
+      .catch((e: unknown) => notificar(`No se ha podido eliminar: ${mensaje(e)}`));
   };
+
+  /**
+   * Duplica lo marcado en la Lista y, si no hay nada marcado, el artículo que
+   * tienes delante — que es como funciona en Glop y evita el botón muerto de
+   * "duplicar" mientras miras una ficha.
+   */
+  const duplicarMarcados = () => {
+    const marcadosAhora = articulos.filter((a) => marcados.has(a.id));
+    const origen = marcadosAhora.length > 0 ? marcadosAhora : (art ? [art] : []);
+    if (origen.length === 0 || guardando) return;
+    setGuardando(true);
+    void (async () => {
+      try {
+        const copias: Articulo[] = [];
+        // La serie avanza DENTRO del bucle: con el mismo `siguienteNumero` para
+        // todas, duplicar tres artículos daba tres veces el mismo código.
+        let enUso = articulos.map((a) => Number(a.codigo) || 0);
+        for (const a of origen) {
+          const n = siguienteNumero(enUso);
+          enUso = [...enUso, n];
+          const copia = duplicarArticulo(a, String(n).padStart(4, "0"));
+          if (real) await guardarArticulo(copia);
+          copias.push(copia);
+        }
+        setArticulos((as) => [...as, ...copias]);
+        setMarcados(new Set());
+        notificar(copias.length === 1 ? "Artículo duplicado." : `${copias.length} artículos duplicados.`);
+      } catch (e: unknown) {
+        notificar(`No se ha podido duplicar: ${mensaje(e)}`);
+      } finally {
+        setGuardando(false);
+      }
+    })();
+  };
+
+  const marcar = (id: string) =>
+    setMarcados((m) => {
+      const s = new Set(m);
+      // `delete` devuelve false si no estaba: entonces es que toca marcarlo.
+      if (!s.delete(id)) s.add(id);
+      return s;
+    });
 
   // Sin artículos no hay ficha que enseñar. Estado vacío CON salida: borrar el
   // último dejaba la pantalla en blanco y sin botón para volver.
@@ -267,6 +372,11 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       <BotonPie Icono={ChevronsRight} onClick={() => irA(articulos.length - 1)} disabled={editando || idx >= articulos.length - 1}>Fin</BotonPie>
       <SepPie />
       <BotonPie Icono={PlusCircle} tono="ok" onClick={crear} disabled={editando}>Nuevo</BotonPie>
+      {/* Duplicar va junto a Nuevo porque ES un alta: la de quien da de alta
+          ocho vinos que solo cambian en el nombre y el precio. */}
+      <BotonPie Icono={Copy} onClick={duplicarMarcados} disabled={editando || guardando}>
+        {marcados.size > 1 ? `Duplicar (${marcados.size})` : "Duplicar"}
+      </BotonPie>
       <BotonPie Icono={Pencil} onClick={modificar} disabled={editando}>Modificar</BotonPie>
       <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={editando || articulos.length === 0}>Eliminar</BotonPie>
       <SepPie />
@@ -298,18 +408,32 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       >
         {pestana === "Lista" && (
           <Caja crecer>
-            <div className="flex flex-none gap-2 border-b border-line p-2.5">
-              <div className="relative flex-1">
+            <div className="flex flex-none items-center gap-2 border-b border-line p-2.5">
+              <div className="relative min-w-0 flex-1">
                 <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                 <input value={q} onChange={(e) => setQ(e.target.value)}
                   placeholder="Buscar por descripción, código de barras o familia…"
-                  className={claseEntrada(false, "pl-9.5")} />
+                  className={claseEntrada(false, "w-full pl-9.5")} />
               </div>
+              {!real && (
+                <span className="flex-none rounded-full border border-amber/40 bg-amber/10 px-3 py-1.5 text-[11.5px] font-bold text-amber">
+                  Carta de ejemplo · terminal sin emparejar
+                </span>
+              )}
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70">
+                    <th className="w-11 text-center!">
+                      {/* Marcar todo lo que se está VIENDO (lo filtrado), no los
+                          1.200 del bar: nadie quiere duplicar la carta entera
+                          por pulsar una casilla. */}
+                      <input type="checkbox" aria-label="Marcar todo lo que se ve"
+                        checked={lista.length > 0 && lista.every((a) => marcados.has(a.id))}
+                        onChange={(e) => setMarcados(e.target.checked ? new Set(lista.map((a) => a.id)) : new Set())}
+                        className="h-4.5 w-4.5 accent-(--brand)" />
+                    </th>
                     <th className="w-20">Código</th><th>Descripción</th><th>Familia</th>
                     <th className="text-right!">Barra</th><th className="text-right!">Salón</th>
                     <th className="text-right!">Coste</th><th className="text-right!">Margen</th>
@@ -325,6 +449,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                       <tr key={a.id} aria-selected={sel}
                         onClick={() => { setIdx(articulos.indexOf(a)); setPestana("Ficha"); setFmtSel(null); }}
                         className={`cursor-pointer border-b border-line text-[13.5px] ${sel ? "bg-accent-soft" : ""}`}>
+                        {/* `stopPropagation`: la fila entera navega a la ficha, y
+                            marcar la casilla no debe llevarte a otra pantalla. */}
+                        <td className="px-2.5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={marcados.has(a.id)} onChange={() => marcar(a.id)}
+                            aria-label={`Marcar ${a.nombre}`}
+                            className="h-4.5 w-4.5 accent-(--brand)" />
+                        </td>
                         <td className="px-2.5 py-2 font-mono text-[13px] text-muted">{a.codigo}</td>
                         <td className="px-2.5 py-2 font-semibold">{a.nombre}</td>
                         <td className="px-2.5 py-2">
@@ -346,7 +477,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     );
                   })}
                   {lista.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-muted">Ningún artículo se llama «{q.trim()}».</td></tr>
+                    <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-muted">Ningún artículo se llama «{q.trim()}».</td></tr>
                   )}
                 </tbody>
               </table>
@@ -431,6 +562,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             </Caja>
 
             <Caja crecer titulo="Formatos de venta" contador={`${art.formatos.length} formatos`}>
+              {real && (
+                <p className="flex flex-none items-center gap-2 border-b border-line bg-amber/8 px-3.5 py-2 text-[12px] font-semibold text-amber">
+                  <Info size={15} className="flex-none" />
+                  De momento se guarda el precio de <b>Barra</b>. Salón y Terraza son otra
+                  tarifa, y las tarifas todavía no están hechas: no las des por guardadas.
+                </p>
+              )}
               <div className="min-h-0 flex-1 overflow-auto border-t border-line">
                 <table className="w-full min-w-[980px] border-collapse">
                   {/* Anchos FIJOS en las numéricas: si no, la tabla reparte su
@@ -497,7 +635,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     if (!b) return b;
                     const n = siguienteNumero(b.formatos.map((f) => Number(f.codigo.split(".")[1]) || 0));
                     return { ...b, formatos: [...b.formatos, {
-                      id: `${b.codigo}-f${n}`, codigo: `${b.codigo}.${n}`, nombre: "Nuevo formato",
+                      id: crypto.randomUUID(), codigo: `${b.codigo}.${n}`, nombre: "Nuevo formato",
                       barra: 0, salon: 0, terraza: 0, barras: "", combinado: false,
                       modificable: false, raciones: 1, coste: 0,
                     }] };
