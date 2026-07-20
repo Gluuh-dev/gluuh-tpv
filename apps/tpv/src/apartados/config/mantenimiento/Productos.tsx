@@ -3,7 +3,7 @@ import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../..
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2,
 } from "lucide-react";
 import { Modal, BarraVentana, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -232,16 +232,46 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     temporizador.current = window.setTimeout(() => setAviso(""), 2400);
   };
 
+  // ── DESHACER (Ctrl+Z) ──────────────────────────────────────────────────────
+  // Una pila con la foto ANTERIOR del borrador. Como TODA edición de la ficha
+  // pasa por `editar`, deshacer sale gratis para los precios, los nombres y los
+  // parámetros — no solo para el formato que acabas de borrar sin querer, que
+  // es lo que dolía.
+  const historial = useRef<Articulo[]>([]);
+  const [hayQueDeshacer, setHayQueDeshacer] = useState(false);
+
+  /** Cambia el borrador GUARDANDO ANTES cómo estaba. */
+  const editar = (cambio: (b: Articulo) => Articulo) =>
+    setBorrador((b) => {
+      if (!b) return b;
+      // Tope de 60: una ficha son cuatro pantallas, no un editor de texto, y una
+      // pila sin límite se come la memoria del mini-PC del bar sin que se note.
+      historial.current = [...historial.current.slice(-59), b];
+      setHayQueDeshacer(true);
+      return cambio(b);
+    });
+
+  const deshacer = () => {
+    const previo = historial.current.pop();
+    if (!previo) return;
+    setBorrador(previo);
+    setHayQueDeshacer(historial.current.length > 0);
+    notificar("Deshecho.");
+  };
+
+  // El historial es de ESTA edición: al entrar, salir o guardar se tira. Si no,
+  // un Ctrl+Z después de guardar resucitaría la ficha de otro artículo.
+  const olvidarHistorial = () => { historial.current = []; setHayQueDeshacer(false); };
+
   // Toda edición pasa por aquí: el borrador es la única copia mutable.
   const set = <K extends keyof Articulo>(campo: K, valor: Articulo[K]) =>
-    setBorrador((b) => (b ? { ...b, [campo]: valor } : b));
+    editar((b) => ({ ...b, [campo]: valor }));
 
   // Los parámetros son sí/no. `vendible` y `alPeso` se reflejan además en los
   // atajos de la ficha (la lista y los interruptores de Datos generales), para
   // que no haya dos verdades sobre lo mismo.
   const setParam = (campo: keyof ParametrosArticulo, valor: boolean) =>
-    setBorrador((b) => {
-      if (!b) return b;
+    editar((b) => {
       const parametros = { ...b.parametros, [campo]: valor };
       return {
         ...b,
@@ -252,13 +282,29 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     });
 
   const setFormato = (id: string, campo: keyof FormatoVenta, valor: FormatoVenta[keyof FormatoVenta]) =>
-    setBorrador((b) => b ? { ...b, formatos: b.formatos.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)) } : b);
+    editar((b) => ({ ...b, formatos: b.formatos.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)) }));
 
   const alternar = (campo: "categorias" | "alergenos", v: string) =>
-    setBorrador((b) => b ? {
+    editar((b) => ({
       ...b,
       [campo]: b[campo].includes(v) ? b[campo].filter((x) => x !== v) : [...b[campo], v],
-    } : b);
+    }));
+
+  // Ctrl+Z (y Cmd+Z en Mac). Se intercepta AUNQUE el foco esté en un campo: los
+  // inputs de la ficha son controlados por React, así que el deshacer nativo del
+  // navegador ya no funciona en ellos — dejarlo pasar no devolvería nada.
+  useEffect(() => {
+    const alPulsar = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+      if (!borrador) return;              // en consulta no hay nada que deshacer
+      e.preventDefault();
+      deshacer();
+    };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+    // `deshacer` se recrea cada render; lo que importa es si hay borrador vivo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [borrador]);
 
   const irA = (i: number) => {
     const destino = articulos[Math.max(0, Math.min(articulos.length - 1, i))];
@@ -266,11 +312,12 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setFmtSel(null);
   };
 
-  const modificar = () => { if (art) setBorrador(structuredClone(art)); };
+  const modificar = () => { if (art) { olvidarHistorial(); setBorrador(structuredClone(art)); } };
 
   const crear = () => {
     const codigo = String(siguienteNumero(articulos.map((a) => Number(a.codigo) || 0))).padStart(4, "0");
     setNuevo(true);
+    olvidarHistorial();
     setBorrador({
       // UUID: `product.id` lo es en la BD, y un `art-0007` reventaría el alta.
       id: crypto.randomUUID(), codigo, nombre: "", nombreComanda: "", nombreTicket: "",
@@ -312,7 +359,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
       setArticulos((as) => (esNuevo ? [...as, listo] : as.map((a) => (a.id === listo.id ? listo : a))));
       if (esNuevo) abrirArticulo(refDeArticulo(listo));
-      setBorrador(null); setNuevo(false);
+      setBorrador(null); setNuevo(false); olvidarHistorial();
       notificar(esNuevo ? "Artículo creado." : "Cambios guardados.");
     } catch (e: unknown) {
       // El borrador se QUEDA: si el nodo falla, lo último que quiere el dueño es
@@ -323,7 +370,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     }
   };
 
-  const cancelar = () => { setBorrador(null); setNuevo(false); notificar("Cambios descartados."); };
+  const cancelar = () => { setBorrador(null); setNuevo(false); olvidarHistorial(); notificar("Cambios descartados."); };
 
   const eliminar = () => {
     const victima = articulos[idx];
@@ -376,8 +423,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
   /** Alta de formato: la serie sale del MÁXIMO en uso, no de contar (ver `siguienteNumero`). */
   const anadirFormato = () =>
-    setBorrador((b) => {
-      if (!b) return b;
+    editar((b) => {
       const n = siguienteNumero(b.formatos.map((f) => Number(f.codigo.split(".")[1]) || 0));
       return { ...b, formatos: [...b.formatos, {
         id: crypto.randomUUID(), codigo: `${b.codigo}.${n}`, nombre: "Nuevo formato",
@@ -436,6 +482,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       <BotonPie Icono={Pencil} onClick={modificar} disabled={editando}>Modificar</BotonPie>
       <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={editando || articulos.length === 0}>Eliminar</BotonPie>
       <SepPie />
+      {/* Con dedo no hay Ctrl+Z: el atajo está bien para quien tenga teclado,
+          pero la acción tiene que existir también como botón. */}
+      <BotonPie Icono={Undo2} onClick={deshacer} disabled={!editando || !hayQueDeshacer}>Deshacer</BotonPie>
       <BotonPie Icono={CheckCircle2} tono="ok" onClick={guardar} disabled={!editando}>Aceptar</BotonPie>
       <BotonPie Icono={XCircle} tono="no" onClick={cancelar} disabled={!editando}>Cancelar</BotonPie>
       <span className="flex-1" />
@@ -694,7 +743,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                                 disabled={art.formatos.length <= 1}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setBorrador((b) => b ? { ...b, formatos: b.formatos.filter((x) => x.id !== f.id) } : b);
+                                  editar((b) => ({ ...b, formatos: b.formatos.filter((x) => x.id !== f.id) }));
                                   if (fmtSel === f.id) setFmtSel(null);
                                 }}
                                 className="grid h-8 w-8 place-items-center rounded-[5px] text-muted transition-transform active:scale-90 hover:text-danger disabled:opacity-25">
