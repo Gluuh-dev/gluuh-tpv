@@ -169,7 +169,19 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0133`.**
+**Siguiente número libre: `0134`.**
+
+- `0133` — **RESERVADA 20-07 (sesión chat, menús como en Ágora)**:
+  `menu_grupo_categoria_y_pase` — de la pantalla «Editar Menú» de Ágora salen
+  **dos ideas que faltaban**: (1) las opciones de un paso no se listan plato a
+  plato, salen de una **CATEGORÍA** (`Cat. Productos` = «PRIMEROS MENU»), así que
+  cambiar el menú del día es cambiar qué hay en la categoría, no editar el menú;
+  y (2) el **Ord. Preparación** (el pase) **se configura**, no se adivina — hoy
+  `paseDeGrupo()` lo saca con un regex del nombre del grupo y un paso llamado
+  «Para picar» se queda sin pase y en cocina no se ordena. Añade
+  `menu_group.category_id`, `menu_group.num_platos` (el «Nº Platos» de Ágora) y
+  `menu_group.orden_prep`. `menu_choice` se queda: los dos modos conviven
+  (categoría entera o lista explícita).
 
 - `0132` — **RESERVADA 20-07 (sesión chat, precios de Ágora: añadido y menú)**:
   `precio_anadido_y_suplemento_menu` — cierra el triángulo que hace que

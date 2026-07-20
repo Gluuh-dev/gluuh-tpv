@@ -12,13 +12,15 @@ import { eur } from "@/app/lib/money";
 export interface MenuGrupo {
   id: string;
   nombre: string;
+  /** Pase de cocina CONFIGURADO (0133). Sin él se deduce del nombre. */
+  orden_prep?: number | null;
   opciones: { id: string; nombre: string }[];
 }
 
 export interface MenuModalProps {
   menu: { nombre: string; precio: number; grupos: MenuGrupo[] };
   onAceptar(
-    seleccion: { grupoId: string; grupoNombre: string; opcionId: string; opcionNombre: string }[],
+    seleccion: { grupoId: string; grupoNombre: string; grupoOrdenPrep?: number | null; opcionId: string; opcionNombre: string }[],
   ): void;
   onCancelar(): void;
 }
@@ -44,7 +46,7 @@ export function MenuModal({ menu, onAceptar, onCancelar }: MenuModalProps) {
       menu.grupos.map((g) => {
         const opcionId = elegidas[g.id]!;
         const opcion = g.opciones.find((o) => o.id === opcionId)!;
-        return { grupoId: g.id, grupoNombre: g.nombre, opcionId, opcionNombre: opcion.nombre };
+        return { grupoId: g.id, grupoNombre: g.nombre, grupoOrdenPrep: g.orden_prep, opcionId, opcionNombre: opcion.nombre };
       }),
     );
   }

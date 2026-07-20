@@ -10,6 +10,7 @@ import { encolarComandas } from "../lib/print-routing";
 import { claveBase, claveDeLinea, claveParaAnadir } from "./clave-linea";
 import { precioEfectivo as precioEfectivoPuro } from "./precio";
 import { lineasQueSalenEnComanda } from "./comanda";
+import { paseDeGrupo } from "./pase";
 import {
   nombreDeKey as nombreDeKeyPuro,
   nombreBaseDeKey as nombreBaseDeKeyPuro,
@@ -77,23 +78,12 @@ interface Ticket {
 // Menú/combo del tenant, mapeado a la forma que consume MenuModal (un paso por grupo).
 interface MenuTPV {
   id: string; nombre: string; precio: number; clase_fiscal: string; category_id: string | null;
-  grupos: { id: string; nombre: string; opciones: { id: string; nombre: string }[] }[];
+  grupos: { id: string; nombre: string; orden_prep?: number | null; opciones: { id: string; nombre: string }[] }[];
 }
 
 /* ─── Helpers ─── */
 // Iniciales del camarero para la marca sutil de atribución por línea.
 const iniciales = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("");
-// Pase (orden de cocina) según el nombre del grupo del menú: Primero→1 … Postre→4, Bebida→5.
-// Grupos con nombre libre (menú especial) → sin pase (undefined).
-function paseDeGrupo(nombre: string): number | undefined {
-  const n = nombre.trim().toLowerCase();
-  if (/postre/.test(n)) return 4;
-  if (/bebid/.test(n)) return 5;
-  if (/^1|prim/.test(n)) return 1;
-  if (/^2|segu/.test(n)) return 2;
-  if (/^3|terc/.test(n)) return 3;
-  return undefined;
-}
 const TERR: Record<string, string> = {
   PENINSULA_BALEARES: "PENINSULA_BALEARES", CANARIAS: "CANARIAS",
   CEUTA_MELILLA: "CEUTA_MELILLA", FORAL_PV: "PENINSULA_BALEARES", FORAL_NAVARRA: "PENINSULA_BALEARES",
@@ -501,17 +491,17 @@ export default function TPV() {
       try {
         const [{ data: mm }, { data: gg }, { data: cc }] = await Promise.all([
           sb.from("menu").select("id,nombre,precio,clase_fiscal,category_id").eq("activo", true).order("orden"),
-          sb.from("menu_group").select("id,menu_id,nombre,orden").order("orden"),
+          sb.from("menu_group").select("id,menu_id,nombre,orden,orden_prep,num_platos").order("orden"),
           sb.from("menu_choice").select("group_id,product_id,product(nombre)"),
         ]);
-        const grupos = (gg ?? []) as { id: string; menu_id: string; nombre: string; orden: number }[];
+        const grupos = (gg ?? []) as { id: string; menu_id: string; nombre: string; orden: number; orden_prep?: number | null }[];
         type Choice = { group_id: string; product_id: string; product: { nombre: string } | { nombre: string }[] | null };
         const choices = (cc ?? []) as Choice[];
         const nombreDe = (pr: Choice["product"]) => (Array.isArray(pr) ? pr[0]?.nombre : pr?.nombre) ?? "Producto";
         setMenus(((mm ?? []) as { id: string; nombre: string; precio: number; clase_fiscal: string; category_id: string | null }[]).map((m) => ({
           id: m.id, nombre: m.nombre, precio: Number(m.precio), clase_fiscal: m.clase_fiscal, category_id: m.category_id,
           grupos: grupos.filter((g) => g.menu_id === m.id).map((g) => ({
-            id: g.id, nombre: g.nombre,
+            id: g.id, nombre: g.nombre, orden_prep: g.orden_prep,
             opciones: choices.filter((c) => c.group_id === g.id).map((c) => ({ id: c.product_id, nombre: nombreDe(c.product) })),
           })),
         })));
@@ -2301,7 +2291,7 @@ export default function TPV() {
   //  · PARTES   = cada plato elegido, su PROPIA línea a 0 € (base 0 vía preciosManuales; así
   //    los extras que se le añadan —punto de la carne, complementos— SUMAN al precio), marcada
   //    como parte del menú (menuParte → sale con "(M)" y se borra en cascada con la cabecera).
-  function anadirMenu(m: MenuTPV, seleccion: { grupoId: string; grupoNombre: string; opcionId: string; opcionNombre: string }[]) {
+  function anadirMenu(m: MenuTPV, seleccion: { grupoId: string; grupoNombre: string; grupoOrdenPrep?: number | null; opcionId: string; opcionNombre: string }[]) {
     const menuKey = addProd(m.id);
     // Claves ÚNICAS (síncronas, sobre un snapshot vivo): dos platos iguales o uno que ya esté
     // en carta NO fusionan. addProd ya metió la cabecera; partimos de ese estado.
@@ -2322,7 +2312,7 @@ export default function TPV() {
     // Bebida→Bebida. No se toca por línea (el grupo del menú manda). Grupos raros: sin pase.
     setPases((ps) => {
       const r = { ...ps };
-      seleccion.forEach((s, i) => { const pv = paseDeGrupo(s.grupoNombre); if (pv) r[nuevas[i]!] = pv; });
+      seleccion.forEach((s, i) => { const pv = paseDeGrupo(s.grupoNombre, s.grupoOrdenPrep); if (pv) r[nuevas[i]!] = pv; });
       return r;
     });
     setMenuAbierto(null);
