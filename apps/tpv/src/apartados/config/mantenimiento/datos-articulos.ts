@@ -55,7 +55,7 @@ export interface Extra { id: string; nombre: string; precio: number }
  *   esAlcohol       → `es_alcohol`
  * Los que NO tienen columna todavía y habría que crear si se quieren de verdad:
  *   controlaStock · noImprimirSiCero · descripcionLibre · preguntarPrecio ·
- *   eCommerce · esMenuDelDia
+ *   eCommerce (esMenuDelDia existe pero no se usa: ver el campo)
  */
 export interface ParametrosArticulo {
   vendible: boolean;
@@ -67,6 +67,12 @@ export interface ParametrosArticulo {
   eCommerce: boolean;
   /** Sale en la carta por QR de la mesa. En Glop, C_DIGITAL. Son cosas distintas. */
   cartaDigital: boolean;
+  /**
+   * ⚠ MUERTO POR DISEÑO. Un menú no es un artículo: vive en `menu` +
+   * `menu_group` + `menu_choice`. Se mantiene el campo porque la columna existe
+   * (0128) y hay que seguir leyéndola y escribiéndola sin perderla, pero NO se
+   * enseña en la ficha: una casilla que no crea ningún menú engaña.
+   */
   esMenuDelDia: boolean;
   alPeso: boolean;
   combinable: boolean;

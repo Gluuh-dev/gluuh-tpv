@@ -96,12 +96,16 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
       { clave: "descripcionLibre", texto: "Descripción libre", ayuda: "Pide un texto al vender (para «otros» o platos fuera de carta)." },
     ],
   },
+  // ⚠ Aquí NO hay «Menú del día». Un menú no es un artículo: vive en `menu` +
+  // `menu_group` + `menu_choice`, y marcar una casilla en un `product` no crea
+  // ningún menú. La columna `es_menu_del_dia` (0128) sigue en la BD sin uso; se
+  // retirará cuando se confirme que nadie la lee. Los menús se hacen en su
+  // propia sección de Configuración.
   {
     titulo: "Qué es este artículo",
     campos: [
       { clave: "esPrincipal", texto: "Plato principal", ayuda: "Cuenta como plato en el reparto de la comanda." },
       { clave: "esAnadido", texto: "Es un añadido", ayuda: "Va pegado a otro artículo (extras, guarniciones)." },
-      { clave: "esMenuDelDia", texto: "Menú del día", ayuda: "Se compone por pases y lleva precio cerrado." },
       { clave: "combinable", texto: "Se puede combinar", ayuda: "Copas: al añadirlo pregunta con qué refresco va." },
       { clave: "esAlcohol", texto: "Contiene alcohol", ayuda: "Lo necesita el desglose fiscal y el tipo de impuesto." },
     ],

@@ -9,6 +9,7 @@ import { imprimirTicket, imprimirComanda, resolverImpresora, formatearTicket, gu
 import { encolarComandas } from "../lib/print-routing";
 import { claveBase, claveDeLinea, claveParaAnadir } from "./clave-linea";
 import { precioEfectivo as precioEfectivoPuro } from "./precio";
+import { lineasQueSalenEnComanda } from "./comanda";
 import {
   nombreDeKey as nombreDeKeyPuro,
   nombreBaseDeKey as nombreBaseDeKeyPuro,
@@ -860,8 +861,13 @@ export default function TPV() {
     const contexto = mesa ? mesa.nombre : llevar ? `Para llevar · ${llevar.nombre}` : "Aparcado";
     const grupos = (["COCINA", "BARRA", "CAMARERO"] as const).map((estacion) => ({
       estacion,
-      lineas: lineasComanda()
-        .filter((l) => l.estacion === estacion)
+      // `no_imprimir_si_cero` (0128): las invitaciones se quedan en la cuenta a
+      // 0 € para que conste que salieron, pero fuera del papel de cocina — si no,
+      // el cocinero ve «1 Postre» y lo prepara otra vez.
+      lineas: lineasQueSalenEnComanda(
+        lineasComanda().filter((l) => l.estacion === estacion),
+        (pid) => prodPorId.get(pid)?.no_imprimir_si_cero === true,
+      )
         .map((l) => ({ 
           cantidad: l.cantidad, 
           nombre: nombreDeKey(l.id, "nombre_cocina"), 
