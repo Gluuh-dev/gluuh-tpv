@@ -73,3 +73,39 @@ describe("precioEfectivo — descuentos", () => {
     expect(precioEfectivo(base(), "cafe|f1#3")).toBe(2.2);
   });
 });
+
+// ── TARIFAS (0131): la sala puede cambiar el precio ─────────────────────────
+describe("precioEfectivo · tarifa activa", () => {
+  const prod = { id: "p1", nombre: "Caña", precio: 2, clase_fiscal: "REDUCIDO" } as never;
+  const base = {
+    prodPorId: new Map([["p1", prod]]),
+    formatos: {} as Record<string, never[]>,
+    modById: {},
+    preciosManuales: {},
+    descuentos: {},
+  };
+
+  it("sin tarifa se cobra el precio normal", () => {
+    expect(precioEfectivo(base as never, "p1")).toBe(2);
+  });
+
+  it("con precio de tarifa se cobra el de la tarifa", () => {
+    expect(precioEfectivo({ ...base, preciosTarifa: { p1: 2.4 } } as never, "p1")).toBe(2.4);
+  });
+
+  it("UNA TARIFA SIN ESTE ARTÍCULO NO REGALA: cae al precio normal", () => {
+    // El caso peligroso, el mismo que se probó en el servidor: una tarifa a
+    // medio rellenar tiene que cobrar de más, jamás 0.
+    expect(precioEfectivo({ ...base, preciosTarifa: { otro: 0.1 } } as never, "p1")).toBe(2);
+    expect(precioEfectivo({ ...base, preciosTarifa: {} } as never, "p1")).toBe(2);
+  });
+
+  it("al peso, los kilos se multiplican por el precio de la tarifa", () => {
+    expect(precioEfectivo({ ...base, preciosTarifa: { p1: 10 } } as never, "p1|@0.5")).toBe(5);
+  });
+
+  it("un precio MANUAL sigue mandando sobre la tarifa", () => {
+    const ctx = { ...base, preciosTarifa: { p1: 2.4 }, preciosManuales: { p1: 1 } };
+    expect(precioEfectivo(ctx as never, "p1")).toBe(1);
+  });
+});

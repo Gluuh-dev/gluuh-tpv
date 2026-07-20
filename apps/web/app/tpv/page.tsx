@@ -59,7 +59,7 @@ import { urlFoto } from "@/app/lib/urlFoto";
 
 /* ─── Tipos ─── */
 interface Mesa   { id: string; nombre: string; estado: string; room_id: string | null; pos_x: number | null; pos_y: number | null; capacidad: number; rotacion: number; sprite?: string | null; color?: string | null }
-interface Room   { id: string; nombre: string; orden: number; suelo: string | null }
+interface Room   { id: string; nombre: string; orden: number; suelo: string | null; tarifa_id?: string | null }
 interface Reserva { id: string; table_id: string | null; fecha_hora: string; comensales: number; estado: string; notas: string | null; nombre: string | null }
 /** Parte persistida del reparto de una cuenta (`cuenta_parte`, mig. 0123). */
 interface ParteCuenta { id: string; indice: number; tipo: "IGUAL" | "IMPORTE" | "PRODUCTOS"; importe: number; lineas: unknown; cobrada: boolean }
@@ -176,6 +176,10 @@ export default function TPV() {
   const [userId, setUserId]       = useState<string | null>(null);
   const [mesas, setMesas]         = useState<Mesa[]>([]);
   const [rooms, setRooms]         = useState<Room[]>([]);
+  // Precios de la TARIFA activa (0131), por producto. Vacío = precios normales.
+  // La tarifa la elige la SALA de la mesa: es lo que hace que la terraza cobre
+  // distinto sin tocar la carta.
+  const [preciosTarifa, setPreciosTarifa] = useState<Record<string, number>>({});
   const [reservas, setReservas]   = useState<Reserva[]>([]);
   const [elementos, setElementos] = useState<Elemento[]>([]);
   // Se recuerda la sala/vista donde estabas (room id, "BARRA", "RESERVAS", "LLEVAR").
@@ -397,7 +401,7 @@ export default function TPV() {
           sb.from("app_user").select("id").eq("auth_user_id", session.user.id).maybeSingle().then((r) => r.data),
           sb.from("tenant").select("id").limit(1).maybeSingle().then((r) => r.data),
           useCatalogo.getState().cargar(sb),   // catálogo del store (cache + revalidación)
-          sb.from("room").select("id,nombre,orden,suelo").order("orden").then((r) => r.data),
+          sb.from("room").select("id,nombre,orden,suelo,tarifa_id").order("orden").then((r) => r.data),
           sb.from("reservation").select("id,table_id,fecha_hora,comensales,estado,notas,nombre")
             .gte("fecha_hora", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
             .in("estado", ["PENDIENTE", "CONFIRMADA", "SENTADA"])
@@ -569,10 +573,33 @@ export default function TPV() {
 
   /* ── Precio efectivo (peso/formato + suplemento de modificadores + desc./precio manual).
      El cálculo vive en ./precio.ts (puro, con tests); aquí solo se le da el contexto. ── */
+  // La tarifa de la mesa que se está atendiendo. Sin mesa (barra, para llevar)
+  // no hay sala, así que no hay tarifa: precios normales.
+  const tarifaActiva = useMemo(
+    () => rooms.find((r) => r.id === mesa?.room_id)?.tarifa_id ?? null,
+    [rooms, mesa?.room_id],
+  );
+
+  useEffect(() => {
+    if (!tarifaActiva) { setPreciosTarifa({}); return; }
+    let vivo = true;
+    void sb.from("product_price").select("product_id,precio").eq("tarifa_id", tarifaActiva)
+      .then(({ data, error }) => {
+        // Si la consulta falla NO se inventan precios: se dejan los normales.
+        // Cobrar de más es un problema; cobrar de menos por un fallo de red es
+        // dinero que el bar no recupera.
+        if (!vivo || error || !data) { setPreciosTarifa({}); return; }
+        setPreciosTarifa(Object.fromEntries(
+          (data as { product_id: string; precio: number }[]).map((p) => [p.product_id, Number(p.precio)]),
+        ));
+      });
+    return () => { vivo = false; };
+  }, [tarifaActiva, sb]);
+
   const precioEfectivo = useMemo(() => {
-    const ctx = { prodPorId, formatos, modById, preciosManuales, descuentos };
+    const ctx = { prodPorId, formatos, modById, preciosManuales, descuentos, preciosTarifa };
     return (id: string): number => precioEfectivoPuro(ctx, id);
-  }, [prodPorId, formatos, modById, preciosManuales, descuentos]);
+  }, [prodPorId, formatos, modById, preciosManuales, descuentos, preciosTarifa]);
 
   /* ── Total (las líneas invitadas suman 0) ── */
   const total = useMemo(
