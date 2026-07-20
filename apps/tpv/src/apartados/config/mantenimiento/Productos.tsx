@@ -3,7 +3,7 @@ import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../..
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer,
 } from "lucide-react";
 import { Modal, BarraVentana, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -22,6 +22,7 @@ import {
   type Modificadores, type GrupoModificador, type GrupoEfectivo, type TipoGrupo,
 } from "./modificadores";
 import { refDeArticulo, indicePorRef } from "./referencia";
+import { cargarImpresion, explicarRuta, type DatosImpresion } from "./impresion";
 import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, claseEntrada,
   BuscadorRegistros,
@@ -193,6 +194,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   // compartida y las asignaciones que deciden quién hereda qué.
   const [mods, setMods] = useState<Modificadores>(() => modificadoresDemo(ARTICULOS_DEMO));
   const [guardando, setGuardando] = useState(false);
+  // Impresoras y rutas, solo para DECIR en la ficha por dónde saldrá la comanda
+  // (no se configuran aquí: eso es la sección Impresoras).
+  const [impresion, setImpresion] = useState<DatosImpresion | null>(null);
   // Las familias son ESTADO, no constante: desde el buscador se pueden crear sin
   // abandonar el artículo que estás dando de alta.
   const [familias, setFamilias] = useState(FAMILIAS.map((f, i) => ({ ...f, codigo: String(i + 1) })));
@@ -208,6 +212,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       setReal(true);
     });
     void cargarModificadores().then((m) => { if (vivo && m) setMods(m); });
+    void cargarImpresion().then((d) => { if (vivo && d) setImpresion(d); });
     return () => { vivo = false; };
   }, []);
 
@@ -549,35 +554,72 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
   const ro = !editando; // solo lectura mientras no se pulse «Modificar»
 
-  // ── Barra inferior: el corazón del patrón (consulta ⇄ edición) ──
-  const pie = (
+  // ── Barra inferior: CAMBIA según dónde estás ──────────────────────────────
+  // No es un pie fijo con medio botones en gris: cada sitio enseña lo que de
+  // verdad se puede hacer ahí. Un «Anterior/Siguiente» en la Lista, o un
+  // «Aceptar» cuando no editas, es ruido que hay que aprender a ignorar.
+  //
+  //  · Lista    → dar de alta y actuar sobre la selección. Nada de recorrer
+  //               registros de uno en uno: para eso está la propia lista.
+  //  · Consulta → recorrer artículos (Inicio…Fin) y las acciones de siempre.
+  //  · Edición  → SOLO guardar/deshacer/cancelar. Todo lo demás desaparece para
+  //               que no haya forma de irte a otro artículo con cambios sin salvar.
+  const finComun = (
     <>
-      <BotonPie Icono={ChevronsLeft} onClick={() => irA(0)} disabled={editando || idx === 0}>Inicio</BotonPie>
-      <BotonPie Icono={ChevronLeft} onClick={() => irA(idx - 1)} disabled={editando || idx === 0}>Anterior</BotonPie>
-      <BotonPie Icono={ChevronRight} onClick={() => irA(idx + 1)} disabled={editando || idx >= articulos.length - 1}>Siguiente</BotonPie>
-      <BotonPie Icono={ChevronsRight} onClick={() => irA(articulos.length - 1)} disabled={editando || idx >= articulos.length - 1}>Fin</BotonPie>
-      <SepPie />
-      <BotonPie Icono={PlusCircle} tono="ok" onClick={crear} disabled={editando}>Nuevo</BotonPie>
-      {/* Duplicar va junto a Nuevo porque ES un alta: la de quien da de alta
-          ocho vinos que solo cambian en el nombre y el precio. */}
-      <BotonPie Icono={Copy} onClick={duplicarMarcados} disabled={editando || guardando}>
-        {marcados.size > 1 ? `Duplicar (${marcados.size})` : "Duplicar"}
-      </BotonPie>
-      <BotonPie Icono={Pencil} onClick={modificar} disabled={editando}>Modificar</BotonPie>
-      <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={editando || articulos.length === 0}>Eliminar</BotonPie>
-      <SepPie />
-      {/* Con dedo no hay Ctrl+Z: el atajo está bien para quien tenga teclado,
-          pero la acción tiene que existir también como botón. */}
-      <BotonPie Icono={Undo2} onClick={deshacer} disabled={!editando || !hayQueDeshacer}>Deshacer</BotonPie>
-      <BotonPie Icono={CheckCircle2} tono="ok" onClick={guardar} disabled={!editando}>Aceptar</BotonPie>
-      <BotonPie Icono={XCircle} tono="no" onClick={cancelar} disabled={!editando}>Cancelar</BotonPie>
       <span className="flex-1" />
       {aviso && <span className="rounded-full bg-paper px-4 py-2 text-[12.5px] font-bold text-ink">{aviso}</span>}
       <BotonPie Icono={Keyboard} onClick={abrirTeclado}>Teclado</BotonPie>
-      <SepPie />
-      <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir} disabled={editando}>Salir</BotonPie>
     </>
   );
+
+  let pie: React.ReactNode;
+  if (editando) {
+    pie = (
+      <>
+        <BotonPie Icono={Undo2} onClick={deshacer} disabled={!hayQueDeshacer}>Deshacer</BotonPie>
+        <SepPie />
+        <BotonPie Icono={CheckCircle2} tono="ok" onClick={guardar}>Aceptar</BotonPie>
+        <BotonPie Icono={XCircle} tono="no" onClick={cancelar}>Cancelar</BotonPie>
+        {finComun}
+        <span className="rounded-full border border-amber/40 bg-amber/10 px-3 py-1.5 text-[12px] font-bold text-amber">
+          {nuevo ? "Nuevo artículo" : `Editando · ${art.codigo}`}
+        </span>
+      </>
+    );
+  } else if (pestana === "Lista") {
+    pie = (
+      <>
+        <BotonPie Icono={PlusCircle} tono="ok" onClick={crear}>Nuevo</BotonPie>
+        {/* Duplicar va junto a Nuevo porque ES un alta: la de quien da de alta
+            ocho vinos que solo cambian en el nombre y el precio. */}
+        <BotonPie Icono={Copy} onClick={duplicarMarcados} disabled={guardando || articulos.length === 0}>
+          {marcados.size > 1 ? `Duplicar (${marcados.size})` : "Duplicar"}
+        </BotonPie>
+        <BotonPie Icono={Pencil} onClick={modificar} disabled={articulos.length === 0}>Modificar</BotonPie>
+        <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={articulos.length === 0}>Eliminar</BotonPie>
+        {finComun}
+        <SepPie />
+        <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir}>Salir</BotonPie>
+      </>
+    );
+  } else {
+    pie = (
+      <>
+        <BotonPie Icono={ChevronsLeft} onClick={() => irA(0)} disabled={idx === 0}>Inicio</BotonPie>
+        <BotonPie Icono={ChevronLeft} onClick={() => irA(idx - 1)} disabled={idx === 0}>Anterior</BotonPie>
+        <BotonPie Icono={ChevronRight} onClick={() => irA(idx + 1)} disabled={idx >= articulos.length - 1}>Siguiente</BotonPie>
+        <BotonPie Icono={ChevronsRight} onClick={() => irA(articulos.length - 1)} disabled={idx >= articulos.length - 1}>Fin</BotonPie>
+        <SepPie />
+        <BotonPie Icono={PlusCircle} tono="ok" onClick={crear}>Nuevo</BotonPie>
+        <BotonPie Icono={Copy} onClick={duplicarMarcados} disabled={guardando}>Duplicar</BotonPie>
+        <BotonPie Icono={Pencil} onClick={modificar}>Modificar</BotonPie>
+        <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={articulos.length === 0}>Eliminar</BotonPie>
+        {finComun}
+        <SepPie />
+        <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir}>Salir</BotonPie>
+      </>
+    );
+  }
 
   return (
     <>
@@ -902,6 +944,19 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     className={claseEntrada(ro, "min-h-28 resize-y py-2 leading-relaxed")} />
                 </Campo>
               </div>
+              {/* Los alérgenos son OBLIGATORIOS en la carta (reglamento europeo).
+                  Es el mismo dato que en «Cocina y ticket»: tocarlo aquí lo cambia
+                  allí, porque es un solo campo. Se enseña en los dos porque en la
+                  carta es donde el cliente los ve. */}
+              <p className="mb-2 mt-5 text-[11px] font-extrabold uppercase tracking-[.14em] text-muted">
+                Alérgenos que verá el cliente ({art.alergenos.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {ALERGENOS.map((a) => (
+                  <ChipSel key={a} texto={a} disabled={ro}
+                    activo={art.alergenos.includes(a)} onToggle={() => alternar("alergenos", a)} />
+                ))}
+              </div>
             </Desplazable>
           </Caja>
         )}
@@ -932,6 +987,37 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   </Campo>
                 </div>
               </div>
+
+              {/* DÓNDE se imprime: la estación de arriba se traduce a impresora
+                  con las rutas (sección Impresoras). Aquí NO se configura —el
+                  artículo no nombra una impresora, se rompería al cambiar el
+                  aparato— pero sí se DICE, que es lo que uno quiere ver: «¿esto
+                  por dónde sale?». */}
+              <Campo etiqueta="Por dónde saldrá la comanda">
+                {(() => {
+                  if (art.estacion === "NINGUNA") {
+                    return <p className="rounded-[5px] border border-line bg-panel-2 px-3 py-2.5 text-[12.5px] text-muted">No se manda a preparar: no imprime comanda.</p>;
+                  }
+                  if (!impresion) {
+                    return <p className="rounded-[5px] border border-line bg-panel-2 px-3 py-2.5 text-[12.5px] text-muted">Las impresoras salen del nodo (terminal sin emparejar).</p>;
+                  }
+                  const { impresora, motivo } = explicarRuta(art.estacion, null, impresion.rutas, impresion.impresoras);
+                  return (
+                    <div className={`flex items-start gap-2.5 rounded-[5px] border px-3 py-2.5 text-[12.5px] leading-snug ${
+                      impresora ? "border-line bg-panel-2 text-paper/85" : "border-danger/40 bg-danger/8 text-danger"
+                    }`}>
+                      <Printer size={15} className="mt-px flex-none" />
+                      <span>
+                        {impresora
+                          ? <><b>{impresora.nombre}</b> — {motivo}</>
+                          : "Ninguna impresora recoge esta estación: no saldrá nada. Configúralo en Impresoras."}
+                        <span className="mt-0.5 block text-[11px] text-muted">Por sala puede cambiar; se ajusta en Impresoras.</span>
+                      </span>
+                    </div>
+                  );
+                })()}
+              </Campo>
+
               <p className="mb-2 mt-5 text-[11px] font-extrabold uppercase tracking-[.14em] text-muted">
                 Alérgenos declarados ({art.alergenos.length})
               </p>

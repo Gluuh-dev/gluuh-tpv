@@ -108,11 +108,13 @@ export function MarcoMantenimiento({
       )}
 
       {/* ── Cuerpo ── */}
-      {/* `pegado`: sin margen y con el borde de la pestaña continuado, para que
-          la Lista se lea como una sola pieza con su pestaña. `min-w-0` evita que
-          una tabla ancha empuje el layout a la derecha. */}
+      {/* `pegado`: sin margen y SIN `border-t` — la línea de arriba ya la pone la
+          fila de pestañas (`border-b`), y la pestaña activa la tapa con su
+          `border-b-panel`. Un `border-t` aquí volvía a dibujarla y CORTABA la
+          card justo bajo la pestaña. `min-w-0` evita que una tabla ancha empuje
+          el layout. */}
       <div className={pegado
-        ? "flex min-h-0 min-w-0 flex-1 flex-col border-t border-line *:rounded-none *:border-x-0 *:border-t-0"
+        ? "flex min-h-0 min-w-0 flex-1 flex-col *:rounded-none *:border-x-0 *:border-t-0"
         : "flex min-h-0 flex-1 flex-col gap-2.5 p-3"}>
         {children}
       </div>
