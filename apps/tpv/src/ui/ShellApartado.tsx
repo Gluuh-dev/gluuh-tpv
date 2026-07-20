@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { PanelLeftClose, Home, ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { PanelLeftClose, Home, ChevronDown, ChevronRight, ChevronUp, type LucideIcon } from "lucide-react";
 
 // SHELL de los apartados de GESTIÓN (Análisis, Administrador, Visor Node).
 // Lenguaje "Supabase/Notion" validado en el piloto de Administrador:
@@ -152,6 +152,48 @@ export function ShellApartado({
     );
   };
 
+  // TÁCTIL: fuera la barra de desplazamiento (con el dedo no se agarra, y la
+  // nativa de Windows mete sus propias flechitas de 12px). Si la lista no cabe,
+  // salen flechas ARRIBA/ABAJO de tamaño de dedo. Misma solución que ya usan las
+  // subpestañas del marco de mantenimiento.
+  const carril = useRef<HTMLDivElement>(null);
+  const [desbordado, setDesbordado] = useState(false);
+  const [enTope, setEnTope] = useState(true);
+  const [enFondo, setEnFondo] = useState(false);
+
+  const medir = useCallback(() => {
+    const el = carril.current;
+    if (!el) return;
+    setDesbordado(el.scrollHeight > el.clientHeight + 1);
+    setEnTope(el.scrollTop <= 1);
+    setEnFondo(el.scrollTop + el.clientHeight >= el.scrollHeight - 1);
+  }, []);
+
+  // Se remide al cambiar la lista, al plegar/desplegar y al cambiar de tamaño.
+  useEffect(() => {
+    medir();
+    const el = carril.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [medir, grupos, secciones, abierto, cerrados]);
+
+  const desplazar = (dir: -1 | 1) => {
+    const el = carril.current;
+    if (el) el.scrollBy({ top: dir * el.clientHeight * 0.7, behavior: "smooth" });
+  };
+
+  const flecha = (dir: -1 | 1, apagada: boolean) => (
+    <button type="button" onClick={() => desplazar(dir)} disabled={apagada}
+      aria-label={dir < 0 ? "Subir en el menú" : "Bajar en el menú"}
+      className={`flex ${tactil ? "h-11" : "h-9"} flex-none items-center justify-center text-muted transition-transform active:scale-90 disabled:opacity-25 ${
+        dir < 0 ? "border-b border-line" : "border-t border-line"
+      }`}>
+      {dir < 0 ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+    </button>
+  );
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* ── LATERAL a toda la altura: al plegar se desplazan barra y página ── */}
@@ -178,7 +220,8 @@ export function ShellApartado({
           )}
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
+        {desbordado && flecha(-1, enTope)}
+        <nav ref={carril} onScroll={medir} className="no-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
           {grupos
             ? grupos.map((g) => {
               // Plegado: sin sitio para cabeceras de grupo, se listan seguidas.
@@ -202,6 +245,7 @@ export function ShellApartado({
             })
             : (secciones ?? []).map(fila)}
         </nav>
+        {desbordado && flecha(1, enFondo)}
 
         <div className="flex-none border-t border-line p-2">
           <button type="button" onClick={onVolver} title="Volver al inicio (Esc)"
