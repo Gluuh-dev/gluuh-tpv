@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, LogOut, LifeBuoy, Printer, Wifi, Sun, Moon, Lock, LogIn } from "lucide-react";
+import { ArrowRight, LogOut, LifeBuoy, Wifi, Sun, Moon, Lock, LogIn } from "lucide-react";
 import { ETIQUETA_ROL, type Apartado } from "../../lib/nav";
 import { useTema } from "../../lib/tema";
 import { Marca, Chip, Escudo, Fkey } from "../../ui";
 import { iniciales, type Usuario } from "../acceso/tipos";
 import { APARTADOS } from "../meta";
+import { CampanaAvisos } from "./CampanaAvisos";
 
 // REGLAS del TPV (táctil): sin `hover`, solo animación al pulsar (`active:`);
 // sombras al mínimo. El hub tiene SESIÓN: te identificas una vez y navegas lo que
@@ -81,8 +82,10 @@ export function Inicio({ local, turno, usuario, permitido, onNavegar, onIdentifi
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
           <Chip dot><Wifi size={13} /> Node conectado</Chip>
-          <Chip dot warn><Printer size={13} /> Impresora cocina: sin papel</Chip>
           <Chip><span className="text-[14px] font-semibold tracking-wide">{hhmm}</span></Chip>
+          {/* Los avisos (impresora, stock…) ya no son un chip fijo que miente:
+              una campana con lo que pasa de verdad, en un panel lateral. */}
+          <CampanaAvisos />
           {/* Quién está en el terminal. Logueado: avatar + nombre + cerrar sesión.
               Anónimo: botón para identificarse. */}
           {usuario ? (

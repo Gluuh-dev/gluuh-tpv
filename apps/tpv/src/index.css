@@ -156,4 +156,7 @@
 @keyframes gl-velo { from { opacity: 0; } to { opacity: 1; } }
 .gl-aparecer { animation: gl-aparecer 0.16s cubic-bezier(0.2, 0.7, 0.3, 1); }
 .gl-velo { animation: gl-velo 0.16s ease; }
-@media (prefers-reduced-motion: reduce) { .gl-aparecer, .gl-velo { animation: none; } }
+/* Panel lateral (avisos): entra deslizando desde la derecha. */
+@keyframes gl-panel-derecha { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.gl-panel-derecha { animation: gl-panel-derecha 0.2s cubic-bezier(0.2, 0.7, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) { .gl-aparecer, .gl-velo, .gl-panel-derecha { animation: none; } }
