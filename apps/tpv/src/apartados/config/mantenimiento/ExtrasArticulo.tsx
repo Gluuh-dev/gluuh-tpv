@@ -34,7 +34,7 @@ function Chapa({ origen }: Readonly<{ origen: Origen }>) {
 }
 
 export function ExtrasArticulo({
-  grupos, soloLectura, onCambiar, onQuitarHeredado, onNuevo, real,
+  grupos, soloLectura, onCambiar, onQuitarHeredado, onNuevo,
 }: Readonly<{
   grupos: readonly GrupoEfectivo[];
   soloLectura: boolean;
@@ -43,8 +43,6 @@ export function ExtrasArticulo({
   /** Quitar: borra el propio, o excluye el heredado de este artículo. */
   onQuitarHeredado: (g: GrupoEfectivo) => void;
   onNuevo: (tipo: TipoGrupo) => void;
-  /** Con datos del nodo. En demo se avisa de que esto no se guarda. */
-  real: boolean;
 }>) {
   const ro = soloLectura;
 
@@ -52,9 +50,8 @@ export function ExtrasArticulo({
     <>
       <p className="flex flex-none items-center gap-2.5 rounded-[6px] border border-brand-lit/25 bg-accent-soft px-3.5 py-3 text-[13px] font-semibold leading-snug text-brand-lit">
         <Info size={18} className="flex-none" />
-        {real
-          ? "Esto es lo que verá el camarero al vender. Lo que viene de la familia o de una categoría se cambia allí: aquí solo puedes quitárselo a este artículo."
-          : "Carta de ejemplo: este terminal no está emparejado, así que lo que toques aquí no se guarda."}
+        Esto es lo que verá el camarero al vender. Lo que viene de la familia o de
+        una categoría se cambia allí: aquí solo puedes quitárselo a este artículo.
       </p>
 
       <Caja crecer titulo="Extras y comentarios" contador={`${grupos.length} grupos`}

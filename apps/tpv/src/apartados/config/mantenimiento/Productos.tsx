@@ -376,7 +376,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       setArticulos((as) => (esNuevo ? [...as, listo] : as.map((a) => (a.id === listo.id ? listo : a))));
       if (esNuevo) abrirArticulo(refDeArticulo(listo));
       setBorrador(null); setNuevo(false); olvidarHistorial();
-      notificar(esNuevo ? "Artículo creado." : "Cambios guardados.");
+      notificar(real
+        ? (esNuevo ? "Artículo creado." : "Cambios guardados.")
+        : "Guardado solo en este terminal: sin emparejar, se pierde al recargar.");
     } catch (e: unknown) {
       // El borrador se QUEDA: si el nodo falla, lo último que quiere el dueño es
       // volver a teclear la ficha entera.
@@ -580,11 +582,6 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   placeholder="Buscar por descripción, código de barras o familia…"
                   className={claseEntrada(false, "w-full pl-9.5")} />
               </div>
-              {!real && (
-                <span className="flex-none rounded-full border border-amber/40 bg-amber/10 px-3 py-1.5 text-[11.5px] font-bold text-amber">
-                  Carta de ejemplo · terminal sin emparejar
-                </span>
-              )}
             </div>
             <Desplazable eje="ambos">
               <table className="w-full min-w-[880px] border-collapse">
@@ -831,7 +828,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
         {pestana === "Ficha" && sub === "Comentarios y extras" && (
           <ExtrasArticulo
-            grupos={gruposDelArticulo} soloLectura={ro} real={real}
+            grupos={gruposDelArticulo} soloLectura={ro}
             onCambiar={cambiarGrupo} onQuitarHeredado={quitarGrupo} onNuevo={nuevoGrupo}
           />
         )}

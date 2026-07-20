@@ -131,7 +131,9 @@ export function Compras({ onSalir }: Readonly<{ onSalir: () => void }>) {
       }));
       setBorrador(null); setNuevo(false);
       if (esNuevo) abrirDoc(d.id);
-      notificar(esNuevo ? "Documento creado." : "Cambios guardados.");
+      notificar(real
+        ? (esNuevo ? "Documento creado." : "Cambios guardados.")
+        : "Guardado solo en este terminal: sin emparejar, se pierde al recargar.");
     } catch (e: unknown) {
       notificar(`No se ha guardado: ${mensaje(e)}`);
     } finally {
@@ -230,11 +232,6 @@ export function Compras({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   placeholder="Buscar por número, proveedor o fecha…"
                   className={claseEntrada(false, "w-full pl-9.5")} />
               </div>
-              {!real && (
-                <span className="flex-none rounded-full border border-amber/40 bg-amber/10 px-3 py-1.5 text-[11.5px] font-bold text-amber">
-                  Terminal sin emparejar · no se guarda
-                </span>
-              )}
             </div>
             <Desplazable eje="ambos">
               <table className="w-full min-w-[720px] border-collapse">
