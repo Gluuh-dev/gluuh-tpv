@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Monitor, MapPin, Wifi, CircleDot, Keyboard } from "lucide-react";
+import { Monitor, MapPin, Wifi, CircleDot, Keyboard, Lock } from "lucide-react";
 import { getTecladoAuto, setTecladoAuto } from "../../../ui";
 
 function Sep() { return <span className="h-3.5 w-px bg-border" />; }
@@ -25,14 +25,19 @@ function ToggleAutoTeclado() {
 
 // Pie de la operativa: operario, terminal, contexto, caja, modo zurdo, conexión.
 export function BarraEstado({
-  operario, terminal, contexto, zurdo, onZurdo,
-}: Readonly<{ operario: string; terminal: string; contexto: string; zurdo: boolean; onZurdo: (v: boolean) => void }>) {
+  operario, terminal, contexto, zurdo, onZurdo, onBloquear,
+}: Readonly<{ operario: string; terminal: string; contexto: string; zurdo: boolean; onZurdo: (v: boolean) => void; onBloquear?: () => void }>) {
   return (
     <footer className="flex flex-none items-center gap-3 border-t border-border bg-surface-2 px-4 py-2 text-xs text-muted-foreground">
-      <span className="flex items-center gap-2">
+      {/* El operario activo es un BOTÓN: pulsarlo baja el velo (bloquear a mano,
+          siempre a la vista). En un bar es el gesto de "me voy, que entre otro". */}
+      <button type="button" onClick={onBloquear} disabled={!onBloquear}
+        className="flex items-center gap-2 rounded-md px-1.5 py-0.5 transition-transform active:scale-95 disabled:opacity-100"
+        title={onBloquear ? "Bloquear el terminal" : undefined}>
         <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[10px] font-bold text-white">{operario.split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
         {operario}
-      </span>
+        {onBloquear && <Lock size={11} className="opacity-60" />}
+      </button>
       <Sep />
       <span className="flex items-center gap-1.5"><Monitor size={13} /> {terminal}</span>
       <Sep />

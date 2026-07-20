@@ -14,6 +14,7 @@ import { AyudaModal } from "./apartados/ayuda/AyudaModal";
 import { APARTADOS } from "./apartados/meta";
 import { TecladoEnPantalla } from "./ui";
 import { cargarOperarios, validarPin } from "./apartados/acceso/operarios";
+import { EQUIPO_DEMO } from "./apartados/acceso/demo";
 import type { Usuario } from "./apartados/acceso/tipos";
 import { cumpleRol, TECLA_A_VISTA, type Vista, type Apartado, type Rol } from "./lib/nav";
 import { useRuta, navegar, rutaDeUrl } from "./lib/rutas";
@@ -24,13 +25,6 @@ const DEMO = {
   local: { nombre: "BAR LA ALAMEDA", terminal: "TERMINAL 01" },
   turno: { mesasAbiertas: 12, mesasTotal: 24, ventas: "486,30 €", comandas: 3 },
 };
-const USUARIOS_DEMO: Usuario[] = [
-  { id: "1", nombre: "María Ruiz", rol: "admin" },
-  { id: "2", nombre: "Berto Sanz", rol: "operario" },
-  { id: "3", nombre: "Lucía Gil", rol: "operario" },
-  { id: "4", nombre: "Soporte Gluuh", rol: "tecnico", color: "linear-gradient(150deg,#54E3B1,#159C6E)" },
-];
-
 // Una pantalla por apartado (feature-first). Añadir un apartado = un archivo aquí.
 const PANTALLAS: Record<Apartado, ComponentType<{ onVolver: () => void }>> = {
   tpv: Tpv,
@@ -51,7 +45,7 @@ export function App() {
 
   // El equipo del terminal: el REAL del nodo si hay sesión de dispositivo;
   // si no (sin emparejar), la demo marcada como ejemplo.
-  const [equipo, setEquipo] = useState<{ usuarios: Usuario[]; demo: boolean }>({ usuarios: USUARIOS_DEMO, demo: true });
+  const [equipo, setEquipo] = useState<{ usuarios: Usuario[]; demo: boolean }>({ usuarios: EQUIPO_DEMO, demo: true });
   useEffect(() => {
     cargarOperarios().then((reales) => {
       if (reales?.length) setEquipo({ usuarios: reales, demo: false });
