@@ -7,7 +7,7 @@ import {
 import { Modal, CabeceraModal } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import {
-  MarcoMantenimiento, Caja, Campo, BotonPie, SepPie, EstadoPie, claseEntrada,
+  MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
 } from "./Marco";
 import {
   ARTICULOS_DEMO, FAMILIAS, IMPUESTOS, ESTACIONES, ALERGENOS,
@@ -290,14 +290,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     <div className="flex gap-1.5">
                       <input value={art.codigo} readOnly className={claseEntrada(true, "w-20 flex-none text-center font-mono")} />
                       <input id="a-ds" value={art.nombre} readOnly={ro} placeholder="Descripción del artículo"
-                        onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro)} />
+                        onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro, "min-w-0 flex-1")} />
                     </div>
                   </Campo>
                   <Campo etiqueta="Familia de venta" htmlFor="a-fam">
-                    <select id="a-fam" value={art.familia} disabled={ro}
-                      onChange={(e) => set("familia", e.target.value)} className={claseEntrada(ro)}>
+                    <Selector id="a-fam" value={art.familia} disabled={ro} onChange={(v) => set("familia", v)}>
                       {FAMILIAS.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                    </select>
+                    </Selector>
                   </Campo>
                   <Campo etiqueta="Descripción para pedidos y comanda" htmlFor="a-cmd">
                     <input id="a-cmd" value={art.nombreComanda} readOnly={ro}
@@ -307,10 +306,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
                 <div>
                   <Campo etiqueta="Impuesto de venta (incluido en el precio)" htmlFor="a-imp">
-                    <select id="a-imp" value={art.impuesto} disabled={ro}
-                      onChange={(e) => set("impuesto", Number(e.target.value))} className={claseEntrada(ro)}>
+                    <Selector id="a-imp" value={art.impuesto} disabled={ro} onChange={(v) => set("impuesto", Number(v))}>
                       {IMPUESTOS.map((i) => <option key={i.valor} value={i.valor}>{i.texto}</option>)}
-                    </select>
+                    </Selector>
                   </Campo>
                   <Campo etiqueta="Código de barras" htmlFor="a-bar">
                     <input id="a-bar" value={art.barras} readOnly={ro} inputMode="numeric"
@@ -342,12 +340,15 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             <Caja crecer titulo="Formatos de venta" contador={`${art.formatos.length} formatos`}>
               <div className="min-h-0 flex-1 overflow-auto border-t border-line">
                 <table className="w-full min-w-[980px] border-collapse">
+                  {/* Anchos FIJOS en las numéricas: si no, la tabla reparte su
+                      ancho mínimo entre todas y un precio de 4 caracteres acaba
+                      en una caja de 150px. La flexible es «Formato». */}
                   <thead>
-                    <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70">
-                      <th className="w-20">Código</th><th className="min-w-[180px]">Formato</th>
-                      <th className="text-right!">Barra</th><th className="text-right!">Salón</th><th className="text-right!">Terraza</th>
-                      <th className="text-center!">Combinado</th><th className="text-right!">Raciones</th>
-                      <th className="text-right!">Coste</th><th className="text-right!">Margen</th>
+                    <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:border-b [&>th]:border-line [&>th]:bg-panel [&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted">
+                      <th className="w-20">Código</th><th className="min-w-45">Formato</th>
+                      <th className="w-26 text-right!">Barra</th><th className="w-26 text-right!">Salón</th><th className="w-26 text-right!">Terraza</th>
+                      <th className="w-24 text-center!">Combinado</th><th className="w-24 text-right!">Raciones</th>
+                      <th className="w-24 text-right!">Coste</th><th className="w-20 text-right!">Margen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -388,7 +389,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                               onChange={(e) => setFormato(f.id, "coste", Number(e.target.value))}
                               className={claseEntrada(ro, "text-right font-mono", true)} />
                           </td>
-                          <td className={`px-2.5 py-1 text-right font-mono font-extrabold ${m < 55 ? "text-danger" : "text-mint"}`}>
+                          <td className={`px-2.5 py-1 text-right font-mono text-[13px] font-semibold ${m < 55 ? "text-danger" : "text-mint"}`}>
                             {m.toFixed(0)} %
                           </td>
                         </tr>
@@ -516,10 +517,9 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 </div>
                 <div>
                   <Campo etiqueta="Estación de preparación" htmlFor="a-est">
-                    <select id="a-est" value={art.estacion} disabled={ro}
-                      onChange={(e) => set("estacion", e.target.value as Estacion)} className={claseEntrada(ro)}>
+                    <Selector id="a-est" value={art.estacion} disabled={ro} onChange={(v) => set("estacion", v as Estacion)}>
                       {ESTACIONES.map((e) => <option key={e.valor} value={e.valor}>{e.texto}</option>)}
-                    </select>
+                    </Selector>
                   </Campo>
                   <Campo etiqueta="Tiempo de preparación (minutos)" htmlFor="a-tp">
                     <input id="a-tp" type="number" min="0" step="1" value={art.tiempoPrep} readOnly={ro}

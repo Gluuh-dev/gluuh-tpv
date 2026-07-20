@@ -1,5 +1,5 @@
-import { type ReactNode, useRef } from "react";
-import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ChevronDown, type LucideIcon } from "lucide-react";
 
 // ============================================================================
 // MARCO DE MANTENIMIENTO — el patrón clásico de los TPV de hostelería (Ágora,
@@ -33,6 +33,20 @@ export function MarcoMantenimiento({
 }>) {
   const carril = useRef<HTMLDivElement>(null);
   const desplazar = (dir: number) => carril.current?.scrollBy({ left: dir * 240, behavior: "smooth" });
+
+  // Las flechas SOLO si las subpestañas no caben. Con 4 pestañas cortas sobraban
+  // y ademas quedaban muertas (no habia nada a lo que desplazarse).
+  const [desborda, setDesborda] = useState(false);
+  useEffect(() => {
+    const el = carril.current;
+    if (!el) return;
+    const medir = () => setDesborda(el.scrollWidth > el.clientWidth + 1);
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [subpestanas]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -73,7 +87,7 @@ export function MarcoMantenimiento({
               );
             })}
           </div>
-          <div className="flex flex-none gap-1 p-1">
+          <div className={`flex-none gap-1 p-1 ${desborda ? "flex" : "hidden"}`}>
             <button type="button" aria-label="Pestaña anterior" onClick={() => desplazar(-1)}
               className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
               <ChevronLeft size={16} strokeWidth={2.6} />
@@ -139,14 +153,43 @@ export function Campo({ etiqueta, htmlFor, children }: Readonly<{
 // La ALTURA se queda táctil (44px / 40px en celda): aquí se toca con el dedo.
 // Lo que baja es el peso visual (radio, tipografía, grosor) para casar con el
 // resto de la gestión.
+//
+// ⚠️ El ANCHO va aparte por la misma razón que `compacta`: si el `w-full` de
+// aquí y un `w-20` de `extra` compiten, gana el que Tailwind ponga después en la
+// hoja generada (que es `w-full`), NO el del atributo class. Resultado: un campo
+// de código de 4 dígitos ocupando media pantalla y aplastando al de al lado.
+// Por eso, si `extra` ya trae un ancho, aquí no se pone ninguno.
 export const claseEntrada = (soloLectura?: boolean, extra = "", compacta = false) =>
-  `w-full rounded-[5px] border px-2.5 font-medium outline-none transition-colors ${
+  `${/\bw-/.test(extra) ? "" : "w-full"} rounded-[5px] border px-2.5 font-medium outline-none transition-colors ${
     compacta ? "min-h-10 text-[13px]" : "min-h-11 text-[13.5px]"
   } ${
     soloLectura
       ? "border-line bg-paper/3 text-muted"
       : "border-line bg-background text-paper focus:border-brand-lit"
   } ${extra}`;
+
+/**
+ * SELECT con aspecto propio: el desplegable nativo pega su flecha al borde y
+ * descuadra el texto respecto a los inputs. Se apaga (`appearance-none`) y se
+ * pinta un chevron con su hueco reservado, para que todos los controles de la
+ * ficha queden alineados.
+ */
+export function Selector({ id, value, onChange, disabled, children, extra = "" }: Readonly<{
+  id?: string; value: string | number; onChange: (v: string) => void;
+  disabled?: boolean; children: ReactNode; extra?: string;
+}>) {
+  const clase = claseEntrada(disabled, `appearance-none pr-9 ${extra}`);
+  return (
+    <div className="relative">
+      <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
+        className={`${clase} ${disabled ? "" : "cursor-pointer"}`}>
+        {children}
+      </select>
+      <ChevronDown size={15} aria-hidden
+        className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${disabled ? "text-muted/50" : "text-muted"}`} />
+    </div>
+  );
+}
 
 /** Botón de la barra inferior: icono grande arriba, rótulo debajo. */
 export function BotonPie({ Icono, children, tono = "marca", onClick, disabled }: Readonly<{
