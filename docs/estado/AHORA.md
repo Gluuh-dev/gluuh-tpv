@@ -169,7 +169,19 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0132`.**
+**Siguiente número libre: `0133`.**
+
+- `0132` — **RESERVADA 20-07 (sesión chat, precios de Ágora: añadido y menú)**:
+  `precio_anadido_y_suplemento_menu` — cierra el triángulo que hace que
+  `product.es_anadido` deje de ser un flag muerto. En Ágora un artículo **no es**
+  un menú: lo que tiene es **Supl. Menú** (lo que suma si entra en un menú) y
+  **Precio Añadido** (lo que cuesta vendido como extra de otro), **los dos por
+  tarifa** (`docs/referencia/09-…/productos/producto.md` §8). Y un extra ES un
+  producto, no un texto: por eso `modifier.product_ref_id`. Añade
+  `product_price.precio_anadido`, `product_price.suplemento_menu` y
+  `modifier.product_ref_id`. Con eso, elegir «extra de queso» en una pizza suma
+  el precio añadido del producto queso y hereda su clase fiscal, en vez de un
+  número tecleado a mano que no cuadra con nada.
 
 - `0131` — **RESERVADA 20-07 (sesión chat, tarifas que SÍ se cobran)**:
   `tarifa_por_sala` — hasta ahora `product_price` tenía **75 precios de tarifa

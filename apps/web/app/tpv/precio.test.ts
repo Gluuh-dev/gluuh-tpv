@@ -109,3 +109,37 @@ describe("precioEfectivo · tarifa activa", () => {
     expect(precioEfectivo(ctx as never, "p1")).toBe(1);
   });
 });
+
+// ── AÑADIDOS QUE SON PRODUCTOS (0132) ───────────────────────────────────────
+describe("precioEfectivo · añadido que es un producto", () => {
+  const prod = { id: "p1", nombre: "Pizza", precio: 10, clase_fiscal: "REDUCIDO" } as never;
+  const base = {
+    prodPorId: new Map([["p1", prod]]),
+    formatos: {} as Record<string, never[]>,
+    modById: { queso: { id: "queso", nombre: "Extra queso", precio_extra: 1 } },
+    preciosManuales: {},
+    descuentos: {},
+  };
+
+  it("sin nada nuevo, suma el precio_extra de siempre", () => {
+    expect(precioEfectivo(base as never, "p1||queso")).toBe(11);
+  });
+
+  it("si el añadido apunta a un producto, manda SU precio de añadido", () => {
+    const ctx = { ...base, preciosAnadido: { queso: 1.5 } };
+    expect(precioEfectivo(ctx as never, "p1||queso")).toBe(11.5);
+  });
+
+  it("un añadido de TEXTO no se ve afectado", () => {
+    // «sin cebolla» no es un producto y no debe serlo.
+    const ctx = { ...base, preciosAnadido: { otro: 9 } };
+    expect(precioEfectivo(ctx as never, "p1||queso")).toBe(11);
+  });
+
+  it("un añadido gratis (0) sigue siendo gratis, no cae al precio_extra", () => {
+    // `??` y no `||`: con `||`, un 0 legítimo se habría ignorado y el cliente
+    // habría pagado un extra que el dueño puso a cero a propósito.
+    const ctx = { ...base, preciosAnadido: { queso: 0 } };
+    expect(precioEfectivo(ctx as never, "p1||queso")).toBe(10);
+  });
+});

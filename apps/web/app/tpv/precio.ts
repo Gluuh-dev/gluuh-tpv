@@ -25,6 +25,17 @@ export interface CtxPrecio {
    * rellenar cobra de más, nunca regala el género.
    */
   preciosTarifa?: Record<string, number>;
+  /**
+   * Precio de un AÑADIDO que es un producto (0132), por id de opción.
+   *
+   * En Ágora un extra no es un texto con un número tecleado: es un PRODUCTO con
+   * su «Precio Añadido». Así, cambiar el precio del queso una vez lo cambia en
+   * las catorce pizzas donde aparece, en vez de en catorce sitios a mano.
+   *
+   * Sin entrada, manda el `precio_extra` de siempre: los modificadores de texto
+   * («sin cebolla») no son productos y no deben serlo.
+   */
+  preciosAnadido?: Record<string, number>;
 }
 
 export function precioEfectivo(ctx: CtxPrecio, id: string): number {
@@ -47,7 +58,9 @@ export function precioEfectivo(ctx: CtxPrecio, id: string): number {
   let base = ctx.preciosManuales[id] ?? calc;
   if (mods) {
     for (const m of mods.split(",")) {
-      base += ctx.modById[m]?.precio_extra ?? 0;
+      // El precio del PRODUCTO al que apunta el añadido manda; si la opción es
+      // de texto (o el producto no tiene precio de añadido), el de siempre.
+      base += ctx.preciosAnadido?.[m] ?? ctx.modById[m]?.precio_extra ?? 0;
     }
   }
   const desc = ctx.descuentos[id];
