@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 import pg from "pg";
-import { exigirNodoVivo, noConcluyente } from "./ayuda.mjs";
+import { exigirNodoVivo, noConcluyente, barDePrueba, borrarBar } from "./ayuda.mjs";
 
 // Si el nodo no atiende peticiones autenticadas, nada de lo de abajo concluye.
 await exigirNodoVivo();
@@ -46,11 +46,28 @@ const comprobar = (bien, texto) => {
   if (!bien) fallos++;
 };
 
-// ── El bar ───────────────────────────────────────────────────────────────────
+// ── El bar: SUYO, creado aquí ────────────────────────────────────────────────
+//
+// Antes cogía un operario CUALQUIERA del nodo (`... limit 1`) y un usuario con
+// email CUALQUIERA. Dos problemas:
+//   · salía el de la PLANTILLA, cuya carta está vacía, y «la RLS le enseña su
+//     carta» fallaba por falta de datos — no por un fallo de verdad;
+//   · y al dueño elegido se le SOBRESCRIBÍA LA CONTRASEÑA con la de la prueba.
+//     Si tocaba el de un bar real, se quedaba sin poder entrar.
+// Con su propio bar, la prueba es determinista y no toca datos de nadie.
+const bar = await barDePrueba(bd, "Bar de la prueba de auth");
 const { rows: [op] } = await bd.query(
-  "select id, nombre, tenant_id from public.app_user where email is null and clave_hash is not null limit 1",
+  `insert into public.app_user (tenant_id, nombre, rol, activo, clave_hash)
+   values ($1, 'Camarero de prueba', 'CAMARERO', true, crypt('no-se-usa', gen_salt('bf')))
+   returning id, nombre, tenant_id`,
+  [bar.tenantId],
 );
-if (!op) throw new Error("el nodo no tiene operarios: provisiona primero");
+// Un producto, para que «¿ve su carta?» compruebe algo de verdad.
+await bd.query(
+  `insert into public.product (tenant_id, nombre, precio, clase_fiscal, tipo_impositivo)
+   values ($1, 'Caña de prueba', 2.00, 'GENERAL', public.resolver_iva('GENERAL', 'CANARIAS'))`,
+  [bar.tenantId],
+);
 
 console.log(`Empleado de prueba: ${op.nombre}\n`);
 
@@ -91,8 +108,12 @@ comprobar(rOtraVez.status === 400, "RECHAZADO: un vale se usa una vez y ya");
 
 // ── 3. El DUEÑO entra SIN INTERNET ───────────────────────────────────────────
 console.log("\n3. El DUEÑO entra al panel del bar SIN INTERNET (antes: imposible)");
+// El dueño DE ESTE bar (el que creó barDePrueba), no uno cualquiera del nodo:
+// más abajo se le fija la contraseña, y hacerlo sobre el de un bar real lo dejaría
+// sin poder entrar.
 const { rows: [duenyo] } = await bd.query(
-  "select id, email, nombre from public.app_user where email is not null limit 1",
+  "select id, email, nombre from public.app_user where tenant_id = $1 and email is not null limit 1",
+  [bar.tenantId],
 );
 if (!duenyo) {
   comprobar(false, "no hay ningún usuario con email en el nodo");
@@ -133,5 +154,7 @@ console.log(fallos === 0
   : `❌ ${fallos} comprobación(es) han fallado.`);
 console.log("═".repeat(64));
 
+// El bar de la prueba se lleva por delante su operario, su carta y su dueño (FK en cascada).
+await borrarBar(bd, bar.tenantId);
 await bd.end();
 process.exit(fallos === 0 ? 0 : 1);

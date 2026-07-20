@@ -105,9 +105,21 @@ const servidor = http.createServer(async (req, res) => {
       trozos.push(t);
     }
     if (excedido) {
+      // ANTES aquí había un `req.destroy()`, y arrancaba el socket de cuajo. Esa
+      // conexión es KEEP-ALIVE y el gateway la reutiliza: la siguiente petición se
+      // la encontraba muerta → ECONNRESET. O sea, alguien subía una foto demasiado
+      // grande, se le rechazaba bien... y **la petición siguiente de ese TPV
+      // fallaba**, sin que nada relacionara una cosa con la otra.
+      //
+      // Para responder y que la conexión SIGA SIRVIENDO hay que consumir el resto
+      // del cuerpo: si no, quedan bytes a medio enviar y lo siguiente que llegue se
+      // interpreta como basura. Se drena con un tope — a un cliente que siga
+      // mandando sin parar sí se le corta (ahí ya no compensa cuidarle la conexión).
+      let sobra = 0;
+      req.on("data", (t) => { sobra += t.length; if (sobra > MAX_BYTES) req.destroy(); });
+      req.resume();
       res.writeHead(413, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: `demasiado grande (máx ${MAX_BYTES / 1024 / 1024} MB)` }));
-      req.destroy();
       return;
     }
 
