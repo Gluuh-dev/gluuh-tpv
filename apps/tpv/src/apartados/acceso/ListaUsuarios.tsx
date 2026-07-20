@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { Desplazable } from "../../ui";
 import { cumpleRol, ETIQUETA_ROL, type Rol } from "../../lib/nav";
 import { iniciales, type Usuario } from "./tipos";
 
@@ -16,7 +17,7 @@ export function ListaUsuarios({
   onElegir: (u: Usuario) => void;
 }>) {
   return (
-    <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 content-start gap-2.5 overflow-y-auto">
+    <Desplazable className="grid auto-rows-min grid-cols-2 content-start gap-2.5">
       {usuarios.map((u) => {
         const puede = cumpleRol(u.rol, requiere);
         const activo = elegido?.id === u.id;
@@ -38,6 +39,6 @@ export function ListaUsuarios({
           </button>
         );
       })}
-    </div>
+    </Desplazable>
   );
 }

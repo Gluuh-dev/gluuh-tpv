@@ -5,7 +5,7 @@ import {
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
   Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy,
 } from "lucide-react";
-import { Modal, CabeceraModal, abrirTeclado } from "../../../ui";
+import { Modal, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { BotonProducto } from "../../tpv/venta/BotonProducto";
 import { AspectoArticulo } from "./AspectoArticulo";
@@ -468,8 +468,8 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 </span>
               )}
             </div>
-            <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full border-collapse">
+            <Desplazable eje="ambos">
+              <table className="w-full min-w-[880px] border-collapse">
                 <thead>
                   <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70">
                     <th className="w-11 text-center!">
@@ -536,7 +536,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   )}
                 </tbody>
               </table>
-            </div>
+            </Desplazable>
           </Caja>
         )}
 
@@ -620,7 +620,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   tarifa, y las tarifas todavía no están hechas: no las des por guardadas.
                 </p>
               )}
-              <div className="min-h-0 flex-1 overflow-auto border-t border-line">
+              <Desplazable eje="ambos" className="border-t border-line">
                 <table className="w-full min-w-[980px] border-collapse">
                   {/* Anchos FIJOS en las numéricas: si no, la tabla reparte su
                       ancho mínimo entre todas y un precio de 4 caracteres acaba
@@ -679,7 +679,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </Desplazable>
               <div className="flex flex-none items-center gap-1.5 border-t border-line bg-panel-2 px-2.5 py-2">
                 <button type="button" disabled={ro} aria-label="Añadir formato"
                   onClick={() => setBorrador((b) => {
@@ -715,7 +715,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             </Aviso>
             <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-2">
               <Caja crecer titulo="Grupos de comentarios" contador={art.comentarios.length}>
-                <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 pb-2.5">
+                <Desplazable className="flex flex-col gap-1.5 px-2.5 pb-2.5">
                   {art.comentarios.map((g) => (
                     <div key={g.id} className="flex items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 py-2.5">
                       <span className="min-w-0 flex-1">
@@ -732,7 +732,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   {art.comentarios.length === 0 && (
                     <p className="px-1 py-4 text-[13px] text-muted">Sin grupos de comentarios.</p>
                   )}
-                </div>
+                </Desplazable>
                 <button type="button" disabled={ro}
                   className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-[6px] border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
                   <Plus size={16} /> Añadir grupo de comentarios
@@ -740,7 +740,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
               </Caja>
 
               <Caja crecer titulo="Ingredientes extra" contador={art.extras.length}>
-                <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 pb-2.5">
+                <Desplazable className="flex flex-col gap-1.5 px-2.5 pb-2.5">
                   {art.extras.map((x) => (
                     <div key={x.id} className="flex items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 py-2.5">
                       <b className="min-w-0 flex-1 truncate text-[13.5px] font-bold">{x.nombre}</b>
@@ -757,7 +757,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   {art.extras.length === 0 && (
                     <p className="px-1 py-4 text-[13px] text-muted">Sin ingredientes extra.</p>
                   )}
-                </div>
+                </Desplazable>
                 <button type="button" disabled={ro}
                   className="m-2.5 flex min-h-11.5 items-center justify-center gap-2 rounded-[6px] border border-dashed border-brand-lit text-[13.5px] font-bold text-brand-lit transition-transform active:scale-[.98] disabled:opacity-35">
                   <Plus size={16} /> Añadir ingrediente extra
@@ -771,21 +771,21 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           <>
             <Aviso>Un artículo puede estar en varias categorías a la vez: la familia decide dónde vive, las categorías dónde aparece.</Aviso>
             <Caja crecer titulo="Categorías donde aparece" contador={art.categorias.length}>
-              <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
+              <Desplazable className="p-3.5">
                 <div className="flex flex-wrap gap-2">
                   {familias.map((c) => (
                     <ChipSel key={c.id} texto={c.nombre} disabled={ro}
                       activo={art.categorias.includes(c.id)} onToggle={() => alternar("categorias", c.id)} />
                   ))}
                 </div>
-              </div>
+              </Desplazable>
             </Caja>
           </>
         )}
 
         {pestana === "Ficha" && sub === "Cocina y ticket" && (
           <Caja crecer>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
+            <Desplazable className="p-3.5">
               <div className="grid gap-3.5 lg:grid-cols-2">
                 <div>
                   <Campo etiqueta="Nombre en el ticket del cliente" htmlFor="a-tk">
@@ -818,7 +818,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     activo={art.alergenos.includes(a)} onToggle={() => alternar("alergenos", a)} />
                 ))}
               </div>
-            </div>
+            </Desplazable>
           </Caja>
         )}
       </MarcoMantenimiento>
@@ -846,10 +846,10 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       )}
 
       {params && (
-        <Modal onCerrar={cerrarVentana} ancho="xl">
+        <Modal onCerrar={cerrarVentana} ancho="3xl">
           <CabeceraModal Icono={SlidersHorizontal} titulo="Parámetros del artículo"
             subtitulo={`${art.codigo} · ${art.nombre || "Sin descripción"}`} onCerrar={cerrarVentana} />
-          <div className="max-h-[70vh] overflow-y-auto p-4">
+          <Desplazable fuera="max-h-[70vh]" className="p-4">
             {ro && (
               <p className="mb-3 rounded-[5px] border border-line bg-paper/3 px-3 py-2 text-[12.5px] text-muted">
                 En consulta no se puede cambiar nada. Cierra y pulsa «Modificar» abajo.
@@ -858,7 +858,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
             {GRUPOS_PARAMETROS.map((g) => (
               <div key={g.titulo} className="mb-4 last:mb-0">
                 <p className="pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">{g.titulo}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {g.campos.map(({ clave, texto, ayuda }) => {
                     const activo = art.parametros[clave];
                     return (
@@ -881,7 +881,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 </div>
               </div>
             ))}
-          </div>
+          </Desplazable>
         </Modal>
       )}
 

@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import { ReceiptText, Armchair, Sun, ShoppingBag, CalendarCheck, Settings, type LucideIcon } from "lucide-react";
 import { SALAS_DEMO } from "./datos";
+import { Flechas } from "../../ui";
 
 // Rail derecho persistente: Ticket · Aparcado · [salas del restaurante] · Para
 // llevar · Reservas · ⚙. Salas dinámicas (config del local). `vista` = clave fija
@@ -26,8 +28,10 @@ function Tab({ Icono, label, activo, badge, onClick }: Readonly<{ Icono: LucideI
 export function RailSalas({
   vista, onVista, onConfig,
 }: Readonly<{ vista: string; onVista: (v: string) => void; onConfig: () => void }>) {
+  const carril = useRef<HTMLDivElement>(null);
   return (
-    <aside className="flex w-[84px] flex-none flex-col gap-0.5 overflow-y-auto border-l border-border bg-surface py-1.5">
+    <aside className="flex w-[84px] flex-none flex-col border-l border-border bg-surface">
+      <div ref={carril} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto py-1.5">
       <Tab Icono={ReceiptText} label="Ticket" activo={vista === "ticket"} onClick={() => onVista("ticket")} />
       <Tab Icono={Armchair} label="Aparcado" badge={13} activo={vista === "aparcado"} onClick={() => onVista("aparcado")} />
       {SALAS_DEMO.map((s) => {
@@ -39,6 +43,8 @@ export function RailSalas({
       <button type="button" onClick={onConfig} aria-label="Configuración" className="mx-1.5 mt-auto grid place-items-center rounded-xl border-t border-border py-3 text-muted-foreground transition-transform active:scale-95">
         <Settings size={20} />
       </button>
+      </div>
+      <Flechas contenedor={carril} className="justify-center border-t border-border py-1" />
     </aside>
   );
 }

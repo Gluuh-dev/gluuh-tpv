@@ -1,3 +1,5 @@
+import { useRef } from "react";
+import { Flechas } from "../../../ui";
 import {
   UserRound, Bookmark, ArrowRightLeft, Coffee, Split, Trash2, Send, ChefHat,
   Banknote, LayoutGrid, Printer, Lock, type LucideIcon,
@@ -15,8 +17,10 @@ function Boton({ Icono, label, tono = "accion", onClick }: Readonly<{ Icono: Luc
 }
 
 export function ColumnaFunciones({ onVaciar, onFuncion }: Readonly<{ onVaciar: () => void; onFuncion: (f: string) => void }>) {
+  const carril = useRef<HTMLDivElement>(null);
   return (
-    <div className="no-scrollbar flex w-[88px] flex-none flex-col gap-[.28rem] overflow-y-auto bg-surface px-[.3rem] py-[.4rem]">
+    <div className="relative flex w-[88px] flex-none flex-col bg-surface">
+      <div ref={carril} className="flex min-h-0 flex-1 flex-col gap-[.28rem] overflow-y-auto px-[.3rem] py-[.4rem]">
       <Boton Icono={UserRound} label="Cliente" onClick={() => onFuncion("cliente")} />
       <Boton Icono={Bookmark} label="Aparcar" onClick={() => onFuncion("aparcar")} />
       <Boton Icono={ArrowRightLeft} label="Pasar mesa" onClick={() => onFuncion("pasar")} />
@@ -31,6 +35,8 @@ export function ColumnaFunciones({ onVaciar, onFuncion }: Readonly<{ onVaciar: (
         <Boton Icono={Printer} label="Imprimir" tono="util" onClick={() => onFuncion("imprimir")} />
         <Boton Icono={Lock} label="Bloquear" tono="util" onClick={() => onFuncion("bloquear")} />
       </div>
+      </div>
+      <Flechas contenedor={carril} className="justify-center border-t border-border py-1" />
     </div>
   );
 }

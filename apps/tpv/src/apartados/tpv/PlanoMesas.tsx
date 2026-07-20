@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Home, Banknote, StickyNote, Split, MoveHorizontal, ChefHat, ReceiptText, Printer, DoorOpen, CreditCard } from "lucide-react";
 import { eur } from "../../lib/dinero";
 import { SALAS_DEMO, type Mesa } from "./datos";
 import { RailSalas } from "./RailSalas";
+import { Desplazable, Flechas } from "../../ui";
 
 function colorMesa(estado: Mesa["estado"], sel: boolean): string {
   if (sel) return "#3b82f6";
@@ -32,6 +33,7 @@ export function PlanoMesas({
   const sala = SALAS_DEMO.find((s) => s.id === vista) ?? SALAS_DEMO[0]!;
   const ocup = sala.mesas.filter((m) => m.estado !== "LIBRE").length;
   const [sel, setSel] = useState<Mesa | null>(null);
+  const pie = useRef<HTMLDivElement>(null);   // carril de acciones de abajo
 
   const tocarMesa = (m: Mesa) => {
     if (sel?.id === m.id || m.estado === "LIBRE") { onAbrirMesa(m); return; } // 2º toque / mesa libre → abrir
@@ -53,8 +55,8 @@ export function PlanoMesas({
       {/* Cuerpo: suelo + preview + rail */}
       <div className="flex min-h-0 flex-1">
         {/* Suelo */}
-        <div className="no-scrollbar min-h-0 flex-1 overflow-auto p-6"
-          style={{ backgroundImage: "radial-gradient(circle, color-mix(in srgb, var(--paper) 8%, transparent) 1px, transparent 1px)", backgroundSize: "26px 26px" }}>
+        <Desplazable className="p-6"
+          estilo={{ backgroundImage: "radial-gradient(circle, color-mix(in srgb, var(--paper) 8%, transparent) 1px, transparent 1px)", backgroundSize: "26px 26px" }}>
           <div className="grid auto-rows-min content-start gap-3" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(96px,1fr))" }}>
             {sala.mesas.map((m) => {
               const activa = sel?.id === m.id;
@@ -72,7 +74,7 @@ export function PlanoMesas({
               <button type="button" onClick={onNuevaBarra} className="grid aspect-square place-items-center rounded-xl border-2 border-dashed border-brand-lit/50 bg-brand/5 text-brand-lit transition-transform active:scale-95">Nueva</button>
             )}
           </div>
-        </div>
+        </Desplazable>
 
         {/* Panel de previsualización */}
         <aside className="flex w-[320px] flex-none flex-col border-l border-border bg-card">
@@ -91,7 +93,8 @@ export function PlanoMesas({
       </div>
 
       {/* Barra de acciones */}
-      <footer className="no-scrollbar flex flex-none items-center gap-2 overflow-x-auto border-t border-border bg-surface px-3 py-2">
+      <footer className="flex flex-none items-center gap-2 border-t border-border bg-surface px-3 py-2">
+        <div ref={pie} className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
         <AccPie Icono={DoorOpen} label="Cerrar salón" onClick={onInicio} />
         <AccPie Icono={Banknote} label="Abrir cajón" disabled />
         <AccPie Icono={StickyNote} label="Notas mesa" disabled />
@@ -104,6 +107,8 @@ export function PlanoMesas({
           <AccPie Icono={DoorOpen} label="Abrir mesa" tono="brand" disabled={!sel} onClick={() => sel && onAbrirMesa(sel)} />
           <AccPie Icono={CreditCard} label="Cobrar" tono="cobro" disabled={!sel} onClick={() => sel && onAbrirMesa(sel)} />
         </span>
+        </div>
+        <Flechas contenedor={pie} eje="x" paso={220} />
       </footer>
     </div>
   );

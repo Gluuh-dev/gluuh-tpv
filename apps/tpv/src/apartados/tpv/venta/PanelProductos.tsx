@@ -1,19 +1,9 @@
 import { useMemo, useRef } from "react";
-import { ChevronUp, ChevronDown, Plus, Check } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 import { CATEGORIAS_DEMO, PRODUCTOS_DEMO, colorCategoria } from "../datos";
 import { BotonProducto } from "./BotonProducto";
+import { Flechas } from "../../../ui";
 import { useVenta } from "../store";
-
-// Flechas de scroll de una sección (familias / artículos), como en el TPV de Next.
-function Flechas({ contenedor }: Readonly<{ contenedor: React.RefObject<HTMLDivElement | null> }>) {
-  const scroll = (dir: -1 | 1) => contenedor.current?.scrollBy({ top: dir * 180, behavior: "smooth" });
-  return (
-    <span className="flex gap-1">
-      <button type="button" onClick={() => scroll(-1)} aria-label="Arriba" className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-transform active:scale-90"><ChevronUp size={16} /></button>
-      <button type="button" onClick={() => scroll(1)} aria-label="Abajo" className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-transform active:scale-90"><ChevronDown size={16} /></button>
-    </span>
-  );
-}
 
 function Banda({ children, color, contenedor }: Readonly<{ children: React.ReactNode; color?: string; contenedor: React.RefObject<HTMLDivElement | null> }>) {
   return (

@@ -3,7 +3,7 @@ import {
   Banknote, CreditCard, Smartphone, FileText, QrCode, Coins,
   Delete, Euro, Mail, Percent, Split, X, XCircle,
 } from "lucide-react";
-import { Modal, Select, CampoTexto } from "../../../ui";
+import { Modal, Select, CampoTexto, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { sugerenciasEfectivo } from "./efectivo";
 import { imprimirTicket } from "../../../lib/impresion";
@@ -337,7 +337,7 @@ export function CobrarModal({
 
             <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card p-3">
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Importe · formas de pago</h3>
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+              <Desplazable className="flex flex-col gap-2">
                 {Array.from({ length: MAX_PAGOS }, (_, i) => {
                   const p = pagos[i];
                   return (
@@ -351,7 +351,7 @@ export function CobrarModal({
                     </div>
                   );
                 })}
-              </div>
+              </Desplazable>
             </div>
 
             <div className="flex flex-none gap-2.5">

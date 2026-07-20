@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { UserRound, Search, Check, TriangleAlert, Coins, Building2, X } from "lucide-react";
-import { Modal, CabeceraModal } from "../../../ui";
+import { Modal, CabeceraModal, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { CLIENTES_DEMO } from "../datos";
 import { useVenta } from "../store";
@@ -29,7 +29,7 @@ export function ClienteModal({ onCerrar }: Readonly<{ onCerrar: () => void }>) {
             <Search size={16} className="absolute left-3 text-muted-foreground" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente…" className="h-10 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm outline-none" />
           </label>
-          <div className="no-scrollbar max-h-[44vh] space-y-1 overflow-auto">
+          <Desplazable fuera="max-h-[44vh]" className="space-y-1">
             {lista.map((c) => (
               <button key={c.id} type="button" onClick={() => setSel(c.id)}
                 className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-transform active:scale-[.99] ${sel === c.id ? "border-brand bg-brand/10" : "border-border bg-surface"}`}>
@@ -44,7 +44,7 @@ export function ClienteModal({ onCerrar }: Readonly<{ onCerrar: () => void }>) {
               </button>
             ))}
             {lista.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Sin clientes.</p>}
-          </div>
+          </Desplazable>
         </div>
 
         {/* Ficha */}

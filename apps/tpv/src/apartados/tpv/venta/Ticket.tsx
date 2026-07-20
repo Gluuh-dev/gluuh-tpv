@@ -3,6 +3,7 @@ import { eur } from "../../../lib/dinero";
 import { PRODUCTOS_DEMO } from "../datos";
 import { useVenta } from "../store";
 import { marcharPendientes } from "./ticket-impresion";
+import { Desplazable } from "../../../ui";
 
 const nombreDe = (id: string) => PRODUCTOS_DEMO.find((p) => p.id === id.split("|")[0])?.nombre ?? "Producto";
 
@@ -34,7 +35,7 @@ export function Ticket() {
         <span>Producto</span><span className="text-center">Uds</span><span className="text-right">Precio</span><span className="text-right">Total</span>
       </div>
 
-      <div className="no-scrollbar min-h-0 flex-1 overflow-auto py-1">
+      <Desplazable className="py-1">
         {ids.length === 0 && <p className="mt-10 text-center text-sm text-muted-foreground">Toca un producto para empezar la comanda.</p>}
         {ids.map((id) => {
           const q = comanda[id]!;
@@ -78,7 +79,7 @@ export function Ticket() {
             </div>
           );
         })}
-      </div>
+      </Desplazable>
     </div>
   );
 }

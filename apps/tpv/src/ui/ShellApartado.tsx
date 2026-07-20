@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftClose, Home, ChevronDown, ChevronRight, ChevronUp, type LucideIcon } from "lucide-react";
+import { Desplazable } from "./Flechas";
 
 // SHELL de los apartados de GESTIÓN (Análisis, Administrador, Visor Node).
 // Lenguaje "Supabase/Notion" validado en el piloto de Administrador:
@@ -265,8 +266,11 @@ export function ShellApartado({
           </div>
           {acciones}
         </header>
-        <main className={contenidoPropio ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "min-h-0 flex-1 overflow-y-auto"}>
-          {children}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Con `contenidoPropio` la pantalla se gobierna el scroll ella (tiene
+              sus propias listas con flechas). Si no, se lo ponemos aquí, que
+              para eso el shell es el que sabe cuánto alto queda. */}
+          {contenidoPropio ? children : <Desplazable>{children}</Desplazable>}
         </main>
       </div>
     </div>

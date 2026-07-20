@@ -12,7 +12,7 @@
 // PRESENTACIONAL: las partes llegan por props y toda mutación va por callbacks.
 import { useEffect, useMemo, useState } from "react";
 import { Users, ListTree, Coins, Printer, Delete, X } from "lucide-react";
-import { Modal } from "../../../ui";
+import { Modal, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 
 export interface LineaTicket {
@@ -285,7 +285,7 @@ export function DividirCuentaModal({
                 <h3 className="flex flex-none items-center gap-2 px-4 pb-2 pt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Partes <span className="ml-auto normal-case tracking-normal text-foreground">{igualesCobradas.length ? `${igualesCobradas.length} cobradas · ` : ""}{importesIguales.length} pendientes</span>
                 </h3>
-                <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(196px,1fr))] content-start gap-2 overflow-y-auto p-3 max-[1150px]:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
+                <Desplazable className="grid auto-rows-min grid-cols-[repeat(auto-fill,minmax(196px,1fr))] content-start gap-2 p-3 max-[1150px]:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
                   {igualesCobradas.map((p) => (
                     <TarjetaParte key={p.id} titulo={`Parte ${p.indice}`} importe={p.importe} cobrada onCobrar={() => {}} />
                   ))}
@@ -296,7 +296,7 @@ export function DividirCuentaModal({
                     : igualesPend.map((p) => (
                         <TarjetaParte key={p.id} titulo={`Parte ${p.indice}`} importe={p.importe} cobrada={false} onCobrar={() => onCobrarParte(p)} />
                       ))}
-                </div>
+                </Desplazable>
               </div>
             </div>
           )}
@@ -309,7 +309,7 @@ export function DividirCuentaModal({
                 <h3 className="flex flex-none items-center gap-2 px-4 pb-2 pt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Sin asignar <span className="ml-auto normal-case tracking-normal text-foreground">{udsSinAsignar} uds · {eur(totalSinAsignar)}</span>
                 </h3>
-                <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 pb-3">
+                <Desplazable className="flex flex-col gap-1.5 px-3 pb-3">
                   {sinAsignar.length === 0 && <p className="m-auto p-5 text-center text-sm text-muted-foreground">Todo repartido.<br />Cobra cada cuenta cuando quieras.</p>}
                   {sinAsignar.map((l) => (
                     <button key={l.id} type="button" onClick={() => pasarUnidad(l.id)} className="grid min-h-14 grid-cols-[40px_1fr_auto] items-center gap-2.5 rounded-md border border-border bg-background px-2.5 text-left transition-transform active:scale-[.99]">
@@ -318,7 +318,7 @@ export function DividirCuentaModal({
                       <span className="text-sm font-bold tabular-nums">{eur(l.restantes * l.precio)}</span>
                     </button>
                   ))}
-                </div>
+                </Desplazable>
                 <div className="flex flex-none items-center gap-2.5 border-t border-border p-2.5">
                   <div className="mr-auto"><small className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Queda en la mesa</small><b className="text-lg font-extrabold tabular-nums">{eur(totalSinAsignar)}</b></div>
                   <button type="button" onClick={pasarTodo} disabled={!sinAsignar.length} className="min-h-11 rounded-md border border-border bg-card px-3 text-sm font-semibold transition-transform active:scale-[.98] disabled:opacity-40">Pasar todo a la cuenta</button>
@@ -344,7 +344,7 @@ export function DividirCuentaModal({
                     <button type="button" onClick={anadirCuenta} className="flex min-h-13 flex-none items-center rounded-md border border-dashed border-brand px-3.5 text-sm font-bold text-brand transition-transform active:scale-95">+ Añadir</button>
                   )}
                 </div>
-                <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 pb-3">
+                <Desplazable className="flex flex-col gap-1.5 px-3 pb-3">
                   {entradasVivas(cuentas[ctAct] ?? {}).length === 0 && <p className="m-auto p-5 text-center text-sm text-muted-foreground">Cuenta {ctAct + 1} vacía.<br />Toca los productos de la izquierda.</p>}
                   {entradasVivas(cuentas[ctAct] ?? {}).map(([id, u]) => (
                     <button key={id} type="button" onClick={() => moverAsinAsignar(id, -1)} className="grid min-h-14 grid-cols-[40px_1fr_auto] items-center gap-2.5 rounded-md border border-brand/30 bg-brand/5 px-2.5 text-left transition-transform active:scale-[.99]" title="Tocar para devolver 1 unidad">
@@ -353,7 +353,7 @@ export function DividirCuentaModal({
                       <span className="text-sm font-bold tabular-nums">{eur(u * (precioDe[id] ?? 0))}</span>
                     </button>
                   ))}
-                </div>
+                </Desplazable>
                 <div className="flex flex-none items-center gap-2 border-t border-border p-2.5">
                   <div className="mr-auto"><small className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total de la cuenta {ctAct + 1}</small><b className="text-lg font-extrabold tabular-nums">{eur(totalCuenta(cuentas[ctAct] ?? {}))}</b></div>
                   <button type="button" onClick={vaciarCuenta} disabled={!entradasVivas(cuentas[ctAct] ?? {}).length} className="min-h-11 rounded-md border border-border bg-card px-3 text-sm font-semibold transition-transform active:scale-[.98] disabled:opacity-40">Devolver todo</button>
@@ -385,7 +385,7 @@ export function DividirCuentaModal({
                 <h3 className="flex flex-none items-center gap-2 px-4 pb-2 pt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Importes separados <span className="ml-auto normal-case tracking-normal text-foreground">{eur(cobradoTotal)} cobrados · quedan {eur(pendiente)}</span>
                 </h3>
-                <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(196px,1fr))] content-start gap-2 overflow-y-auto p-3 max-[1150px]:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
+                <Desplazable className="grid auto-rows-min grid-cols-[repeat(auto-fill,minmax(196px,1fr))] content-start gap-2 p-3 max-[1150px]:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
                   {importesLista.map((p) => (
                     <TarjetaParte key={p.id} titulo={`Importe ${p.indice}`} importe={p.importe} cobrada={p.cobrada} onCobrar={() => onCobrarParte(p)} />
                   ))}
@@ -396,7 +396,7 @@ export function DividirCuentaModal({
                       <button type="button" onClick={() => onCobrarResto(restoImp)} className="min-h-11 rounded-md border border-warning bg-card text-xs font-bold text-warning transition-transform active:scale-[.98]">Cobrar el resto</button>
                     </div>
                   )}
-                </div>
+                </Desplazable>
               </div>
             </div>
           )}

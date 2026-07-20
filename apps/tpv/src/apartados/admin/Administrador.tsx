@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Users, ShieldCheck, Clock, BadgeCheck, Building2, Nfc, KeyRound, Check, X, Plus, Search,
 } from "lucide-react";
-import { ShellApartado, Boton, Tarjeta, Campo, R, RC, TH, TD, type SeccionShell } from "../../ui";
+import { ShellApartado, Boton, Tarjeta, Campo, Desplazable, R, RC, TH, TD, type SeccionShell } from "../../ui";
 import { iniciales } from "../acceso/tipos";
 
 // ADMINISTRADOR — lo del DUEÑO: quién trabaja aquí y con qué permisos, turnos,
@@ -148,7 +148,7 @@ export function Administrador({ onVolver }: Readonly<{ onVolver: () => void }>) 
       {seccion === "permisos" && (
         <div className="p-4">
           <Tarjeta titulo="Qué puede hacer cada perfil">
-            <div className="overflow-x-auto">
+            <Desplazable fuera="min-w-0" eje="ambos">
               <table className="w-full min-w-140 border-collapse">
                 <thead>
                   <tr>
@@ -171,7 +171,7 @@ export function Administrador({ onVolver }: Readonly<{ onVolver: () => void }>) 
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Desplazable>
           </Tarjeta>
         </div>
       )}

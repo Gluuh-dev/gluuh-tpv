@@ -3,6 +3,7 @@
 export { Modal } from "./Modal";
 export { CabeceraModal } from "./CabeceraModal";
 export { BarraVentana } from "./BarraVentana";
+export { Flechas, Desplazable } from "./Flechas";
 export { Select, type OpcionSelect } from "./Select";
 export { CampoTexto } from "./CampoTexto";
 export { Escudo } from "./Escudo";

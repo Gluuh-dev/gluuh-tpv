@@ -127,8 +127,21 @@
   .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-transparent px-4 py-2 text-sm font-semibold text-muted transition-transform active:scale-95; }
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* ─── AQUÍ NO HAY BARRAS DE DESPLAZAMIENTO ────────────────────────────────────
+   Esto es un TPV que se maneja con el DEDO sobre un cristal, no con un ratón:
+   una barra de 8 px no se puede agarrar con el pulgar, y al intentarlo lo que
+   pasa es que arrastras la lista sin querer. Para moverse hay FLECHAS grandes
+   (`ui/Flechas.tsx`), que sí se aciertan.
+
+   Va GLOBAL y no por componente a propósito: mientras existió la clase
+   `.no-scrollbar`, había que acordarse de ponerla, y cada pantalla nueva se
+   estrenaba con su barra. Ahora no se puede olvidar. El scroll SIGUE
+   funcionando (dedo, rueda, teclado): lo único que desaparece es el dibujo.
+
+   `.no-scrollbar` se queda como alias sin efecto: hay decenas de sitios que la
+   usan y quitarla de todos es ruido sin ganancia.                            */
+*::-webkit-scrollbar { width: 0; height: 0; display: none; }
+* { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Aparición de modales: CENTRADA (fundido + leve escala desde el centro), sin
    deslizar de ningún lado. transform-origin center por defecto. */

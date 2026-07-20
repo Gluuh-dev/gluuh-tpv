@@ -1,5 +1,5 @@
 import { Gift, Check } from "lucide-react";
-import { Modal, CabeceraModal } from "../../../ui";
+import { Modal, CabeceraModal, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
 import { PRODUCTOS_DEMO } from "../datos";
 import { useVenta } from "../store";
@@ -22,7 +22,7 @@ export function InvitacionesModal({ onCerrar }: Readonly<{ onCerrar: () => void 
     <Modal onCerrar={onCerrar} ancho="2xl" className="overflow-hidden p-0">
       <CabeceraModal Icono={Gift} titulo="Invitaciones" derecha={<span className="text-sm text-white/80">{nInv} de {ids.length} invitadas</span>} onCerrar={onCerrar} />
 
-      <div className="max-h-[52vh] overflow-auto p-4">
+      <Desplazable fuera="max-h-[52vh]" className="p-4">
         {ids.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No hay líneas en la comanda.</p>}
         <div className="space-y-1">
           {ids.map((id) => {
@@ -39,7 +39,7 @@ export function InvitacionesModal({ onCerrar }: Readonly<{ onCerrar: () => void 
             );
           })}
         </div>
-      </div>
+      </Desplazable>
 
       <footer className="flex items-center gap-2 border-t border-border p-4">
         <span className="text-sm text-muted-foreground">{nInv > 0 ? `${nInv} invitada${nInv === 1 ? "" : "s"}` : "Ninguna invitada"}</span>

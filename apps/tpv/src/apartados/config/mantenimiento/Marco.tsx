@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown, Search, PlusCircle, Keyboard, type LucideIcon } from "lucide-react";
-import { Modal, BarraVentana, abrirTeclado } from "../../../ui";
+import { Modal, BarraVentana, abrirTeclado, Desplazable } from "../../../ui";
 
 // ============================================================================
 // MARCO DE MANTENIMIENTO — el patrón clásico de los TPV de hostelería (Ágora,
@@ -278,7 +278,7 @@ export function BuscadorRegistros({
           </div>
         )}
 
-        <div className="max-h-[46vh] min-h-40 overflow-y-auto rounded-[5px] border border-line">
+        <Desplazable fuera="max-h-[46vh] min-h-40 rounded-[5px] border border-line">
           <table className="w-full border-collapse">
             <thead>
               <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:border-b [&>th]:border-line [&>th]:bg-panel [&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted">
@@ -300,7 +300,7 @@ export function BuscadorRegistros({
               )}
             </tbody>
           </table>
-        </div>
+        </Desplazable>
       </div>
 
       <footer className="flex flex-none items-center gap-2 border-t border-line px-4 py-3">
