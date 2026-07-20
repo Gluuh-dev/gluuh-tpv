@@ -50,7 +50,7 @@ export const GRUPOS: Grupo[] = [
     Icono: UtensilsCrossed,
     secciones: [
       { // ← (panel)/productos + productos/[id] + etiquetas + tpv/config/articulos
-        id: "productos", titulo: "Productos", Icono: Package,
+        id: "productos", titulo: "Productos", Icono: Package, funcional: true,
         desc: "La ficha completa de cada artículo de la carta.",
         alcance: [
           "Nombre, texto del botón y foto",

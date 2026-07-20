@@ -15,10 +15,17 @@ export function Modal({
   className?: string;
   cerrarFuera?: boolean;
 }>) {
+  // Esc en CAPTURA y cortando el evento: si no, el Esc global de App.tsx (que
+  // manda a Inicio) también se dispara y cerrar un modal te echaba además de la
+  // pantalla. El modal se come su propio Esc; lo de detrás no se entera.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCerrar(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onCerrar();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [onCerrar]);
 
   return (

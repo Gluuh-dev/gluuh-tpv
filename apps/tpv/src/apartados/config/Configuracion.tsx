@@ -1,16 +1,27 @@
-import { useMemo, useState } from "react";
-import { House, Search, Sun, Moon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { House, Search, Sun, Moon, Menu, X } from "lucide-react";
 import { MarcoApartado } from "../../ui";
 import { APARTADOS } from "../meta";
 import { useTema } from "../../lib/tema";
 import { GRUPOS, type Seccion } from "./secciones";
+import { Productos } from "./mantenimiento/Productos";
 
 // Configuración DENTRO del TPV. El mapa vive en `secciones.tsx` (inventario del
 // panel Next, 19-07) y esta pantalla lo sirve en plan ajustes profesionales:
 // buscador (encuentra por título, descripción o alcance, sin acentos), vista
 // general por dominios, y ficha por sección con su estado. Cada sección se
 // construye por fases: cuando se diseña, sustituye su ficha por la pantalla
-// real («Preferencias» ya lo es: tema del terminal).
+// real (ver `PANTALLAS` abajo).
+//
+// El menú de secciones es un CAJÓN, no un rail fijo: en un terminal de 15" un
+// rail de 19rem se comía un cuarto de la pantalla y las pantallas de
+// mantenimiento (tablas anchas de precios) necesitan ese ancho. Se abre con el
+// botón «Secciones», se cierra al elegir, con Esc o tocando fuera.
+
+// Secciones con pantalla completa propia (mandan sobre la ficha de alcance).
+const PANTALLAS: Record<string, (p: Readonly<{ onSalir: () => void }>) => React.ReactNode> = {
+  productos: Productos,
+};
 
 // «impresion» debe encontrar «Impresión»: fuera acentos y mayúsculas.
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -145,9 +156,10 @@ function FilaSeccion({ s, activa, detalle, onClick }: Readonly<{
   );
 }
 
-export function Configuracion({ onVolver }: Readonly<{ onVolver: () => void }>) {
-  const m = APARTADOS.config;
-  const [sel, setSel] = useState<Seccion | null>(null); // null = vista general
+// Cajón de secciones: buscador + los 8 dominios. Se abre sobre el contenido.
+function CajonSecciones({ sel, onIr, onCerrar }: Readonly<{
+  sel: Seccion | null; onIr: (s: Seccion | null) => void; onCerrar: () => void;
+}>) {
   const [q, setQ] = useState("");
 
   // Resultados del buscador: sección + su dominio (para situarla).
@@ -161,66 +173,108 @@ export function Configuracion({ onVolver }: Readonly<{ onVolver: () => void }>) 
     );
   }, [q]);
 
-  const abrir = (s: Seccion) => setSel(s);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      if (q) setQ(""); else onCerrar();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [q, onCerrar]);
 
   return (
-    <MarcoApartado titulo={m.titulo} desc={m.desc} icono={<m.Icono size={22} />} color={m.color} onVolver={onVolver}>
-      <div className="flex min-h-0 flex-1">
-        {/* ── Rail: buscador + secciones (táctil: filas ≥48px, sin hover) ── */}
-        <nav className="flex w-76 flex-none flex-col border-r border-line">
-          <div className="px-4 pb-3 pt-5">
-            <div className="relative">
-              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Escape" && q) { e.stopPropagation(); setQ(""); } }}
-                placeholder="Buscar un ajuste…"
-                className="h-11 w-full rounded-xl border border-line bg-panel pl-9.5 pr-3 text-[14px] text-paper placeholder:text-muted focus:border-brand-lit focus:outline-none"
-              />
+    <div className="fixed inset-0 z-50 flex">
+      <nav className="flex w-88 max-w-[86vw] flex-none flex-col border-r border-line bg-panel">
+        <div className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar un ajuste…"
+              className="h-11 w-full rounded-lg border border-line bg-panel-2 pl-9.5 pr-3 text-[14px] text-paper placeholder:text-muted focus:border-brand-lit focus:outline-none"
+            />
+          </div>
+          <button type="button" onClick={onCerrar} aria-label="Cerrar el menú"
+            className="grid h-11 w-11 flex-none place-items-center rounded-lg border border-line text-muted transition-transform active:scale-90">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4">
+          {resultados ? (
+            <div className="space-y-1">
+              {resultados.map(({ grupo, s }) => (
+                <FilaSeccion key={s.id} s={s} activa={sel?.id === s.id} detalle={grupo} onClick={() => onIr(s)} />
+              ))}
+              {resultados.length === 0 && (
+                <p className="px-3 py-2 text-sm text-muted">Ningún ajuste se llama «{q.trim()}».</p>
+              )}
             </div>
-          </div>
-
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-5">
-            {resultados ? (
-              <div className="space-y-1">
-                {resultados.map(({ grupo, s }) => (
-                  <FilaSeccion key={s.id} s={s} activa={sel?.id === s.id} detalle={grupo} onClick={() => abrir(s)} />
-                ))}
-                {resultados.length === 0 && (
-                  <p className="px-3 py-2 text-sm text-muted">Ningún ajuste se llama «{q.trim()}».</p>
-                )}
-              </div>
-            ) : (
-              <>
-                <button type="button" onClick={() => setSel(null)}
-                  className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14.5px] font-semibold transition-transform active:scale-[.98] ${
-                    sel === null ? "bg-brand text-white" : "text-paper/85"
-                  }`}>
-                  <House size={18} className={sel === null ? "text-white/90" : "text-muted"} />
-                  Vista general
-                </button>
-                {GRUPOS.map((g) => (
-                  <div key={g.titulo}>
-                    <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">{g.titulo}</p>
-                    <div className="space-y-1">
-                      {g.secciones.map((s) => (
-                        <FilaSeccion key={s.id} s={s} activa={sel?.id === s.id} onClick={() => abrir(s)} />
-                      ))}
-                    </div>
+          ) : (
+            <>
+              <button type="button" onClick={() => onIr(null)}
+                className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14.5px] font-semibold transition-transform active:scale-[.98] ${
+                  sel === null ? "bg-brand text-white" : "text-paper/85"
+                }`}>
+                <House size={18} className={sel === null ? "text-white/90" : "text-muted"} />
+                Vista general
+              </button>
+              {GRUPOS.map((g) => (
+                <div key={g.titulo}>
+                  <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[.14em] text-muted">{g.titulo}</p>
+                  <div className="space-y-1">
+                    {g.secciones.map((s) => (
+                      <FilaSeccion key={s.id} s={s} activa={sel?.id === s.id} onClick={() => onIr(s)} />
+                    ))}
                   </div>
-                ))}
-              </>
-            )}
-          </div>
-        </nav>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </nav>
+      <button type="button" aria-label="Cerrar el menú" onClick={onCerrar}
+        className="gl-velo flex-1 cursor-default bg-black/35 backdrop-blur-[1.5px]" />
+    </div>
+  );
+}
 
-        {/* ── Contenido ── */}
-        <section className="min-w-0 flex-1 overflow-y-auto px-8 py-7">
-          {sel === null && <VistaGeneral onIr={abrir} />}
-          {sel !== null && (sel.id === "preferencias" ? <Preferencias s={sel} /> : <FichaAlcance s={sel} />)}
-        </section>
-      </div>
+export function Configuracion({ onVolver }: Readonly<{ onVolver: () => void }>) {
+  const m = APARTADOS.config;
+  const [sel, setSel] = useState<Seccion | null>(null); // null = vista general
+  const [menu, setMenu] = useState(false);
+
+  const abrir = (s: Seccion | null) => { setSel(s); setMenu(false); };
+
+  // La cabecera dice DÓNDE estás: dentro de una sección toma su título e icono.
+  const Pantalla = sel ? PANTALLAS[sel.id] : undefined;
+  const Icono = sel?.Icono ?? m.Icono;
+
+  return (
+    <MarcoApartado
+      titulo={sel?.titulo ?? m.titulo}
+      desc={sel?.desc ?? m.desc}
+      icono={<Icono size={22} />}
+      color={m.color}
+      onVolver={onVolver}
+      acciones={
+        <button type="button" onClick={() => setMenu(true)}
+          className="flex items-center gap-2 rounded-md border border-line bg-paper/5 px-4 py-2 text-sm font-semibold text-paper/85 transition-transform active:scale-95">
+          <Menu size={16} /> Secciones
+        </button>
+      }
+    >
+      {Pantalla
+        ? <Pantalla onSalir={() => setSel(null)} />
+        : (
+          <section className="min-w-0 flex-1 overflow-y-auto px-8 py-7">
+            {sel === null && <VistaGeneral onIr={abrir} />}
+            {sel !== null && (sel.id === "preferencias" ? <Preferencias s={sel} /> : <FichaAlcance s={sel} />)}
+          </section>
+        )}
+
+      {menu && <CajonSecciones sel={sel} onIr={abrir} onCerrar={() => setMenu(false)} />}
     </MarcoApartado>
   );
 }
