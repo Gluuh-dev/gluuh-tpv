@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { ChevronUp, ChevronDown, Plus, Check } from "lucide-react";
-import { eur } from "../../../lib/dinero";
 import { CATEGORIAS_DEMO, PRODUCTOS_DEMO, colorCategoria } from "../datos";
+import { BotonProducto } from "./BotonProducto";
 import { useVenta } from "../store";
 
 // Flechas de scroll de una sección (familias / artículos), como en el TPV de Next.
@@ -67,12 +67,9 @@ export function PanelProductos() {
       <div ref={prodRef} className="no-scrollbar grid flex-1 auto-rows-min content-start gap-2 overflow-auto p-2.5"
         style={{ gridTemplateColumns: "repeat(auto-fill,minmax(118px,1fr))" }}>
         {productos.map((p) => (
-          <button key={p.id} type="button" onClick={() => addProd(p.id)}
-            className="flex min-h-[78px] flex-col justify-between rounded-[9px] p-2 text-left shadow-[0_2px_0_rgba(0,0,0,.28)] transition-transform active:translate-y-px active:scale-[.98]"
-            style={{ background: colorCategoria(p.categoria), color: "#fff" }}>
-            <span className="text-[11px] font-bold uppercase leading-tight [text-shadow:0_1px_2px_rgba(0,0,0,.45)]">{p.nombre}</span>
-            <span className="text-sm font-semibold tabular-nums [text-shadow:0_1px_2px_rgba(0,0,0,.45)]">{eur(p.precio)}</span>
-          </button>
+          <BotonProducto key={p.id} nombre={p.nombre} precio={p.precio}
+            color={p.color ?? colorCategoria(p.categoria)} foto={p.foto} icono={p.icono}
+            onClick={() => addProd(p.id)} />
         ))}
         {!buscando && (
           <button type="button" className="flex min-h-[78px] flex-col items-center justify-center gap-1 rounded-[9px] border-2 border-dashed border-border text-muted-foreground transition-transform active:scale-95">

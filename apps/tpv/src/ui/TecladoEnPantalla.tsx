@@ -231,6 +231,14 @@ export function TecladoEnPantalla() {
         onMouseDown={noRobarFoco} onPointerDown={alBajar} onPointerMove={alMover} onPointerUp={alSoltar}
         title="Arrastra la barra para mover el teclado">
         <span style={etiquetaCampo}>{campo || "Teclado"}</span>
+        {/* El interruptor vive AQUÍ, en el teclado, y no solo en Ajustes: quien se
+            harta de que salga solo lo apaga en el momento, sin ir a buscarlo. */}
+        <button type="button" onMouseDown={noRobarFoco} aria-pressed={auto}
+          onClick={() => setTecladoAuto(!auto)}
+          style={{ ...conmutador, ...(auto ? conmutadorOn : {}) }}
+          title={auto ? "Sale solo al tocar un campo — púlsalo para desactivarlo" : "Solo sale cuando lo pides — púlsalo para que salga solo"}>
+          Auto · {auto ? "sí" : "no"}
+        </button>
         <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
       </div>
 
@@ -292,7 +300,9 @@ export function getTecladoAuto(): boolean { return leerAuto(); }
 export function setTecladoAuto(v: boolean) {
   try { localStorage.setItem(CLAVE_AUTO, v ? "1" : "0"); } catch { /* noop */ }
   window.dispatchEvent(new CustomEvent("gluuh:teclado-auto", { detail: v }));
-  if (!v) window.dispatchEvent(new Event("gluuh:cerrar-teclado"));
+  // Apagar el auto YA NO cierra el teclado: el interruptor está dentro de su
+  // propia barra, y al pulsarlo desaparecía justo lo que estabas usando. En
+  // manual el teclado se cierra con su ✕, que es lo que uno espera.
 }
 
 // ── estilos: SIGUEN EL TEMA (tokens de la operativa) → claro y oscuro ──
@@ -324,6 +334,12 @@ const visor: React.CSSProperties = {
 const cursor: React.CSSProperties = {
   width: 1, height: 16, marginLeft: 1, background: "var(--paper)", animation: "gl-velo 1s steps(1) infinite alternate",
 };
+const conmutador: React.CSSProperties = {
+  flexShrink: 0, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap",
+  padding: "5px 9px", borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+  background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.28)", color: "rgba(255,255,255,.85)",
+};
+const conmutadorOn: React.CSSProperties = { background: "#fff", borderColor: "#fff", color: "var(--brand)" };
 const cerrar: React.CSSProperties = {
   background: "transparent", border: 0, color: "#fff", fontSize: 16, cursor: "pointer",
   padding: "4px 10px", borderRadius: 4, flexShrink: 0, lineHeight: 1,

@@ -2,10 +2,12 @@ import { useMemo, useRef, useState } from "react";
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard,
 } from "lucide-react";
-import { Modal, CabeceraModal } from "../../../ui";
+import { Modal, CabeceraModal, abrirTeclado } from "../../../ui";
 import { eur } from "../../../lib/dinero";
+import { BotonProducto } from "../../tpv/venta/BotonProducto";
+import { AspectoArticulo } from "./AspectoArticulo";
 import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
   BuscadorRegistros,
@@ -118,6 +120,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const [fmtSel, setFmtSel] = useState<string | null>(null);
   const [borrar, setBorrar] = useState(false);
   const [params, setParams] = useState(false);   // ventana «Parámetros del artículo»
+  const [aspecto, setAspecto] = useState(false); // ventana «Aspecto en el TPV»
   const [buscaFam, setBuscaFam] = useState(false);
   // Las familias son ESTADO, no constante: desde el buscador se pueden crear sin
   // abandonar el artículo que estás dando de alta.
@@ -125,6 +128,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
   const nombreDeFamilia = (id: string) => familias.find((f) => f.id === id)?.nombre ?? id;
   const codigoDeFamilia = (id: string) => familias.find((f) => f.id === id)?.codigo ?? "";
+  const colorDeFamilia = (id: string) => familias.find((f) => f.id === id)?.color ?? "#64748b";
 
   const crearFamilia = (nombre: string) => {
     const id = `fam-${Date.now().toString(36)}`;
@@ -270,6 +274,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       <BotonPie Icono={XCircle} tono="no" onClick={cancelar} disabled={!editando}>Cancelar</BotonPie>
       <span className="flex-1" />
       {aviso && <span className="rounded-full bg-paper px-4 py-2 text-[12.5px] font-bold text-ink">{aviso}</span>}
+      <BotonPie Icono={Keyboard} onClick={abrirTeclado}>Teclado</BotonPie>
       <EstadoPie editando={editando}>
         {editando
           ? `${nuevo ? "Nuevo artículo" : "Editando"} · ${art.codigo}`
@@ -399,15 +404,19 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="relative flex flex-1 flex-col items-center justify-center gap-1.5 rounded-[6px] border border-line bg-panel-2 p-3">
-                    <button type="button" disabled={ro} aria-label="Cambiar la foto del artículo"
-                      className="absolute right-1.5 top-1.5 grid h-8.5 w-8.5 place-items-center rounded-[5px] border border-mint/40 bg-mint/10 text-mint transition-transform active:scale-90 disabled:opacity-35">
-                      <Camera size={16} />
+                  {/* La muestra es el botón REAL del TPV, no un dibujo parecido:
+                      el mismo componente que pinta la botonera de venta. */}
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-[6px] border border-line bg-panel-2 p-3">
+                    <span className="text-[10.5px] font-medium uppercase tracking-wide text-muted">Así se verá en el TPV</span>
+                    <div className="w-32">
+                      <BotonProducto comoPrevia nombre={art.nombre || "Sin nombre"}
+                        precio={art.formatos[0]?.barra ?? 0}
+                        color={art.color ?? colorDeFamilia(art.familia)} foto={art.foto} icono={art.icono} />
+                    </div>
+                    <button type="button" disabled={ro} onClick={() => setAspecto(true)}
+                      className="flex min-h-10 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
+                      <Camera size={15} /> Foto, color e icono
                     </button>
-                    <span className="grid h-14 w-14 place-items-center rounded-full bg-brand text-[22px] font-extrabold text-white">
-                      {art.nombre.trim().charAt(0).toUpperCase() || "?"}
-                    </span>
-                    <span className="text-center text-[11px] font-bold leading-tight text-paper/70">{art.nombre || "Sin descripción"}</span>
                   </div>
                   <Interruptor activo={art.visible} disabled={ro} etiqueta="Visible en TPV"
                     onToggle={() => setParam("vendible", !art.visible)} />
@@ -634,6 +643,16 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           onCrear={crearFamilia}
           onAceptar={(id) => set("familia", id)}
           onCerrar={() => setBuscaFam(false)}
+        />
+      )}
+
+      {aspecto && (
+        <AspectoArticulo
+          nombre={art.nombre} precio={art.formatos[0]?.barra ?? 0}
+          colorFamilia={colorDeFamilia(art.familia)}
+          foto={art.foto} color={art.color} icono={art.icono}
+          onCambiar={(campo, valor) => set(campo, valor)}
+          onCerrar={() => setAspecto(false)}
         />
       )}
 

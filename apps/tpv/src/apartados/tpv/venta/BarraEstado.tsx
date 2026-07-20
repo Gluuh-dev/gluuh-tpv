@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Monitor, MapPin, Wifi, CircleDot, Keyboard } from "lucide-react";
 import { getTecladoAuto, setTecladoAuto } from "../../../ui";
 
@@ -8,6 +8,13 @@ function Sep() { return <span className="h-3.5 w-px bg-border" />; }
 // pantalla; tocar fuera lo oculta. Se persiste en localStorage (getTecladoAuto).
 function ToggleAutoTeclado() {
   const [on, setOn] = useState(getTecladoAuto);
+  // El teclado lleva su propio interruptor en la barra de título; sin escuchar
+  // el aviso, esta casilla se quedaba mintiendo hasta recargar la pantalla.
+  useEffect(() => {
+    const cambiar = (e: Event) => setOn(!!(e as CustomEvent<boolean>).detail);
+    window.addEventListener("gluuh:teclado-auto", cambiar);
+    return () => window.removeEventListener("gluuh:teclado-auto", cambiar);
+  }, []);
   return (
     <label className="flex cursor-pointer items-center gap-2 select-none" title="Mostrar el teclado en pantalla al tocar un campo">
       <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setTecladoAuto(e.target.checked); }} className="accent-[color:var(--brand)]" />

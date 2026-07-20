@@ -95,6 +95,13 @@ export interface Articulo {
   formatos: FormatoVenta[];
   comentarios: GrupoComentarios[];
   extras: Extra[];
+  // ── Aspecto del botón en el TPV (los tres opcionales) ──
+  /** Foto del artículo. Sin ella, el botón es color liso. */
+  foto?: string;
+  /** Color propio del botón. Sin él, hereda el de la familia. */
+  color?: string;
+  /** Nombre de icono (ver `lib/iconos`). Solo se pinta si NO hay foto. */
+  icono?: string;
 }
 
 export const IMPUESTOS = [

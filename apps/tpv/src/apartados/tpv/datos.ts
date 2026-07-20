@@ -55,7 +55,13 @@ export const SALAS_DEMO: Sala[] = [
 // Colores por familia como en el TPV real: azul bebidas, rojo comida, morado
 // dulces, gris menús. "Populares" es una familia destacada (favoritos).
 export interface Categoria { id: string; nombre: string; color: string }
-export interface Producto { id: string; nombre: string; precio: number; categoria: string }
+export interface Producto {
+  id: string; nombre: string; precio: number; categoria: string;
+  // Aspecto del tile. Los tres opcionales: sin ellos el botón sale como siempre
+  // (color de la familia, sin foto ni icono). Se configuran en la ficha del
+  // artículo → «Aspecto en el TPV».
+  color?: string; foto?: string; icono?: string;
+}
 
 const AZUL = "#2f7fd0", ROJO = "#c0553f", MORADO = "#7c3d9b", GRIS = "#3b414d", VERDE = "#2ea06a";
 
