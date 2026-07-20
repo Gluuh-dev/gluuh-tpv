@@ -167,7 +167,19 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0127`.**
+**Siguiente número libre: `0128`.**
+
+- `0127` — **RESERVADA 20-07 (sesión chat, limpieza de modelos duplicados)**:
+  `retirar_stubs_alergenos_y_plantilla_ticket` — retira 4 stubs del CRUD genérico
+  que nunca se usaron y que competían con el modelo real: `product_allergen`,
+  `allergen`, `alergeno` (los alérgenos viven en `product.alergenos[]`, **110
+  productos** los usan) y `plantilla_ticket` (el diseño del ticket vive en
+  `setting` clave `impresion.config.ticket`). Las 4 con **0 filas** verificadas y
+  sin referencias, salvo `plantilla_ticket` en la consola de plataforma (grupo
+  "tickets" del alta y contador de la plantilla), que se retira en el mismo commit.
+  ⚠️ **`printer`/`print_route`/`print_job` NO se tocan**: no son stubs, son la
+  impresión compartida de `0079` con código vivo (`print-routing.ts`,
+  `PrintDispatcher`); están vacías solo porque ningún bar las ha configurado aún.
 
 - `0126` — **APLICADA EN LA NUBE 18-07 (sesión chat, combinar copas / 7.1)**: `family.combinable`
   (bool, default false) + `product.combinable` (bool NULL = hereda de la familia; true/false

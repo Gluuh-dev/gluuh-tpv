@@ -14,59 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      alergeno: {
-        Row: {
-          created_at: string | null
-          descripcion: string | null
-          id: string
-          nombre: string
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string | null
-          descripcion?: string | null
-          id?: string
-          nombre: string
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string | null
-          descripcion?: string | null
-          id?: string
-          nombre?: string
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "alergeno_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenant"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      allergen: {
-        Row: {
-          codigo: string
-          id: string
-          nombre: string
-        }
-        Insert: {
-          codigo: string
-          id?: string
-          nombre: string
-        }
-        Update: {
-          codigo?: string
-          id?: string
-          nombre?: string
-        }
-        Relationships: []
-      }
       app_user: {
         Row: {
           activo: boolean
@@ -3055,41 +3002,6 @@ export type Database = {
           },
         ]
       }
-      plantilla_ticket: {
-        Row: {
-          created_at: string | null
-          descripcion: string | null
-          id: string
-          nombre: string
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string | null
-          descripcion?: string | null
-          id?: string
-          nombre: string
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string | null
-          descripcion?: string | null
-          id?: string
-          nombre?: string
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "plantilla_ticket_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenant"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       platform_admin: {
         Row: {
           auth_user_id: string
@@ -3398,42 +3310,6 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenant"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      product_allergen: {
-        Row: {
-          allergen_id: string
-          product_id: string
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          allergen_id: string
-          product_id: string
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          allergen_id?: string
-          product_id?: string
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_allergen_allergen_id_fkey"
-            columns: ["allergen_id"]
-            isOneToOne: false
-            referencedRelation: "allergen"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_allergen_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "product"
             referencedColumns: ["id"]
           },
         ]

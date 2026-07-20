@@ -3,7 +3,9 @@
 // Plantilla base (consola de plataforma, Fase 2). La plantilla es un tenant
 // (marcado es_plantilla) que se edita como un backoffice normal: tu cuenta de
 // Gluuh es su dueña, así que entras a app.gluuh.com y editas su carta, impuestos,
-// formas de pago y tickets. Al crear una empresa marcas qué clonar de aquí.
+// formas de pago. Al crear una empresa marcas qué clonar de aquí.
+// (0127: se retiró "plantillas de ticket" — la tabla era un stub sin usar; el
+// diseño del ticket vive en `setting` clave `impresion.config.ticket`.)
 import { useEffect, useState } from "react";
 import { LayoutTemplate, ExternalLink } from "lucide-react";
 import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
@@ -11,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { TablaPublica } from "@gluuh/supabase";
 
-interface Resumen { nombre: string; productos: number; familias: number; impuestos: number; formas: number; tickets: number }
+interface Resumen { nombre: string; productos: number; familias: number; impuestos: number; formas: number }
 
 export default function Plantilla() {
   const [r, setR] = useState<Resumen | null>(null);
@@ -21,13 +23,13 @@ export default function Plantilla() {
     (async () => {
       const { data: pl } = await sb.from("tenant").select("id,nombre").eq("es_plantilla", true).maybeSingle();
       const t = pl as { id: string; nombre: string } | null;
-      if (!t) { setR({ nombre: "—", productos: 0, familias: 0, impuestos: 0, formas: 0, tickets: 0 }); return; }
+      if (!t) { setR({ nombre: "—", productos: 0, familias: 0, impuestos: 0, formas: 0 }); return; }
       const cnt = async (tabla: TablaPublica) =>
         (await sb.from(tabla).select("id", { count: "exact", head: true }).eq("tenant_id", t.id)).count ?? 0;
       setR({
         nombre: t.nombre,
         productos: await cnt("product"), familias: await cnt("family"),
-        impuestos: await cnt("tax_rate"), formas: await cnt("payment_method"), tickets: await cnt("plantilla_ticket"),
+        impuestos: await cnt("tax_rate"), formas: await cnt("payment_method"),
       });
     })();
   }, []);
@@ -45,7 +47,7 @@ export default function Plantilla() {
       <Card>
         <CardHeader><CardTitle className="text-base">Cómo se edita</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-[13px] text-(--text-secondary)">
-          <p>La plantilla es la empresa <strong>«{r?.nombre ?? "…"}»</strong>. Tu cuenta de Gluuh es su dueña, así que la editas como cualquier backoffice: entra a <strong>app.gluuh.com</strong> con tu correo y modifica su <strong>carta, impuestos, formas de pago y plantillas de ticket</strong>. Lo que dejes ahí es lo que heredan las empresas nuevas.</p>
+          <p>La plantilla es la empresa <strong>«{r?.nombre ?? "…"}»</strong>. Tu cuenta de Gluuh es su dueña, así que la editas como cualquier backoffice: entra a <strong>app.gluuh.com</strong> con tu correo y modifica su <strong>carta, impuestos y formas de pago</strong>. Lo que dejes ahí es lo que heredan las empresas nuevas.</p>
           <Button variant="outline" size="sm" onClick={() => window.open("https://app.gluuh.com", "_blank", "noopener,noreferrer")}>
             <ExternalLink className="h-4 w-4" /> Abrir el backoffice de la plantilla
           </Button>
@@ -58,7 +60,7 @@ export default function Plantilla() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
               { l: "Familias", v: r?.familias }, { l: "Productos", v: r?.productos },
-              { l: "Impuestos", v: r?.impuestos }, { l: "Formas de pago", v: r?.formas }, { l: "Tickets", v: r?.tickets },
+              { l: "Impuestos", v: r?.impuestos }, { l: "Formas de pago", v: r?.formas },
             ].map((x) => (
               <div key={x.l} className="rounded-md border border-border bg-surface p-3 text-center">
                 <div className="text-xl font-semibold tabular-nums">{r ? x.v : "—"}</div>

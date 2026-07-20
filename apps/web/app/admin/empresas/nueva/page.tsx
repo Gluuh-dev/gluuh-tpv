@@ -21,10 +21,11 @@ const IMPORTABLES = [
   { k: "catalogo", nombre: "Familias y productos" },
   { k: "impuestos", nombre: "Impuestos" },
   { k: "formas_pago", nombre: "Formas de pago" },
-  { k: "tickets", nombre: "Plantillas de ticket" },
+  // 0127: fuera "Plantillas de ticket" — la tabla era un stub que nunca clonó
+  // nada; el diseño del ticket vive en `setting` (`impresion.config.ticket`).
 ];
 const normalizarUsuario = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
-const VACIO = { empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[], importar: ["catalogo", "impuestos", "formas_pago", "tickets"] as string[] };
+const VACIO = { empresa: "", usuario: "", emailContacto: "", cif: "", direccion: "", poblacion: "", provincia: "", codigoPostal: "", telefono: "", meses: "12", modulos: [] as string[], importar: ["catalogo", "impuestos", "formas_pago"] as string[] };
 
 export default function NuevaEmpresa() {
   const router = useRouter();

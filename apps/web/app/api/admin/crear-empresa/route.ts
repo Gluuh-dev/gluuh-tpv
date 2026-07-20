@@ -8,7 +8,9 @@ import { hostPlataforma, mfaPlataformaInsuficiente } from "@/app/lib/plataforma"
 import { clonarCatalogo, clonarTabla } from "@/app/lib/clonar-plantilla";
 
 // Grupos que se pueden importar de la plantilla al alta, y su tabla/acción.
-const TABLA_GRUPO: Partial<Record<string, TablaPublica>> = { impuestos: "tax_rate", formas_pago: "payment_method", tickets: "plantilla_ticket" };
+// (0127: se retiró el grupo "tickets" — `plantilla_ticket` nunca tuvo una fila;
+// el diseño del ticket vive en `setting` clave `impresion.config.ticket`.)
+const TABLA_GRUPO: Partial<Record<string, TablaPublica>> = { impuestos: "tax_rate", formas_pago: "payment_method" };
 
 // Alta de empresa COMPLETA en un paso. SOLO el técnico de Gluuh (es_admin_plataforma).
 // Decisiones guía 15 §12: el cliente NO tiene email de login — se le genera un
