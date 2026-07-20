@@ -231,8 +231,6 @@ export function TecladoEnPantalla() {
           <span style={cursor} />
         </div>
         <button type="button" onMouseDown={noRobarFoco} onClick={() => guardarAbierto(false)} style={cerrar} title="Cerrar">✕</button>
-        {/* Ya no es el asa (arrastra la barra entera): se queda como pista visual. */}
-        <span style={agarre} aria-hidden>⠿</span>
       </div>
 
       <div style={teclas}>

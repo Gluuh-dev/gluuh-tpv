@@ -23,6 +23,10 @@ export function Modal({
 }>) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const origen = useRef<{ x: number; y: number } | null>(null);
+  const caja = useRef<HTMLDivElement>(null);
+  // Geometría de la ventana SIN desplazar, medida al empezar a arrastrar: con
+  // ella se calculan los topes para que no se pueda tirar fuera de la pantalla.
+  const base = useRef<{ left: number; top: number; w: number; h: number } | null>(null);
 
   // Esc en CAPTURA y cortando el evento: si no, el Esc global de App.tsx (que
   // manda a Inicio) también se dispara y cerrar un modal te echaba además de la
@@ -40,13 +44,33 @@ export function Modal({
   const empezarArrastre = (e: React.PointerEvent) => {
     if (!arrastrable) return;
     const t = e.target as HTMLElement;
-    // Solo por la cabecera, y sin robarle el toque a sus botones (la X).
-    if (!t.closest("[data-arrastrar]") || t.closest("button, input, select, textarea, a")) return;
+    const cabecera = t.closest("[data-arrastrar]");
+    if (!cabecera) return;                       // solo se coge por la cabecera
+    // OJO: el velo de fuera ES un <button>, así que `closest("button")` a secas
+    // SIEMPRE encontraba algo y el arrastre no arrancaba nunca. Solo cuenta el
+    // control si está DENTRO de la cabecera (la X).
+    const control = t.closest("button, input, select, textarea, a");
+    if (control && cabecera.contains(control)) return;
     origen.current = { x: e.clientX - (pos?.x ?? 0), y: e.clientY - (pos?.y ?? 0) };
+
+    const r = caja.current?.getBoundingClientRect();
+    base.current = r
+      ? { left: r.left - (pos?.x ?? 0), top: r.top - (pos?.y ?? 0), w: r.width, h: r.height }
+      : null;
 
     const mover = (ev: PointerEvent) => {
       if (!origen.current) return;
-      setPos({ x: ev.clientX - origen.current.x, y: ev.clientY - origen.current.y });
+      let x = ev.clientX - origen.current.x;
+      let y = ev.clientY - origen.current.y;
+      // Como una ventana de escritorio: se mueve libre, pero SIEMPRE queda un
+      // asa visible. Si no, se arrastra fuera y no hay forma de recuperarla.
+      const b = base.current;
+      if (b) {
+        const VISIBLE = 120;                       // ancho mínimo que queda a la vista
+        x = Math.max(VISIBLE - b.left - b.w, Math.min(window.innerWidth - VISIBLE - b.left, x));
+        y = Math.max(8 - b.top, Math.min(window.innerHeight - 56 - b.top, y));
+      }
+      setPos({ x, y });
     };
     const soltar = () => {
       origen.current = null;
@@ -71,6 +95,7 @@ export function Modal({
         centrado (se veía en las tablas de los buscadores).
       */}
       <div
+        ref={caja}
         style={pos ? { transform: `translate(${pos.x}px, ${pos.y}px)` } : undefined}
         className={`gl-aparecer w-full text-left ${ANCHOS[ancho]} rounded-md bg-panel text-paper shadow-xl ${className}`}
         onClick={(e) => e.stopPropagation()}
