@@ -21,7 +21,7 @@ import { Modal, BarraVentana, abrirTeclado, Desplazable } from "../../../ui";
 export function MarcoMantenimiento({
   pestanas, pestana, onPestana,
   subpestanas, subpestana, onSubpestana,
-  pie, children,
+  pie, children, pegado,
 }: Readonly<{
   pestanas: string[];
   pestana: string;
@@ -31,6 +31,12 @@ export function MarcoMantenimiento({
   onSubpestana?: (s: string) => void;
   pie: ReactNode;
   children: ReactNode;
+  /**
+   * El contenido va PEGADO a las pestañas, sin margen y sin la esquina superior
+   * redondeada bajo la pestaña activa. Para la Lista: así la tabla parece la
+   * continuación de la pestaña, no una tarjeta flotando debajo.
+   */
+  pegado?: boolean;
 }>) {
   const carril = useRef<HTMLDivElement>(null);
   const desplazar = (dir: number) => carril.current?.scrollBy({ left: dir * 240, behavior: "smooth" });
@@ -102,7 +108,14 @@ export function MarcoMantenimiento({
       )}
 
       {/* ── Cuerpo ── */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-3">{children}</div>
+      {/* `pegado`: sin margen y con el borde de la pestaña continuado, para que
+          la Lista se lea como una sola pieza con su pestaña. `min-w-0` evita que
+          una tabla ancha empuje el layout a la derecha. */}
+      <div className={pegado
+        ? "flex min-h-0 min-w-0 flex-1 flex-col border-t border-line *:rounded-none *:border-x-0 *:border-t-0"
+        : "flex min-h-0 flex-1 flex-col gap-2.5 p-3"}>
+        {children}
+      </div>
 
       {/* ── Barra de acciones ── */}
       <footer className="flex flex-none flex-wrap items-center gap-1 border-t border-line bg-panel px-3 py-2">

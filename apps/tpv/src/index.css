@@ -28,6 +28,10 @@
     --paper: #1c1024;
     --muted: #6d5c7a;
     --line: rgba(28, 16, 36, 0.1);
+    /* Verde de TEXTO sobre fondo claro. El `--mint` (#3fd8a4) es de acento sobre
+       fondo oscuro; sobre blanco casi no se lee, así que un margen «66 %» en
+       verde salía flojo. Este es el verde para leer en claro. */
+    --exito-texto: #0f9d63;
     --radius: 18px;
     color-scheme: light;
   }
@@ -41,6 +45,8 @@
     --paper: #f6f1f9;
     --muted: #b9a5c6;
     --line: rgba(255, 255, 255, 0.1);
+    /* En oscuro el mint SÍ se lee: se deja el de acento. */
+    --exito-texto: var(--mint);
     color-scheme: dark;
   }
 
@@ -108,6 +114,7 @@
   --color-accent-foreground: var(--paper);
   --color-accent-soft: color-mix(in srgb, var(--brand) 16%, transparent);
   --color-success: var(--mint);
+  --color-exito-texto: var(--exito-texto);
   --color-warning: var(--amber);
   /* Naranja "acción de dinero" (Cobrar) — el único acento naranja de la UI */
   --color-cobro: #c46a2a;

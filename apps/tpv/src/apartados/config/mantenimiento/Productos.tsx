@@ -131,16 +131,19 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
 ];
 
 /**
- * Casilla de sí/no de la lista. Un ✓ verde y un — apagado, no dos iconos que
- * griten igual: en una tabla de 1.200 filas lo que hace falta es distinguir de
- * un vistazo lo que ESTÁ puesto, no leer cruz por cruz.
+ * Casilla de sí/no de la lista: un CHECKBOX pintado (cuadro verde con ✓), no un
+ * icono suelto. Se lee como lo que es —algo marcado— y en una tabla de 1.200
+ * filas la mancha verde salta a la vista; el apagado es un cuadro tenue y vacío,
+ * que se distingue del puesto sin tener que leer nada.
  */
 function Casilla({ si }: Readonly<{ si: boolean }>) {
   return (
     <td className="px-2.5 py-2 text-center">
-      {si
-        ? <Check size={15} className="mx-auto text-mint" strokeWidth={3} />
-        : <span className="text-muted/50">—</span>}
+      <span className={`inline-grid h-5 w-5 place-items-center rounded-[4px] border ${
+        si ? "border-mint bg-mint text-white" : "border-line bg-transparent"
+      }`}>
+        {si && <Check size={13} strokeWidth={3.4} />}
+      </span>
     </td>
   );
 }
@@ -585,6 +588,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         subpestana={sub}
         onSubpestana={(s) => setSub(s as Sub)}
         pie={pie}
+        pegado={pestana === "Lista"}
       >
         {pestana === "Lista" && (
           <Caja crecer>
@@ -647,7 +651,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                         </td>
                         <td className="px-2.5 py-2 text-right font-mono">{f ? eur(f.precio) : "—"}</td>
                         <td className="px-2.5 py-2 text-right font-mono text-muted">{f ? eur(f.coste) : "—"}</td>
-                        <td className={`px-2.5 py-2 text-right font-mono font-extrabold ${m < 55 ? "text-danger" : "text-mint"}`}>
+                        <td className={`px-2.5 py-2 text-right font-mono font-extrabold ${m < 55 ? "text-danger" : "text-exito-texto"}`}>
                           {m.toFixed(0)} %
                         </td>
                         <td className="px-2.5 py-2 text-center font-mono text-muted">{a.impuesto} %</td>
@@ -787,7 +791,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                               onChange={(e) => setFormato(f.id, "coste", Number(e.target.value))}
                               className={claseEntrada(ro, "text-right font-mono", true)} />
                           </td>
-                          <td className={`px-2.5 py-1 text-right font-mono text-[13px] font-semibold ${m < 55 ? "text-danger" : "text-mint"}`}>
+                          <td className={`px-2.5 py-1 text-right font-mono text-[13px] font-semibold ${m < 55 ? "text-danger" : "text-exito-texto"}`}>
                             {m.toFixed(0)} %
                           </td>
                           {/* Quitar la línea DESDE la línea: con un botón único
