@@ -1,10 +1,14 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { Inicio } from "./apartados/inicio/Inicio";
-import { Tpv } from "./apartados/tpv/Tpv";
-import { Configuracion } from "./apartados/config/Configuracion";
-import { Analisis } from "./apartados/analisis/Analisis";
-import { Administrador } from "./apartados/admin/Administrador";
-import { VisorNode } from "./apartados/nodo/VisorNode";
+
+// Los apartados bajan CUANDO SE ABREN. Inicio es lo único del arranque: el TPV de
+// un bar arranca en un mini-PC debajo de la barra, no en un portátil de
+// desarrollo, y ahí se nota bajar Configuración entera para no mirarla.
+const Tpv = lazy(() => import("./apartados/tpv/Tpv").then((m) => ({ default: m.Tpv })));
+const Configuracion = lazy(() => import("./apartados/config/Configuracion").then((m) => ({ default: m.Configuracion })));
+const Analisis = lazy(() => import("./apartados/analisis/Analisis").then((m) => ({ default: m.Analisis })));
+const Administrador = lazy(() => import("./apartados/admin/Administrador").then((m) => ({ default: m.Administrador })));
+const VisorNode = lazy(() => import("./apartados/nodo/VisorNode").then((m) => ({ default: m.VisorNode })));
 import { CredencialModal } from "./apartados/acceso/CredencialModal";
 import { AyudaModal } from "./apartados/ayuda/AyudaModal";
 import { APARTADOS } from "./apartados/meta";
@@ -101,7 +105,13 @@ export function App() {
   return (
     <>
       {Pantalla
-        ? <Pantalla onVolver={() => setVista("inicio")} />
+        ? (
+          // Sin pantalla de carga: el fallback es el fondo del apartado. Un
+          // "Cargando…" que parpadea 80 ms es más ruido que información.
+          <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+            <Pantalla onVolver={() => setVista("inicio")} />
+          </Suspense>
+        )
         : (
           <Inicio
             local={DEMO.local}

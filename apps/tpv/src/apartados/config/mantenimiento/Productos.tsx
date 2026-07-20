@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRuta, navegar } from "../../../lib/rutas";
+import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../../../lib/rutas";
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
@@ -13,6 +13,7 @@ import {
   cargarCatalogo, guardarArticulo, borrarArticulo, crearFamiliaEnNodo, subirFotoArticulo,
 } from "./catalogo";
 import { duplicarArticulo } from "./duplicar";
+import { refDeArticulo, indicePorRef } from "./referencia";
 import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
   BuscadorRegistros,
@@ -143,14 +144,23 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const ruta = useRuta();
   const [borrador, setBorrador] = useState<Articulo | null>(null);
   const [nuevo, setNuevo] = useState(false);
-  const [pestana, setPestana] = useState("Ficha");
+  // La pestaña NO es estado: la dice la URL. `/config/productos` es la LISTA (que
+  // es donde uno espera caer al entrar) y `/config/productos/0007` es esa ficha.
+  // Un alta a medias también manda: el borrador aún no tiene sitio en la URL.
+  const pestana = borrador || ruta.id ? "Ficha" : "Lista";
+  const setPestana = (p: string) =>
+    abrirArticulo(p === "Lista" ? undefined : refDeArticulo(articulos[idx]!));
   const [sub, setSub] = useState<Sub>("Datos generales");
   const [q, setQ] = useState("");
   const [fmtSel, setFmtSel] = useState<string | null>(null);
   const [borrar, setBorrar] = useState(false);
-  const [params, setParams] = useState(false);   // ventana «Parámetros del artículo»
-  const [aspecto, setAspecto] = useState(false); // ventana «Aspecto en el TPV»
-  const [buscaFam, setBuscaFam] = useState(false);
+  // Las ventanas CON CONTENIDO viven en la URL: así el Atrás las cierra, que es
+  // lo que hace una app de escritorio. El «¿Borrar?» NO: una confirmación en el
+  // historial acaba con el Atrás contestando por ti, y aquí se borran artículos.
+  const ventana = useVentana();
+  const params = ventana === "parametros";
+  const aspecto = ventana === "aspecto";
+  const buscaFam = ventana === "familias";
   // `real` = los datos salen del nodo. Si no, la pantalla enseña el catálogo de
   // ejemplo y LO DICE: datos fingidos vendidos como reales es peor que nada.
   const [real, setReal] = useState(false);
@@ -173,12 +183,14 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     return () => { vivo = false; };
   }, []);
 
-  // Un id que ya no existe (artículo borrado, enlace viejo, o la demo cambiada
-  // por la carta real) no deja la pantalla en blanco: cae al primero.
-  const enUrl = ruta.id ? articulos.findIndex((a) => a.id === ruta.id) : -1;
+  // Una referencia que ya no existe (artículo borrado, enlace viejo, o la demo
+  // cambiada por la carta real) no deja la pantalla en blanco: cae al primero.
+  const enUrl = indicePorRef(articulos, ruta.id);
   const idx = Math.max(enUrl, 0);
-  const abrirArticulo = (id?: string) =>
-    navegar({ vista: "config", seccion: "productos", ...(id ? { id } : {}) }, true);
+  // Abrir una ficha SÍ apila historial (el Atrás vuelve a la lista, que es lo
+  // que uno espera); volver a la lista lo reemplaza, para no dejar rastro doble.
+  const abrirArticulo = (ref?: string) =>
+    navegar({ vista: "config", seccion: "productos", ...(ref ? { id: ref } : {}) }, !ref);
 
   const nombreDeFamilia = (id: string) => familias.find((f) => f.id === id)?.nombre ?? id;
   const codigoDeFamilia = (id: string) => familias.find((f) => f.id === id)?.codigo ?? "";
@@ -249,7 +261,8 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     } : b);
 
   const irA = (i: number) => {
-    abrirArticulo(articulos[Math.max(0, Math.min(articulos.length - 1, i))]?.id);
+    const destino = articulos[Math.max(0, Math.min(articulos.length - 1, i))];
+    abrirArticulo(destino && refDeArticulo(destino));
     setFmtSel(null);
   };
 
@@ -271,7 +284,8 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       }],
       comentarios: [], extras: [],
     });
-    setPestana("Ficha");
+    // La pestaña NO se toca aquí: al haber borrador ya sale la Ficha sola. Si se
+    // forzara, navegaría al artículo ANTERIOR y se llevaría el alta por delante.
     setSub("Datos generales");
   };
 
@@ -297,7 +311,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       if (real) await guardarArticulo(listo);
 
       setArticulos((as) => (esNuevo ? [...as, listo] : as.map((a) => (a.id === listo.id ? listo : a))));
-      if (esNuevo) abrirArticulo(listo.id);
+      if (esNuevo) abrirArticulo(refDeArticulo(listo));
       setBorrador(null); setNuevo(false);
       notificar(esNuevo ? "Artículo creado." : "Cambios guardados.");
     } catch (e: unknown) {
@@ -415,11 +429,14 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       <span className="flex-1" />
       {aviso && <span className="rounded-full bg-paper px-4 py-2 text-[12.5px] font-bold text-ink">{aviso}</span>}
       <BotonPie Icono={Keyboard} onClick={abrirTeclado}>Teclado</BotonPie>
-      <EstadoPie editando={editando}>
-        {editando
-          ? `${nuevo ? "Nuevo artículo" : "Editando"} · ${art.codigo}`
-          : `Consulta · artículo ${idx + 1} de ${articulos.length}`}
-      </EstadoPie>
+      {/* En consulta el pie NO dice nada: «artículo 1 de 49» no sirve para nada
+          —el contador ya está en la lista— y ocupaba sitio a los botones. El
+          aviso se reserva para cuando SÍ importa: que estás editando. */}
+      {editando && (
+        <EstadoPie editando>
+          {nuevo ? "Nuevo artículo" : `Editando · ${art.codigo}`}
+        </EstadoPie>
+      )}
       <SepPie />
       <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir} disabled={editando}>Salir</BotonPie>
     </>
@@ -485,7 +502,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     const sel = a.id === art.id;
                     return (
                       <tr key={a.id} aria-selected={sel}
-                        onClick={() => { abrirArticulo(a.id); setPestana("Ficha"); setFmtSel(null); }}
+                        onClick={() => { abrirArticulo(refDeArticulo(a)); setFmtSel(null); }}
                         className={`cursor-pointer border-b border-line text-[13.5px] ${sel ? "bg-accent-soft" : ""}`}>
                         {/* `stopPropagation`: la fila entera navega a la ficha, y
                             marcar la casilla no debe llevarte a otra pantalla. */}
@@ -543,7 +560,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                         className={claseEntrada(true, "w-16 flex-none text-center font-mono")} />
                       <input id="a-fam" value={nombreDeFamilia(art.familia)} readOnly
                         placeholder="Sin familia" className={claseEntrada(true, "min-w-0 flex-1")} />
-                      <button type="button" disabled={ro} onClick={() => setBuscaFam(true)}
+                      <button type="button" disabled={ro} onClick={() => abrirVentana("familias")}
                         aria-label="Buscar familia de venta"
                         className="grid min-h-11 w-11 flex-none place-items-center rounded-[5px] border border-line bg-panel text-brand-lit transition-transform active:scale-95 disabled:opacity-40">
                         <Search size={16} />
@@ -566,10 +583,6 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     <input id="a-bar" value={art.barras} readOnly={ro} inputMode="numeric"
                       onChange={(e) => set("barras", e.target.value)} className={claseEntrada(ro, "font-mono")} />
                   </Campo>
-                  <Campo etiqueta="Se vende al peso">
-                    <Interruptor activo={art.alPeso} disabled={ro} etiqueta={art.alPeso ? "Sí, por kilos" : "No, por unidades"}
-                      onToggle={() => setParam("alPeso", !art.alPeso)} />
-                  </Campo>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -582,16 +595,16 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                         precio={art.formatos[0]?.barra ?? 0}
                         color={art.color ?? colorDeFamilia(art.familia)} foto={art.foto} icono={art.icono} />
                     </div>
-                    <button type="button" disabled={ro} onClick={() => setAspecto(true)}
+                    <button type="button" disabled={ro} onClick={() => abrirVentana("aspecto")}
                       className="flex min-h-10 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
                       <Camera size={15} /> Foto, color e icono
                     </button>
                   </div>
-                  <Interruptor activo={art.visible} disabled={ro} etiqueta="Visible en TPV"
-                    onToggle={() => setParam("vendible", !art.visible)} />
-                  {/* Como en Glop: el comportamiento del artículo vive en su
-                      propia ventana, que si no la ficha se hace ilegible. */}
-                  <button type="button" onClick={() => setParams(true)}
+                  {/* Como en Glop: TODO el comportamiento del artículo vive en su
+                      propia ventana —vendible y venta por peso incluidos—, y así
+                      la ficha deja el ancho para la tabla de formatos, que es lo
+                      que de verdad se mira aquí. */}
+                  <button type="button" onClick={() => abrirVentana("parametros")}
                     className="flex min-h-11 items-center justify-center gap-2 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-medium text-paper/85 transition-transform active:scale-[.98]">
                     <SlidersHorizontal size={15} /> Parámetros del artículo
                   </button>
@@ -818,7 +831,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           etiquetaNuevo="Nueva familia"
           onCrear={crearFamilia}
           onAceptar={(id) => set("familia", id)}
-          onCerrar={() => setBuscaFam(false)}
+          onCerrar={cerrarVentana}
         />
       )}
 
@@ -828,14 +841,14 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           colorFamilia={colorDeFamilia(art.familia)}
           foto={art.foto} color={art.color} icono={art.icono}
           onCambiar={(campo, valor) => set(campo, valor)}
-          onCerrar={() => setAspecto(false)}
+          onCerrar={cerrarVentana}
         />
       )}
 
       {params && (
-        <Modal onCerrar={() => setParams(false)} ancho="xl">
+        <Modal onCerrar={cerrarVentana} ancho="xl">
           <CabeceraModal Icono={SlidersHorizontal} titulo="Parámetros del artículo"
-            subtitulo={`${art.codigo} · ${art.nombre || "Sin descripción"}`} onCerrar={() => setParams(false)} />
+            subtitulo={`${art.codigo} · ${art.nombre || "Sin descripción"}`} onCerrar={cerrarVentana} />
           <div className="max-h-[70vh] overflow-y-auto p-4">
             {ro && (
               <p className="mb-3 rounded-[5px] border border-line bg-paper/3 px-3 py-2 text-[12.5px] text-muted">
