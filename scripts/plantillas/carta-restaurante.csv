@@ -1,0 +1,73 @@
+familia;categoria;producto;precio;clase_fiscal;estacion;alcohol
+Entrantes;Para picar;Pan con alioli;2,50;REDUCIDO;COCINA;no
+Entrantes;Para picar;Aceitunas aliñadas;3,20;REDUCIDO;COCINA;no
+Entrantes;Para picar;Patatas bravas;6,80;REDUCIDO;COCINA;no
+Entrantes;Para picar;Croquetas de jamón (6 u.);8,50;REDUCIDO;COCINA;no
+Entrantes;Para picar;Boquerones en vinagre;7,90;REDUCIDO;COCINA;no
+Entrantes;Para picar;Jamón ibérico de bellota;18,50;REDUCIDO;COCINA;no
+Entrantes;Para picar;Queso manchego curado;9,80;REDUCIDO;COCINA;no
+Entrantes;Para picar;Gambas al ajillo;12,90;REDUCIDO;COCINA;no
+Entrantes;Para picar;Pulpo a la gallega;16,50;REDUCIDO;COCINA;no
+Entrantes;Para picar;Tortilla española;5,50;REDUCIDO;COCINA;no
+Entrantes;Ensaladas;Ensalada mixta;7,50;REDUCIDO;COCINA;no
+Entrantes;Ensaladas;Ensalada de burrata;11,90;REDUCIDO;COCINA;no
+Entrantes;Ensaladas;Ensalada césar;10,50;REDUCIDO;COCINA;no
+Entrantes;Ensaladas;Gazpacho andaluz;5,80;REDUCIDO;COCINA;no
+Arroces;Arroces;Paella valenciana (mín. 2);17,50;REDUCIDO;COCINA;no
+Arroces;Arroces;Arroz negro (mín. 2);18,90;REDUCIDO;COCINA;no
+Arroces;Arroces;Arroz a banda (mín. 2);17,90;REDUCIDO;COCINA;no
+Arroces;Arroces;Fideuá (mín. 2);17,50;REDUCIDO;COCINA;no
+Carnes;Carnes;Entrecot de ternera;22,90;REDUCIDO;COCINA;no
+Carnes;Carnes;Solomillo al foie;26,50;REDUCIDO;COCINA;no
+Carnes;Carnes;Chuletillas de cordero;19,90;REDUCIDO;COCINA;no
+Carnes;Carnes;Secreto ibérico;18,50;REDUCIDO;COCINA;no
+Carnes;Carnes;Pollo de corral asado;14,90;REDUCIDO;COCINA;no
+Carnes;Carnes;Rabo de toro estofado;19,50;REDUCIDO;COCINA;no
+Pescados;Pescados;Lubina a la espalda;21,90;REDUCIDO;COCINA;no
+Pescados;Pescados;Bacalao al pil-pil;20,50;REDUCIDO;COCINA;no
+Pescados;Pescados;Merluza a la romana;17,90;REDUCIDO;COCINA;no
+Pescados;Pescados;Chipirones a la plancha;16,50;REDUCIDO;COCINA;no
+Pescados;Pescados;Dorada a la sal;19,90;REDUCIDO;COCINA;no
+Hamburguesas;Hamburguesas;Hamburguesa clásica;11,90;REDUCIDO;COCINA;no
+Hamburguesas;Hamburguesas;Hamburguesa de la casa;13,90;REDUCIDO;COCINA;no
+Hamburguesas;Hamburguesas;Hamburguesa vegana;12,50;REDUCIDO;COCINA;no
+Menú del día;Menú del día;Menú del día completo;14,50;REDUCIDO;COCINA;no
+Menú del día;Menú del día;Menú del día (1 plato);11,00;REDUCIDO;COCINA;no
+Postres;Postres;Tarta de queso;5,90;REDUCIDO;COCINA;no
+Postres;Postres;Flan de huevo casero;4,50;REDUCIDO;COCINA;no
+Postres;Postres;Coulant de chocolate;6,20;REDUCIDO;COCINA;no
+Postres;Postres;Arroz con leche;4,80;REDUCIDO;COCINA;no
+Postres;Postres;Fruta de temporada;4,20;REDUCIDO;COCINA;no
+Postres;Postres;Helado (2 bolas);4,50;REDUCIDO;COCINA;no
+Bebidas;Refrescos;Coca-Cola;2,60;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Coca-Cola Zero;2,60;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Fanta naranja;2,60;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Nestea;2,60;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Tónica;2,80;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Agua mineral 50 cl;1,90;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Agua mineral 1 l;3,20;REDUCIDO;BARRA;no
+Bebidas;Refrescos;Zumo natural de naranja;3,50;REDUCIDO;BARRA;no
+Bebidas;Cafés e infusiones;Café solo;1,50;REDUCIDO;BARRA;no
+Bebidas;Cafés e infusiones;Café cortado;1,60;REDUCIDO;BARRA;no
+Bebidas;Cafés e infusiones;Café con leche;1,80;REDUCIDO;BARRA;no
+Bebidas;Cafés e infusiones;Capuchino;2,20;REDUCIDO;BARRA;no
+Bebidas;Cafés e infusiones;Descafeinado;1,60;REDUCIDO;BARRA;no
+Bebidas;Cafés e infusiones;Infusión;1,80;REDUCIDO;BARRA;no
+Bebidas;Cervezas;Caña;2,00;GENERAL;BARRA;si
+Bebidas;Cervezas;Doble;3,20;GENERAL;BARRA;si
+Bebidas;Cervezas;Tercio;2,90;GENERAL;BARRA;si
+Bebidas;Cervezas;Cerveza sin alcohol;2,60;REDUCIDO;BARRA;no
+Bebidas;Cervezas;Clara;2,20;GENERAL;BARRA;si
+Bebidas;Vinos;Copa de vino tinto;2,80;GENERAL;BARRA;si
+Bebidas;Vinos;Copa de vino blanco;2,80;GENERAL;BARRA;si
+Bebidas;Vinos;Botella Rioja crianza;16,50;GENERAL;BARRA;si
+Bebidas;Vinos;Botella Ribera del Duero;19,90;GENERAL;BARRA;si
+Bebidas;Vinos;Botella Albariño;17,50;GENERAL;BARRA;si
+Bebidas;Vinos;Botella Verdejo;14,90;GENERAL;BARRA;si
+Bebidas;Vinos;Sangría (jarra 1 l);12,90;GENERAL;BARRA;si
+Bebidas;Copas;Gin-tonic;7,50;GENERAL;BARRA;si
+Bebidas;Copas;Ron cola;7,00;GENERAL;BARRA;si
+Bebidas;Copas;Mojito;8,00;GENERAL;BARRA;si
+Bebidas;Copas;Whisky;7,50;GENERAL;BARRA;si
+Bebidas;Copas;Carajillo;2,80;GENERAL;BARRA;si
+Bebidas;Copas;Chupito;2,50;GENERAL;BARRA;si
