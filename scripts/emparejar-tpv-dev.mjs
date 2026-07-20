@@ -82,7 +82,7 @@ try {
   }
 
   const token = firmarSesion(deviceId, tenant, secretoDelNodo());
-  const sesion = JSON.stringify({ access_token: token, device_id: deviceId });
+  const sesion = JSON.stringify({ access_token: token, device_id: deviceId, device_nombre: nombre });
 
   console.log(`\n✅ Terminal vinculado a «${t.nombre}»\n`);
   console.log("Pega ESTO en la consola del navegador (F12) donde tengas abierto el TPV,");
