@@ -1,0 +1,14 @@
+familia;categoria;producto;precio;clase_fiscal;estacion;alcohol
+Bebidas;Refrescos;Coca-Cola;2,50;GENERAL;BARRA;no
+Bebidas;Refrescos;Fanta naranja;2,50;GENERAL;BARRA;no
+Bebidas;Cervezas;Caña;1,80;GENERAL;BARRA;si
+Bebidas;Cervezas;Tercio;2,60;GENERAL;BARRA;si
+Bebidas;Cafés;Café solo;1,40;REDUCIDO;BARRA;no
+Bebidas;Cafés;Cortado;1,50;REDUCIDO;BARRA;no
+Comida;Tapas;Tortilla española;3,50;REDUCIDO;COCINA;no
+Comida;Tapas;Croquetas caseras;4,20;REDUCIDO;COCINA;no
+Comida;Raciones;Pulpo a la gallega;14,90;REDUCIDO;COCINA;no
+Comida;Raciones;Patatas bravas;6,50;REDUCIDO;COCINA;no
+Comida;Hamburguesas;Hamburguesa clásica;9,90;REDUCIDO;COCINA;no
+Postres;Dulces;Tarta de queso;5,50;REDUCIDO;COCINA;no
+Postres;Dulces;Flan casero;3,80;REDUCIDO;COCINA;no
