@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark, FileText, Receipt,
+  Percent, AlertTriangle,
 } from "lucide-react";
 import { CatalogoInformes } from "./CatalogoInformes";
 import { disponibles, totalInformes } from "./informes";
@@ -66,6 +67,7 @@ const SECCIONES: readonly SeccionShell[] = [
   { id: "ventas", label: "Ventas", Icono: TrendingUp },
   { id: "diario", label: "Diario de tickets", Icono: Receipt },
   { id: "productos", label: "Productos", Icono: Package },
+  { id: "margenes", label: "Márgenes", Icono: Percent },
   { id: "camareros", label: "Camareros", Icono: Users },
   { id: "caja", label: "Caja y cierres", Icono: Banknote },
   { id: "impuestos", label: "Impuestos", Icono: Landmark },
@@ -87,6 +89,20 @@ const CAMAREROS = [
   { nombre: "Berto Sanz", tickets: 21, ventas: 498.9, propinas: 13.0 },
   { nombre: "Lucía Gil", tickets: 18, ventas: 375.0, propinas: 10.0 },
 ];
+// Ficha de cada artículo: coste unitario SIN impuesto (`product_format.coste`) y
+// su tipo de IGIC (el que resuelve `resolver_iva` por clase fiscal × territorio).
+// «Tarta de queso» va a propósito sin coste: es el caso normal en un bar recién
+// dado de alta, y la pantalla tiene que saber decir «no lo sé».
+const FICHA: Record<string, Ficha> = {
+  "Menú del día": { coste: 4.15, iva: 7 },
+  "Caña": { coste: 0.42, iva: 7 },
+  "Croquetas caseras": { coste: 2.3, iva: 7 },
+  "Café solo": { coste: 0.26, iva: 7 },
+  "Tortilla": { coste: 1.55, iva: 7 },
+  "Vino de la casa": { coste: 1.1, iva: 7 },
+  "Tarta de queso": { iva: 3 },
+};
+
 const CIERRES = [
   { cuando: "Ayer · 23:48", ventas: 1370.2, efectivo: 442.2, tarjeta: 806, descuadre: -2.15 },
   { cuando: "17-07 · 23:52", ventas: 1512.8, efectivo: 508.4, tarjeta: 884.4, descuadre: 0 },
@@ -149,6 +165,72 @@ export function porFamilia(top: readonly { familia: string; uds: number; importe
     m.set(t.familia, f);
   }
   return [...m.values()].sort((a, b) => b.importe - a.importe);
+}
+
+// ── Márgenes y menú engineering ─────────────────────────────────────────────
+// El coste sale de `product_format.coste` (migración 0128), que ya existe y ya lo
+// lee el catálogo; aquí solo se cruza con lo vendido.
+//
+// DOS TRAMPAS, y las dos cambian decisiones de precio:
+//
+// 1. El margen va sobre la BASE, no sobre el PVP. Los precios de carta llevan el
+//    impuesto incluido: contar el IGIC como ingreso propio infla el margen y
+//    lleva a bajar precios que no dan lo que parecía.
+// 2. Un artículo SIN coste no tiene margen cero ni margen del 100 %: no se sabe.
+//    Sale como «sin escandallo» y queda FUERA de los totales. Rellenar el hueco
+//    con un cero es lo que convierte un informe en una mentira con formato.
+export interface Ficha { coste?: number; iva: number }
+export interface FilaMargen {
+  nombre: string; familia: string; uds: number;
+  importe: number; base: number;
+  coste: number | null; margen: number | null; pct: number | null;
+}
+
+export function margenDe(
+  top: readonly { nombre: string; familia: string; uds: number; importe: number }[],
+  ficha: Readonly<Record<string, Ficha>>,
+): FilaMargen[] {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return top.map((t) => {
+    const f = ficha[t.nombre];
+    const base = r2(t.importe / (1 + (f?.iva ?? 0) / 100));
+    if (!f || f.coste === undefined) {
+      return { ...t, base, coste: null, margen: null, pct: null };
+    }
+    const coste = r2(f.coste * t.uds);
+    const margen = r2(base - coste);
+    return { ...t, base, coste, margen, pct: base ? (margen / base) * 100 : null };
+  });
+}
+
+/** Totales del periodo. Los artículos sin escandallo se cuentan aparte, no se suman. */
+export function resumenMargen(filas: readonly FilaMargen[]) {
+  const con = filas.filter((f) => f.margen !== null);
+  const base = con.reduce((a, f) => a + f.base, 0);
+  const coste = con.reduce((a, f) => a + (f.coste ?? 0), 0);
+  const margen = base - coste;
+  return {
+    base, coste, margen,
+    pct: base ? (margen / base) * 100 : null,
+    sinCoste: filas.length - con.length,
+  };
+}
+
+/** Los cuatro cuadrantes de Ágora: se cruza cuánto se vende con cuánto deja. */
+export type Cuadrante = "Estrella" | "Caballo" | "Puzle" | "Perro" | "—";
+
+export function cuadrantes(filas: readonly FilaMargen[]): Map<string, Cuadrante> {
+  const con = filas.filter((f) => f.pct !== null);
+  const m = new Map<string, Cuadrante>(filas.map((f) => [f.nombre, "—" as Cuadrante]));
+  if (con.length < 2) return m;                       // con un artículo no hay «alto» ni «bajo»
+  const medio = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
+  const mUds = medio(con.map((f) => f.uds));
+  const mPct = medio(con.map((f) => f.pct!));
+  for (const f of con) {
+    const vende = f.uds >= mUds, deja = f.pct! >= mPct;
+    m.set(f.nombre, vende && deja ? "Estrella" : vende ? "Caballo" : deja ? "Puzle" : "Perro");
+  }
+  return m;
 }
 
 // IGIC canario (7 % general, 3 % reducido): el desglose sale hacia atrás del PVP.
@@ -319,6 +401,10 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   // que no suman 100 y parecen un error de cuentas.
   const familias = useMemo(() => filtrar(porFamilia(top), busq, (f) => [f.familia]), [top, busq]);
   const ventaTop = top.reduce((a, t) => a + t.importe, 0);
+  const margenTodo = useMemo(() => margenDe(top, FICHA), [top]);
+  const margenes = useMemo(() => filtrar(margenTodo, busq, (m) => [m.nombre, m.familia]), [margenTodo, busq]);
+  const resMargen = resumenMargen(margenes);
+  const cuad = useMemo(() => cuadrantes(margenTodo), [margenTodo]);
   // El diario se deriva del periodo (mismo nº de tickets y mismo total que los KPI).
   const diarioTodo = useMemo(() => diarioDe(d.tickets, d.ventas, 1000), [d.tickets, d.ventas]);
   const diario = useMemo(
@@ -370,6 +456,17 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     { titulo: "Importe", valor: (f) => num(f.importe), derecha: true },
     { titulo: "% del total", valor: (f) => pct(f.importe, ventaTop), derecha: true },
   ];
+  const COL_MARGENES: ColumnaInforme<FilaMargen>[] = [
+    { titulo: "Artículo", valor: (m) => m.nombre },
+    { titulo: "Familia", valor: (m) => m.familia },
+    { titulo: "Uds", valor: (m) => m.uds, derecha: true },
+    { titulo: "Venta (PVP)", valor: (m) => num(m.importe), derecha: true },
+    { titulo: "Base", valor: (m) => num(m.base), derecha: true },
+    { titulo: "Coste", valor: (m) => (m.coste === null ? "Sin escandallo" : num(m.coste)), derecha: true },
+    { titulo: "Margen", valor: (m) => (m.margen === null ? "" : num(m.margen)), derecha: true },
+    { titulo: "% margen", valor: (m) => (m.pct === null ? "" : `${m.pct.toFixed(1)} %`), derecha: true },
+    { titulo: "Clasificación", valor: (m) => cuad.get(m.nombre) ?? "—" },
+  ];
   const COL_PAGOS: ColumnaInforme<typeof d.pagos[number]>[] = [
     { titulo: "Forma de pago", valor: (p) => p.nombre },
     { titulo: "Importe", valor: (p) => num(p.importe), derecha: true },
@@ -388,6 +485,7 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     diario: `${etiquetaPeriodo} · ticket a ticket`,
     ventas: `${etiquetaPeriodo} · detalle por franja`,
     productos: `${etiquetaPeriodo} · ${d.top.length} artículos en ${porFamilia(d.top).length} familias`,
+    margenes: `${etiquetaPeriodo} · margen sobre base y menú engineering`,
     camareros: `${etiquetaPeriodo} · rendimiento por operario`,
     caja: `${etiquetaPeriodo} · formas de pago y cierres Z`,
     impuestos: `${etiquetaPeriodo} · desglose IGIC (Canarias)`,
@@ -593,6 +691,92 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
                 ))}
               </tbody>
             </table>
+          </Tarjeta>
+        </div>
+      )}
+
+      {seccion === "margenes" && (
+        <div className="space-y-3 p-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <Kpi label="Base (sin impuesto)" valor={eur(resMargen.base)} sub="Lo que entra de verdad" />
+            <Kpi label="Coste de producto" valor={eur(resMargen.coste)} sub="Escandallo × unidades" />
+            <Kpi label="Margen bruto" valor={eur(resMargen.margen)}
+              sub={resMargen.pct === null ? "Sin datos" : `${resMargen.pct.toFixed(1)} % sobre la base`} />
+            <Kpi label="Sin escandallo" valor={String(resMargen.sinCoste)}
+              sub={resMargen.sinCoste ? "Fuera de los totales" : "Todo con coste"} />
+          </div>
+
+          {resMargen.sinCoste > 0 && (
+            <p className={`${RC} flex items-start gap-2 border border-amber/30 bg-amber/10 px-3.5 py-2.5 text-[12px] leading-relaxed`}>
+              <AlertTriangle size={14} className="mt-0.5 flex-none text-amber" />
+              <span>
+                {resMargen.sinCoste === 1 ? "Hay 1 artículo" : `Hay ${resMargen.sinCoste} artículos`} sin coste en su
+                ficha. {resMargen.sinCoste === 1 ? "Queda" : "Quedan"} fuera de los totales:
+                dar por hecho un coste de cero diría que {resMargen.sinCoste === 1 ? "deja" : "dejan"} el 100 % de margen,
+                que es justo lo contrario de la verdad.
+              </span>
+            </p>
+          )}
+
+          <Tarjeta titulo="Margen por artículo">
+            <BarraInforme titulo={`Márgenes y menú engineering · ${etiquetaPeriodo}`} columnas={COL_MARGENES}
+              filas={margenes} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[
+                { etiqueta: "Base", valor: eur(resMargen.base) },
+                { etiqueta: "Coste", valor: eur(resMargen.coste) },
+                { etiqueta: "Margen", valor: `${eur(resMargen.margen)}${resMargen.pct === null ? "" : ` · ${resMargen.pct.toFixed(1)} %`}` },
+              ]} />
+            <table className="w-full border-collapse">
+              <thead><tr>
+                <th className={TH}>Artículo</th><th className={`${TH} text-right`}>Uds</th>
+                <th className={`${TH} text-right`}>Base</th><th className={`${TH} text-right`}>Coste</th>
+                <th className={`${TH} text-right`}>Margen</th><th className={`${TH} text-right`}>%</th>
+                <th className={TH}>Clasificación</th>
+              </tr></thead>
+              <tbody>
+                {margenes.map((m) => {
+                  const c = cuad.get(m.nombre) ?? "—";
+                  return (
+                    <tr key={m.nombre} className="border-b border-line">
+                      <td className={TD}><b className="font-medium">{m.nombre}</b> <span className="text-muted">· {m.familia}</span></td>
+                      <td className={`${TD} text-right tabular-nums`}>{m.uds}</td>
+                      <td className={`${TD} text-right tabular-nums`}>{eur(m.base)}</td>
+                      <td className={`${TD} text-right tabular-nums ${m.coste === null ? "text-amber" : "text-muted"}`}>
+                        {m.coste === null ? "Sin escandallo" : eur(m.coste)}
+                      </td>
+                      <td className={`${TD} text-right font-medium tabular-nums`}>{m.margen === null ? "—" : eur(m.margen)}</td>
+                      <td className={`${TD} text-right tabular-nums ${m.pct !== null && m.pct < 60 ? "text-amber" : ""}`}>
+                        {m.pct === null ? "—" : `${m.pct.toFixed(1)} %`}
+                      </td>
+                      <td className={TD}>
+                        <span className={`rounded-[3px] px-1.5 py-0.5 text-[11.5px] font-medium ${
+                          c === "Estrella" ? "bg-mint/15 text-mint"
+                          : c === "Caballo" ? "bg-brand/15 text-brand-lit"
+                          : c === "Puzle" ? "bg-amber/15 text-amber"
+                          : c === "Perro" ? "bg-danger/15 text-danger"
+                          : "bg-paper/8 text-muted"}`}>{c}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td className={`${TD} font-semibold`}>Total con escandallo</td>
+                  <td className={TD} />
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(resMargen.base)}</td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(resMargen.coste)}</td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(resMargen.margen)}</td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>{resMargen.pct === null ? "—" : `${resMargen.pct.toFixed(1)} %`}</td>
+                  <td className={TD} />
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-3 text-[12px] leading-relaxed text-muted">
+              El margen se calcula sobre la <b className="font-medium text-paper">base</b>, no sobre el PVP: el impuesto
+              no es ingreso del local. <b className="font-medium text-paper">Estrella</b> vende mucho y deja mucho ·{" "}
+              <b className="font-medium text-paper">Caballo</b> vende mucho y deja poco ·{" "}
+              <b className="font-medium text-paper">Puzle</b> deja mucho pero vende poco ·{" "}
+              <b className="font-medium text-paper">Perro</b> ni una cosa ni la otra.
+            </p>
           </Tarjeta>
         </div>
       )}

@@ -7,7 +7,8 @@
 // el dueño pierde la confianza en todos, incluidos los buenos.
 
 /** Secciones del Análisis a las que puede llevar un informe (las que existen). */
-export type SeccionInforme = "resumen" | "ventas" | "diario" | "productos" | "camareros" | "caja" | "impuestos";
+export type SeccionInforme =
+  | "resumen" | "ventas" | "diario" | "productos" | "margenes" | "camareros" | "caja" | "impuestos";
 
 export interface Informe {
   id: string;
@@ -55,9 +56,9 @@ export const CATALOGO: GrupoInformes[] = [
     informes: [
       { id: "ca-top50", nombre: "Top 50 Productos", va: "productos" },
       { id: "ca-familias", nombre: "Familias y Productos", va: "productos" },
-      { id: "ca-margenes-fam", nombre: "Márgenes por Familias", falta: "Necesita el coste de cada artículo (escandallo)" },
-      { id: "ca-margenes-cat", nombre: "Márgenes por Categorías", falta: "Necesita el coste de cada artículo (escandallo)" },
-      { id: "ca-menu-eng", nombre: "Menú Engineering", falta: "Necesita coste y margen por artículo" },
+      { id: "ca-margenes-fam", nombre: "Márgenes por Familias", va: "margenes" },
+      { id: "ca-margenes-cat", nombre: "Márgenes por Categorías", falta: "Necesita los productos repartidos en categorías" },
+      { id: "ca-menu-eng", nombre: "Menú Engineering", va: "margenes" },
       { id: "ca-historico", nombre: "Histórico de Ventas", va: "diario" },
       { id: "ca-alergenos", nombre: "Alérgenos por Producto", falta: "Necesita los alérgenos rellenos en la ficha" },
       { id: "ca-promos", nombre: "Promociones y Productos", falta: "Necesita promociones activas" },
