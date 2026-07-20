@@ -45,8 +45,30 @@ const nube = async (ruta, init) => {
 const sincronizar = () =>
   execFileSync("node", ["apps/nodo/sincronizar.mjs"], { encoding: "utf8" });
 
-const { rows: [{ id: tenantId }] } = await bd.query("select id from public.tenant limit 1");
-console.log(`\nBar ${tenantId.slice(0, 8)}…\n`);
+// El bar contra el que se prueba. Antes era `select id from tenant limit 1`: sin
+// ORDER BY y sin filtro, cogía UNO CUALQUIERA — y si el nodo tiene el tenant
+// PLANTILLA (el que la nube clona en cada empresa nueva), esta prueba se ponía a
+// cambiar precios y a borrar productos EN LA PLANTILLA DE PRODUCCIÓN.
+// Ahora: se puede fijar con NODO_TENANT, y la plantilla queda excluida siempre.
+const { rows: candidatos } = await bd.query(
+  `select id, nombre, coalesce(es_plantilla,false) es_plantilla
+     from public.tenant
+    where ($1::uuid is null or id = $1::uuid)
+    order by created_at`,
+  [process.env.NODO_TENANT ?? null],
+);
+const elegido = candidatos.find((t) => !t.es_plantilla);
+if (!elegido) {
+  const porQue = candidatos.length
+    ? "el único tenant de este nodo es la PLANTILLA, y no se toca: es la que la nube clona en cada empresa nueva"
+    : "este nodo no tiene ningún bar";
+  console.error(`\n⚠️  Prueba no ejecutada — ${porQue}.`);
+  console.error("   Crea uno:  node scripts/sembrar-restaurante.mjs   (o fija NODO_TENANT=<uuid>)");
+  await bd.end();
+  process.exit(2);
+}
+const tenantId = elegido.id;
+console.log(`\nBar ${tenantId.slice(0, 8)}… «${elegido.nombre}»\n`);
 
 // Se parte de un pase limpio: así lo que se mueva después es SÓLO lo que provoque la
 // prueba, y no la deuda que hubiera pendiente de antes.

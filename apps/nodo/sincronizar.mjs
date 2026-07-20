@@ -345,11 +345,26 @@ async function subirTabla({ nombre, conflicto, tiempo, filtro, origen, columnas 
 // `updated_at`. Sin saber cuándo se tocó una fila no se puede saber quién gana, y esto
 // era literalmente imposible de construir.
 
+// ¿De qué bar es este nodo? Manda `NODO_TENANT`. Si no está, se deduce — pero
+// FAIL-CLOSED: antes era `select id from tenant limit 1`, que sin ORDER BY coge
+// UNO CUALQUIERA. Con más de un tenant en la base (pasa al sembrar un banco de
+// pruebas, o si quedó el tenant PLANTILLA), el nodo podía ponerse a sincronizar
+// el bar equivocado — incluida la plantilla que la nube clona en cada alta.
+// Ante la duda no se elige: se para y se pide que lo digan explícitamente.
 async function elBarDeEsteNodo() {
   const c = credenciales().tenant;
   if (c) return c;
-  const { rows: [t] } = await bd.query("select id from public.tenant limit 1");
-  return t?.id;
+  const { rows } = await bd.query(
+    `select id, nombre from public.tenant
+      where coalesce(es_plantilla, false) = false
+      order by created_at`,
+  );
+  if (rows.length === 1) return rows[0].id;
+  if (!rows.length) throw new Error("Este nodo no tiene ningún bar que sincronizar (solo la plantilla, que no se toca).");
+  throw new Error(
+    `Hay ${rows.length} bares en este nodo (${rows.map((r) => r.nombre).join(", ")}) y no sé cuál es el suyo. `
+    + "Fija NODO_TENANT=<uuid> para decirlo.",
+  );
 }
 
 const marcaDeAgua = (clave) =>

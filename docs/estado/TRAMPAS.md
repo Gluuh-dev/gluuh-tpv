@@ -300,7 +300,37 @@ cualquier empresa.
 
 ---
 
-## 14 · Cosas sueltas que muerden
+## 14 · `select id from tenant limit 1` — el nodo elegía bar A DEDO
+
+**Encontrado el 20-07-2026** al preparar las pruebas de sincronización.
+
+`sincronizar.mjs` (y `prueba-catalogo.mjs`) resolvían «¿de qué bar es este nodo?» con:
+
+```js
+const { rows: [t] } = await bd.query("select id from public.tenant limit 1");
+```
+
+**Sin `ORDER BY` y sin filtro**: coge uno **cualquiera** (y el orden que devuelve Postgres
+no está garantizado entre ejecuciones). Con un solo bar en el nodo «funciona» — por eso
+llevaba ahí sin dar guerra.
+
+**Cuándo muerde**: en cuanto el nodo tiene **más de una fila en `tenant`**. Pasa al sembrar
+un banco de pruebas… y pasa si queda el tenant **PLANTILLA**, que es el que la nube clona en
+cada empresa nueva. En ese caso el nodo podía ponerse a **sincronizar la plantilla de
+producción**: subirle precios del banco de pruebas, o bajarle borrados. Y `prueba-catalogo`
+directamente le hacía `PATCH` de precios y `DELETE` de productos **en la nube**.
+
+**Cómo está resuelto**: manda `NODO_TENANT`; si no está, se deduce **fail-closed** — se
+excluye siempre la plantilla, y **con más de un candidato el nodo PARA** y pide que se lo
+digan, en vez de elegir a ciegas. Es la misma regla que ya aplica `current_tenant_id()`
+cuando hay dos membresías (0111–0114): ante la duda, nada.
+
+**Regla de oro**: el tenant plantilla **no se sincroniza ni se usa de banco de pruebas**.
+Para probar, `node scripts/sembrar-restaurante.mjs` crea uno aparte.
+
+---
+
+## 15 · Cosas sueltas que muerden
 
 - **Las migraciones NO son idempotentes.** `0001_init.sql` hace `create table tenant` a secas.
   La cuenta la lleva `nodo_migracion`.
