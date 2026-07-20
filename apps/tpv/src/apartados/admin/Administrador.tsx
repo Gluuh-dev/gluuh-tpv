@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   Users, ShieldCheck, Clock, BadgeCheck, Building2, Nfc, KeyRound, Check, X, Plus, Search,
-  PanelLeftClose, PanelLeftOpen, Home, type LucideIcon,
+  PanelLeftClose, Home, type LucideIcon,
 } from "lucide-react";
 import { iniciales } from "../acceso/tipos";
 
@@ -53,6 +53,17 @@ const PERFILES: { nombre: string; gente: number; permisos: boolean[] }[] = [
 // ── primitivas del lenguaje (pequeñas, poco redondeadas, borde sutil) ──
 const TH = "border-b border-line px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted";
 const TD = "px-3 py-2 text-[12.5px]";
+
+// Placa de marca del lateral: cuadrado morado con el logo dentro. El SVG
+// monocolor es BLANCO (fill #fff), así que sobre un lateral neutro solo se ve
+// con fondo de marca — y así funciona igual en claro y en oscuro.
+function PlacaMarca() {
+  return (
+    <span className={`grid h-7 w-7 flex-none place-items-center ${R} bg-brand`}>
+      <img src="/logo-gluuh-monocolor.svg" alt="Gluuh" className="h-4 w-auto" draggable={false} />
+    </span>
+  );
+}
 
 function Boton({ children, primario, onClick }: Readonly<{ children: ReactNode; primario?: boolean; onClick?: () => void }>) {
   return (
@@ -110,17 +121,26 @@ export function Administrador({ onVolver }: Readonly<{ onVolver: () => void }>) 
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* ── LATERAL a toda la altura: al plegar, se desplazan barra y página ── */}
       <aside className={`flex flex-none flex-col border-r border-line bg-panel transition-[width] duration-150 ${abierto ? "w-56" : "w-13"}`}>
-        <div className="flex h-15 flex-none items-center gap-2 border-b border-line px-3">
-          {abierto && (
-            <span className="flex min-w-0 items-center gap-2">
-              <img src="/logo-gluuh-monocolor.svg" alt="" className="h-5 w-auto opacity-90" draggable={false} />
-              <span className="truncate text-[13px] font-semibold">Administrador</span>
-            </span>
+        <div className="flex h-15 flex-none items-center gap-2.5 border-b border-line px-3">
+          {abierto ? (
+            <>
+              <PlacaMarca />
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-[13px] font-semibold leading-tight">Gluuh</b>
+                <span className="block truncate text-[11px] leading-tight text-muted">Administrador</span>
+              </span>
+              <button type="button" onClick={plegar} title="Plegar menú" aria-label="Plegar menú"
+                className={`grid h-7 w-7 flex-none place-items-center ${R} text-muted transition-transform active:scale-90`}>
+                <PanelLeftClose size={16} />
+              </button>
+            </>
+          ) : (
+            // Plegado: la marca ES el botón de desplegar (en 52px no caben ambos).
+            <button type="button" onClick={plegar} title="Desplegar menú" aria-label="Desplegar menú"
+              className="mx-auto transition-transform active:scale-90">
+              <PlacaMarca />
+            </button>
           )}
-          <button type="button" onClick={plegar} title={abierto ? "Plegar menú" : "Desplegar menú"}
-            className={`grid h-7 w-7 flex-none place-items-center ${R} text-muted transition-transform active:scale-90 ${abierto ? "ml-auto" : "mx-auto"}`}>
-            {abierto ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-          </button>
         </div>
 
         <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
