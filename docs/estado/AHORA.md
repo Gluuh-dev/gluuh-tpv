@@ -169,7 +169,18 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 ## 🔢 Migraciones
 
-**Siguiente número libre: `0131`.**
+**Siguiente número libre: `0132`.**
+
+- `0131` — **RESERVADA 20-07 (sesión chat, tarifas que SÍ se cobran)**:
+  `tarifa_por_sala` — hasta ahora `product_price` tenía **75 precios de tarifa
+  guardados que no ha cobrado nadie nunca**: `valorar_linea_pedido` (0053)
+  valoraba SIEMPRE con `product.precio`. Y la tarifa solo se podía asignar a un
+  cliente (`customer.tarifa_id`, 0 filas), así que el «precio de terraza» —que
+  es lo que pide un bar— no tenía forma de expresarse. Añade `room.tarifa_id`
+  (la sala elige tarifa) y hace que la valoración use `product_price` **con
+  vuelta atrás a `product.precio`**: sin precio de tarifa se cobra el de
+  siempre, nunca 0 ni null. ⚠️ Ruta del dinero: probado sobre el nodo con
+  pedidos reales en transacción.
 
 - `0130` — **RESERVADA 20-07 (sesión chat, compras desde el TPV)**:
   `compras_y_stock` — lo que falta para poder **gestionar compras**, no solo
