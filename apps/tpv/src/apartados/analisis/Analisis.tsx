@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark, FileText,
+  LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark, FileText, Receipt,
 } from "lucide-react";
 import { CatalogoInformes } from "./CatalogoInformes";
 import { disponibles, totalInformes } from "./informes";
@@ -64,6 +64,7 @@ const SECCIONES: readonly SeccionShell[] = [
   { id: "informes", label: "Informes", Icono: FileText },
   { id: "resumen", label: "Resumen", Icono: LayoutDashboard },
   { id: "ventas", label: "Ventas", Icono: TrendingUp },
+  { id: "diario", label: "Diario de tickets", Icono: Receipt },
   { id: "productos", label: "Productos", Icono: Package },
   { id: "camareros", label: "Camareros", Icono: Users },
   { id: "caja", label: "Caja y cierres", Icono: Banknote },
@@ -91,6 +92,48 @@ const CIERRES = [
   { cuando: "17-07 · 23:52", ventas: 1512.8, efectivo: 508.4, tarjeta: 884.4, descuadre: 0 },
   { cuando: "16-07 · 23:41", ventas: 1408.4, efectivo: 471.1, tarjeta: 812.3, descuadre: 1.05 },
 ];
+
+// ── Diario de tickets ───────────────────────────────────────────────────────
+// El informe que más pide un dueño: VER LOS TICKETS, uno a uno, y poder buscar
+// «¿qué pasó con la mesa 7 del sábado?». Se genera a partir del propio periodo
+// (mismo nº de tickets y mismo importe total) para que no contradiga a los KPI:
+// dos pantallas del mismo día que no cuadran destruyen la confianza en las dos.
+export interface Ticket {
+  numero: string; hora: string; mesa: string; operario: string; pago: string;
+  comensales: number; total: number;
+}
+
+const MESAS = ["Mesa 1", "Mesa 3", "Mesa 5", "Mesa 7", "Terraza 2", "Terraza 4", "Barra"];
+const PAGOS = ["Efectivo", "Tarjeta", "Tarjeta", "Bizum"];   // la tarjeta pesa más, como en un bar
+
+export function diarioDe(tickets: number, ventasTotal: number, serie: number): Ticket[] {
+  const filas: Ticket[] = [];
+  // Importes variados pero DETERMINISTAS (nada de Math.random: la pantalla no
+  // puede cambiar sola entre dos repintados). Los pesos se NORMALIZAN por su
+  // suma: si no, la media (~1,1) se pasa del total y el último ticket salía
+  // negativo — se recortaba a 0 y el diario sumaba más que los KPI.
+  const pesos = Array.from({ length: tickets }, (_, i) => 0.6 + ((i * 37) % 100) / 100);
+  const sumaPesos = pesos.reduce((a, p) => a + p, 0) || 1;
+  let repartido = 0;
+  for (let i = 0; i < tickets; i++) {
+    // El último se lleva lo que quede, para que la suma cuadre al céntimo.
+    const total = i === tickets - 1
+      ? Math.round((ventasTotal - repartido) * 100) / 100
+      : Math.round((ventasTotal * (pesos[i]! / sumaPesos)) * 100) / 100;
+    repartido = Math.round((repartido + total) * 100) / 100;
+    const minuto = 8 * 60 + Math.floor((i * 733) % (13 * 60));   // repartidos entre 08:00 y 21:00
+    filas.push({
+      numero: `F-2026-${String(serie + i).padStart(4, "0")}`,
+      hora: `${String(Math.floor(minuto / 60)).padStart(2, "0")}:${String(minuto % 60).padStart(2, "0")}`,
+      mesa: MESAS[i % MESAS.length]!,
+      operario: CAMAREROS[i % CAMAREROS.length]!.nombre,
+      pago: PAGOS[i % PAGOS.length]!,
+      comensales: 1 + (i % 4),
+      total: Math.max(total, 0),
+    });
+  }
+  return filas.sort((a, b) => b.hora.localeCompare(a.hora));   // lo último, arriba
+}
 
 // IGIC canario (7 % general, 3 % reducido): el desglose sale hacia atrás del PVP.
 const impuestosDe = (ventas: number) => {
@@ -252,6 +295,12 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const camareros = useMemo(() => filtrar(d.camareros, busq, (c) => [c.nombre]), [d.camareros, busq]);
   const cierres = useMemo(() => filtrar(d.cierres, busq, (c) => [c.cuando]), [d.cierres, busq]);
   const impuestos = useMemo(() => filtrar(d.impuestos, busq, (i) => [i.tipo]), [d.impuestos, busq]);
+  // El diario se deriva del periodo (mismo nº de tickets y mismo total que los KPI).
+  const diarioTodo = useMemo(() => diarioDe(d.tickets, d.ventas, 1000), [d.tickets, d.ventas]);
+  const diario = useMemo(
+    () => filtrar(diarioTodo, busq, (t) => [t.numero, t.mesa, t.operario, t.pago, t.hora]),
+    [diarioTodo, busq],
+  );
 
   const COL_FRANJAS: ColumnaInforme<typeof d.franjas[number]>[] = [
     { titulo: "Franja", valor: (f) => f.etiqueta },
@@ -281,6 +330,15 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     { titulo: "Tarjeta", valor: (c) => num(c.tarjeta), derecha: true },
     { titulo: "Descuadre", valor: (c) => (Math.abs(c.descuadre) < 0.005 ? "Cuadra" : num(c.descuadre)), derecha: true },
   ];
+  const COL_DIARIO: ColumnaInforme<Ticket>[] = [
+    { titulo: "Ticket", valor: (t) => t.numero },
+    { titulo: "Hora", valor: (t) => t.hora },
+    { titulo: "Mesa", valor: (t) => t.mesa },
+    { titulo: "Operario", valor: (t) => t.operario },
+    { titulo: "Pago", valor: (t) => t.pago },
+    { titulo: "Pax", valor: (t) => t.comensales, derecha: true },
+    { titulo: "Total", valor: (t) => num(t.total), derecha: true },
+  ];
   const COL_IMPUESTOS: ColumnaInforme<typeof d.impuestos[number]>[] = [
     { titulo: "Tipo", valor: (i) => i.tipo },
     { titulo: "Base imponible", valor: (i) => num(i.base), derecha: true },
@@ -291,6 +349,7 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const SUB: Record<string, string> = {
     informes: `${disponibles} de ${totalInformes} informes disponibles`,
     resumen: `${etiquetaPeriodo} · ${d.tickets} tickets`,
+    diario: `${etiquetaPeriodo} · ticket a ticket`,
     ventas: `${etiquetaPeriodo} · detalle por franja`,
     productos: `${etiquetaPeriodo} · ${d.top.length} artículos con venta`,
     camareros: `${etiquetaPeriodo} · rendimiento por operario`,
@@ -399,6 +458,49 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
                 </tr>
               </tbody>
             </table>
+          </Tarjeta>
+        </div>
+      )}
+
+      {seccion === "diario" && (
+        <div className="p-4">
+          <Tarjeta titulo="Tickets del periodo">
+            <BarraInforme titulo={`Diario de tickets · ${etiquetaPeriodo}`} columnas={COL_DIARIO}
+              filas={diario} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
+              totales={[
+                { etiqueta: "Tickets", valor: String(diario.length) },
+                { etiqueta: "Total", valor: eur(diario.reduce((a, t) => a + t.total, 0)) },
+                { etiqueta: "Ticket medio", valor: eur(diario.reduce((a, t) => a + t.total, 0) / Math.max(diario.length, 1)) },
+              ]} />
+            {diario.length === 0 ? (
+              <p className="py-8 text-center text-[12.5px] text-muted">Ningún ticket cuadra con la búsqueda.</p>
+            ) : (
+              <table className="w-full border-collapse">
+                <thead><tr>
+                  <th className={TH}>Ticket</th><th className={TH}>Hora</th><th className={TH}>Mesa</th>
+                  <th className={TH}>Operario</th><th className={TH}>Pago</th>
+                  <th className={`${TH} text-right`}>Pax</th><th className={`${TH} text-right`}>Total</th>
+                </tr></thead>
+                <tbody>
+                  {diario.map((t) => (
+                    <tr key={t.numero} className="border-b border-line">
+                      <td className={`${TD} font-mono text-[11.5px] text-muted`}>{t.numero}</td>
+                      <td className={`${TD} tabular-nums`}>{t.hora}</td>
+                      <td className={`${TD} font-medium`}>{t.mesa}</td>
+                      <td className={TD}>{t.operario}</td>
+                      <td className={TD}><span className="rounded-[3px] bg-paper/8 px-1.5 py-0.5 text-[11.5px]">{t.pago}</span></td>
+                      <td className={`${TD} text-right tabular-nums text-muted`}>{t.comensales}</td>
+                      <td className={`${TD} text-right font-medium tabular-nums`}>{eur(t.total)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className={`${TD} font-semibold`} colSpan={5}>Total · {diario.length} tickets</td>
+                    <td className={`${TD} text-right font-semibold tabular-nums`}>{diario.reduce((a, t) => a + t.comensales, 0)}</td>
+                    <td className={`${TD} text-right font-semibold tabular-nums`}>{eur(diario.reduce((a, t) => a + t.total, 0))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
           </Tarjeta>
         </div>
       )}
