@@ -15,6 +15,7 @@ import { APARTADOS } from "./apartados/meta";
 import { TecladoEnPantalla } from "./ui";
 import { cargarOperarios, validarPin } from "./apartados/acceso/operarios";
 import { EQUIPO_DEMO } from "./apartados/acceso/demo";
+import { cargarInicio, type DatosInicio } from "./apartados/inicio/datos";
 import { reducirSesion, operarioActivo, DORMIDO } from "./apartados/tpv/sesion";
 import type { Usuario } from "./apartados/acceso/tipos";
 import { cumpleRol, TECLA_A_VISTA, type Vista, type Apartado, type Rol } from "./lib/nav";
@@ -59,6 +60,11 @@ export function App() {
   useEffect(() => {
     cargarOperarios().then((reales) => { if (reales?.length) setEquipo({ usuarios: reales, demo: false }); });
   }, []);
+
+  // Identidad del local y KPIs del turno. Con terminal emparejado salen del nodo
+  // (nombre real, ventas del día…); sin él, se queda la demo de abajo.
+  const [inicio, setInicio] = useState<DatosInicio | null>(null);
+  useEffect(() => { cargarInicio().then((d) => { if (d) setInicio(d); }); }, []);
 
   // La validación de verdad: el PIN identifica en el nodo (con backoff), y aquí
   // se comprueba el rol de la puerta y, si se eligió usuario, que sea él.
@@ -117,8 +123,8 @@ export function App() {
   } else {
     contenido = (
       <Inicio
-        local={DEMO.local}
-        turno={DEMO.turno}
+        local={inicio?.local ?? DEMO.local}
+        turno={inicio?.turno ?? DEMO.turno}
         usuario={usuario}
         permitido={permitido}
         onNavegar={abrir}
