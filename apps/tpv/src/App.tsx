@@ -12,7 +12,7 @@ const VisorNode = lazy(() => import("./apartados/nodo/VisorNode").then((m) => ({
 import { CredencialModal } from "./apartados/acceso/CredencialModal";
 import { AyudaModal } from "./apartados/ayuda/AyudaModal";
 import { APARTADOS } from "./apartados/meta";
-import { TecladoEnPantalla } from "./ui";
+import { TecladoEnPantalla, Cargando } from "./ui";
 import { cargarOperarios, validarPin } from "./apartados/acceso/operarios";
 import { EQUIPO_DEMO } from "./apartados/acceso/demo";
 import { cargarInicio, type DatosInicio } from "./apartados/inicio/datos";
@@ -109,17 +109,16 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [login, ayuda]);
 
-  // Sin pantalla de carga: el fallback es el fondo del apartado. Un "Cargando…"
-  // que parpadea 80 ms es más ruido que información.
-  const cargando = <div className="min-h-dvh bg-background" />;
+  // Fallback mientras baja el código del apartado. `Cargando` no parpadea: solo
+  // se pinta si de verdad tarda (retardo interno), así una carga rápida ni la ve.
   let contenido: ReactNode;
   if (vista === "tpv") {
     // El TPV hereda el operario del hub (`operarioInicial`): al entrar ya estás
     // dentro, sin re-pedir PIN. Su velo automático (cobro/cuenta/tiempo) es suyo.
-    contenido = <Suspense fallback={cargando}><Tpv onVolver={() => irVista("inicio")} operarioInicial={usuario ?? undefined} /></Suspense>;
+    contenido = <Suspense fallback={<Cargando etiqueta="el TPV" />}><Tpv onVolver={() => irVista("inicio")} operarioInicial={usuario ?? undefined} /></Suspense>;
   } else if (vista !== "inicio") {
     const Pantalla = PANTALLAS[vista];
-    contenido = <Suspense fallback={cargando}><Pantalla onVolver={() => irVista("inicio")} /></Suspense>;
+    contenido = <Suspense fallback={<Cargando etiqueta={APARTADOS[vista].titulo} />}><Pantalla onVolver={() => irVista("inicio")} /></Suspense>;
   } else {
     contenido = (
       <Inicio
