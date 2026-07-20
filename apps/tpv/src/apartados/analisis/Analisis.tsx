@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark,
+  LayoutDashboard, TrendingUp, TrendingDown, Package, Users, Banknote, Landmark, FileText,
 } from "lucide-react";
+import { CatalogoInformes } from "./CatalogoInformes";
+import { disponibles, totalInformes } from "./informes";
 import {
   ShellApartado, Tarjeta, Segmento, BarraInforme, RC, TH, TD,
   type SeccionShell, type ColumnaInforme,
@@ -32,6 +34,7 @@ const PERIODOS = [
 ];
 
 const SECCIONES: readonly SeccionShell[] = [
+  { id: "informes", label: "Informes", Icono: FileText },
   { id: "resumen", label: "Resumen", Icono: LayoutDashboard },
   { id: "ventas", label: "Ventas", Icono: TrendingUp },
   { id: "productos", label: "Productos", Icono: Package },
@@ -239,6 +242,7 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   ];
 
   const SUB: Record<string, string> = {
+    informes: `${disponibles} de ${totalInformes} informes disponibles`,
     resumen: `${etiquetaPeriodo} · ${d.tickets} tickets`,
     ventas: `${etiquetaPeriodo} · detalle por franja`,
     productos: `${etiquetaPeriodo} · ${d.top.length} artículos con venta`,
@@ -251,6 +255,8 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
     <ShellApartado app="Análisis" claveLateral="analisis" secciones={SECCIONES}
       seccion={seccion} onSeccion={setSeccion} onVolver={onVolver} subtitulo={SUB[seccion]}
       acciones={<Segmento valor={periodo} opciones={PERIODOS} onCambio={setPeriodo} />}>
+
+      {seccion === "informes" && <CatalogoInformes onAbrir={irA} />}
 
       {seccion === "resumen" && (
         <div className="space-y-3 p-4">
