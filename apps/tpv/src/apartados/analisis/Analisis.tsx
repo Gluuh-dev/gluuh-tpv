@@ -7,6 +7,7 @@ import { CatalogoInformes } from "./CatalogoInformes";
 import { disponibles, totalInformes } from "./informes";
 import {
   ShellApartado, Tarjeta, Segmento, BarraInforme, RC, TH, TD,
+  GraficaBarras, GraficaArea, Donut, Dispersion,
   type SeccionShell, type ColumnaInforme,
 } from "../../ui";
 import { eur } from "../../lib/dinero";
@@ -15,6 +16,10 @@ import { eur } from "../../lib/dinero";
 // importes van con coma decimal (formato español) para que Excel los sume.
 const num = (n: number) => n.toFixed(2).replace(".", ",");
 const pct = (parte: number, total: number) => `${((parte / (total || 1)) * 100).toFixed(1)} %`;
+
+/** Cifra corta para los ejes: «1,5 k» en vez de «1.486,30 €», que no cabe. */
+export const corto = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1).replace(".", ",")} k` : String(Math.round(n));
 
 /** Filtro de texto sin acentos (buscar "cana" encuentra "Caña"). */
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -331,23 +336,10 @@ function Kpi({ label, valor, sub, delta }: Readonly<{ label: string; valor: stri
   );
 }
 
-function Barras({ filas }: Readonly<{ filas: Fila[] }>) {
-  const max = Math.max(...filas.map((f) => f.ventas), 1);
-  return (
-    <div className="flex h-36 items-end gap-2">
-      {filas.map((f) => {
-        const punta = f.ventas === max;
-        return (
-          <div key={f.etiqueta} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-            <span className={`text-[10.5px] tabular-nums ${punta ? "font-semibold text-brand-lit" : "text-muted"}`}>{Math.round(f.ventas)}</span>
-            <div className={`w-full rounded-t-[3px] ${punta ? "bg-brand" : "bg-brand/30"}`} style={{ height: `${Math.max((f.ventas / max) * 100, 3)}%` }} />
-            <span className="w-full truncate text-center text-[10.5px] text-muted">{f.etiqueta}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+/** Colores fijos por forma de pago: el efectivo es siempre el mismo verde. */
+const CLASE_PAGO: Record<string, string> = {
+  Tarjeta: "stroke-brand", Efectivo: "stroke-mint", Bizum: "stroke-amber",
+};
 
 export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   const [periodo, setPeriodo] = useState<Periodo>("hoy");
@@ -401,6 +393,7 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
   // que no suman 100 y parecen un error de cuentas.
   const familias = useMemo(() => filtrar(porFamilia(top), busq, (f) => [f.familia]), [top, busq]);
   const ventaTop = top.reduce((a, t) => a + t.importe, 0);
+  const grafico = useMemo(() => d.franjas.map((f) => ({ etiqueta: f.etiqueta, valor: f.ventas })), [d.franjas]);
   const margenTodo = useMemo(() => margenDe(top, FICHA), [top]);
   const margenes = useMemo(() => filtrar(margenTodo, busq, (m) => [m.nombre, m.familia]), [margenTodo, busq]);
   const resMargen = resumenMargen(margenes);
@@ -525,7 +518,14 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
             <Kpi label="Comensales" valor={String(d.comensales)} sub={`${(d.comensales / Math.max(d.tickets, 1)).toFixed(1)} por ticket`} />
           </div>
 
-          <Tarjeta titulo={porDia ? "Ventas por periodo" : "Ventas por franja"}><Barras filas={d.franjas} /></Tarjeta>
+          {/* Un periodo largo es una EVOLUCIÓN (línea); un día son bloques
+              independientes (barras). Poner línea entre franjas del mismo día
+              sugiere una tendencia donde solo hay horas de comida y de cena. */}
+          <Tarjeta titulo={porDia ? "Evolución de ventas" : "Ventas por franja horaria"}>
+            {porDia
+              ? <GraficaArea datos={grafico} fmt={corto} />
+              : <GraficaBarras datos={grafico} fmt={corto} />}
+          </Tarjeta>
 
           <div className="grid gap-3 xl:grid-cols-2">
             <Tarjeta titulo="Lo más vendido">
@@ -544,29 +544,22 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
             </Tarjeta>
 
             <Tarjeta titulo="Cómo se cobra">
-              <ul className="space-y-3">
-                {d.pagos.map((p) => {
-                  const pct = (p.importe / totalPagos) * 100;
-                  return (
-                    <li key={p.nombre}>
-                      <span className="flex items-baseline justify-between gap-2 text-[12.5px]">
-                        <b className="font-medium">{p.nombre}</b>
-                        <span className="tabular-nums">{eur(p.importe)} <span className="text-muted">· {pct.toFixed(0)} %</span></span>
-                      </span>
-                      <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-paper/10">
-                        <span className="block h-full rounded-full bg-mint" style={{ width: `${pct}%` }} />
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <Donut
+                partes={d.pagos.map((p) => ({ nombre: p.nombre, valor: p.importe, clase: CLASE_PAGO[p.nombre] ?? "stroke-brand-lit" }))}
+                centro={{ arriba: corto(totalPagos), abajo: "cobrado" }} />
             </Tarjeta>
           </div>
         </div>
       )}
 
       {seccion === "ventas" && (
-        <div className="p-4">
+        <div className="space-y-3 p-4">
+          <Tarjeta titulo={porDia ? "Evolución de ventas" : "Ventas por franja horaria"}>
+            {porDia
+              ? <GraficaArea datos={grafico} fmt={corto} alto={200} />
+              : <GraficaBarras datos={grafico} fmt={corto} alto={200} />}
+          </Tarjeta>
+
           <Tarjeta titulo="Detalle por franja">
             <BarraInforme titulo={`Ventas por franja · ${etiquetaPeriodo}`} columnas={COL_FRANJAS}
               filas={franjas} busqueda={busq} onBusqueda={setBusq} periodo={etiquetaPeriodo}
@@ -717,6 +710,20 @@ export function Analisis({ onVolver }: Readonly<{ onVolver: () => void }>) {
               </span>
             </p>
           )}
+
+          <Tarjeta titulo="Menú engineering">
+            {/* El dibujo con el que se decide qué queda en la carta. */}
+            <Dispersion puntos={margenes.filter((m) => m.pct !== null).map((m) => ({
+              nombre: m.nombre, x: m.uds, y: m.pct!,
+              clase: { Estrella: "fill-mint", Caballo: "fill-brand", Puzle: "fill-amber", Perro: "fill-danger", "—": "fill-muted" }[cuad.get(m.nombre) ?? "—"],
+            }))} />
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted">
+              <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-mint" /> Estrella · vende y deja</span>
+              <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-brand" /> Caballo · vende, deja poco</span>
+              <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-amber" /> Puzle · deja, vende poco</span>
+              <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-danger" /> Perro · ni una cosa ni otra</span>
+            </div>
+          </Tarjeta>
 
           <Tarjeta titulo="Margen por artículo">
             <BarraInforme titulo={`Márgenes y menú engineering · ${etiquetaPeriodo}`} columnas={COL_MARGENES}

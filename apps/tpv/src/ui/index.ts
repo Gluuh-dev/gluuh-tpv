@@ -15,6 +15,7 @@ export { TecladoEnPantalla, abrirTeclado, getTecladoAuto, setTecladoAuto } from 
 export { EnObras } from "./EnObras";
 export { MarcoApartado } from "./MarcoApartado";
 export { BarraInforme } from "./BarraInforme";
+export { GraficaBarras, GraficaArea, Donut, Dispersion, paso, ticks } from "./graficas";
 export { descargarCSV, imprimirInforme, type ColumnaInforme } from "../lib/exportar";
 // Lenguaje de los apartados de GESTIÓN (Análisis, Administrador, Visor Node).
 export {
