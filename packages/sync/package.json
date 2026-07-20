@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@powersync/common": "^1.54.0"
+    "@powersync/common": "^1.57.2"
   },
   "devDependencies": {
     "typescript": "^6.0.3"

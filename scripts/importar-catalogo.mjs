@@ -28,7 +28,7 @@ export function detectarSeparador(cabecera) {
 }
 
 export function parsearCSV(texto) {
-  const limpio = texto.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const limpio = texto.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   const primeraLinea = limpio.slice(0, limpio.indexOf("\n") === -1 ? undefined : limpio.indexOf("\n"));
   const sep = detectarSeparador(primeraLinea);
 
@@ -83,9 +83,9 @@ export function normalizarPrecio(v) {
   if (!s) return NaN;
   // "1.234,56" (es) vs "1,234.56" (en): manda el ÚLTIMO separador como decimal.
   const ultimaComa = s.lastIndexOf(","), ultimoPunto = s.lastIndexOf(".");
-  let limpio = s;
-  if (ultimaComa > ultimoPunto) limpio = s.replace(/\./g, "").replace(",", ".");
-  else limpio = s.replace(/,/g, "");
+  const limpio = ultimaComa > ultimoPunto
+    ? s.replace(/\./g, "").replace(",", ".")   // 1.234,56 → miles con punto
+    : s.replace(/,/g, "");                     // 1,234.56 → miles con coma
   return Number.parseFloat(limpio);
 }
 

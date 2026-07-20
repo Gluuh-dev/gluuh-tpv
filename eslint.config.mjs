@@ -78,16 +78,28 @@ export default tseslint.config(
     },
   },
 
-  // ── React (solo el front) ──
+  // ── React: hooks en TODO el front (la web de Next y la SPA del TPV) ──
+  // La SPA se quedó fuera al crearse y estuvo sin ninguna regla de hooks: sus
+  // `eslint-disable react-hooks/exhaustive-deps` apuntaban a una regla no
+  // registrada (error "rule was not found") y, peor, nadie vigilaba los hooks
+  // condicionales ni las dependencias de sus efectos.
   {
-    files: ["apps/web/**/*.{ts,tsx}"],
-    plugins: { "react-hooks": reactHooks, "@next/next": next },
+    files: ["apps/web/**/*.{ts,tsx}", "apps/tpv/**/*.{ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
     rules: {
-      ...next.configs.recommended.rules,
       // Romper esto SÍ es un bug real (hooks condicionales = estado corrupto).
       "react-hooks/rules-of-hooks": "error",
       // Aviso: hay `eslint-disable` deliberados donde las deps se leen por getState/ref.
       "react-hooks/exhaustive-deps": "warn",
+    },
+  },
+
+  // ── Next (solo la web; la SPA es Vite) ──
+  {
+    files: ["apps/web/**/*.{ts,tsx}"],
+    plugins: { "@next/next": next },
+    rules: {
+      ...next.configs.recommended.rules,
       "@next/next/no-img-element": "off",                  // <img> intencional (ver plan 014)
     },
   },
