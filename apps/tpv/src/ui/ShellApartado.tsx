@@ -85,7 +85,8 @@ export function Segmento<T extends string>({ valor, opciones, onCambio }: Readon
 }
 
 export function ShellApartado({
-  app, secciones, grupos, seccion, onSeccion, onVolver, claveLateral, subtitulo, acciones, tactil, children,
+  app, secciones, grupos, seccion, onSeccion, onVolver, claveLateral, subtitulo, acciones, tactil,
+  plegadoPorDefecto, contenidoPropio, children,
 }: Readonly<{
   /** Nombre del apartado bajo "Gluuh" en la cabecera del lateral. */
   app: string;
@@ -104,11 +105,21 @@ export function ShellApartado({
   acciones?: ReactNode;
   /** Se maneja con el dedo (Configuración desde el TPV): targets ≥44px. */
   tactil?: boolean;
+  /**
+   * Arranca con el lateral plegado. Para apartados cuyas pantallas necesitan el
+   * ancho ENTERO (mantenimiento con tablas de precios): en un terminal de 15"
+   * un lateral abierto se come un cuarto de la pantalla.
+   */
+  plegadoPorDefecto?: boolean;
+  /** La sección se encarga de su propio scroll y alto (pantallas completas). */
+  contenidoPropio?: boolean;
   children: ReactNode;
 }>) {
   const [abierto, setAbierto] = useState(() => {
-    if (typeof localStorage === "undefined") return true;
-    return localStorage.getItem(`gluuh_lateral_${claveLateral}`) !== "0";
+    if (typeof localStorage === "undefined") return !plegadoPorDefecto;
+    const guardado = localStorage.getItem(`gluuh_lateral_${claveLateral}`);
+    if (guardado === null) return !plegadoPorDefecto;   // primera vez
+    return guardado !== "0";
   });
   // Grupos plegados (solo en modo agrupado). Por defecto, todos abiertos.
   const [cerrados, setCerrados] = useState<Record<string, boolean>>({});
@@ -210,7 +221,9 @@ export function ShellApartado({
           </div>
           {acciones}
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+        <main className={contenidoPropio ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "min-h-0 flex-1 overflow-y-auto"}>
+          {children}
+        </main>
       </div>
     </div>
   );
