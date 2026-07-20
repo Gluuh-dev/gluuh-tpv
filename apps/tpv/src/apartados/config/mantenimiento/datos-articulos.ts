@@ -31,6 +31,46 @@ export interface FormatoVenta {
 export interface GrupoComentarios { id: string; nombre: string; min: number; max: number; opciones: string[] }
 export interface Extra { id: string; nombre: string; precio: number }
 
+/**
+ * PARÁMETROS del artículo: cómo se COMPORTA al venderlo (en Glop viven en su
+ * propia ventana, «Parámetros del artículo»). Aquí van juntos porque casi todos
+ * son un sí/no y comparten pantalla.
+ *
+ * Equivalencia con nuestra BD (`product`) para cuando se cablee el nodo:
+ *   vendible        → `disponible`
+ *   alPeso          → `vendido_por_peso`
+ *   combinable      → `combinable`     (copas: 0126)
+ *   esPrincipal     → `es_principal`
+ *   esAnadido       → `es_anadido`
+ *   agotado         → `agotado_hasta`  (el «86» de barra; aquí solo el sí/no)
+ *   esAlcohol       → `es_alcohol`
+ * Los que NO tienen columna todavía y habría que crear si se quieren de verdad:
+ *   controlaStock · noImprimirSiCero · descripcionLibre · preguntarPrecio ·
+ *   eCommerce · esMenuDelDia
+ */
+export interface ParametrosArticulo {
+  vendible: boolean;
+  controlaStock: boolean;
+  noImprimirSiCero: boolean;
+  descripcionLibre: boolean;
+  preguntarPrecio: boolean;
+  eCommerce: boolean;
+  esMenuDelDia: boolean;
+  alPeso: boolean;
+  combinable: boolean;
+  esPrincipal: boolean;
+  esAnadido: boolean;
+  esAlcohol: boolean;
+  agotado: boolean;
+}
+
+export const PARAMETROS_POR_DEFECTO: ParametrosArticulo = {
+  vendible: true, controlaStock: false, noImprimirSiCero: false,
+  descripcionLibre: false, preguntarPrecio: false, eCommerce: false,
+  esMenuDelDia: false, alPeso: false, combinable: false,
+  esPrincipal: true, esAnadido: false, esAlcohol: false, agotado: false,
+};
+
 export interface Articulo {
   id: string;
   codigo: string;
@@ -42,8 +82,11 @@ export interface Articulo {
   /** % de impuesto incluido en el PVP. */
   impuesto: number;
   barras: string;
+  /** Atajo de `parametros.vendible`: se ve en la lista y en la cabecera. */
   visible: boolean;
+  /** Atajo de `parametros.alPeso` (se muestra en Datos generales). */
   alPeso: boolean;
+  parametros: ParametrosArticulo;
   estacion: Estacion;
   tiempoPrep: number;
   alergenos: string[];
@@ -74,6 +117,8 @@ export const ALERGENOS = [
 ];
 
 const BEBIDAS = new Set(["cervezas", "vinos", "refrescos", "cafes", "cocteles"]);
+// Con alcohol: lo necesita el desglose fiscal (y el tipo de IGIC en Canarias).
+const ALCOHOL = new Set(["cervezas", "vinos", "cocteles", "copas", "combinados"]);
 
 // Formatos típicos por familia: [nombre, factor sobre el precio base].
 const FORMATOS: Record<string, [string, number][]> = {
@@ -131,6 +176,13 @@ export const ARTICULOS_DEMO: Articulo[] = PRODUCTOS_DEMO.map((p, i) => {
     barras: `840${String(i * 37 + 11).padStart(10, "0")}`,
     visible: true,
     alPeso: false,
+    parametros: {
+      ...PARAMETROS_POR_DEFECTO,
+      // Las bebidas alcohólicas se marcan solas: lo pide el desglose fiscal y,
+      // en Canarias, el tipo de IGIC.
+      esAlcohol: ALCOHOL.has(p.categoria),
+      combinable: p.categoria === "copas",
+    },
     estacion: BEBIDAS.has(p.categoria) ? "BARRA" : "COCINA",
     tiempoPrep: BEBIDAS.has(p.categoria) ? 1 : 8,
     alergenos: ALERGENOS_FAMILIA[p.categoria] ?? [],

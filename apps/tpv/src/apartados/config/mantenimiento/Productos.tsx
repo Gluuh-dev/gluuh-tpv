@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal,
 } from "lucide-react";
 import { Modal, CabeceraModal } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -10,9 +10,9 @@ import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, EstadoPie, claseEntrada,
 } from "./Marco";
 import {
-  ARTICULOS_DEMO, FAMILIAS, IMPUESTOS, ESTACIONES, ALERGENOS,
+  ARTICULOS_DEMO, FAMILIAS, IMPUESTOS, ESTACIONES, ALERGENOS, PARAMETROS_POR_DEFECTO,
   nombreFamilia, margen, siguienteNumero,
-  type Articulo, type FormatoVenta, type Estacion,
+  type Articulo, type FormatoVenta, type Estacion, type ParametrosArticulo,
 } from "./datos-articulos";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -64,6 +64,39 @@ function ChipSel({ texto, activo, onToggle, disabled }: Readonly<{
   );
 }
 
+// Los parámetros, agrupados por lo que decide cada uno. El texto de ayuda dice
+// QUÉ PASA en el bar si lo marcas — no repite el nombre del campo.
+const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArticulo; texto: string; ayuda: string }[] }[] = [
+  {
+    titulo: "Venta",
+    campos: [
+      { clave: "vendible", texto: "Vendible", ayuda: "Si se apaga, deja de salir en el TPV sin borrarlo ni perder su histórico." },
+      { clave: "agotado", texto: "Agotado hoy", ayuda: "El «86» de barra: sale en gris y no se puede pedir hasta que vuelva." },
+      { clave: "alPeso", texto: "Venta por peso", ayuda: "Al venderlo pide los kilos y calcula el importe." },
+      { clave: "preguntarPrecio", texto: "Preguntar precio", ayuda: "Sin precio fijo: lo teclea el camarero al añadirlo." },
+      { clave: "descripcionLibre", texto: "Descripción libre", ayuda: "Pide un texto al vender (para «otros» o platos fuera de carta)." },
+    ],
+  },
+  {
+    titulo: "Qué es este artículo",
+    campos: [
+      { clave: "esPrincipal", texto: "Plato principal", ayuda: "Cuenta como plato en el reparto de la comanda." },
+      { clave: "esAnadido", texto: "Es un añadido", ayuda: "Va pegado a otro artículo (extras, guarniciones)." },
+      { clave: "esMenuDelDia", texto: "Menú del día", ayuda: "Se compone por pases y lleva precio cerrado." },
+      { clave: "combinable", texto: "Se puede combinar", ayuda: "Copas: al añadirlo pregunta con qué refresco va." },
+      { clave: "esAlcohol", texto: "Contiene alcohol", ayuda: "Lo necesita el desglose fiscal y el tipo de impuesto." },
+    ],
+  },
+  {
+    titulo: "Cocina, stock y ticket",
+    campos: [
+      { clave: "controlaStock", texto: "Controla stock", ayuda: "Descuenta existencias al venderlo y avisa al quedarse corto." },
+      { clave: "noImprimirSiCero", texto: "No imprimir si vale 0", ayuda: "Las invitaciones no ensucian la comanda de cocina." },
+      { clave: "eCommerce", texto: "Visible en carta digital", ayuda: "Sale en la carta por QR y en los pedidos por internet." },
+    ],
+  },
+];
+
 function Aviso({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <p className="flex flex-none items-center gap-2.5 rounded-[6px] border border-brand-lit/25 bg-accent-soft px-3.5 py-3 text-[13px] font-semibold leading-snug text-brand-lit">
@@ -83,6 +116,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const [q, setQ] = useState("");
   const [fmtSel, setFmtSel] = useState<string | null>(null);
   const [borrar, setBorrar] = useState(false);
+  const [params, setParams] = useState(false);   // ventana «Parámetros del artículo»
   const [aviso, setAviso] = useState("");
   const temporizador = useRef<number | undefined>(undefined);
 
@@ -108,6 +142,21 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const set = <K extends keyof Articulo>(campo: K, valor: Articulo[K]) =>
     setBorrador((b) => (b ? { ...b, [campo]: valor } : b));
 
+  // Los parámetros son sí/no. `vendible` y `alPeso` se reflejan además en los
+  // atajos de la ficha (la lista y los interruptores de Datos generales), para
+  // que no haya dos verdades sobre lo mismo.
+  const setParam = (campo: keyof ParametrosArticulo, valor: boolean) =>
+    setBorrador((b) => {
+      if (!b) return b;
+      const parametros = { ...b.parametros, [campo]: valor };
+      return {
+        ...b,
+        parametros,
+        visible: campo === "vendible" ? valor : b.visible,
+        alPeso: campo === "alPeso" ? valor : b.alPeso,
+      };
+    });
+
   const setFormato = (id: string, campo: keyof FormatoVenta, valor: FormatoVenta[keyof FormatoVenta]) =>
     setBorrador((b) => b ? { ...b, formatos: b.formatos.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)) } : b);
 
@@ -127,6 +176,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setBorrador({
       id: `art-${codigo}`, codigo, nombre: "", nombreComanda: "", nombreTicket: "",
       familia: FAMILIAS[0]?.id ?? "", impuesto: 10, barras: "", visible: true, alPeso: false,
+      parametros: { ...PARAMETROS_POR_DEFECTO },
       estacion: "BARRA", tiempoPrep: 1, alergenos: [], categorias: [],
       formatos: [{
         id: `${codigo}-f1`, codigo: `${codigo}.1`, nombre: "Unidad",
@@ -316,7 +366,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   </Campo>
                   <Campo etiqueta="Se vende al peso">
                     <Interruptor activo={art.alPeso} disabled={ro} etiqueta={art.alPeso ? "Sí, por kilos" : "No, por unidades"}
-                      onToggle={() => set("alPeso", !art.alPeso)} />
+                      onToggle={() => setParam("alPeso", !art.alPeso)} />
                   </Campo>
                 </div>
 
@@ -332,7 +382,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     <span className="text-center text-[11px] font-bold leading-tight text-paper/70">{art.nombre || "Sin descripción"}</span>
                   </div>
                   <Interruptor activo={art.visible} disabled={ro} etiqueta="Visible en TPV"
-                    onToggle={() => set("visible", !art.visible)} />
+                    onToggle={() => setParam("vendible", !art.visible)} />
+                  {/* Como en Glop: el comportamiento del artículo vive en su
+                      propia ventana, que si no la ficha se hace ilegible. */}
+                  <button type="button" onClick={() => setParams(true)}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-medium text-paper/85 transition-transform active:scale-[.98]">
+                    <SlidersHorizontal size={15} /> Parámetros del artículo
+                  </button>
                 </div>
               </div>
             </Caja>
@@ -540,6 +596,46 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           </Caja>
         )}
       </MarcoMantenimiento>
+
+      {params && (
+        <Modal onCerrar={() => setParams(false)} ancho="xl">
+          <CabeceraModal Icono={SlidersHorizontal} titulo="Parámetros del artículo"
+            subtitulo={`${art.codigo} · ${art.nombre || "Sin descripción"}`} onCerrar={() => setParams(false)} />
+          <div className="max-h-[70vh] overflow-y-auto p-4">
+            {ro && (
+              <p className="mb-3 rounded-[5px] border border-line bg-paper/3 px-3 py-2 text-[12.5px] text-muted">
+                En consulta no se puede cambiar nada. Cierra y pulsa «Modificar» abajo.
+              </p>
+            )}
+            {GRUPOS_PARAMETROS.map((g) => (
+              <div key={g.titulo} className="mb-4 last:mb-0">
+                <p className="pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">{g.titulo}</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {g.campos.map(({ clave, texto, ayuda }) => {
+                    const activo = art.parametros[clave];
+                    return (
+                      <button key={clave} type="button" disabled={ro} onClick={() => setParam(clave, !activo)}
+                        className={`flex min-h-12 items-start gap-2.5 rounded-[5px] border p-2.5 text-left transition-transform active:scale-[.99] disabled:opacity-60 ${
+                          activo ? "border-brand-lit bg-accent-soft" : "border-line bg-panel"
+                        }`}>
+                        <span className={`mt-px grid h-5 w-5 flex-none place-items-center rounded border-2 ${
+                          activo ? "border-brand bg-brand text-white" : "border-line"
+                        }`}>
+                          {activo && <Check size={13} strokeWidth={3.2} />}
+                        </span>
+                        <span className="min-w-0">
+                          <b className="block text-[13px] font-semibold">{texto}</b>
+                          <span className="block text-[11.5px] leading-snug text-muted">{ayuda}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
 
       {borrar && (
         <Modal onCerrar={() => setBorrar(false)} ancho="sm">
