@@ -100,7 +100,7 @@ export function Flechas({ contenedor, eje = "y", paso = 180, className = "" }: R
  * y `className` las del contenido — van separadas porque el que scrollea y el
  * que se estira son dos cajas distintas.
  */
-export function Desplazable({ children, fuera = "min-h-0 flex-1", className = "", eje = "y", paso = 200, estilo }: Readonly<{
+export function Desplazable({ children, fuera = "min-h-0 flex-1", className = "", eje = "y", paso = 200, estilo, pie }: Readonly<{
   children: React.ReactNode;
   fuera?: string;
   className?: string;
@@ -109,6 +109,12 @@ export function Desplazable({ children, fuera = "min-h-0 flex-1", className = ""
   paso?: number;
   /** Estilo del área que se mueve (el suelo del plano lleva su textura ahí). */
   estilo?: React.CSSProperties;
+  /**
+   * Si se pasa, las flechas NO flotan encima: van en un PIE de la tabla, con este
+   * contenido a la izquierda (el conteo de filas) y las flechas —verticales y
+   * laterales— a la derecha. Es el patrón de las listas de configuración.
+   */
+  pie?: React.ReactNode;
 }>) {
   const ref = useRef<HTMLDivElement>(null);
   const sombra = "drop-shadow-[0_2px_6px_rgba(0,0,0,.35)]";
@@ -121,14 +127,24 @@ export function Desplazable({ children, fuera = "min-h-0 flex-1", className = ""
     // aquí y no encima de lo de al lado.
     <div className={`relative flex flex-col overflow-hidden ${fuera}`}>
       <div ref={ref} style={estilo} className={`min-h-0 flex-1 overflow-auto ${className}`}>{children}</div>
-      {/* `pointer-events-none` en el hueco y `auto` en los botones: si no, la
-          esquina entera dejaba de recibir toques sobre la lista de debajo. */}
-      <span className="pointer-events-none absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1 *:pointer-events-auto">
-        {/* En «ambos» cada pareja se apaga sola si su eje no desborda, así que una
-            tabla que solo se va a lo ancho no enseña flechas de subir y bajar. */}
-        {eje !== "y" && <Flechas contenedor={ref} eje="x" paso={paso} className={sombra} />}
-        {eje !== "x" && <Flechas contenedor={ref} eje="y" paso={paso} className={sombra} />}
-      </span>
+      {pie !== undefined ? (
+        // Pie de la tabla: conteo a la izquierda, flechas a la derecha (no flotan).
+        <div className="flex flex-none items-center gap-3 border-t border-line px-3 py-1.5">
+          {pie}
+          <span className="flex-1" />
+          {eje !== "y" && <Flechas contenedor={ref} eje="x" paso={paso} />}
+          {eje !== "x" && <Flechas contenedor={ref} eje="y" paso={paso} />}
+        </div>
+      ) : (
+        // `pointer-events-none` en el hueco y `auto` en los botones: si no, la
+        // esquina entera dejaba de recibir toques sobre la lista de debajo.
+        <span className="pointer-events-none absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1 *:pointer-events-auto">
+          {/* En «ambos» cada pareja se apaga sola si su eje no desborda, así que una
+              tabla que solo se va a lo ancho no enseña flechas de subir y bajar. */}
+          {eje !== "y" && <Flechas contenedor={ref} eje="x" paso={paso} className={sombra} />}
+          {eje !== "x" && <Flechas contenedor={ref} eje="y" paso={paso} className={sombra} />}
+        </span>
+      )}
     </div>
   );
 }

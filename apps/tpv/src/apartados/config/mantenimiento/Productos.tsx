@@ -731,7 +731,12 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 )}
               </div>
             </div>
-            <Desplazable eje="ambos">
+            <Desplazable eje="ambos" pie={
+              <span className="text-[11.5px] font-medium text-muted">
+                {listaOrd.length} {listaOrd.length === 1 ? "artículo" : "artículos"}
+                {q && ` · de ${articulos.length}`}
+              </span>
+            }>
               <table className="w-full min-w-220 border-collapse">
                 <thead>
                   <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:border-b [&>th]:border-r [&>th]:border-line [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70 [&>th:last-child]:border-r-0">
