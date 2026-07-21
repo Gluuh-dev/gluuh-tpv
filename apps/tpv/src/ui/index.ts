@@ -1,6 +1,7 @@
 // Kit de UI reutilizable de la operativa (design system del TPV).
 // Import limpio: `import { Modal, Escudo, TecladoNumerico } from "../../ui"`.
 export { Modal } from "./Modal";
+export { PanelLateral } from "./PanelLateral";
 export { Cargando } from "./Cargando";
 export { CabeceraModal } from "./CabeceraModal";
 export { BarraVentana } from "./BarraVentana";

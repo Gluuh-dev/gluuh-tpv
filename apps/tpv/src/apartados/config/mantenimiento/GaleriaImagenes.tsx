@@ -36,14 +36,15 @@ export function GaleriaImagenes({ fotos, actual, onElegir }: Readonly<{
         <div className="flex flex-col gap-3 p-2">
           {grupos.map(([grupo, lista]) => (
             <div key={grupo}>
-              <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-muted">{grupo}</p>
-              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+              <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-muted">{grupo}</p>
+              {/* Miniaturas al TAMAÑO del botón del TPV (~120px, 3:2) para ver cómo quedará. */}
+              <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
                 {lista.map((f) => {
                   const on = actual === refDeFoto(f);
                   return (
                     <button key={f.id} type="button" title={f.nombre} aria-pressed={on}
                       onClick={() => onElegir(refDeFoto(f))}
-                      className={`aspect-[4/3] overflow-hidden rounded-[6px] border-2 transition-transform active:scale-95 ${
+                      className={`aspect-3/2 overflow-hidden rounded-[9px] border-2 shadow-[0_2px_0_rgba(0,0,0,.28)] transition-transform active:scale-95 ${
                         on ? "border-brand-lit" : "border-transparent"
                       }`}>
                       <img src={f.url} alt="" loading="lazy" className="h-full w-full object-cover" />

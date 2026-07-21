@@ -172,4 +172,7 @@
 @keyframes gl-velo { from { opacity: 0; } to { opacity: 1; } }
 .gl-aparecer { animation: gl-aparecer 0.16s cubic-bezier(0.2, 0.7, 0.3, 1); }
 .gl-velo { animation: gl-velo 0.16s ease; }
-@media (prefers-reduced-motion: reduce) { .gl-aparecer, .gl-velo { animation: none; } }
+/* Panel lateral (drawer): entra deslizando desde la derecha. */
+@keyframes gl-lateral { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.gl-lateral { animation: gl-lateral 0.18s cubic-bezier(0.2, 0.7, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) { .gl-aparecer, .gl-velo, .gl-lateral { animation: none; } }

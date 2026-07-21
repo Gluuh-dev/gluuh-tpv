@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Camera, Trash2, Ban } from "lucide-react";
-import { Modal, BarraVentana } from "../../../ui";
+import { PanelLateral } from "../../../ui";
 import { NOMBRES_ICONOS, ICONOS } from "../../../lib/iconos";
 import { fotoReducida } from "../../../lib/imagen";
 import { galeriaProductos } from "../../../lib/galeria";
@@ -53,10 +53,8 @@ export function AspectoArticulo({
   };
 
   return (
-    <Modal onCerrar={onCerrar} ancho="xl" className="overflow-hidden">
-      <BarraVentana titulo="Aspecto en el TPV" onCerrar={onCerrar} />
-
-      <div className="flex h-[68vh] gap-4 p-4">
+    <PanelLateral titulo="Aspecto en el TPV" onCerrar={onCerrar}>
+      <div className="flex min-h-0 flex-1 gap-4 p-4">
         {/* ── Controles (izquierda): muestra, foto propia, color e icono ── */}
         <div className="no-scrollbar flex w-56 flex-none flex-col gap-3 overflow-y-auto">
           <div>
@@ -145,6 +143,6 @@ export function AspectoArticulo({
           Listo
         </button>
       </div>
-    </Modal>
+    </PanelLateral>
   );
 }
