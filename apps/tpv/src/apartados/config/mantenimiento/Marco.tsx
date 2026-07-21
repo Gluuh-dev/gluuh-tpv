@@ -82,7 +82,10 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
   }, [subpestanas]);
 
   return (
-    <div className="flex flex-none items-end border-b border-line bg-panel px-3 pt-1.5">
+    // Sin `border-b` en la banda: esa línea era la que se veía bajo la subpestaña
+    // activa. Las inactivas llevan su propio borde (cerradas); la activa va con
+    // `border-b-0` (abierta hacia el cuerpo).
+    <div className="flex flex-none items-end bg-panel px-3 pt-1.5">
       <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto">
         {subpestanas.map((s, i) => {
           const on = s === subpestana;
