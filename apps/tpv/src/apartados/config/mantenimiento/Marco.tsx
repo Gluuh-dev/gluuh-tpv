@@ -36,15 +36,15 @@ export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
         return (
           <button
             key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
-            // Lados inclinados (trapecio, más ancho abajo) como una lengüeta de
-            // carpeta; el solape lo da `-ml`, y la activa va delante (`z-10`).
-            style={{ clipPath: "polygon(11px 0, calc(100% - 11px) 0, 100% 100%, 0 100%)" }}
-            className={`relative -mb-px flex min-h-9 items-center px-6 text-[13.5px] transition-transform active:scale-[.98] ${
-              i > 0 ? "-ml-2.5" : ""
+            // Lengüeta con esquinas redondeadas y borde; se solapan un poco (`-ml`)
+            // y la activa va delante (`z-10`), abre el borde de la caja
+            // (`border-b-panel`) y lleva una sombra ARRIBA para despegarse.
+            className={`-mb-px flex min-h-9 items-center rounded-t-[10px] border px-6 text-[13.5px] transition-transform active:scale-[.98] ${
+              i > 0 ? "-ml-1.5" : ""
             } ${
               on
-                ? "z-10 bg-panel font-semibold text-paper"
-                : "bg-panel-2 font-medium text-muted"
+                ? "relative z-10 border-line border-b-panel bg-panel font-semibold text-paper shadow-[0_-3px_8px_rgba(0,0,0,.09)]"
+                : "border-line/70 bg-panel-2 font-medium text-muted"
             }`}
           >
             {p}
@@ -82,20 +82,19 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
   }, [subpestanas]);
 
   return (
-    <div className="flex flex-none items-end bg-panel px-3 pt-1.5">
+    <div className="flex flex-none items-end border-b border-line bg-panel px-3 pt-1.5">
       <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto">
         {subpestanas.map((s, i) => {
           const on = s === subpestana;
           return (
             <button
               key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
-              style={{ clipPath: "polygon(9px 0, calc(100% - 9px) 0, 100% 100%, 0 100%)" }}
-              className={`relative -mb-px flex min-h-8 flex-none items-center whitespace-nowrap px-5 text-[12px] transition-transform active:scale-[.98] ${
-                i > 0 ? "-ml-2" : ""
+              className={`-mb-px flex min-h-8 flex-none items-center whitespace-nowrap rounded-t-[9px] border px-5 text-[12px] transition-transform active:scale-[.98] ${
+                i > 0 ? "-ml-1.5" : ""
               } ${
                 on
-                  ? "z-10 bg-panel font-bold text-paper shadow-[0_-1px_3px_rgba(0,0,0,.06)]"
-                  : "bg-panel-2 font-medium text-muted"
+                  ? "relative z-10 border-line border-b-panel bg-panel font-bold text-paper shadow-[0_-2px_6px_rgba(0,0,0,.08)]"
+                  : "border-line/70 bg-panel-2 font-medium text-muted"
               }`}
             >
               {s}
@@ -142,11 +141,11 @@ export function MarcoMantenimiento({
     <div className="flex min-h-0 flex-1 flex-col">
       <Pestanas pestanas={pestanas} pestana={pestana} onPestana={onPestana} />
 
-      {/* ── Cuerpo: CAJA BLANCA a ras. La lengüeta activa (relleno blanco) se
-          funde con ella sin costura; las inactivas quedan en gris detrás. Las
-          subpestañas viven DENTRO, arriba, como lengüetas. `min-w-0` evita que
-          una tabla ancha empuje el layout. */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel">
+      {/* ── Cuerpo: CAJA BLANCA con borde. La lengüeta activa abre el borde
+          superior (`border-b-panel` + `-mb-px`) y se funde con ella; las
+          inactivas quedan en gris detrás. Las subpestañas viven DENTRO, arriba,
+          como lengüetas. `min-w-0` evita que una tabla ancha empuje el layout. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col border border-line bg-panel">
         {haySub && (
           <SubPestanas subpestanas={subpestanas} subpestana={subpestana} onSubpestana={onSubpestana} />
         )}
@@ -157,8 +156,8 @@ export function MarcoMantenimiento({
         </div>
       </div>
 
-      {/* ── Barra de acciones ── */}
-      <footer className="flex flex-none flex-wrap items-center gap-1 border-t border-line bg-panel px-3 py-2">
+      {/* ── Barra de acciones (la línea de arriba ya la pone el borde de la caja) ── */}
+      <footer className="flex flex-none flex-wrap items-center gap-1 bg-panel px-3 py-2">
         {pie}
       </footer>
     </div>

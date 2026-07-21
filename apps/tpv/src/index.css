@@ -124,6 +124,22 @@
   --radius-xl: 1rem; --radius-2xl: 1.125rem; --radius-3xl: 1.25rem;
 }
 
+/* CONFIG EN GRIS NEUTRO — el resto de la operativa lleva el lavanda de marca,
+   pero sobre ese tono las lengüetas y tarjetas grises se pierden. En las
+   pantallas de Configuración redefinimos SOLO las superficies y las líneas a un
+   gris neutro; los acentos de marca (brand, mint, ámbar) siguen igual. Respeta
+   claro/oscuro. */
+.gl-neutro {
+  --ink: #edeef1;
+  --panel-2: #e4e6eb;
+  --line: rgba(24, 26, 32, 0.14);
+}
+.dark .gl-neutro {
+  --ink: #17181c;
+  --panel-2: #24262b;
+  --line: rgba(255, 255, 255, 0.1);
+}
+
 /* Silueta de escudo del logo (placas de icono) */
 .escudo { clip-path: polygon(50% 0%, 100% 22%, 88% 88%, 50% 100%, 12% 88%, 0% 22%); }
 

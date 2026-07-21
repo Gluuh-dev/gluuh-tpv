@@ -175,11 +175,15 @@ export function Configuracion({ onVolver }: Readonly<{ onVolver: () => void }>) 
   const sel = TODAS.find((s) => s.id === selId) ?? null;
   const Pantalla = PANTALLAS[selId];
 
-  let contenido: ReactNode;
-  if (Pantalla) contenido = <Pantalla onSalir={() => setSelId(GENERAL)} />;
-  else if (selId === "preferencias") contenido = <Preferencias />;
-  else if (sel) contenido = <FichaAlcance s={sel} />;
-  else contenido = <VistaGeneral onIr={setSelId} />;
+  let interior: ReactNode;
+  if (Pantalla) interior = <Pantalla onSalir={() => setSelId(GENERAL)} />;
+  else if (selId === "preferencias") interior = <Preferencias />;
+  else if (sel) interior = <FichaAlcance s={sel} />;
+  else interior = <VistaGeneral onIr={setSelId} />;
+  // `gl-neutro`: la config va en gris neutro (no el lavanda de marca). Con
+  // `display:contents` las variables CSS bajan a los hijos sin crear caja ni
+  // romper el flex del marco.
+  const contenido = <div className="gl-neutro" style={{ display: "contents" }}>{interior}</div>;
 
   return (
     <ShellApartado
