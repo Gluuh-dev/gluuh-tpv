@@ -195,54 +195,57 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           <Caja crecer>
             <Desplazable className="p-3.5">
               <div className="grid max-w-3xl gap-3.5">
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <Campo etiqueta="Nombre" htmlFor="c-nom">
-                    <input id="c-nom" value={cat.nombre} readOnly={ro} placeholder="Cervezas, Vinos…"
-                      onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro)} />
-                  </Campo>
-                  <Campo etiqueta="Familia" htmlFor="c-fam">
-                    <Selector id="c-fam" value={cat.familyId ?? ""} disabled={ro}
-                      onChange={(v) => set("familyId", v || null)}>
-                      <option value="">Sin familia</option>
-                      {familias.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                    </Selector>
-                  </Campo>
-                  <Campo etiqueta="Estación de preparación" htmlFor="c-est">
-                    <Selector id="c-est" value={cat.estacion} disabled={ro} onChange={(v) => set("estacion", v)}>
-                      {ESTACIONES.map((e) => <option key={e.valor} value={e.valor}>{e.texto}</option>)}
-                    </Selector>
-                  </Campo>
-                  <Campo etiqueta="Orden en la carta" htmlFor="c-ord">
-                    <input id="c-ord" type="number" min="0" step="1" value={cat.orden} readOnly={ro}
-                      onChange={(e) => set("orden", Number(e.target.value))} className={claseEntrada(ro, "w-28 text-right font-mono")} />
-                  </Campo>
-                </div>
-
-                <Campo etiqueta="Categoría padre (subcategoría de)" htmlFor="c-padre">
-                  <Selector id="c-padre" value={cat.categoriaPadreId ?? ""} disabled={ro}
-                    onChange={(v) => set("categoriaPadreId", v || null)}>
-                    <option value="">Ninguna (de primer nivel)</option>
-                    {categorias.filter((o) => o.id !== cat.id).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-                  </Selector>
-                </Campo>
-
-                <Campo etiqueta="Aspecto en el TPV">
-                  <div className="flex items-center gap-3">
-                    <div className="w-32 flex-none">
-                      <PreviaClasificacion nombre={cat.nombre} color={cat.color}
-                        foto={cat.fotoUrl || undefined} icono={cat.icono || undefined} />
+                {/* Datos a la izquierda, Aspecto arriba a la derecha (disposición Ágora). */}
+                <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_12rem]">
+                  <div className="grid content-start gap-3.5">
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                      <Campo etiqueta="Nombre" htmlFor="c-nom">
+                        <input id="c-nom" value={cat.nombre} readOnly={ro} placeholder="Cervezas, Vinos…"
+                          onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro)} />
+                      </Campo>
+                      <Campo etiqueta="Familia" htmlFor="c-fam">
+                        <Selector id="c-fam" value={cat.familyId ?? ""} disabled={ro}
+                          onChange={(v) => set("familyId", v || null)}>
+                          <option value="">Sin familia</option>
+                          {familias.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                        </Selector>
+                      </Campo>
+                      <Campo etiqueta="Estación de preparación" htmlFor="c-est">
+                        <Selector id="c-est" value={cat.estacion} disabled={ro} onChange={(v) => set("estacion", v)}>
+                          {ESTACIONES.map((e) => <option key={e.valor} value={e.valor}>{e.texto}</option>)}
+                        </Selector>
+                      </Campo>
+                      <Campo etiqueta="Orden en la carta" htmlFor="c-ord">
+                        <input id="c-ord" type="number" min="0" step="1" value={cat.orden} readOnly={ro}
+                          onChange={(e) => set("orden", Number(e.target.value))} className={claseEntrada(ro, "w-28 text-right font-mono")} />
+                      </Campo>
                     </div>
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                      <Campo etiqueta="Categoría padre (subcategoría de)" htmlFor="c-padre">
+                        <Selector id="c-padre" value={cat.categoriaPadreId ?? ""} disabled={ro}
+                          onChange={(v) => set("categoriaPadreId", v || null)}>
+                          <option value="">Ninguna (de primer nivel)</option>
+                          {categorias.filter((o) => o.id !== cat.id).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                        </Selector>
+                      </Campo>
+                      <Campo etiqueta="Texto del botón" htmlFor="c-tb">
+                        <input id="c-tb" value={cat.textoBoton} readOnly={ro} placeholder={cat.nombre || "Igual que el nombre"}
+                          onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
+                      </Campo>
+                    </div>
+                  </div>
+
+                  {/* Aspecto en el TPV — arriba a la derecha. */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[11.5px] font-medium text-muted">Aspecto en el TPV</span>
+                    <PreviaClasificacion nombre={cat.nombre} color={cat.color}
+                      foto={cat.fotoUrl || undefined} icono={cat.icono || undefined} />
                     <button type="button" disabled={ro} onClick={() => setAspecto(true)}
-                      className="flex min-h-11 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
                       <Camera size={15} /> Foto, color e icono
                     </button>
                   </div>
-                </Campo>
-
-                <Campo etiqueta="Texto del botón" htmlFor="c-tb">
-                  <input id="c-tb" value={cat.textoBoton} readOnly={ro} placeholder={cat.nombre || "Igual que el nombre"}
-                    onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
-                </Campo>
+                </div>
                 <div className="grid gap-3.5 sm:grid-cols-2">
                   <Campo etiqueta="Nombre en la carta QR" htmlFor="c-cn">
                     <input id="c-cn" value={cat.cartaNombre} readOnly={ro} placeholder={cat.nombre || "El nombre normal"}

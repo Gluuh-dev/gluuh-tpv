@@ -10,10 +10,14 @@ import {
 import { InterruptorSN } from "./ClasificacionUI";
 import { AspectoClasificacion, PreviaClasificacion } from "./AspectoClasificacion";
 import {
-  cargarFamilias, guardarFamilia, borrarFamilia, cargarGruposMayores, subirFotoClasificacion,
-  type Familia, type GrupoMayor,
+  cargarFamilias, guardarFamilia, borrarFamilia, cargarGruposMayores, cargarCategorias,
+  subirFotoClasificacion, type Familia, type GrupoMayor, type Categoria,
 } from "./clasificacion";
 import { CATEGORIAS_DEMO } from "../../tpv/datos";
+
+// Las tres pestañas del patrón de Configuración; dentro de «Ficha», las subpestañas.
+const SUBS = ["General", "Categorías"] as const;
+type Sub = (typeof SUBS)[number];
 
 // ────────────────────────────────────────────────────────────────────────────
 // FAMILIAS — el primer nivel de la carta (Bebidas, Cocina, Postres).
@@ -35,12 +39,15 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const ruta = useRuta();
   const [familias, setFamilias] = useState<Familia[]>(DEMO);
   const [gruposMayores, setGruposMayores] = useState<GrupoMayor[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [real, setReal] = useState(false);
   const [borrador, setBorrador] = useState<Familia | null>(null);
   const [nuevo, setNuevo] = useState(false);
   const [q, setQ] = useState("");
   const [borrar, setBorrar] = useState(false);
   const [aspecto, setAspecto] = useState(false);
+  const [informe, setInforme] = useState(false);
+  const [sub, setSub] = useState<Sub>("General");
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -48,6 +55,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
     let vivo = true;
     cargarFamilias().then((f) => { if (vivo && f) { setFamilias(f); setReal(true); } });
     cargarGruposMayores().then((g) => { if (vivo) setGruposMayores(g); });
+    cargarCategorias().then((c) => { if (vivo && c) setCategorias(c); });
     return () => { vivo = false; };
   }, []);
 
@@ -64,7 +72,17 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
   const editando = borrador !== null;
   const ro = !editando;
-  const pestana = borrador || ruta.id ? "Ficha" : "Lista";
+  // «Informe» es un eje aparte (booleano), no derivado de la selección: así no
+  // se pisa con el ruta→Ficha y no hay bucle de efectos.
+  const pestanaBase = borrador || ruta.id ? "Ficha" : "Lista";
+  const pestana = informe ? "Informe" : pestanaBase;
+
+  const irPestana = (p: string) => {
+    if (editando) return;                       // no se salta de pestaña a medio editar
+    if (p === "Informe") { setInforme(true); return; }
+    setInforme(false);
+    abrir(p === "Lista" ? undefined : fam?.id);
+  };
 
   const set = <K extends keyof Familia>(campo: K, valor: Familia[K]) =>
     setBorrador((b) => (b ? { ...b, [campo]: valor } : b));
@@ -130,6 +148,14 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
         </span>
       </>
     );
+  } else if (pestana === "Informe") {
+    pie = (
+      <>
+        {finComun}
+        <SepPie />
+        <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir}>Salir</BotonPie>
+      </>
+    );
   } else {
     pie = (
       <>
@@ -146,8 +172,10 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   return (
     <>
       <MarcoMantenimiento
-        pestanas={["Lista", "Ficha"]} pestana={pestana}
-        onPestana={(p) => { if (!editando) abrir(p === "Lista" ? undefined : fam?.id); }}
+        pestanas={["Lista", "Ficha", "Informe"]} pestana={pestana}
+        onPestana={irPestana}
+        subpestanas={pestana === "Ficha" ? SUBS : undefined}
+        subpestana={sub} onSubpestana={(s) => setSub(s as Sub)}
         pie={pie} pegado={pestana === "Lista"}
       >
         {pestana === "Lista" && (
@@ -188,55 +216,60 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           </Caja>
         )}
 
-        {pestana === "Ficha" && fam && (
+        {pestana === "Ficha" && sub === "General" && fam && (
           <Caja crecer>
             <Desplazable className="p-3.5">
               <div className="grid max-w-3xl gap-3.5">
-                <Campo etiqueta="Nombre" htmlFor="f-nom">
-                  <input id="f-nom" value={fam.nombre} readOnly={ro} placeholder="Bebidas, Cocina, Postres…"
-                    onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro)} />
-                </Campo>
-                <div className="grid gap-3.5 sm:grid-cols-3">
-                  <Campo etiqueta="Orden en la venta" htmlFor="f-ord">
-                    <input id="f-ord" type="number" min="0" step="1" value={fam.orden} readOnly={ro}
-                      onChange={(e) => set("orden", Number(e.target.value))} className={claseEntrada(ro, "text-right font-mono")} />
-                  </Campo>
-                  <Campo etiqueta="Orden en la factura" htmlFor="f-oi">
-                    <input id="f-oi" type="number" min="0" step="1" value={fam.ordenImpresion} readOnly={ro}
-                      onChange={(e) => set("ordenImpresion", Number(e.target.value))} className={claseEntrada(ro, "text-right font-mono")} />
-                  </Campo>
-                  <Campo etiqueta="Texto del botón" htmlFor="f-tb">
-                    <input id="f-tb" value={fam.textoBoton} readOnly={ro} placeholder={fam.nombre || "Igual que el nombre"}
-                      onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
-                  </Campo>
-                </div>
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <Campo etiqueta="Familia padre (agrupa bajo un botón)" htmlFor="f-padre">
-                    <Selector id="f-padre" value={fam.familiaPadreId ?? ""} disabled={ro}
-                      onChange={(v) => set("familiaPadreId", v || null)}>
-                      <option value="">Ninguna (de primer nivel)</option>
-                      {familias.filter((o) => o.id !== fam.id).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-                    </Selector>
-                  </Campo>
-                  <Campo etiqueta="Grupo mayor (desglose del ticket)" htmlFor="f-gm">
-                    <Selector id="f-gm" value={fam.grupoMayorId ?? ""} disabled={ro}
-                      onChange={(v) => set("grupoMayorId", v || null)}>
-                      <option value="">Ninguno</option>
-                      {gruposMayores.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-                    </Selector>
-                  </Campo>
-                </div>
-                <Campo etiqueta="Aspecto en el TPV">
-                  <div className="flex items-center gap-3">
-                    <div className="w-32 flex-none">
-                      <PreviaClasificacion nombre={fam.nombre} color={fam.color} foto={fam.fotoUrl || undefined} />
+                {/* Datos a la izquierda, Aspecto arriba a la derecha (disposición Ágora). */}
+                <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_12rem]">
+                  <div className="grid content-start gap-3.5">
+                    <Campo etiqueta="Nombre" htmlFor="f-nom">
+                      <input id="f-nom" value={fam.nombre} readOnly={ro} placeholder="Bebidas, Cocina, Postres…"
+                        onChange={(e) => set("nombre", e.target.value)} className={claseEntrada(ro)} />
+                    </Campo>
+                    <div className="grid gap-3.5 sm:grid-cols-3">
+                      <Campo etiqueta="Orden en la venta" htmlFor="f-ord">
+                        <input id="f-ord" type="number" min="0" step="1" value={fam.orden} readOnly={ro}
+                          onChange={(e) => set("orden", Number(e.target.value))} className={claseEntrada(ro, "text-right font-mono")} />
+                      </Campo>
+                      <Campo etiqueta="Orden en la factura" htmlFor="f-oi">
+                        <input id="f-oi" type="number" min="0" step="1" value={fam.ordenImpresion} readOnly={ro}
+                          onChange={(e) => set("ordenImpresion", Number(e.target.value))} className={claseEntrada(ro, "text-right font-mono")} />
+                      </Campo>
+                      <Campo etiqueta="Texto del botón" htmlFor="f-tb">
+                        <input id="f-tb" value={fam.textoBoton} readOnly={ro} placeholder={fam.nombre || "Igual que el nombre"}
+                          onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
+                      </Campo>
                     </div>
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                      <Campo etiqueta="Familia padre (agrupa bajo un botón)" htmlFor="f-padre">
+                        <Selector id="f-padre" value={fam.familiaPadreId ?? ""} disabled={ro}
+                          onChange={(v) => set("familiaPadreId", v || null)}>
+                          <option value="">Ninguna (de primer nivel)</option>
+                          {familias.filter((o) => o.id !== fam.id).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                        </Selector>
+                      </Campo>
+                      <Campo etiqueta="Grupo mayor (desglose del ticket)" htmlFor="f-gm">
+                        <Selector id="f-gm" value={fam.grupoMayorId ?? ""} disabled={ro}
+                          onChange={(v) => set("grupoMayorId", v || null)}>
+                          <option value="">Ninguno</option>
+                          {gruposMayores.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                        </Selector>
+                      </Campo>
+                    </div>
+                  </div>
+
+                  {/* Aspecto en el TPV — arriba a la derecha. */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[11.5px] font-medium text-muted">Aspecto en el TPV</span>
+                    <PreviaClasificacion nombre={fam.nombre} color={fam.color} foto={fam.fotoUrl || undefined} />
                     <button type="button" disabled={ro} onClick={() => setAspecto(true)}
-                      className="flex min-h-11 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
                       <Camera size={15} /> Foto y color
                     </button>
                   </div>
-                </Campo>
+                </div>
+
                 <div className="grid gap-2 sm:grid-cols-2">
                   <InterruptorSN etiqueta="Se puede combinar (copas)" activo={fam.combinable} soloLectura={ro}
                     onToggle={() => set("combinable", !fam.combinable)} />
@@ -250,6 +283,23 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   Al borrar una familia, sus categorías y productos NO se borran: se quedan sin familia.
                 </p>
               </div>
+            </Desplazable>
+          </Caja>
+        )}
+
+        {pestana === "Ficha" && sub === "Categorías" && fam && (
+          <Caja crecer>
+            <Desplazable className="p-3.5">
+              <FamiliaCategorias familia={fam} categorias={categorias} onAbrir={(id) =>
+                navegar({ vista: "config", seccion: "categorias", id })} />
+            </Desplazable>
+          </Caja>
+        )}
+
+        {pestana === "Informe" && (
+          <Caja crecer>
+            <Desplazable className="p-3.5">
+              <FamiliaInforme familia={fam} categorias={categorias} />
             </Desplazable>
           </Caja>
         )}
@@ -279,5 +329,68 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
         </Modal>
       )}
     </>
+  );
+}
+
+// ── Subpestaña «Categorías»: lo que cuelga de esta familia (solo lectura) ──────
+function FamiliaCategorias({ familia, categorias, onAbrir }: Readonly<{
+  familia: Familia; categorias: Categoria[]; onAbrir: (id: string) => void;
+}>) {
+  const suyas = categorias.filter((c) => c.familyId === familia.id);
+  if (suyas.length === 0) {
+    return (
+      <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
+        Esta familia todavía no tiene categorías. Se asignan desde cada categoría, en su campo «Familia».
+      </p>
+    );
+  }
+  return (
+    <div className="grid max-w-2xl gap-2">
+      <p className="text-[12px] text-muted">
+        {suyas.length} categoría{suyas.length === 1 ? "" : "s"} cuelgan de «{familia.nombre}». Toca una para abrirla.
+      </p>
+      <div className="grid gap-1.5">
+        {suyas.map((c) => (
+          <button key={c.id} type="button" onClick={() => onAbrir(c.id)}
+            className="flex min-h-11 items-center gap-2.5 rounded-[6px] border border-line bg-panel-2 px-3 text-left transition-transform active:scale-[.99]">
+            <span className="h-5 w-5 flex-none rounded-[4px]" style={{ background: c.color }} />
+            <span className="text-[13.5px] font-semibold text-paper">{c.nombre}</span>
+            <span className="ml-auto text-[11.5px] text-muted">{c.mostrarVenta ? "en venta" : "oculta"}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Pestaña «Informe»: resumen honesto de la carta (el detalle vive en Análisis) ─
+function FamiliaInforme({ familia, categorias }: Readonly<{
+  familia?: Familia; categorias: Categoria[];
+}>) {
+  if (!familia) return <p className="text-[13px] text-muted">Elige una familia en la Lista para ver su informe.</p>;
+  const suyas = categorias.filter((c) => c.familyId === familia.id);
+  const enVenta = suyas.filter((c) => c.mostrarVenta).length;
+  return (
+    <div className="grid max-w-2xl gap-3.5">
+      <h3 className="text-[14px] font-semibold text-paper">{familia.nombre}</h3>
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <Metrica etiqueta="Categorías" valor={suyas.length} />
+        <Metrica etiqueta="En venta" valor={enVenta} />
+        <Metrica etiqueta="Orden en factura" valor={familia.ordenImpresion} />
+      </div>
+      <p className="flex items-start gap-2 text-[12px] leading-relaxed text-muted">
+        <Info size={14} className="mt-0.5 flex-none" />
+        Los informes de ventas por familia (importe, unidades, márgenes) viven en Análisis. Aquí solo el resumen de la carta.
+      </p>
+    </div>
+  );
+}
+
+function Metrica({ etiqueta, valor }: Readonly<{ etiqueta: string; valor: number }>) {
+  return (
+    <div className="rounded-[7px] border border-line bg-panel-2 p-3">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">{etiqueta}</p>
+      <p className="mt-1 text-[22px] font-bold tabular-nums text-paper">{valor}</p>
+    </div>
   );
 }

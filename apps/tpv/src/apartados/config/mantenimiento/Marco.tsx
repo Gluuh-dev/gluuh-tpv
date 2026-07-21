@@ -18,31 +18,51 @@ import { Modal, BarraVentana, abrirTeclado, Desplazable } from "../../../ui";
 // Lo comparten todas las pantallas de Configuración; ver Productos.tsx.
 // ============================================================================
 
-export function MarcoMantenimiento({
-  pestanas, pestana, onPestana,
-  subpestanas, subpestana, onSubpestana,
-  pie, children, pegado,
-}: Readonly<{
-  pestanas: string[];
-  pestana: string;
-  onPestana: (p: string) => void;
-  subpestanas?: string[];
-  subpestana?: string;
-  onSubpestana?: (s: string) => void;
-  pie: ReactNode;
-  children: ReactNode;
-  /**
-   * El contenido va PEGADO a las pestañas, sin margen y sin la esquina superior
-   * redondeada bajo la pestaña activa. Para la Lista: así la tabla parece la
-   * continuación de la pestaña, no una tarjeta flotando debajo.
-   */
-  pegado?: boolean;
+/**
+ * PESTAÑAS principales (Lista / Ficha / Informe). Aspecto de carpeta: la activa
+ * se «pega» al cuerpo de abajo (`border-b-panel` sobre el `border-b` de la fila)
+ * y va en relieve, para que se lea como pulsada y no como un enlace más.
+ *
+ * Componente aparte porque este trío es el esqueleto del 90% de las pantallas de
+ * Configuración; MarcoMantenimiento solo lo compone.
+ */
+export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
+  pestanas: readonly string[]; pestana: string; onPestana: (p: string) => void;
+}>) {
+  return (
+    <div role="tablist" className="flex flex-none gap-0.5 border-b border-line bg-background px-3">
+      {pestanas.map((p) => {
+        const on = p === pestana;
+        return (
+          <button
+            key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
+            className={`-mb-px mt-1.5 flex min-h-11.5 items-center rounded-t-[6px] border px-5 text-[13.5px] transition-transform active:scale-[.98] ${
+              on
+                ? "border-line border-b-panel bg-panel font-semibold text-paper shadow-[0_-2px_5px_rgba(0,0,0,.05)]"
+                : "border-transparent font-medium text-muted"
+            }`}
+          >
+            {p}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * SUB-PESTAÑAS dentro de Ficha (Datos generales · Extras · Precios…). A
+ * diferencia de las principales, la activa va **hundida** (`inset` shadow + relleno
+ * de marca): parece una tecla pulsada. Se desplazan con ‹ › si no caben.
+ */
+export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<{
+  subpestanas: readonly string[]; subpestana?: string; onSubpestana?: (s: string) => void;
 }>) {
   const carril = useRef<HTMLDivElement>(null);
   const desplazar = (dir: number) => carril.current?.scrollBy({ left: dir * 240, behavior: "smooth" });
 
-  // Las flechas SOLO si las subpestañas no caben. Con 4 pestañas cortas sobraban
-  // y ademas quedaban muertas (no habia nada a lo que desplazarse).
+  // Las flechas SOLO si no caben. Con 3 pestañas cortas sobraban y quedaban
+  // muertas (no había a dónde desplazarse).
   const [desborda, setDesborda] = useState(false);
   useEffect(() => {
     const el = carril.current;
@@ -56,58 +76,67 @@ export function MarcoMantenimiento({
   }, [subpestanas]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* ── Pestañas principales ── */}
-      <div role="tablist" className="flex flex-none gap-0.5 border-b border-line bg-background px-3">
-        {pestanas.map((p) => {
-          const on = p === pestana;
+    <div className="flex flex-none items-center gap-1 border-b border-line bg-panel px-2 py-1.5">
+      <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto">
+        {subpestanas.map((s) => {
+          const on = s === subpestana;
           return (
             <button
-              key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
-              className={`-mb-px mt-1.5 flex min-h-11.5 items-center rounded-t-[6px] border px-5 text-[13.5px] transition-transform active:scale-[.98] ${
+              key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
+              className={`flex min-h-10 flex-none items-center whitespace-nowrap rounded-[6px] border px-3.5 text-[11px] font-semibold uppercase tracking-wide transition-transform active:scale-[.97] ${
                 on
-                  ? "border-line border-b-panel bg-panel font-semibold text-paper"
-                  : "border-transparent font-medium text-muted"
+                  ? "border-brand-lit/40 bg-accent-soft text-brand-lit shadow-[inset_0_2px_4px_rgba(0,0,0,.16)]"
+                  : "border-transparent text-muted"
               }`}
             >
-              {p}
+              {s}
             </button>
           );
         })}
       </div>
+      <div className={`flex-none gap-1 ${desborda ? "flex" : "hidden"}`}>
+        <button type="button" aria-label="Pestaña anterior" onClick={() => desplazar(-1)}
+          className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
+          <ChevronLeft size={16} strokeWidth={2.6} />
+        </button>
+        <button type="button" aria-label="Pestaña siguiente" onClick={() => desplazar(1)}
+          className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
+          <ChevronRight size={16} strokeWidth={2.6} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
-      {/* ── Sub-pestañas (solo si la pestaña las tiene) ── */}
+export function MarcoMantenimiento({
+  pestanas, pestana, onPestana,
+  subpestanas, subpestana, onSubpestana,
+  pie, children, pegado,
+}: Readonly<{
+  pestanas: readonly string[];
+  pestana: string;
+  onPestana: (p: string) => void;
+  subpestanas?: readonly string[];
+  subpestana?: string;
+  onSubpestana?: (s: string) => void;
+  pie: ReactNode;
+  children: ReactNode;
+  /**
+   * El contenido va PEGADO a las pestañas, sin margen y sin la esquina superior
+   * redondeada bajo la pestaña activa. Para la Lista: así la tabla parece la
+   * continuación de la pestaña, no una tarjeta flotando debajo.
+   */
+  pegado?: boolean;
+}>) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Pestanas pestanas={pestanas} pestana={pestana} onPestana={onPestana} />
+
       {subpestanas && subpestanas.length > 0 && (
-        <div className="flex flex-none items-center border-b border-line bg-panel px-1.5">
-          <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
-            {subpestanas.map((s) => {
-              const on = s === subpestana;
-              return (
-                <button
-                  key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
-                  className={`flex min-h-11 flex-none items-center whitespace-nowrap border-b-2 px-4 text-[11px] font-semibold uppercase tracking-wide transition-transform active:scale-[.98] ${
-                    on ? "border-brand-lit text-paper" : "border-transparent text-muted"
-                  }`}
-                >
-                  {s}
-                </button>
-              );
-            })}
-          </div>
-          <div className={`flex-none gap-1 p-1 ${desborda ? "flex" : "hidden"}`}>
-            <button type="button" aria-label="Pestaña anterior" onClick={() => desplazar(-1)}
-              className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
-              <ChevronLeft size={16} strokeWidth={2.6} />
-            </button>
-            <button type="button" aria-label="Pestaña siguiente" onClick={() => desplazar(1)}
-              className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
-              <ChevronRight size={16} strokeWidth={2.6} />
-            </button>
-          </div>
-        </div>
+        <SubPestanas subpestanas={subpestanas} subpestana={subpestana} onSubpestana={onSubpestana} />
       )}
 
-      {/* ── Cuerpo ── */}
+      {/* ── Cuerpo: toma toda la altura que quede entre pestañas y barra ── */}
       {/* `pegado`: sin margen y SIN `border-t` — la línea de arriba ya la pone la
           fila de pestañas (`border-b`), y la pestaña activa la tapa con su
           `border-b-panel`. Un `border-t` aquí volvía a dibujarla y CORTABA la
