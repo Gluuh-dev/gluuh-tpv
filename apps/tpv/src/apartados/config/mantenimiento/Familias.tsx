@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut, Keyboard, Layers, Info, Camera,
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
 } from "lucide-react";
 import { Modal, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { useRuta, navegar } from "../../../lib/rutas";
@@ -70,16 +71,22 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const fam = borrador ?? familias[Math.max(enUrl, 0)];
   const abrir = (id?: string) => navegar({ vista: "config", seccion: "familias", ...(id ? { id } : {}) }, !id);
 
+  // Recorrer registros en el mismo orden que la Lista (Inicio/Anterior/Siguiente/Fin).
+  const idxLista = fam ? lista.findIndex((f) => f.id === fam.id) : -1;
+  const irA = (i: number) => { const f = lista[i]; if (f) abrir(f.id); };
+  const primero = idxLista <= 0;
+  const ultimo = idxLista < 0 || idxLista >= lista.length - 1;
+
   const editando = borrador !== null;
   const ro = !editando;
   // «Informe» es un eje aparte (booleano), no derivado de la selección: así no
   // se pisa con el ruta→Ficha y no hay bucle de efectos.
   const pestanaBase = borrador || ruta.id ? "Ficha" : "Lista";
-  const pestana = informe ? "Informe" : pestanaBase;
+  const pestana = informe ? "Informes" : pestanaBase;
 
   const irPestana = (p: string) => {
     if (editando) return;                       // no se salta de pestaña a medio editar
-    if (p === "Informe") { setInforme(true); return; }
+    if (p === "Informes") { setInforme(true); return; }
     setInforme(false);
     abrir(p === "Lista" ? undefined : fam?.id);
   };
@@ -148,7 +155,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
         </span>
       </>
     );
-  } else if (pestana === "Informe") {
+  } else if (pestana === "Informes") {
     pie = (
       <>
         {finComun}
@@ -159,6 +166,11 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   } else {
     pie = (
       <>
+        <BotonPie Icono={ChevronsLeft} onClick={() => irA(0)} disabled={primero}>Inicio</BotonPie>
+        <BotonPie Icono={ChevronLeft} onClick={() => irA(idxLista - 1)} disabled={primero}>Anterior</BotonPie>
+        <BotonPie Icono={ChevronRight} onClick={() => irA(idxLista + 1)} disabled={ultimo}>Siguiente</BotonPie>
+        <BotonPie Icono={ChevronsRight} onClick={() => irA(lista.length - 1)} disabled={ultimo}>Fin</BotonPie>
+        <SepPie />
         <BotonPie Icono={PlusCircle} tono="ok" onClick={crear}>Nueva</BotonPie>
         <BotonPie Icono={Pencil} onClick={() => fam && setBorrador(structuredClone(fam))} disabled={!fam}>Modificar</BotonPie>
         <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={!fam}>Eliminar</BotonPie>
@@ -172,7 +184,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   return (
     <>
       <MarcoMantenimiento
-        pestanas={["Lista", "Ficha", "Informe"]} pestana={pestana}
+        pestanas={["Lista", "Ficha", "Informes"]} pestana={pestana}
         onPestana={irPestana}
         subpestanas={pestana === "Ficha" ? SUBS : undefined}
         subpestana={sub} onSubpestana={(s) => setSub(s as Sub)}
@@ -296,7 +308,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           </Caja>
         )}
 
-        {pestana === "Informe" && (
+        {pestana === "Informes" && (
           <Caja crecer>
             <Desplazable className="p-3.5">
               <FamiliaInforme familia={fam} categorias={categorias} />
