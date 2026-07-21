@@ -3,7 +3,7 @@ import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../..
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer, FileDown, Images,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer, FileDown,
 } from "lucide-react";
 import { Modal, BarraVentana, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -826,11 +826,6 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 )}
               </div>
               <span className="flex-1" />
-              {/* Auto-asignar fotos de la galería por nombre a los que no tienen. */}
-              <button type="button" onClick={autoAsignarFotos} disabled={!real || guardando || articulos.length === 0}
-                className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-40">
-                <Images size={14} /> Auto-asignar fotos
-              </button>
               {/* Exportar a PDF: los MARCADOS (o, si no hay, todo lo que se ve). */}
               <button type="button" onClick={exportar} disabled={articulos.length === 0}
                 className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40">
@@ -1254,6 +1249,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           colorFamilia={colorDeFamilia(art.familia)}
           foto={art.foto} color={art.color}
           onCambiar={(campo, valor) => set(campo, valor)}
+          onAutoAsignar={real ? autoAsignarFotos : undefined} asignando={guardando}
           onCerrar={cerrarVentana}
         />
       )}

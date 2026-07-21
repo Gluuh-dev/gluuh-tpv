@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Camera, Trash2 } from "lucide-react";
+import { Camera, Trash2, Images } from "lucide-react";
 import { PanelLateral } from "../../../ui";
 import { fotoReducida } from "../../../lib/imagen";
 import { galeriaProductos } from "../../../lib/galeria";
@@ -25,7 +25,7 @@ const PALETA = [
 ];
 
 export function AspectoArticulo({
-  nombre, precio, colorFamilia, foto, color, onCambiar, onCerrar,
+  nombre, precio, colorFamilia, foto, color, onCambiar, onAutoAsignar, asignando, onCerrar,
 }: Readonly<{
   nombre: string;
   precio: number;
@@ -34,6 +34,9 @@ export function AspectoArticulo({
   foto?: string;
   color?: string;
   onCambiar: (campo: "foto" | "color", valor: string | undefined) => void;
+  /** Auto-asigna por nombre la foto de la galería a TODOS los artículos sin foto. */
+  onAutoAsignar?: () => void;
+  asignando?: boolean;
   onCerrar: () => void;
 }>) {
   const fichero = useRef<HTMLInputElement>(null);
@@ -107,7 +110,15 @@ export function AspectoArticulo({
         </div>
       </div>
 
-      <div className="flex justify-end border-t border-line bg-panel-2 px-4 py-3">
+      <div className="flex items-center justify-between border-t border-line bg-panel-2 px-4 py-3">
+        {/* Auto-asigna por nombre la foto a TODOS los artículos sin foto de golpe;
+            no toca los que ya tienen una. Solo con nodo emparejado. */}
+        {onAutoAsignar ? (
+          <button type="button" onClick={onAutoAsignar} disabled={asignando}
+            className="flex min-h-11 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-4 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-40">
+            <Images size={15} /> Auto-asignar todas por nombre
+          </button>
+        ) : <span />}
         <button type="button" onClick={onCerrar}
           className="min-h-11 rounded-[5px] bg-brand px-6 text-[13px] font-semibold text-white transition-transform active:scale-95">
           Listo
