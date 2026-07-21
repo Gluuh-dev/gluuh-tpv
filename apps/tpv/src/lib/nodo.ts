@@ -31,6 +31,16 @@ export function token(): string | null {
 /** ¿Hay terminal emparejado? Si no, la pantalla va en modo demo. */
 export const haySesion = (): boolean => token() !== null;
 
+/** Datos del terminal emparejado (para la auditoría: quién hizo la acción). */
+export function sesionDispositivo(): { device_id?: string; device_nombre?: string } {
+  try {
+    const s = localStorage.getItem(SESION);
+    return s ? (JSON.parse(s) as { device_id?: string; device_nombre?: string }) : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * El bar de este terminal, sacado del propio token (claim `tenant_id`).
  *

@@ -14,6 +14,7 @@ import {
 } from "./catalogo";
 import { duplicarArticulo } from "./duplicar";
 import { exportarTablaPdf, type ColumnaPdf } from "./exportar";
+import { registrarEvento } from "../../../lib/trazabilidad";
 import { ExtrasArticulo } from "./ExtrasArticulo";
 import { StockArticulo } from "./StockArticulo";
 import { TarifasArticulo } from "./TarifasArticulo";
@@ -484,6 +485,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       }
 
       setArticulos((as) => (esNuevo ? [...as, listo] : as.map((a) => (a.id === listo.id ? listo : a))));
+      void registrarEvento({ entidad: "product", accion: esNuevo ? "crear" : "modificar", entidadId: listo.id, resumen: listo.nombre, datos: listo });
       if (esNuevo) abrirArticulo(refDeArticulo(listo));
       setBorrador(null); setNuevo(false); olvidarHistorial();
       notificar(real
@@ -511,6 +513,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       const i = listaOrd.findIndex((a) => a.id === victima.id);
       setArticulos((as) => as.filter((a) => a.id !== victima.id));
       setMarcados((m) => { const s = new Set(m); s.delete(victima.id); return s; });
+      void registrarEvento({ entidad: "product", accion: "eliminar", entidadId: victima.id, resumen: victima.nombre, datos: victima });
       if (pestana === "Lista") {
         const vecina = listaOrd[i + 1] ?? listaOrd[i - 1];
         setFilaSel(vecina ? vecina.id : null);
@@ -566,6 +569,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           enUso = [...enUso, n];
           const copia = duplicarArticulo(a, String(n).padStart(4, "0"));
           if (real) await guardarArticulo(copia);
+          void registrarEvento({ entidad: "product", accion: "duplicar", entidadId: copia.id, resumen: copia.nombre, datos: copia });
           copias.push(copia);
         }
         setArticulos((as) => [...as, ...copias]);
