@@ -1,4 +1,4 @@
-import { leer, escribir, haySesion, tenantId } from "../../../lib/nodo";
+import { leer, escribir, haySesion, tenantId, subirImagen } from "../../../lib/nodo";
 
 // ============================================================================
 // FAMILIAS y CATEGORÍAS — la clasificación de la carta.
@@ -25,6 +25,12 @@ export interface Familia {
   textoBoton: string;
   /** Orden de la familia en el ticket/factura. */
   ordenImpresion: number;
+  /** Familia que la agrupa bajo un solo botón (los «grupos de familias» de Glop). null = de primer nivel. */
+  familiaPadreId: string | null;
+  /** Grupo mayor para el desglose del ticket (Bebida/Comida). null = ninguno. */
+  grupoMayorId: string | null;
+  /** URL de la imagen del botón (o data URL sin subir todavía), o vacío. */
+  fotoUrl: string;
 }
 
 export interface Categoria {
@@ -44,6 +50,10 @@ export interface Categoria {
   /** Nombre en la carta por QR (vacío = el nombre normal). */
   cartaNombre: string;
   cartaDescripcion: string;
+  /** Categoría que la agrupa (subcategorías). null = de primer nivel. */
+  categoriaPadreId: string | null;
+  /** URL de la imagen del botón (o data URL sin subir todavía), o vacío. */
+  fotoUrl: string;
 }
 
 const num = (v: number | string | null | undefined): number => {
@@ -63,18 +73,20 @@ interface FilaFamilia {
   id: string; nombre: string; color: string | null; orden: number | null;
   combinable: boolean | null; mostrar_venta: boolean | null; mostrar_menus: boolean | null;
   texto_boton: string | null; orden_impresion: number | null;
+  familia_padre_id: string | null; grupo_mayor_id: string | null; foto_url: string | null;
 }
 
 export async function cargarFamilias(): Promise<Familia[] | null> {
   if (!haySesion()) return null;
   const filas = await leer<FilaFamilia>(
-    "family?select=id,nombre,color,orden,combinable,mostrar_venta,mostrar_menus,texto_boton,orden_impresion&order=orden");
+    "family?select=id,nombre,color,orden,combinable,mostrar_venta,mostrar_menus,texto_boton,orden_impresion,familia_padre_id,grupo_mayor_id,foto_url&order=orden");
   return filas?.map((f) => ({
     id: f.id, nombre: f.nombre, color: f.color ?? "#64748b", orden: num(f.orden),
     combinable: f.combinable ?? false,
     mostrarVenta: f.mostrar_venta ?? true,
     mostrarMenus: f.mostrar_menus ?? true,
     textoBoton: f.texto_boton ?? "", ordenImpresion: num(f.orden_impresion),
+    familiaPadreId: f.familia_padre_id, grupoMayorId: f.grupo_mayor_id, fotoUrl: f.foto_url ?? "",
   })) ?? null;
 }
 
@@ -83,6 +95,7 @@ export async function guardarFamilia(f: Familia): Promise<void> {
     id: f.id, tenant_id: bar(), nombre: f.nombre, color: f.color, orden: f.orden,
     combinable: f.combinable, mostrar_venta: f.mostrarVenta, mostrar_menus: f.mostrarMenus,
     texto_boton: f.textoBoton || null, orden_impresion: f.ordenImpresion,
+    familia_padre_id: f.familiaPadreId, grupo_mayor_id: f.grupoMayorId, foto_url: f.fotoUrl || null,
     updated_at: new Date().toISOString(),
   }]);
 }
@@ -105,6 +118,7 @@ interface FilaCategoria {
   family_id: string | null; estacion: string | null; icono: string | null;
   mostrar_venta: boolean | null; mostrar_menus: boolean | null;
   texto_boton: string | null; carta_nombre: string | null; carta_descripcion: string | null;
+  categoria_padre_id: string | null; foto_url: string | null;
 }
 
 const ESTACIONES = ["COCINA", "BARRA", "CAMARERO", "NINGUNA"];
@@ -113,13 +127,14 @@ const aEstacion = (v: string | null): string => (ESTACIONES.includes(v ?? "") ? 
 export async function cargarCategorias(): Promise<Categoria[] | null> {
   if (!haySesion()) return null;
   const filas = await leer<FilaCategoria>(
-    "category?select=id,nombre,color,orden,family_id,estacion,icono,mostrar_venta,mostrar_menus,texto_boton,carta_nombre,carta_descripcion&order=orden");
+    "category?select=id,nombre,color,orden,family_id,estacion,icono,mostrar_venta,mostrar_menus,texto_boton,carta_nombre,carta_descripcion,categoria_padre_id,foto_url&order=orden");
   return filas?.map((c) => ({
     id: c.id, nombre: c.nombre, color: c.color ?? "#64748b", orden: num(c.orden),
     familyId: c.family_id, estacion: aEstacion(c.estacion), icono: c.icono ?? "",
     mostrarVenta: c.mostrar_venta ?? true,
     mostrarMenus: c.mostrar_menus ?? true,
     textoBoton: c.texto_boton ?? "", cartaNombre: c.carta_nombre ?? "", cartaDescripcion: c.carta_descripcion ?? "",
+    categoriaPadreId: c.categoria_padre_id, fotoUrl: c.foto_url ?? "",
   })) ?? null;
 }
 
@@ -129,6 +144,7 @@ export async function guardarCategoria(c: Categoria): Promise<void> {
     family_id: c.familyId, estacion: c.estacion, icono: c.icono || null,
     mostrar_venta: c.mostrarVenta, mostrar_menus: c.mostrarMenus,
     texto_boton: c.textoBoton || null, carta_nombre: c.cartaNombre || null, carta_descripcion: c.cartaDescripcion || null,
+    categoria_padre_id: c.categoriaPadreId, foto_url: c.fotoUrl || null,
     updated_at: new Date().toISOString(),
   }]);
 }
@@ -138,4 +154,22 @@ export async function borrarCategoria(id: string): Promise<void> {
   await escribir(`product_category?category_id=eq.${id}`, "DELETE");
   await escribir(`product?category_id=eq.${id}`, "PATCH", { category_id: null });
   await escribir(`category?id=eq.${id}`, "DELETE");
+}
+
+// ── Grupo mayor y fotos ───────────────────────────────────────────────────────
+
+export interface GrupoMayor { id: string; nombre: string }
+
+/**
+ * Los grupos mayores (Bebida/Comida…) para el desplegable de la familia. El TPV
+ * no los da de alta —eso es del panel— así que aquí solo se leen para elegir.
+ */
+export async function cargarGruposMayores(): Promise<GrupoMayor[]> {
+  if (!haySesion()) return [];
+  return (await leer<GrupoMayor>("grupo_mayor?select=id,nombre&order=nombre")) ?? [];
+}
+
+/** Sube la foto de una familia/categoría al nodo y devuelve su URL. */
+export async function subirFotoClasificacion(ambito: "familias" | "categorias", id: string, datos: Blob): Promise<string> {
+  return subirImagen(`${ambito}/${id}-${Date.now()}.jpg`, datos);
 }

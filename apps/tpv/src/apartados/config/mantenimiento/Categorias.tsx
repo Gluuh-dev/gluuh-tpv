@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut, Keyboard, LayoutGrid, Info, Ban,
+  PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut, Keyboard, LayoutGrid, Info, Camera,
 } from "lucide-react";
 import { Modal, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { useRuta, navegar } from "../../../lib/rutas";
 import {
   MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, claseEntrada,
 } from "./Marco";
-import { PaletaColor, InterruptorSN } from "./ClasificacionUI";
+import { InterruptorSN } from "./ClasificacionUI";
+import { AspectoClasificacion, PreviaClasificacion } from "./AspectoClasificacion";
 import {
-  cargarCategorias, cargarFamilias, guardarCategoria, borrarCategoria,
+  cargarCategorias, cargarFamilias, guardarCategoria, borrarCategoria, subirFotoClasificacion,
   type Categoria, type Familia,
 } from "./clasificacion";
-import { NOMBRES_ICONOS, ICONOS } from "../../../lib/iconos";
 import { CATEGORIAS_DEMO } from "../../tpv/datos";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ const ESTACIONES = [
 const DEMO: Categoria[] = CATEGORIAS_DEMO.map((c, i) => ({
   id: c.id, nombre: c.nombre, color: c.color, orden: i + 1,
   familyId: null, estacion: "COCINA", icono: "", mostrarVenta: true, mostrarMenus: true,
-  textoBoton: "", cartaNombre: "", cartaDescripcion: "",
+  textoBoton: "", cartaNombre: "", cartaDescripcion: "", categoriaPadreId: null, fotoUrl: "",
 }));
 
 export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
@@ -42,6 +42,7 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const [nuevo, setNuevo] = useState(false);
   const [q, setQ] = useState("");
   const [borrar, setBorrar] = useState(false);
+  const [aspecto, setAspecto] = useState(false);
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -78,7 +79,7 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
       id: crypto.randomUUID(), nombre: "", color: "#2f7fd0", orden: categorias.length + 1,
       familyId: familias[0]?.id ?? null, estacion: "COCINA", icono: "",
       mostrarVenta: true, mostrarMenus: true,
-      textoBoton: "", cartaNombre: "", cartaDescripcion: "",
+      textoBoton: "", cartaNombre: "", cartaDescripcion: "", categoriaPadreId: null, fotoUrl: "",
     });
   };
 
@@ -88,9 +89,16 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setOcupado(true);
     (async () => {
       try {
-        if (real) await guardarCategoria(borrador);
-        setCategorias((cs) => nuevo ? [...cs, borrador] : cs.map((c) => (c.id === borrador.id ? borrador : c)));
-        if (nuevo) abrir(borrador.id);
+        let listo = borrador;
+        if (real) {
+          if (listo.fotoUrl.startsWith("data:")) {
+            const blob = await (await fetch(listo.fotoUrl)).blob();
+            listo = { ...listo, fotoUrl: await subirFotoClasificacion("categorias", listo.id, blob) };
+          }
+          await guardarCategoria(listo);
+        }
+        setCategorias((cs) => nuevo ? [...cs, listo] : cs.map((c) => (c.id === listo.id ? listo : c)));
+        if (nuevo) abrir(listo.id);
         setBorrador(null); setNuevo(false);
         notificar(real ? "Categoría guardada." : "Guardado solo en este terminal: sin emparejar, se pierde al recargar.");
       } catch (e: unknown) { notificar(`No se ha guardado: ${mensaje(e)}`); }
@@ -138,8 +146,6 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
       </>
     );
   }
-
-  const IconoActual = cat?.icono ? ICONOS[cat.icono] : undefined;
 
   return (
     <>
@@ -212,32 +218,24 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   </Campo>
                 </div>
 
-                <Campo etiqueta="Color">
-                  <PaletaColor valor={cat.color} soloLectura={ro} onCambio={(c) => set("color", c)} />
+                <Campo etiqueta="Categoría padre (subcategoría de)" htmlFor="c-padre">
+                  <Selector id="c-padre" value={cat.categoriaPadreId ?? ""} disabled={ro}
+                    onChange={(v) => set("categoriaPadreId", v || null)}>
+                    <option value="">Ninguna (de primer nivel)</option>
+                    {categorias.filter((o) => o.id !== cat.id).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                  </Selector>
                 </Campo>
 
-                <Campo etiqueta={`Icono ${IconoActual ? "" : "(ninguno)"}`}>
-                  <div className={`flex flex-wrap gap-1.5 ${ro ? "opacity-60" : ""}`}>
-                    <button type="button" disabled={ro} onClick={() => set("icono", "")}
-                      aria-label="Sin icono" aria-pressed={!cat.icono}
-                      className={`grid h-11 w-11 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
-                        cat.icono ? "border-line text-muted" : "border-brand-lit bg-accent-soft text-brand-lit"
-                      }`}>
-                      <Ban size={17} />
+                <Campo etiqueta="Aspecto en el TPV">
+                  <div className="flex items-center gap-3">
+                    <div className="w-32 flex-none">
+                      <PreviaClasificacion nombre={cat.nombre} color={cat.color}
+                        foto={cat.fotoUrl || undefined} icono={cat.icono || undefined} />
+                    </div>
+                    <button type="button" disabled={ro} onClick={() => setAspecto(true)}
+                      className="flex min-h-11 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
+                      <Camera size={15} /> Foto, color e icono
                     </button>
-                    {NOMBRES_ICONOS.map((n) => {
-                      const I = ICONOS[n]!;
-                      const on = cat.icono === n;
-                      return (
-                        <button key={n} type="button" disabled={ro} onClick={() => set("icono", n)}
-                          aria-label={n} aria-pressed={on}
-                          className={`grid h-11 w-11 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
-                            on ? "border-brand-lit bg-accent-soft text-brand-lit" : "border-line text-paper/70"
-                          }`}>
-                          <I size={19} />
-                        </button>
-                      );
-                    })}
                   </div>
                 </Campo>
 
@@ -270,6 +268,13 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           </Caja>
         )}
       </MarcoMantenimiento>
+
+      {aspecto && editando && cat && (
+        <AspectoClasificacion titulo="Aspecto de la categoría" nombre={cat.nombre} color={cat.color}
+          foto={cat.fotoUrl} icono={cat.icono} conIcono
+          onCambiar={(campo, val) => { if (campo === "color") set("color", val); else if (campo === "foto") set("fotoUrl", val); else set("icono", val); }}
+          onCerrar={() => setAspecto(false)} />
+      )}
 
       {borrar && cat && (
         <Modal onCerrar={() => setBorrar(false)} ancho="md">

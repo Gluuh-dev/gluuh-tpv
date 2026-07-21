@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut, Keyboard, Layers, Info,
+  PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut, Keyboard, Layers, Info, Camera,
 } from "lucide-react";
 import { Modal, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { useRuta, navegar } from "../../../lib/rutas";
 import {
-  MarcoMantenimiento, Caja, Campo, BotonPie, SepPie, claseEntrada,
+  MarcoMantenimiento, Caja, Campo, Selector, BotonPie, SepPie, claseEntrada,
 } from "./Marco";
-import { PaletaColor, InterruptorSN } from "./ClasificacionUI";
-import { cargarFamilias, guardarFamilia, borrarFamilia, type Familia } from "./clasificacion";
+import { InterruptorSN } from "./ClasificacionUI";
+import { AspectoClasificacion, PreviaClasificacion } from "./AspectoClasificacion";
+import {
+  cargarFamilias, guardarFamilia, borrarFamilia, cargarGruposMayores, subirFotoClasificacion,
+  type Familia, type GrupoMayor,
+} from "./clasificacion";
 import { CATEGORIAS_DEMO } from "../../tpv/datos";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -24,22 +28,26 @@ const mensaje = (e: unknown) => (e instanceof Error ? e.message : "fallo descono
 const DEMO: Familia[] = CATEGORIAS_DEMO.map((c, i) => ({
   id: c.id, nombre: c.nombre, color: c.color, orden: i + 1,
   combinable: false, mostrarVenta: true, mostrarMenus: true, textoBoton: "", ordenImpresion: i + 1,
+  familiaPadreId: null, grupoMayorId: null, fotoUrl: "",
 }));
 
 export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const ruta = useRuta();
   const [familias, setFamilias] = useState<Familia[]>(DEMO);
+  const [gruposMayores, setGruposMayores] = useState<GrupoMayor[]>([]);
   const [real, setReal] = useState(false);
   const [borrador, setBorrador] = useState<Familia | null>(null);
   const [nuevo, setNuevo] = useState(false);
   const [q, setQ] = useState("");
   const [borrar, setBorrar] = useState(false);
+  const [aspecto, setAspecto] = useState(false);
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     cargarFamilias().then((f) => { if (vivo && f) { setFamilias(f); setReal(true); } });
+    cargarGruposMayores().then((g) => { if (vivo) setGruposMayores(g); });
     return () => { vivo = false; };
   }, []);
 
@@ -67,6 +75,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
       id: crypto.randomUUID(), nombre: "", color: "#2f7fd0",
       orden: familias.length + 1, combinable: false, mostrarVenta: true, mostrarMenus: true,
       textoBoton: "", ordenImpresion: familias.length + 1,
+      familiaPadreId: null, grupoMayorId: null, fotoUrl: "",
     });
   };
 
@@ -76,9 +85,16 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setOcupado(true);
     (async () => {
       try {
-        if (real) await guardarFamilia(borrador);
-        setFamilias((fs) => nuevo ? [...fs, borrador] : fs.map((f) => (f.id === borrador.id ? borrador : f)));
-        if (nuevo) abrir(borrador.id);
+        let listo = borrador;
+        if (real) {
+          if (listo.fotoUrl.startsWith("data:")) {
+            const blob = await (await fetch(listo.fotoUrl)).blob();
+            listo = { ...listo, fotoUrl: await subirFotoClasificacion("familias", listo.id, blob) };
+          }
+          await guardarFamilia(listo);
+        }
+        setFamilias((fs) => nuevo ? [...fs, listo] : fs.map((f) => (f.id === listo.id ? listo : f)));
+        if (nuevo) abrir(listo.id);
         setBorrador(null); setNuevo(false);
         notificar(real ? "Familia guardada." : "Guardado solo en este terminal: sin emparejar, se pierde al recargar.");
       } catch (e: unknown) { notificar(`No se ha guardado: ${mensaje(e)}`); }
@@ -194,8 +210,32 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
                       onChange={(e) => set("textoBoton", e.target.value)} className={claseEntrada(ro)} />
                   </Campo>
                 </div>
-                <Campo etiqueta="Color">
-                  <PaletaColor valor={fam.color} soloLectura={ro} onCambio={(c) => set("color", c)} />
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <Campo etiqueta="Familia padre (agrupa bajo un botón)" htmlFor="f-padre">
+                    <Selector id="f-padre" value={fam.familiaPadreId ?? ""} disabled={ro}
+                      onChange={(v) => set("familiaPadreId", v || null)}>
+                      <option value="">Ninguna (de primer nivel)</option>
+                      {familias.filter((o) => o.id !== fam.id).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                    </Selector>
+                  </Campo>
+                  <Campo etiqueta="Grupo mayor (desglose del ticket)" htmlFor="f-gm">
+                    <Selector id="f-gm" value={fam.grupoMayorId ?? ""} disabled={ro}
+                      onChange={(v) => set("grupoMayorId", v || null)}>
+                      <option value="">Ninguno</option>
+                      {gruposMayores.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                    </Selector>
+                  </Campo>
+                </div>
+                <Campo etiqueta="Aspecto en el TPV">
+                  <div className="flex items-center gap-3">
+                    <div className="w-32 flex-none">
+                      <PreviaClasificacion nombre={fam.nombre} color={fam.color} foto={fam.fotoUrl || undefined} />
+                    </div>
+                    <button type="button" disabled={ro} onClick={() => setAspecto(true)}
+                      className="flex min-h-11 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
+                      <Camera size={15} /> Foto y color
+                    </button>
+                  </div>
                 </Campo>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <InterruptorSN etiqueta="Se puede combinar (copas)" activo={fam.combinable} soloLectura={ro}
@@ -214,6 +254,13 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           </Caja>
         )}
       </MarcoMantenimiento>
+
+      {aspecto && editando && fam && (
+        <AspectoClasificacion titulo="Aspecto de la familia" nombre={fam.nombre} color={fam.color}
+          foto={fam.fotoUrl} icono="" conIcono={false}
+          onCambiar={(campo, val) => { if (campo === "color") set("color", val); else if (campo === "foto") set("fotoUrl", val); }}
+          onCerrar={() => setAspecto(false)} />
+      )}
 
       {borrar && fam && (
         <Modal onCerrar={() => setBorrar(false)} ancho="md">

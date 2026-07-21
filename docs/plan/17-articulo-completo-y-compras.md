@@ -166,25 +166,33 @@ vender, imprimir o cobrar. Si no, se añade a la lista de mentiras.
 
 ---
 
-## 7 · Familias y Categorías — lo que aún NO tienen modelo
+## 7 · Familias y Categorías — paridad con Ágora/Next
 
-De la ficha de Ágora y del panel Next (inventario 20-07), lo que un TPV serio
-configura de familia/categoría y que aquí **falta modelo o consumidor** (no se
-mete a ciegas — es la skill `gluuh-pantalla-config`):
+Inventario contra la ficha de Ágora, el TPV de Glop y el panel Next (21-07). Cada
+campo, contra la regla de la skill `gluuh-pantalla-config`: sólo llega a la
+pantalla lo que tiene **columna Y lector**.
 
-- **Jerarquía padre/subfamilia** (`family.familia_padre_id`, `category.categoria_padre_id`):
-  columnas existen, **0 datos**, y la UI es un árbol (trabajo aparte). Pendiente.
-- **Grupo mayor** (`family.grupo_mayor_id` + tabla `grupo_mayor`, 0 filas): para el
-  desglose Bebida/Comida del ticket. Falta CRUD del grupo mayor primero.
-- **Imágenes de familia/categoría** (`foto_url`, 0 datos las dos): subida como en
-  el aspecto del artículo. Hoy el botón usa color/icono, que basta.
-- **Horario de disponibilidad por categoría** (`category_horario`) y **visibilidad
-  por centro** (`category_sales_center`): tablas + editor en Next YA existen, pero
-  **0 filas** — funcionalidad sin estrenar. Portar cuando haga falta.
-- **Etiquetas de categoría** (`tag`/`entity_tag`, `modelo-de-datos.md:461`): [NUEVO],
-  sin construir.
+✅ **Ya en la pantalla nueva del TPV** (21-07):
+- Familia: nombre, color, **imagen** (`foto_url`), orden (venta + factura),
+  combinable, texto de botón, mostrar en venta/menús, **familia padre**
+  (`familia_padre_id` — son los «grupos de familias» de Glop: una familia agrupa
+  subfamilias bajo un botón) y **grupo mayor** (`grupo_mayor_id`, desglose del
+  ticket; el alta del grupo mayor es del panel, aquí sólo se elige).
+- Categoría: lo anterior + familia, **estación**, **icono** (que el Next NI edita),
+  nombre/descripción de carta QR y **categoría padre** (`categoria_padre_id`).
 
-✅ Lo que SÍ está en la pantalla nueva: nombre, color, orden (venta + factura en
-familia), combinable, mostrar en venta/menús, texto de botón; y en categoría
-además familia, **estación**, **icono** (que el Next NI edita — se rellenaba por
-SQL) y nombre/descripción de carta QR.
+⏳ **Sub-paneles con modelo, aún sin portar al TPV** (existen y funcionan en el Next):
+- **Productos de la familia/categoría**: reasignar productos desde la ficha del
+  padre (escribe `product.family_id` / `product_category`). Útil; es un panel de
+  buscar-y-añadir. Hoy se hace desde la ficha del producto.
+- **Centros de venta** (`category_sales_center` + `sales_center`) y **horario**
+  (`category_horario`): tablas + editor en Next existen pero **0 filas** — sin
+  estrenar. Portar cuando haga falta multi-local u horarios.
+
+⛔ **Referenciado por Ágora/Glop pero SIN tabla en nuestra BD** — no se mete (sería
+casilla que engaña); primero migración:
+- **Grupos de puntos de venta**: la tabla `pos_group` **no existe**.
+- **Etiquetas de categoría** (`tag`/`entity_tag`): **no existen**.
+- **Por familia**: impuesto de venta, formatos de venta, zonas de impresión,
+  tamaño de imagen en TPV / panel grande (Glop). Aquí el impuesto es por producto
+  (clase fiscal × territorio) y la impresión por estación/ruta — no por familia.
