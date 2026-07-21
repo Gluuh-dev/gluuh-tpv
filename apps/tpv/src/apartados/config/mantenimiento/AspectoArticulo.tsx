@@ -3,6 +3,8 @@ import { Camera, Trash2, Ban } from "lucide-react";
 import { Modal, BarraVentana } from "../../../ui";
 import { NOMBRES_ICONOS, ICONOS } from "../../../lib/iconos";
 import { fotoReducida } from "../../../lib/imagen";
+import { galeriaProductos } from "../../../lib/galeria";
+import { GaleriaImagenes } from "./GaleriaImagenes";
 import { BotonProducto } from "../../tpv/venta/BotonProducto";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -51,51 +53,49 @@ export function AspectoArticulo({
   };
 
   return (
-    <Modal onCerrar={onCerrar} ancho="lg" className="overflow-hidden">
+    <Modal onCerrar={onCerrar} ancho="xl" className="overflow-hidden">
       <BarraVentana titulo="Aspecto en el TPV" onCerrar={onCerrar} />
 
-      <div className="flex gap-4 p-4">
-        {/* ── Muestra ── */}
-        <div className="flex w-45 flex-none flex-col gap-2">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Así se verá</p>
-          <div className="rounded-[6px] border border-line bg-background p-2.5">
-            <BotonProducto comoPrevia nombre={nombre || "Sin nombre"} precio={precio}
-              color={color ?? colorFamilia} foto={foto} icono={icono} />
+      <div className="flex h-[68vh] gap-4 p-4">
+        {/* ── Controles (izquierda): muestra, foto propia, color e icono ── */}
+        <div className="no-scrollbar flex w-56 flex-none flex-col gap-3 overflow-y-auto">
+          <div>
+            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">Así se verá</p>
+            <div className="rounded-[6px] border border-line bg-background p-2.5">
+              <BotonProducto comoPrevia nombre={nombre || "Sin nombre"} precio={precio}
+                color={color ?? colorFamilia} foto={foto} icono={icono} />
+            </div>
           </div>
 
           <input ref={fichero} type="file" accept="image/*" className="hidden"
             onChange={(e) => { void elegirFoto(e.target.files?.[0]); e.target.value = ""; }} />
           <button type="button" onClick={() => fichero.current?.click()}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-[.98]">
-            <Camera size={15} /> {foto ? "Cambiar foto" : "Subir foto"}
+            className="flex min-h-10 items-center justify-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-[.98]">
+            <Camera size={15} /> {foto ? "Cambiar foto" : "Subir una propia"}
           </button>
           {foto && (
             <button type="button" onClick={() => onCambiar("foto", undefined)}
-              className="flex min-h-10 items-center justify-center gap-2 rounded-[5px] border border-line px-3 text-[12.5px] font-medium text-muted transition-transform active:scale-[.98]">
+              className="flex min-h-9 items-center justify-center gap-2 rounded-[5px] border border-line px-3 text-[12px] font-medium text-muted transition-transform active:scale-[.98]">
               <Trash2 size={14} /> Quitar foto
             </button>
           )}
           {error && <p className="text-[12px] font-medium leading-snug text-rose">{error}</p>}
-        </div>
 
-        {/* ── Color e icono ── */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Color del botón</p>
-            <div className="flex flex-wrap gap-2">
-              {/* Heredar es la opción por defecto y va la PRIMERA: cambiar el color
-                  de la familia debe seguir arrastrando a sus artículos. */}
+            <div className="flex flex-wrap gap-1.5">
+              {/* Heredar va la PRIMERA: cambiar el color de la familia arrastra a sus artículos. */}
               <button type="button" onClick={() => onCambiar("color", undefined)}
-                className={`flex min-h-11 items-center gap-2 rounded-[5px] border px-3 text-[12.5px] font-semibold transition-transform active:scale-95 ${
+                className={`flex min-h-9 w-full items-center gap-2 rounded-[5px] border px-3 text-[12px] font-semibold transition-transform active:scale-95 ${
                   color === undefined ? "border-brand-lit bg-accent-soft text-brand-lit" : "border-line text-paper/70"
                 }`}>
-                <span className="h-4.5 w-4.5 rounded-[3px]" style={{ background: colorFamilia }} />
+                <span className="h-4 w-4 rounded-[3px]" style={{ background: colorFamilia }} />
                 El de su familia
               </button>
               {PALETA.map((c) => (
                 <button key={c} type="button" onClick={() => onCambiar("color", c)}
                   aria-label={`Color ${c}`} aria-pressed={color === c}
-                  className={`h-11 w-11 rounded-[5px] border-2 transition-transform active:scale-90 ${
+                  className={`h-9 w-9 rounded-[5px] border-2 transition-transform active:scale-90 ${
                     color === c ? "border-paper" : "border-transparent"
                   }`}
                   style={{ background: c }} />
@@ -103,17 +103,17 @@ export function AspectoArticulo({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
               Icono {foto && <span className="normal-case text-muted/80">— tapado por la foto</span>}
             </p>
             <div className={`flex flex-wrap gap-1.5 ${foto ? "opacity-40" : ""}`}>
               <button type="button" onClick={() => onCambiar("icono", undefined)}
                 aria-label="Sin icono" aria-pressed={!icono}
-                className={`grid h-11 w-11 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
+                className={`grid h-9 w-9 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
                   icono ? "border-line text-muted" : "border-brand-lit bg-accent-soft text-brand-lit"
                 }`}>
-                <Ban size={17} />
+                <Ban size={16} />
               </button>
               {NOMBRES_ICONOS.map((n) => {
                 const Icono = ICONOS[n]!;
@@ -121,15 +121,21 @@ export function AspectoArticulo({
                 return (
                   <button key={n} type="button" onClick={() => onCambiar("icono", n)}
                     aria-label={n} aria-pressed={on}
-                    className={`grid h-11 w-11 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
+                    className={`grid h-9 w-9 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
                       on ? "border-brand-lit bg-accent-soft text-brand-lit" : "border-line text-paper/70"
                     }`}>
-                    <Icono size={19} />
+                    <Icono size={17} />
                   </button>
                 );
               })}
             </div>
           </div>
+        </div>
+
+        {/* ── Galería (derecha): elegir una de las fotos que trae la app ── */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+          <p className="flex-none text-[11px] font-medium uppercase tracking-wide text-muted">Elegir una foto de la galería</p>
+          <GaleriaImagenes fotos={galeriaProductos} actual={foto} onElegir={(ref) => onCambiar("foto", ref)} />
         </div>
       </div>
 
