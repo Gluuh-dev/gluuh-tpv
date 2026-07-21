@@ -26,9 +26,16 @@ import { Modal, BarraVentana, abrirTeclado, Desplazable } from "../../../ui";
  * Componente aparte porque este trío es el esqueleto del 90% de las pantallas de
  * Configuración; MarcoMantenimiento solo lo compone.
  */
-export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
+export function Pestanas({ pestanas, pestana, onPestana, funde = "panel" }: Readonly<{
   pestanas: readonly string[]; pestana: string; onPestana: (p: string) => void;
+  /**
+   * Con qué se funde la pestaña activa por abajo. `panel` = el cuerpo blanco (lo
+   * normal). `background` = otra fila de pestañas debajo (cuando hay subpestañas):
+   * así la pestaña «Ficha» no abre un hueco blanco sobre la fila de subpestañas.
+   */
+  funde?: "panel" | "background";
 }>) {
+  const abajo = funde === "panel" ? "border-b-panel" : "border-b-background";
   return (
     <div role="tablist" className="flex flex-none gap-0.5 border-b border-line bg-background px-3">
       {pestanas.map((p) => {
@@ -38,7 +45,7 @@ export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
             key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
             className={`-mb-px mt-1.5 flex min-h-11.5 items-center rounded-t-[6px] border px-5 text-[13.5px] transition-transform active:scale-[.98] ${
               on
-                ? "border-line border-b-panel bg-panel font-semibold text-paper shadow-[0_-2px_5px_rgba(0,0,0,.05)]"
+                ? `border-line ${abajo} bg-panel font-semibold text-paper shadow-[0_-2px_5px_rgba(0,0,0,.05)]`
                 : "border-transparent font-medium text-muted"
             }`}
           >
@@ -51,9 +58,10 @@ export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
 }
 
 /**
- * SUB-PESTAÑAS dentro de Ficha (Datos generales · Extras · Precios…). A
- * diferencia de las principales, la activa va **hundida** (`inset` shadow + relleno
- * de marca): parece una tecla pulsada. Se desplazan con ‹ › si no caben.
+ * SUB-PESTAÑAS dentro de Ficha (Datos generales · Extras · Precios…). Estilo
+ * **subrayado** sobre una banda (como Ágora/Glop): la activa lleva una línea de
+ * marca abajo, no es una carpeta. El cuerpo blanco va pegado justo debajo. Se
+ * desplazan con ‹ › si no caben.
  */
 export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<{
   subpestanas: readonly string[]; subpestana?: string; onSubpestana?: (s: string) => void;
@@ -76,17 +84,15 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
   }, [subpestanas]);
 
   return (
-    <div className="flex flex-none items-center gap-1 border-b border-line bg-panel px-2 py-1.5">
-      <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto">
+    <div className="flex flex-none items-center border-b border-line bg-background px-2">
+      <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
         {subpestanas.map((s) => {
           const on = s === subpestana;
           return (
             <button
               key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
-              className={`flex min-h-10 flex-none items-center whitespace-nowrap rounded-[6px] border px-3.5 text-[11px] font-semibold uppercase tracking-wide transition-transform active:scale-[.97] ${
-                on
-                  ? "border-brand-lit/40 bg-accent-soft text-brand-lit shadow-[inset_0_2px_4px_rgba(0,0,0,.16)]"
-                  : "border-transparent text-muted"
+              className={`-mb-px flex min-h-10 flex-none items-center whitespace-nowrap border-b-2 px-4 text-[11px] font-semibold uppercase tracking-wide transition-transform active:scale-[.98] ${
+                on ? "border-brand-lit text-paper" : "border-transparent text-muted"
               }`}
             >
               {s}
@@ -94,13 +100,13 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
           );
         })}
       </div>
-      <div className={`flex-none gap-1 ${desborda ? "flex" : "hidden"}`}>
+      <div className={`flex-none gap-1 py-1 ${desborda ? "flex" : "hidden"}`}>
         <button type="button" aria-label="Pestaña anterior" onClick={() => desplazar(-1)}
-          className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
+          className="grid h-9 w-9 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
           <ChevronLeft size={16} strokeWidth={2.6} />
         </button>
         <button type="button" aria-label="Pestaña siguiente" onClick={() => desplazar(1)}
-          className="grid h-9.5 w-9.5 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
+          className="grid h-9 w-9 place-items-center rounded-[5px] border border-line text-muted transition-transform active:scale-95">
           <ChevronRight size={16} strokeWidth={2.6} />
         </button>
       </div>
@@ -128,22 +134,25 @@ export function MarcoMantenimiento({
    */
   pegado?: boolean;
 }>) {
+  const haySub = !!subpestanas && subpestanas.length > 0;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Pestanas pestanas={pestanas} pestana={pestana} onPestana={onPestana} />
+      <Pestanas pestanas={pestanas} pestana={pestana} onPestana={onPestana}
+        funde={haySub ? "background" : "panel"} />
 
-      {subpestanas && subpestanas.length > 0 && (
+      {haySub && (
         <SubPestanas subpestanas={subpestanas} subpestana={subpestana} onSubpestana={onSubpestana} />
       )}
 
       {/* ── Cuerpo: toma toda la altura que quede entre pestañas y barra ── */}
-      {/* `pegado`: sin margen y SIN `border-t` — la línea de arriba ya la pone la
-          fila de pestañas (`border-b`), y la pestaña activa la tapa con su
-          `border-b-panel`. Un `border-t` aquí volvía a dibujarla y CORTABA la
-          card justo bajo la pestaña. `min-w-0` evita que una tabla ancha empuje
-          el layout. */}
+      {/* `pegado`: cuerpo BLANCO a ras de la pestaña activa, sin margen ni
+          `border-t` — la línea de arriba ya la pone la fila de pestañas
+          (`border-b`) y la pestaña/subpestaña activa la tapa con su
+          `border-b-panel`. Sin esto se veía una franja de fondo (el «corte») entre
+          la pestaña y la tarjeta. `min-w-0` evita que una tabla ancha empuje el
+          layout. */}
       <div className={pegado
-        ? "flex min-h-0 min-w-0 flex-1 flex-col *:rounded-none *:border-x-0 *:border-t-0"
+        ? "flex min-h-0 min-w-0 flex-1 flex-col bg-panel *:rounded-none *:border-x-0 *:border-t-0"
         : "flex min-h-0 flex-1 flex-col gap-2.5 p-3"}>
         {children}
       </div>

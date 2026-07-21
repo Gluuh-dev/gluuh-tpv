@@ -176,7 +176,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
         onPestana={irPestana}
         subpestanas={pestana === "Ficha" ? SUBS : undefined}
         subpestana={sub} onSubpestana={(s) => setSub(s as Sub)}
-        pie={pie} pegado={pestana === "Lista"}
+        pie={pie} pegado
       >
         {pestana === "Lista" && (
           <Caja crecer>
