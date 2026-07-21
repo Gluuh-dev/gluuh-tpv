@@ -274,6 +274,22 @@ export async function subirFotoArticulo(idArticulo: string, datos: Blob): Promis
   return subirImagen(`productos/${idArticulo}-${Date.now()}.jpg`, datos);
 }
 
+/**
+ * Asigna la foto (referencia de galería) a varios artículos de golpe, sin tocar
+ * formatos ni categorías: solo un PATCH de `foto_url` por fila. Para el
+ * "Auto-asignar fotos" de la Lista. PostgREST no hace PATCH con un valor
+ * distinto por fila en una sola llamada, así que va fila a fila; en tandas para
+ * no soltar cientos de peticiones a la vez.
+ */
+export async function asignarFotosArticulos(asignaciones: { id: string; foto: string }[]): Promise<void> {
+  const updated_at = new Date().toISOString();
+  const TANDA = 8;
+  for (let i = 0; i < asignaciones.length; i += TANDA) {
+    await Promise.all(asignaciones.slice(i, i + TANDA).map(({ id, foto }) =>
+      escribir(`product?id=eq.${id}`, "PATCH", { foto_url: foto, updated_at })));
+  }
+}
+
 // ── TARIFAS (0131) ──────────────────────────────────────────────────────────
 // El precio por sala vive AQUÍ, no en el formato: la tarifa es del artículo, y
 // la sala elige tarifa (`room.tarifa_id`). Si una tarifa no dice nada de un

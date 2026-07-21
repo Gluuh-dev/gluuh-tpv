@@ -3,7 +3,7 @@ import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../..
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer, FileDown,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer, FileDown, Images,
 } from "lucide-react";
 import { Modal, BarraVentana, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -11,7 +11,9 @@ import { BotonProducto } from "../../tpv/venta/BotonProducto";
 import { AspectoArticulo } from "./AspectoArticulo";
 import {
   cargarCatalogo, guardarArticulo, borrarArticulo, crearFamiliaEnNodo, subirFotoArticulo,
+  asignarFotosArticulos,
 } from "./catalogo";
+import { galeriaProductos, refDeFoto } from "../../../lib/galeria";
 import { duplicarArticulo } from "./duplicar";
 import { exportarTablaPdf, type ColumnaPdf } from "./exportar";
 import { registrarEvento } from "../../../lib/trazabilidad";
@@ -549,6 +551,45 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   };
 
   /**
+   * Auto-asigna a cada artículo SIN foto la de la galería cuyo nombre de fichero
+   * coincide con el del artículo (mismo slug). Solo rellena huecos: nunca pisa
+   * una foto ya elegida a mano. Coincidencia EXACTA por slug para no meter la
+   * foto de otro plato parecido.
+   */
+  const autoAsignarFotos = () => {
+    if (!real) { notificar("Conéctate al nodo para asignar fotos."); return; }
+    if (guardando) return;
+    const slug = (s: string) =>
+      s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const porSlug = new Map(galeriaProductos.map((f) => [f.nombre, refDeFoto(f)]));
+    const asignaciones: { id: string; foto: string }[] = [];
+    for (const a of articulos) {
+      if (a.foto) continue;
+      const ref = porSlug.get(slug(a.nombre));
+      if (ref) asignaciones.push({ id: a.id, foto: ref });
+    }
+    if (asignaciones.length === 0) { notificar("No he encontrado ninguna foto que coincida por nombre."); return; }
+    const mapa = new Map(asignaciones.map((x) => [x.id, x.foto]));
+    setArticulos((as) => as.map((a) => (mapa.has(a.id) ? { ...a, foto: mapa.get(a.id)! } : a)));
+    setGuardando(true);
+    void (async () => {
+      try {
+        await asignarFotosArticulos(asignaciones);
+        void registrarEvento({
+          entidad: "product", accion: "modificar", entidadId: "auto-fotos",
+          resumen: `Auto-asignadas ${asignaciones.length} fotos por nombre`,
+          datos: asignaciones,
+        });
+        notificar(`${asignaciones.length} ${asignaciones.length === 1 ? "foto asignada" : "fotos asignadas"} por nombre.`);
+      } catch (e) {
+        notificar(`No se han podido guardar las fotos: ${mensaje(e)}`);
+      } finally {
+        setGuardando(false);
+      }
+    })();
+  };
+
+  /**
    * Duplica lo marcado en la Lista y, si no hay nada marcado, el artículo que
    * tienes delante — que es como funciona en Glop y evita el botón muerto de
    * "duplicar" mientras miras una ficha.
@@ -785,6 +826,11 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                 )}
               </div>
               <span className="flex-1" />
+              {/* Auto-asignar fotos de la galería por nombre a los que no tienen. */}
+              <button type="button" onClick={autoAsignarFotos} disabled={!real || guardando || articulos.length === 0}
+                className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-40">
+                <Images size={14} /> Auto-asignar fotos
+              </button>
               {/* Exportar a PDF: los MARCADOS (o, si no hay, todo lo que se ve). */}
               <button type="button" onClick={exportar} disabled={articulos.length === 0}
                 className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40">
