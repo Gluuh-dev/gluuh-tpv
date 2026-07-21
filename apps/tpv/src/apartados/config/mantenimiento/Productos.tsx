@@ -557,7 +557,6 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
    * foto de otro plato parecido.
    */
   const autoAsignarFotos = () => {
-    if (!real) { notificar("Conéctate al nodo para asignar fotos."); return; }
     if (guardando) return;
     const slug = (s: string) =>
       s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -571,6 +570,8 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     if (asignaciones.length === 0) { notificar("No he encontrado ninguna foto que coincida por nombre."); return; }
     const mapa = new Map(asignaciones.map((x) => [x.id, x.foto]));
     setArticulos((as) => as.map((a) => (mapa.has(a.id) ? { ...a, foto: mapa.get(a.id)! } : a)));
+    // Sin nodo (demo): se ve en pantalla pero no hay dónde guardarlo. Se dice.
+    if (!real) { notificar(`${asignaciones.length} fotos asignadas (demo: sin nodo no se guardan).`); return; }
     setGuardando(true);
     void (async () => {
       try {
@@ -1249,7 +1250,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
           colorFamilia={colorDeFamilia(art.familia)}
           foto={art.foto} color={art.color}
           onCambiar={(campo, valor) => set(campo, valor)}
-          onAutoAsignar={real ? autoAsignarFotos : undefined} asignando={guardando}
+          onAutoAsignar={autoAsignarFotos} asignando={guardando}
           onCerrar={cerrarVentana}
         />
       )}
