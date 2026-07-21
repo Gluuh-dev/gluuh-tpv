@@ -36,10 +36,10 @@ export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
         return (
           <button
             key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
-            className={`-mb-px flex min-h-12 items-center rounded-t-[12px] px-6 text-[14.5px] transition-all active:scale-[.98] ${
+            className={`-mb-px flex min-h-12 items-center rounded-t-[12px] border px-6 text-[14.5px] transition-all active:scale-[.98] ${
               on
-                ? "bg-panel font-semibold text-paper shadow-[0_-2px_6px_rgba(0,0,0,.05)]"
-                : "bg-panel-2 font-medium text-muted"
+                ? "border-line border-b-panel bg-panel font-semibold text-paper shadow-[0_-2px_6px_rgba(0,0,0,.04)]"
+                : "border-line/60 bg-panel-2 font-medium text-muted"
             }`}
           >
             {p}
@@ -77,17 +77,17 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
   }, [subpestanas]);
 
   return (
-    <div className="flex flex-none items-end bg-panel px-3 pt-2">
+    <div className="flex flex-none items-end border-b border-line bg-panel px-3 pt-2">
       <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-end gap-1 overflow-x-auto">
         {subpestanas.map((s) => {
           const on = s === subpestana;
           return (
             <button
               key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
-              className={`-mb-px flex min-h-10 flex-none items-center whitespace-nowrap rounded-t-[10px] px-5 text-[12.5px] transition-all active:scale-[.98] ${
+              className={`-mb-px flex min-h-10 flex-none items-center whitespace-nowrap rounded-t-[10px] border px-5 text-[12.5px] transition-all active:scale-[.98] ${
                 on
-                  ? "bg-panel font-bold text-paper shadow-[0_-1px_4px_rgba(0,0,0,.05)]"
-                  : "bg-panel-2 font-medium text-muted"
+                  ? "border-line border-b-panel bg-panel font-bold text-paper"
+                  : "border-line/60 bg-panel-2 font-medium text-muted"
               }`}
             >
               {s}
@@ -134,11 +134,12 @@ export function MarcoMantenimiento({
     <div className="flex min-h-0 flex-1 flex-col">
       <Pestanas pestanas={pestanas} pestana={pestana} onPestana={onPestana} />
 
-      {/* ── Cuerpo: una CAJA BLANCA con la que se funde la pestaña (y la
-          subpestaña) activa. Las subpestañas viven DENTRO de la caja, arriba,
-          como las lengüetas de una carpeta. `min-w-0` evita que una tabla ancha
-          empuje el layout. */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel">
+      {/* ── Cuerpo: una CAJA BLANCA con borde con la que se funde la pestaña (y
+          la subpestaña) activa. La pestaña activa «abre» el borde superior de la
+          caja (`-mb-px` + `border-b-panel`). Las subpestañas viven DENTRO de la
+          caja, arriba, como las lengüetas de una carpeta. `min-w-0` evita que una
+          tabla ancha empuje el layout. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col border-x border-t border-line bg-panel">
         {haySub && (
           <SubPestanas subpestanas={subpestanas} subpestana={subpestana} onSubpestana={onSubpestana} />
         )}
