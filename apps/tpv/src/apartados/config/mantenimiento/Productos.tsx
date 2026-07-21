@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../../../lib/rutas";
 import {
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ChevronUp, ChevronDown,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
   Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer,
 } from "lucide-react";
@@ -177,6 +177,12 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     abrirArticulo(p === "Lista" ? undefined : refDeArticulo(articulos[idx]!));
   const [sub, setSub] = useState<Sub>("Datos generales");
   const [q, setQ] = useState("");
+  // Fila resaltada en la LISTA: pulsar una fila SOLO la marca (no entra a la
+  // ficha). Para verla/editarla se pulsa «Modificar» (como en Glop). Y el orden
+  // de la tabla, que se cambia pulsando la cabecera de una columna.
+  const [filaSel, setFilaSel] = useState<string | null>(null);
+  const [orden, setOrden] = useState<{ col: string; asc: boolean } | null>(null);
+  const filaRef = useRef<HTMLTableRowElement>(null);
   const [fmtSel, setFmtSel] = useState<string | null>(null);
   const [borrar, setBorrar] = useState(false);
   // Las ventanas CON CONTENIDO viven en la URL: así el Atrás las cierra, que es
@@ -256,6 +262,73 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     // `familias` entra porque el nombre de la familia se busca también.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articulos, q, familias]);
+
+  // Orden por la columna que se pulse (asc/desc). Sobre la lista YA filtrada.
+  const listaOrd = useMemo(() => {
+    if (!orden) return lista;
+    const val = (a: Articulo): string | number => {
+      const f = a.formatos[0];
+      switch (orden.col) {
+        case "codigo": return Number(a.codigo) || 0;
+        case "barras": return a.barras;
+        case "nombre": return norm(a.nombre);
+        case "familia": return norm(nombreDeFamilia(a.familia));
+        case "precio": return f?.precio ?? 0;
+        case "coste": return f?.coste ?? 0;
+        case "margen": return f ? margen(f, a.impuesto) : 0;
+        case "impuesto": return a.impuesto;
+        case "vendible": return a.visible ? 1 : 0;
+        case "stock": return a.parametros.controlaStock ? 1 : 0;
+        case "ecom": return a.parametros.eCommerce ? 1 : 0;
+        case "carta": return a.parametros.cartaDigital ? 1 : 0;
+        default: return 0;
+      }
+    };
+    return [...lista].sort((x, y) => {
+      const vx = val(x), vy = val(y);
+      const c = typeof vx === "number" && typeof vy === "number"
+        ? vx - vy : String(vx).localeCompare(String(vy));
+      return orden.asc ? c : -c;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lista, orden, familias]);
+
+  const ordenar = (col: string) =>
+    setOrden((o) => (o?.col === col ? { col, asc: !o.asc } : { col, asc: true }));
+
+  // El artículo sobre el que actúan Modificar/Eliminar/Duplicar en la Lista es la
+  // FILA marcada (o, en la ficha, el de la URL). Cae al primero visible.
+  const artAccion = (filaSel && articulos.find((a) => a.id === filaSel)) || art;
+  const idxEnLista = artAccion ? listaOrd.findIndex((a) => a.id === artAccion.id) : -1;
+  const seleccionar = (i: number) => {
+    const a = listaOrd[Math.max(0, Math.min(listaOrd.length - 1, i))];
+    if (a) setFilaSel(a.id);
+  };
+  /** Modificar desde la Lista: abre la ficha de la fila marcada y entra a editar. */
+  const abrirYModificar = () => {
+    if (!artAccion) return;
+    abrirArticulo(refDeArticulo(artAccion));
+    olvidarHistorial();
+    setBorrador(structuredClone(artAccion));
+  };
+
+  // Al mover la selección con las flechas, traer la fila a la vista (no hay barra).
+  useEffect(() => { filaRef.current?.scrollIntoView({ block: "nearest" }); }, [filaSel]);
+
+  /** Encabezado de columna ORDENABLE: pulsa para ordenar (asc/desc) por ella. */
+  const Enc = (col: string, label: string, cls = "") => {
+    const on = orden?.col === col;
+    const just = cls.includes("right") ? "justify-end" : cls.includes("center") ? "justify-center" : "";
+    return (
+      <th className={cls}>
+        <button type="button" onClick={() => ordenar(col)}
+          className={`inline-flex w-full items-center gap-1 ${just}`}>
+          <span>{label}</span>
+          <span className={`text-[8px] leading-none ${on ? "text-brand-lit" : "text-transparent"}`}>{on && orden.asc ? "▲" : "▼"}</span>
+        </button>
+      </th>
+    );
+  };
 
   // Un solo temporizador vivo: si no, el de un aviso anterior borraba el nuevo
   // antes de tiempo (guardar dos veces seguidas y el segundo "OK" no se leía).
@@ -414,7 +487,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const cancelar = () => { setBorrador(null); setNuevo(false); olvidarHistorial(); notificar("Cambios descartados."); };
 
   const eliminar = () => {
-    const victima = articulos[idx];
+    const victima = artAccion;
     setBorrar(false);
     if (!victima) return;
     const seguir = () => {
@@ -435,7 +508,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
    */
   const duplicarMarcados = () => {
     const marcadosAhora = articulos.filter((a) => marcados.has(a.id));
-    const origen = marcadosAhora.length > 0 ? marcadosAhora : (art ? [art] : []);
+    const origen = marcadosAhora.length > 0 ? marcadosAhora : (artAccion ? [artAccion] : []);
     if (origen.length === 0 || guardando) return;
     setGuardando(true);
     void (async () => {
@@ -595,7 +668,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         <BotonPie Icono={Copy} onClick={duplicarMarcados} disabled={guardando || articulos.length === 0}>
           {marcados.size > 1 ? `Duplicar (${marcados.size})` : "Duplicar"}
         </BotonPie>
-        <BotonPie Icono={Pencil} onClick={modificar} disabled={articulos.length === 0}>Modificar</BotonPie>
+        <BotonPie Icono={Pencil} onClick={abrirYModificar} disabled={articulos.length === 0}>Modificar</BotonPie>
         <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={articulos.length === 0}>Eliminar</BotonPie>
         {finComun}
         <SepPie />
@@ -636,51 +709,79 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         {pestana === "Lista" && (
           <Caja crecer>
             <div className="flex flex-none items-center gap-2 border-b border-line p-2.5">
-              <div className="relative min-w-0 flex-1">
-                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              {/* Buscador más chico, con «✕» para limpiar. */}
+              <div className="relative w-full max-w-md">
+                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                 <input value={q} onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar por descripción, código de barras o familia…"
-                  className={claseEntrada(false, "w-full pl-9.5")} />
+                  placeholder="Buscar descripción, código o familia…"
+                  className={claseEntrada(false, "h-10 w-full pl-9 pr-9 text-[13px]")} />
+                {q && (
+                  <button type="button" onClick={() => setQ("")} aria-label="Limpiar búsqueda"
+                    className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted transition-transform active:scale-90">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <span className="flex-1" />
+              {/* Sin barras de scroll: para moverse por la tabla, flechas ↑/↓ que
+                  mueven la fila marcada y la traen a la vista. */}
+              <div className="flex flex-none items-center gap-1">
+                <button type="button" onClick={() => seleccionar(idxEnLista - 1)} disabled={idxEnLista <= 0}
+                  aria-label="Fila anterior"
+                  className="grid h-10 w-10 place-items-center rounded-[6px] border border-line bg-panel text-muted transition-transform active:scale-95 disabled:opacity-35">
+                  <ChevronUp size={18} strokeWidth={2.4} />
+                </button>
+                <button type="button" onClick={() => seleccionar(idxEnLista + 1)}
+                  disabled={idxEnLista < 0 || idxEnLista >= listaOrd.length - 1}
+                  aria-label="Fila siguiente"
+                  className="grid h-10 w-10 place-items-center rounded-[6px] border border-line bg-panel text-muted transition-transform active:scale-95 disabled:opacity-35">
+                  <ChevronDown size={18} strokeWidth={2.4} />
+                </button>
               </div>
             </div>
             <Desplazable eje="ambos">
-              <table className="w-full min-w-[880px] border-collapse">
+              <table className="w-full min-w-220 border-collapse">
                 <thead>
-                  <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70">
+                  <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:border-b [&>th]:border-r [&>th]:border-line [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70 [&>th:last-child]:border-r-0">
                     <th className="w-11 text-center!">
                       {/* Marcar todo lo que se está VIENDO (lo filtrado), no los
-                          1.200 del bar: nadie quiere duplicar la carta entera
-                          por pulsar una casilla. */}
+                          1.200 del bar: nadie quiere duplicar la carta entera. */}
                       <input type="checkbox" aria-label="Marcar todo lo que se ve"
-                        checked={lista.length > 0 && lista.every((a) => marcados.has(a.id))}
-                        onChange={(e) => setMarcados(e.target.checked ? new Set(lista.map((a) => a.id)) : new Set())}
+                        checked={listaOrd.length > 0 && listaOrd.every((a) => marcados.has(a.id))}
+                        onChange={(e) => setMarcados(e.target.checked ? new Set(listaOrd.map((a) => a.id)) : new Set())}
                         className="h-4.5 w-4.5 accent-(--brand)" />
                     </th>
-                    <th className="w-20">Código</th>
-                    <th className="w-34">C. barras</th>
-                    <th>Descripción</th><th>Familia</th>
-                    <th className="text-right!">Precio</th>
-                    <th className="text-right!">Coste</th><th className="text-right!">Margen</th>
-                    <th className="text-center!">Imp.</th>
-                    {/* Las cuatro casillas de Glop. Aquí se MIRAN, no se tocan: se
-                        cambian en la ficha, que es donde se ve qué hace cada una. */}
-                    <th className="text-center!">Vendible</th>
-                    <th className="text-center!">Stock</th>
-                    <th className="text-center!">Ecom</th>
-                    <th className="text-center!">Carta QR</th>
+                    {Enc("codigo", "Código", "w-20")}
+                    {Enc("barras", "C. barras", "w-34")}
+                    {Enc("nombre", "Descripción")}
+                    {Enc("familia", "Familia")}
+                    {Enc("precio", "Precio", "text-right!")}
+                    {Enc("coste", "Coste", "text-right!")}
+                    {Enc("margen", "Margen", "text-right!")}
+                    {Enc("impuesto", "Imp.", "text-center!")}
+                    {/* Las cuatro casillas de Glop. Aquí se MIRAN, no se tocan. */}
+                    {Enc("vendible", "Vendible", "text-center!")}
+                    {Enc("stock", "Stock", "text-center!")}
+                    {Enc("ecom", "Ecom", "text-center!")}
+                    {Enc("carta", "Carta QR", "text-center!")}
                   </tr>
                 </thead>
-                <tbody>
-                  {lista.map((a) => {
+                {/* Divisorias entre columnas y filas de cebra (una sí, otra no). */}
+                <tbody className="[&>tr>td]:border-r [&>tr>td]:border-line [&>tr>td:last-child]:border-r-0">
+                  {listaOrd.map((a) => {
                     const f = a.formatos[0];
                     const m = f ? margen(f, a.impuesto) : 0;
-                    const sel = a.id === art.id;
+                    const sel = a.id === artAccion?.id;
                     return (
-                      <tr key={a.id} aria-selected={sel}
-                        onClick={() => { abrirArticulo(refDeArticulo(a)); setFmtSel(null); }}
-                        className={`cursor-pointer border-b border-line text-[13.5px] ${sel ? "bg-accent-soft" : ""}`}>
-                        {/* `stopPropagation`: la fila entera navega a la ficha, y
-                            marcar la casilla no debe llevarte a otra pantalla. */}
+                      // Pulsar una fila SOLO la marca (no entra a la ficha). Doble
+                      // clic sí la abre, como en Glop.
+                      <tr key={a.id} ref={sel ? filaRef : undefined} aria-selected={sel}
+                        onClick={() => { setFilaSel(a.id); setFmtSel(null); }}
+                        onDoubleClick={() => abrirArticulo(refDeArticulo(a))}
+                        className={`cursor-pointer border-b border-line text-[13.5px] ${
+                          sel ? "bg-accent-soft" : "even:bg-paper/4"
+                        }`}>
+                        {/* `stopPropagation`: marcar la casilla no cambia la fila. */}
                         <td className="px-2.5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={marcados.has(a.id)} onChange={() => marcar(a.id)}
                             aria-label={`Marcar ${a.nombre}`}
@@ -705,7 +806,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                       </tr>
                     );
                   })}
-                  {lista.length === 0 && (
+                  {listaOrd.length === 0 && (
                     <tr><td colSpan={14} className="px-4 py-8 text-center text-sm text-muted">Ningún artículo se llama «{q.trim()}».</td></tr>
                   )}
                 </tbody>
@@ -1099,10 +1200,10 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
       {borrar && (
         <Modal onCerrar={() => setBorrar(false)} ancho="sm">
-          <CabeceraModal Icono={MinusCircle} titulo="Eliminar artículo" subtitulo={art.nombre} onCerrar={() => setBorrar(false)} />
+          <CabeceraModal Icono={MinusCircle} titulo="Eliminar artículo" subtitulo={artAccion?.nombre} onCerrar={() => setBorrar(false)} />
           <div className="p-4">
             <p className="text-[14px] leading-relaxed text-paper/80">
-              Se borra <b>{art.nombre}</b> con sus {art.formatos.length} formatos. Los tickets ya
+              Se borra <b>{artAccion?.nombre}</b> con sus {artAccion?.formatos.length} formatos. Los tickets ya
               cobrados no cambian.
             </p>
             <div className="mt-4 flex gap-2">
