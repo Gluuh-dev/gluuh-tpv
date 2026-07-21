@@ -24,6 +24,14 @@ const proxy = Object.fromEntries(
 export default defineConfig({
   base: "/",
   plugins: [react(), tailwindcss()],
-  build: { outDir: "dist", sourcemap: true },
+  build: {
+    outDir: "dist", sourcemap: true,
+    // Las fotos del catálogo (webp) son cientos y casi todas < 4 KB: con el inline
+    // por defecto acabarían en base64 DENTRO del JS, inflándolo y sin poder
+    // cachearlas por separado. Se fuerzan a fichero para que el navegador las pida
+    // on-demand (solo las que se ven) y las guarde en caché. El resto de assets
+    // pequeños (iconos sueltos) mantienen el inline por defecto de 4 KB.
+    assetsInlineLimit: (ruta) => (ruta.includes("/catalogo/") ? false : undefined),
+  },
   server: { port: 3120, proxy },
 });

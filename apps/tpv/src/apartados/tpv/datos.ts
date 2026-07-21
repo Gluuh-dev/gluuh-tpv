@@ -1,5 +1,6 @@
 // Datos DEMO de la operativa (salas, mesas, catálogo). Se reemplazan por los del
 // nodo (catalogo-store + jornada) al cablear; los TIPOS son los que se conservan.
+import { fotoProducto, fotoCategoria, POR_CATEGORIA } from "./imagenes";
 
 export type EstadoMesa = "LIBRE" | "OCUPADA" | "POR_COBRAR";
 
@@ -54,7 +55,7 @@ export const SALAS_DEMO: Sala[] = [
 // ── Catálogo demo (para la pantalla de venta) ────────────────────────────────
 // Colores por familia como en el TPV real: azul bebidas, rojo comida, morado
 // dulces, gris menús. "Populares" es una familia destacada (favoritos).
-export interface Categoria { id: string; nombre: string; color: string }
+export interface Categoria { id: string; nombre: string; color: string; foto?: string }
 export interface Producto {
   id: string; nombre: string; precio: number; categoria: string;
   // Aspecto del tile. Los tres opcionales: sin ellos el botón sale como siempre
@@ -65,7 +66,10 @@ export interface Producto {
 
 const AZUL = "#2f7fd0", ROJO = "#c0553f", MORADO = "#7c3d9b", GRIS = "#3b414d", VERDE = "#2ea06a";
 
-export const CATEGORIAS_DEMO: Categoria[] = [
+// La `foto` de cada categoría/producto la resuelve el índice de imágenes por su
+// nombre (ver imagenes.ts): no se escribe a mano. Si no hay imagen con ese slug,
+// queda undefined y el tile cae al color de la familia — como debe.
+const CATEGORIAS_BASE: Omit<Categoria, "foto">[] = [
   { id: "populares", nombre: "Populares", color: VERDE },
   { id: "menus", nombre: "Menús", color: GRIS },
   { id: "cervezas", nombre: "Cervezas", color: AZUL },
@@ -80,6 +84,42 @@ export const CATEGORIAS_DEMO: Categoria[] = [
   { id: "postres", nombre: "Postres", color: MORADO },
   { id: "bolleria", nombre: "Bollería", color: MORADO },
 ];
+
+// Categorías GENERADAS: llenan el catálogo con las carpetas de imágenes que no
+// tenía el demo escrito a mano. Cada una toma su carpeta (`img`), su color de
+// familia y un precio base (demo; se varía un poco por artículo para que no sean
+// todos iguales). Al cablear el nodo esto se reemplaza por el catálogo real.
+const GENERADAS: { id: string; nombre: string; color: string; img: string; precio: number }[] = [
+  { id: "arroces", nombre: "Arroces", color: ROJO, img: "arroces", precio: 13 },
+  { id: "carnes", nombre: "Carnes", color: ROJO, img: "carnes", precio: 14 },
+  { id: "pescados", nombre: "Pescados y mariscos", color: ROJO, img: "pescados", precio: 15 },
+  { id: "ensaladas", nombre: "Ensaladas", color: VERDE, img: "ensaladas", precio: 8.5 },
+  { id: "tostadas", nombre: "Tostadas y desayunos", color: MORADO, img: "tostadas", precio: 3.8 },
+  { id: "helados", nombre: "Helados", color: MORADO, img: "helados", precio: 3.8 },
+  { id: "zumos", nombre: "Zumos y batidos", color: AZUL, img: "zumos", precio: 3.2 },
+  { id: "licores", nombre: "Licores y destilados", color: AZUL, img: "licores", precio: 5.5 },
+];
+
+const CATEGORIAS_GEN: Categoria[] = GENERADAS.map((g) => ({
+  id: g.id, nombre: g.nombre, color: g.color, foto: fotoCategoria(g.id),
+}));
+
+export const CATEGORIAS_DEMO: Categoria[] = [
+  ...CATEGORIAS_BASE.map((c) => ({ ...c, foto: fotoCategoria(c.id) })),
+  ...CATEGORIAS_GEN,
+];
+
+// Un producto por cada foto de la carpeta, con precio base ±10 % (determinista:
+// varía por posición, sin Math.random, para que la pantalla no cambie sola).
+const PRODUCTOS_GEN: Producto[] = GENERADAS.flatMap((g) =>
+  (POR_CATEGORIA.get(g.img) ?? []).map((f, i) => ({
+    id: `${g.id}-${f.slug}`,
+    nombre: f.nombre,
+    precio: Math.round((g.precio * (0.9 + ((i * 7) % 20) / 100)) * 20) / 20,   // redondeo a 0,05 €
+    categoria: g.id,
+    foto: f.url,
+  })),
+);
 
 export function colorCategoria(id: string): string {
   return CATEGORIAS_DEMO.find((c) => c.id === id)?.color ?? "#64748b";
@@ -127,7 +167,7 @@ export const CLIENTES_DEMO: ClienteDemo[] = [
 // Al cablear el nodo esto vendrá de la config fiscal del local; la forma no cambia.
 export const TIPOS_DOC_DEMO = ["Factura simplificada", "Factura completa"] as const;
 
-export const PRODUCTOS_DEMO: Producto[] = [
+const PRODUCTOS_BASE: Producto[] = [
   // Populares (favoritos)
   { id: "pop1", nombre: "Alhambra 1925", precio: 1.4, categoria: "populares" },
   { id: "pop2", nombre: "Café con leche", precio: 1.5, categoria: "populares" },
@@ -189,4 +229,10 @@ export const PRODUCTOS_DEMO: Producto[] = [
   // Bollería
   { id: "bo1", nombre: "Croissant", precio: 1.6, categoria: "bolleria" },
   { id: "bo2", nombre: "Napolitana", precio: 1.8, categoria: "bolleria" },
+];
+// Los productos escritos a mano reciben su foto por nombre; luego se suman los
+// generados desde las imágenes (categorías que el demo no cubría a mano).
+export const PRODUCTOS_DEMO: Producto[] = [
+  ...PRODUCTOS_BASE.map((p) => ({ ...p, foto: p.foto ?? fotoProducto(p.nombre) })),
+  ...PRODUCTOS_GEN,
 ];
