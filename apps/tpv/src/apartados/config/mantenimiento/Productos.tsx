@@ -3,7 +3,7 @@ import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../..
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
-  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer,
+  Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer, FileDown,
 } from "lucide-react";
 import { Modal, BarraVentana, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { eur } from "../../../lib/dinero";
@@ -13,6 +13,7 @@ import {
   cargarCatalogo, guardarArticulo, borrarArticulo, crearFamiliaEnNodo, subirFotoArticulo,
 } from "./catalogo";
 import { duplicarArticulo } from "./duplicar";
+import { exportarTablaPdf, type ColumnaPdf } from "./exportar";
 import { ExtrasArticulo } from "./ExtrasArticulo";
 import { StockArticulo } from "./StockArticulo";
 import { TarifasArticulo } from "./TarifasArticulo";
@@ -50,6 +51,18 @@ import {
 
 const SUBS = ["Datos generales", "Comentarios y extras", "Categorías", "Stock y compras", "Cocina y ticket", "Carta digital"] as const;
 type Sub = (typeof SUBS)[number];
+
+// Columnas del PDF de exportación (los pesos reparten el ancho de la hoja).
+const COLS_EXPORT: readonly ColumnaPdf[] = [
+  { clave: "codigo", titulo: "Código", ancho: 8 },
+  { clave: "barras", titulo: "C. barras", ancho: 14 },
+  { clave: "nombre", titulo: "Descripción", ancho: 30 },
+  { clave: "familia", titulo: "Familia", ancho: 16 },
+  { clave: "precio", titulo: "Precio", ancho: 9, alin: "der" },
+  { clave: "coste", titulo: "Coste", ancho: 9, alin: "der" },
+  { clave: "margen", titulo: "Margen", ancho: 8, alin: "der" },
+  { clave: "impuesto", titulo: "Imp.", ancho: 6, alin: "der" },
+];
 
 // «cafe» debe encontrar «Café»: fuera acentos y mayúsculas (igual que en Configuracion).
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -492,14 +505,44 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
     setBorrar(false);
     if (!victima) return;
     const seguir = () => {
+      // Si borro desde la LISTA, me quedo en ella: la fila desaparece y paso a
+      // marcar la vecina (la de abajo, o la de arriba si era la última). Solo en
+      // la ficha tiene sentido navegar al artículo anterior.
+      const i = listaOrd.findIndex((a) => a.id === victima.id);
       setArticulos((as) => as.filter((a) => a.id !== victima.id));
-      irA(idx > 0 ? idx - 1 : 0);
       setMarcados((m) => { const s = new Set(m); s.delete(victima.id); return s; });
+      if (pestana === "Lista") {
+        const vecina = listaOrd[i + 1] ?? listaOrd[i - 1];
+        setFilaSel(vecina ? vecina.id : null);
+      } else {
+        irA(idx > 0 ? idx - 1 : 0);
+      }
       notificar("Artículo eliminado.");
     };
     if (!real) { seguir(); return; }
     void borrarArticulo(victima.id).then(seguir)
       .catch((e: unknown) => notificar(`No se ha podido eliminar: ${mensaje(e)}`));
+  };
+
+  /** Exporta a PDF los artículos marcados (o, si no hay marcados, los que se ven). */
+  const exportar = () => {
+    const src = marcados.size > 0 ? articulos.filter((a) => marcados.has(a.id)) : listaOrd;
+    if (src.length === 0) return;
+    const filas = src.map((a) => {
+      const f = a.formatos[0];
+      const m = f ? margen(f, a.impuesto) : 0;
+      return {
+        codigo: a.codigo,
+        barras: a.barras || "",
+        nombre: a.nombre,
+        familia: nombreDeFamilia(a.familia),
+        precio: f ? eur(f.precio) : "—",
+        coste: f ? eur(f.coste) : "—",
+        margen: `${m.toFixed(0)} %`,
+        impuesto: `${a.impuesto} %`,
+      };
+    });
+    void exportarTablaPdf("Artículos", COLS_EXPORT, filas, `articulos-${new Date().toISOString().slice(0, 10)}`);
   };
 
   /**
@@ -527,6 +570,13 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         }
         setArticulos((as) => [...as, ...copias]);
         setMarcados(new Set());
+        // Duplicar UNA fila abre su copia directamente en edición (para ajustar
+        // el nombre/precio al momento, que es lo que se va a hacer siempre).
+        if (copias.length === 1 && copias[0]) {
+          abrirArticulo(refDeArticulo(copias[0]));
+          olvidarHistorial();
+          setBorrador(structuredClone(copias[0]));
+        }
         notificar(copias.length === 1 ? "Artículo duplicado." : `${copias.length} artículos duplicados.`);
       } catch (e: unknown) {
         notificar(`No se ha podido duplicar: ${mensaje(e)}`);
@@ -715,7 +765,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       >
         {pestana === "Lista" && (
           <Caja crecer>
-            <div className="flex flex-none items-center border-b border-line p-2.5">
+            <div className="flex flex-none items-center gap-2 border-b border-line p-2.5">
               {/* Buscador pequeño, con «✕» para limpiar. Moverse por las filas es
                   con las flechas del pie (Inicio/Anterior/Siguiente/Fin). */}
               <div className="relative w-full max-w-xs">
@@ -730,6 +780,11 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   </button>
                 )}
               </div>
+              {/* Exportar a PDF: los MARCADOS (o, si no hay, todo lo que se ve). */}
+              <button type="button" onClick={exportar} disabled={articulos.length === 0}
+                className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40">
+                <FileDown size={14} /> Exportar{marcados.size > 0 ? ` (${marcados.size})` : ""}
+              </button>
             </div>
             <Desplazable eje="ambos" pie={
               <span className="text-[11.5px] font-medium text-muted">
