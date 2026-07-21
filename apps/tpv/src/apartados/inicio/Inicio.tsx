@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, LogOut, LifeBuoy, Wifi, Sun, Moon, Lock, LogIn } from "lucide-react";
+import { ArrowRight, LogOut, LifeBuoy, Wifi, WifiOff, Sun, Moon, Lock, LogIn } from "lucide-react";
 import { ETIQUETA_ROL, type Apartado } from "../../lib/nav";
 import { useTema } from "../../lib/tema";
 import { Marca, Chip, Escudo, Fkey } from "../../ui";
@@ -44,6 +44,8 @@ function Tarjeta({
 interface Props {
   local: { nombre: string; terminal: string };
   turno: { mesasAbiertas: number; mesasTotal: number; ventas: string; comandas: number };
+  /** Sin terminal emparejado: lo de arriba son datos de ejemplo, no del nodo. */
+  demo: boolean;
   /** Quién está identificado en el terminal, o null (anónimo). */
   usuario: Usuario | null;
   /** ¿El rol actual puede abrir este apartado? (anónimo = sí, lleva al login). */
@@ -54,7 +56,7 @@ interface Props {
   onAyuda: () => void;
 }
 
-export function Inicio({ local, turno, usuario, permitido, onNavegar, onIdentificarse, onCerrarSesion, onAyuda }: Readonly<Props>) {
+export function Inicio({ local, turno, demo, usuario, permitido, onNavegar, onIdentificarse, onCerrarSesion, onAyuda }: Readonly<Props>) {
   const { oscuro, alternar } = useTema();
   const [hora, setHora] = useState(() => new Date());
   useEffect(() => {
@@ -81,7 +83,11 @@ export function Inicio({ local, turno, usuario, permitido, onNavegar, onIdentifi
           </div>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
-          <Chip dot><Wifi size={13} /> Node conectado</Chip>
+          {/* Estado REAL: emparejado (verde) vs demo (sin nodo). Antes decía
+              «Node conectado» siempre, aunque fuera demo — y despistaba. */}
+          {demo
+            ? <Chip><WifiOff size={13} /> Modo demo (sin emparejar)</Chip>
+            : <Chip dot><Wifi size={13} /> Node conectado</Chip>}
           <Chip><span className="text-[14px] font-semibold tracking-wide">{hhmm}</span></Chip>
           {/* Los avisos (impresora, stock…) ya no son un chip fijo que miente:
               una campana con lo que pasa de verdad, en un panel lateral. */}

@@ -124,6 +124,7 @@ export function App() {
       <Inicio
         local={inicio?.local ?? DEMO.local}
         turno={inicio?.turno ?? DEMO.turno}
+        demo={inicio === null}
         usuario={usuario}
         permitido={permitido}
         onNavegar={abrir}
