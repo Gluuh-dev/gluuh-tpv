@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut, Keyboard, Layers, Info, Camera,
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search, X, Copy, FileDown,
 } from "lucide-react";
 import { Modal, CabeceraModal, abrirTeclado, Desplazable } from "../../../ui";
 import { useRuta, navegar } from "../../../lib/rutas";
@@ -14,11 +14,23 @@ import {
   cargarFamilias, guardarFamilia, borrarFamilia, cargarGruposMayores, cargarCategorias,
   subirFotoClasificacion, type Familia, type GrupoMayor, type Categoria,
 } from "./clasificacion";
+import { exportarTablaPdf, type ColumnaPdf } from "./exportar";
+import { registrarEvento } from "../../../lib/trazabilidad";
 import { CATEGORIAS_DEMO } from "../../tpv/datos";
 
 // Las tres pestañas del patrón de Configuración; dentro de «Ficha», las subpestañas.
 const SUBS = ["General", "Categorías"] as const;
 type Sub = (typeof SUBS)[number];
+
+// Columnas del PDF de exportación de familias.
+const COLS_EXPORT: readonly ColumnaPdf[] = [
+  { clave: "nombre", titulo: "Familia", ancho: 34 },
+  { clave: "orden", titulo: "Orden venta", ancho: 12, alin: "der" },
+  { clave: "ordenFactura", titulo: "Orden factura", ancho: 13, alin: "der" },
+  { clave: "combinable", titulo: "Combinable", ancho: 12 },
+  { clave: "venta", titulo: "En venta", ancho: 10 },
+  { clave: "menus", titulo: "En menús", ancho: 10 },
+];
 
 // ────────────────────────────────────────────────────────────────────────────
 // FAMILIAS — el primer nivel de la carta (Bebidas, Cocina, Postres).
@@ -51,6 +63,12 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const [sub, setSub] = useState<Sub>("General");
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  // Selección en la LISTA (marcar sin abrir), orden por columna y marcados (para
+  // duplicar/exportar) — mismo patrón que Productos.
+  const [filaSel, setFilaSel] = useState<string | null>(null);
+  const [orden, setOrden] = useState<{ col: string; asc: boolean } | null>(null);
+  const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set());
+  const filaRef = useRef<HTMLTableRowElement>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -71,11 +89,56 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
   const fam = borrador ?? familias[Math.max(enUrl, 0)];
   const abrir = (id?: string) => navegar({ vista: "config", seccion: "familias", ...(id ? { id } : {}) }, !id);
 
-  // Recorrer registros en el mismo orden que la Lista (Inicio/Anterior/Siguiente/Fin).
-  const idxLista = fam ? lista.findIndex((f) => f.id === fam.id) : -1;
-  const irA = (i: number) => { const f = lista[i]; if (f) abrir(f.id); };
-  const primero = idxLista <= 0;
-  const ultimo = idxLista < 0 || idxLista >= lista.length - 1;
+  // Orden por la columna que se pulse (asc/desc), sobre la lista ya filtrada.
+  const listaOrd = useMemo(() => {
+    if (!orden) return lista;
+    const val = (f: Familia): string | number => {
+      switch (orden.col) {
+        case "nombre": return norm(f.nombre);
+        case "orden": return f.orden;
+        case "ordenFactura": return f.ordenImpresion;
+        case "combinable": return f.combinable ? 1 : 0;
+        case "venta": return f.mostrarVenta ? 1 : 0;
+        case "menus": return f.mostrarMenus ? 1 : 0;
+        default: return 0;
+      }
+    };
+    return [...lista].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      return orden.asc ? c : -c;
+    });
+  }, [lista, orden]);
+
+  const ordenar = (col: string) => setOrden((o) => (o?.col === col ? { col, asc: !o.asc } : { col, asc: true }));
+
+  // La familia sobre la que actúan las acciones de la Lista: la fila marcada (o,
+  // en la ficha, la de la URL). Cae a la primera visible.
+  const famAccion = (filaSel && familias.find((f) => f.id === filaSel)) || fam;
+  const idxEnLista = famAccion ? listaOrd.findIndex((f) => f.id === famAccion.id) : -1;
+  const seleccionar = (i: number) => { const f = listaOrd[Math.max(0, Math.min(listaOrd.length - 1, i))]; if (f) setFilaSel(f.id); };
+  // Recorrer registros abiertos en la ficha (Inicio/Anterior/Siguiente/Fin).
+  const idxLista = fam ? listaOrd.findIndex((f) => f.id === fam.id) : -1;
+  const irA = (i: number) => { const f = listaOrd[i]; if (f) abrir(f.id); };
+
+  const marcar = (id: string) => setMarcados((m) => { const s = new Set(m); if (!s.delete(id)) { s.add(id); } return s; });
+
+  // Al mover la selección con las flechas, traer la fila a la vista (no hay barra).
+  useEffect(() => { filaRef.current?.scrollIntoView({ block: "nearest" }); }, [filaSel]);
+
+  /** Cabecera de columna ORDENABLE. */
+  const Enc = (col: string, label: string, cls = "") => {
+    const on = orden?.col === col;
+    const just = cls.includes("right") ? "justify-end" : cls.includes("center") ? "justify-center" : "";
+    return (
+      <th className={cls}>
+        <button type="button" onClick={() => ordenar(col)} className={`inline-flex w-full items-center gap-1 ${just}`}>
+          <span>{label}</span>
+          <span className={`text-[8px] leading-none ${on ? "text-brand-lit" : "text-transparent"}`}>{on && orden.asc ? "▲" : "▼"}</span>
+        </button>
+      </th>
+    );
+  };
 
   const editando = borrador !== null;
   const ro = !editando;
@@ -104,6 +167,48 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
     });
   };
 
+  /** Modificar desde la Lista: abre la ficha de la fila marcada y entra a editar. */
+  const abrirYModificar = () => {
+    if (!famAccion) return;
+    abrir(famAccion.id);
+    setBorrador(structuredClone(famAccion));
+  };
+
+  /** Duplica la fila marcada y abre la copia directamente en edición. */
+  const duplicar = () => {
+    if (!famAccion || ocupado) return;
+    const copia: Familia = {
+      ...structuredClone(famAccion), id: crypto.randomUUID(),
+      nombre: `${famAccion.nombre} (copia)`, orden: familias.length + 1,
+    };
+    setOcupado(true);
+    (async () => {
+      try {
+        if (real) await guardarFamilia(copia);
+        setFamilias((fs) => [...fs, copia]);
+        void registrarEvento({ entidad: "family", accion: "duplicar", entidadId: copia.id, resumen: copia.nombre, datos: copia });
+        abrir(copia.id); setBorrador(structuredClone(copia)); setNuevo(false);
+        notificar(real ? "Familia duplicada." : "Duplicada solo en este terminal.");
+      } catch (e: unknown) { notificar(`No se ha podido duplicar: ${mensaje(e)}`); }
+      finally { setOcupado(false); }
+    })();
+  };
+
+  /** Exporta a PDF las familias marcadas (o, si no hay marcadas, las que se ven). */
+  const exportar = () => {
+    const src = marcados.size > 0 ? familias.filter((f) => marcados.has(f.id)) : listaOrd;
+    if (src.length === 0) return;
+    const filas = src.map((f) => ({
+      nombre: f.nombre,
+      orden: String(f.orden),
+      ordenFactura: String(f.ordenImpresion),
+      combinable: f.combinable ? "Sí" : "—",
+      venta: f.mostrarVenta ? "Sí" : "—",
+      menus: f.mostrarMenus ? "Sí" : "—",
+    }));
+    void exportarTablaPdf("Familias", COLS_EXPORT, filas, `familias-${new Date().toISOString().slice(0, 10)}`);
+  };
+
   const guardar = () => {
     if (!borrador || ocupado) return;
     if (!borrador.nombre.trim()) { notificar("La familia necesita un nombre."); return; }
@@ -119,6 +224,7 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           await guardarFamilia(listo);
         }
         setFamilias((fs) => nuevo ? [...fs, listo] : fs.map((f) => (f.id === listo.id ? listo : f)));
+        void registrarEvento({ entidad: "family", accion: nuevo ? "crear" : "modificar", entidadId: listo.id, resumen: listo.nombre, datos: listo });
         if (nuevo) abrir(listo.id);
         setBorrador(null); setNuevo(false);
         notificar(real ? "Familia guardada." : "Guardado solo en este terminal: sin emparejar, se pierde al recargar.");
@@ -129,10 +235,24 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
   const eliminar = () => {
     setBorrar(false);
-    if (!fam) return;
-    const seguir = () => { setFamilias((fs) => fs.filter((f) => f.id !== fam.id)); abrir(); notificar("Familia eliminada."); };
+    const victima = famAccion;
+    if (!victima) return;
+    const seguir = () => {
+      const i = listaOrd.findIndex((f) => f.id === victima.id);
+      setFamilias((fs) => fs.filter((f) => f.id !== victima.id));
+      setMarcados((m) => { const s = new Set(m); s.delete(victima.id); return s; });
+      void registrarEvento({ entidad: "family", accion: "eliminar", entidadId: victima.id, resumen: victima.nombre, datos: victima });
+      // Borrar desde la LISTA me deja EN la lista: la fila desaparece y marco la vecina.
+      if (pestana === "Lista") {
+        const vecina = listaOrd[i + 1] ?? listaOrd[i - 1];
+        setFilaSel(vecina ? vecina.id : null);
+      } else {
+        abrir();
+      }
+      notificar("Familia eliminada.");
+    };
     if (!real) { seguir(); return; }
-    borrarFamilia(fam.id).then(seguir).catch((e: unknown) => notificar(`No se ha podido eliminar: ${mensaje(e)}`));
+    borrarFamilia(victima.id).then(seguir).catch((e: unknown) => notificar(`No se ha podido eliminar: ${mensaje(e)}`));
   };
 
   const finComun = (
@@ -163,15 +283,39 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
         <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir}>Salir</BotonPie>
       </>
     );
+  } else if (pestana === "Lista") {
+    // En la Lista, las flechas mueven la FILA marcada (no navegan a la ficha).
+    const primero = idxEnLista <= 0;
+    const ultimo = idxEnLista < 0 || idxEnLista >= listaOrd.length - 1;
+    pie = (
+      <>
+        <BotonPie Icono={ChevronsLeft} onClick={() => seleccionar(0)} disabled={primero}>Inicio</BotonPie>
+        <BotonPie Icono={ChevronLeft} onClick={() => seleccionar(idxEnLista - 1)} disabled={primero}>Anterior</BotonPie>
+        <BotonPie Icono={ChevronRight} onClick={() => seleccionar(idxEnLista + 1)} disabled={ultimo}>Siguiente</BotonPie>
+        <BotonPie Icono={ChevronsRight} onClick={() => seleccionar(listaOrd.length - 1)} disabled={ultimo}>Fin</BotonPie>
+        <SepPie />
+        <BotonPie Icono={PlusCircle} tono="ok" onClick={crear}>Nueva</BotonPie>
+        <BotonPie Icono={Copy} onClick={duplicar} disabled={ocupado || !famAccion}>Duplicar</BotonPie>
+        <BotonPie Icono={Pencil} onClick={abrirYModificar} disabled={!famAccion}>Modificar</BotonPie>
+        <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={!famAccion}>Eliminar</BotonPie>
+        {finComun}
+        <SepPie />
+        <BotonPie Icono={LogOut} tono="neutro" onClick={onSalir}>Salir</BotonPie>
+      </>
+    );
   } else {
+    // En la ficha, las flechas RECORREN registros (Inicio/Anterior/Siguiente/Fin).
+    const primero = idxLista <= 0;
+    const ultimo = idxLista < 0 || idxLista >= listaOrd.length - 1;
     pie = (
       <>
         <BotonPie Icono={ChevronsLeft} onClick={() => irA(0)} disabled={primero}>Inicio</BotonPie>
         <BotonPie Icono={ChevronLeft} onClick={() => irA(idxLista - 1)} disabled={primero}>Anterior</BotonPie>
         <BotonPie Icono={ChevronRight} onClick={() => irA(idxLista + 1)} disabled={ultimo}>Siguiente</BotonPie>
-        <BotonPie Icono={ChevronsRight} onClick={() => irA(lista.length - 1)} disabled={ultimo}>Fin</BotonPie>
+        <BotonPie Icono={ChevronsRight} onClick={() => irA(listaOrd.length - 1)} disabled={ultimo}>Fin</BotonPie>
         <SepPie />
         <BotonPie Icono={PlusCircle} tono="ok" onClick={crear}>Nueva</BotonPie>
+        <BotonPie Icono={Copy} onClick={duplicar} disabled={ocupado || !fam}>Duplicar</BotonPie>
         <BotonPie Icono={Pencil} onClick={() => fam && setBorrador(structuredClone(fam))} disabled={!fam}>Modificar</BotonPie>
         <BotonPie Icono={MinusCircle} tono="no" onClick={() => setBorrar(true)} disabled={!fam}>Eliminar</BotonPie>
         {finComun}
@@ -193,34 +337,73 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
         {pestana === "Lista" && (
           <Caja crecer>
             <div className="flex flex-none items-center gap-2 border-b border-line p-2.5">
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar familia…"
-                className={claseEntrada(false, "w-full")} />
+              <div className="relative w-full max-w-xs">
+                <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar familia…"
+                  className="h-8 w-full rounded-[5px] border border-line bg-background pl-8 pr-8 text-[12.5px] font-medium text-paper outline-none transition-colors placeholder:text-muted focus:border-brand-lit" />
+                {q && (
+                  <button type="button" onClick={() => setQ("")} aria-label="Limpiar búsqueda"
+                    className="absolute right-1.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted transition-transform active:scale-90">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
               {!real && (
-                <span className="flex-none rounded-full border border-amber/40 bg-amber/10 px-3 py-1.5 text-[11.5px] font-bold text-amber">
-                  Ejemplo
-                </span>
+                <span className="flex-none rounded-full border border-amber/40 bg-amber/10 px-3 py-1.5 text-[11.5px] font-bold text-amber">Ejemplo</span>
               )}
+              <span className="flex-1" />
+              <button type="button" onClick={exportar} disabled={familias.length === 0}
+                className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40">
+                <FileDown size={14} /> Exportar{marcados.size > 0 ? ` (${marcados.size})` : ""}
+              </button>
             </div>
-            <Desplazable>
-              <table className="w-full border-collapse">
+            <Desplazable eje="ambos" pie={
+              <span className="text-[11.5px] font-medium text-muted">
+                {listaOrd.length} {listaOrd.length === 1 ? "familia" : "familias"}{q && ` · de ${familias.length}`}
+              </span>
+            }>
+              <table className="w-full min-w-140 border-collapse">
                 <thead>
-                  <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70">
-                    <th className="w-14 text-center!">Color</th><th>Nombre</th>
-                    <th className="w-24 text-right!">Orden</th><th className="w-28 text-center!">Combinable</th>
+                  <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-2 [&>th]:border-b [&>th]:border-r [&>th]:border-line [&>th]:bg-ink-2 [&>th]:px-2.5 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[10.5px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-paper/70 [&>th:last-child]:border-r-0">
+                    <th className="w-11 text-center!">
+                      <input type="checkbox" aria-label="Marcar todo lo que se ve"
+                        checked={listaOrd.length > 0 && listaOrd.every((f) => marcados.has(f.id))}
+                        onChange={(e) => setMarcados(e.target.checked ? new Set(listaOrd.map((f) => f.id)) : new Set())}
+                        className="h-4.5 w-4.5 accent-(--brand)" />
+                    </th>
+                    <th className="w-14 text-center!">Color</th>
+                    {Enc("nombre", "Nombre")}
+                    {Enc("orden", "Orden", "text-right!")}
+                    {Enc("ordenFactura", "O. factura", "text-right!")}
+                    {Enc("combinable", "Combinable", "text-center!")}
+                    {Enc("venta", "Venta", "text-center!")}
+                    {Enc("menus", "Menús", "text-center!")}
                   </tr>
                 </thead>
-                <tbody>
-                  {lista.map((f) => (
-                    <tr key={f.id} onClick={() => abrir(f.id)}
-                      className={`cursor-pointer border-b border-line text-[13.5px] ${f.id === fam?.id ? "bg-accent-soft" : ""}`}>
-                      <td className="px-2.5 py-2"><span className="mx-auto block h-5 w-5 rounded-[4px]" style={{ background: f.color }} /></td>
-                      <td className="px-2.5 py-2 font-semibold">{f.nombre}</td>
-                      <td className="px-2.5 py-2 text-right font-mono text-muted">{f.orden}</td>
-                      <td className="px-2.5 py-2 text-center text-[12px] text-muted">{f.combinable ? "Sí" : "—"}</td>
-                    </tr>
-                  ))}
-                  {lista.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">Ninguna familia.</td></tr>
+                <tbody className="[&>tr>td]:border-r [&>tr>td]:border-line [&>tr>td:last-child]:border-r-0">
+                  {listaOrd.map((f) => {
+                    const sel = f.id === famAccion?.id;
+                    return (
+                      // Clic = marcar (no abre); doble clic abre la ficha.
+                      <tr key={f.id} ref={sel ? filaRef : undefined} aria-selected={sel}
+                        onClick={() => setFilaSel(f.id)} onDoubleClick={() => abrir(f.id)}
+                        className={`cursor-pointer border-b border-line text-[13.5px] ${sel ? "bg-accent-soft" : "even:bg-paper/4"}`}>
+                        <td className="px-2.5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={marcados.has(f.id)} onChange={() => marcar(f.id)}
+                            aria-label={`Marcar ${f.nombre}`} className="h-4.5 w-4.5 accent-(--brand)" />
+                        </td>
+                        <td className="px-2.5 py-2"><span className="mx-auto block h-5 w-5 rounded-[4px]" style={{ background: f.color }} /></td>
+                        <td className="px-2.5 py-2 font-semibold">{f.nombre}</td>
+                        <td className="px-2.5 py-2 text-right font-mono text-muted">{f.orden}</td>
+                        <td className="px-2.5 py-2 text-right font-mono text-muted">{f.ordenImpresion}</td>
+                        <td className="px-2.5 py-2 text-center text-[12px] text-muted">{f.combinable ? "Sí" : "—"}</td>
+                        <td className="px-2.5 py-2 text-center text-[12px] text-muted">{f.mostrarVenta ? "Sí" : "—"}</td>
+                        <td className="px-2.5 py-2 text-center text-[12px] text-muted">{f.mostrarMenus ? "Sí" : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  {listaOrd.length === 0 && (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted">Ninguna familia.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -324,9 +507,9 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
           onCerrar={() => setAspecto(false)} />
       )}
 
-      {borrar && fam && (
+      {borrar && famAccion && (
         <Modal onCerrar={() => setBorrar(false)} ancho="md">
-          <CabeceraModal Icono={Layers} titulo="Eliminar familia" subtitulo={fam.nombre} onCerrar={() => setBorrar(false)} />
+          <CabeceraModal Icono={Layers} titulo="Eliminar familia" subtitulo={famAccion.nombre} onCerrar={() => setBorrar(false)} />
           <div className="p-4">
             <p className="text-[13.5px] leading-relaxed text-paper/85">
               Se borrará la familia. Sus categorías y productos <b>se quedan sin familia</b>, no se pierden.
