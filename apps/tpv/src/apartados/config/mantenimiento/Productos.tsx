@@ -780,6 +780,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   </button>
                 )}
               </div>
+              <span className="flex-1" />
               {/* Exportar a PDF: los MARCADOS (o, si no hay, todo lo que se ve). */}
               <button type="button" onClick={exportar} disabled={articulos.length === 0}
                 className="flex h-8 flex-none items-center gap-1.5 rounded-[5px] border border-line bg-panel px-3 text-[12.5px] font-semibold text-paper transition-transform active:scale-95 disabled:opacity-40">
