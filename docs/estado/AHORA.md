@@ -172,16 +172,16 @@ Sale de `docs/plan/11-decisiones-del-nodo.md`.
 
 **Siguiente número libre: `0137`.**
 
-- `0136` — **RESERVADA 21-07 (sesión chat, trazabilidad / auditoría)**:
+- `0136` — **APLICADA 21-07 en NUBE y NODO (sesión chat, trazabilidad / auditoría)**:
   `evento_auditoria` — «todo lo que sea crear/eliminar/modificar tendremos
   guardado una trazabilidad por si pasa algo». Tabla append-only por bar
   (`tenant_id`, `entidad`, `entidad_id`, `accion` ∈ crear/modificar/eliminar/
   duplicar, `resumen` legible, `datos` jsonb con el snapshot, `actor_device`/
   `actor_operario` de la sesión, `created_at`). RLS por tenant. La escribe el TPV
   best-effort (`lib/trazabilidad.ts`): si el registro falla, **NO bloquea** la
-  operación. Enganchada primero en Productos (guardar/eliminar/duplicar); a
-  replicar en el resto de mantenimientos. ⚠ Aplicar en NUBE y NODO (el TPV
-  escribe contra el nodo).
+  operación. Enganchada primero en Productos (guardar/eliminar/duplicar +
+  auto-asignar fotos); a replicar en el resto de mantenimientos. Ya aplicada en
+  nube (`gxcqihslbicrszgzudjs`) y nodo (55432/`gluuh`): tabla + RLS + 2 policies.
 
 - `0135` — **RESERVADA 20-07 (sesión chat, códigos de barras múltiples)**:
   `product_barcode` — Ágora permite N códigos por artículo («el primero será el
