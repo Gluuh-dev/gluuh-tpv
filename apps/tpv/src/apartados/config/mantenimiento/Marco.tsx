@@ -30,16 +30,21 @@ export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
   pestanas: readonly string[]; pestana: string; onPestana: (p: string) => void;
 }>) {
   return (
-    <div role="tablist" className="flex flex-none items-end gap-1.5 bg-background px-3 pt-2.5">
-      {pestanas.map((p) => {
+    <div role="tablist" className="flex flex-none items-end bg-background px-3 pt-2">
+      {pestanas.map((p, i) => {
         const on = p === pestana;
         return (
           <button
             key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
-            className={`-mb-px flex min-h-12 items-center rounded-t-[12px] border px-6 text-[14.5px] transition-all active:scale-[.98] ${
+            // Lados inclinados (trapecio, más ancho abajo) como una lengüeta de
+            // carpeta; el solape lo da `-ml`, y la activa va delante (`z-10`).
+            style={{ clipPath: "polygon(11px 0, calc(100% - 11px) 0, 100% 100%, 0 100%)" }}
+            className={`relative -mb-px flex min-h-9 items-center px-6 text-[13.5px] transition-transform active:scale-[.98] ${
+              i > 0 ? "-ml-2.5" : ""
+            } ${
               on
-                ? "border-line border-b-panel bg-panel font-semibold text-paper shadow-[0_-2px_6px_rgba(0,0,0,.04)]"
-                : "border-line/60 bg-panel-2 font-medium text-muted"
+                ? "z-10 bg-panel font-semibold text-paper"
+                : "bg-panel-2 font-medium text-muted"
             }`}
           >
             {p}
@@ -77,17 +82,20 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
   }, [subpestanas]);
 
   return (
-    <div className="flex flex-none items-end border-b border-line bg-panel px-3 pt-2">
-      <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-end gap-1 overflow-x-auto">
-        {subpestanas.map((s) => {
+    <div className="flex flex-none items-end bg-panel px-3 pt-1.5">
+      <div ref={carril} role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto">
+        {subpestanas.map((s, i) => {
           const on = s === subpestana;
           return (
             <button
               key={s} type="button" role="tab" aria-selected={on} onClick={() => onSubpestana?.(s)}
-              className={`-mb-px flex min-h-10 flex-none items-center whitespace-nowrap rounded-t-[10px] border px-5 text-[12.5px] transition-all active:scale-[.98] ${
+              style={{ clipPath: "polygon(9px 0, calc(100% - 9px) 0, 100% 100%, 0 100%)" }}
+              className={`relative -mb-px flex min-h-8 flex-none items-center whitespace-nowrap px-5 text-[12px] transition-transform active:scale-[.98] ${
+                i > 0 ? "-ml-2" : ""
+              } ${
                 on
-                  ? "border-line border-b-panel bg-panel font-bold text-paper"
-                  : "border-line/60 bg-panel-2 font-medium text-muted"
+                  ? "z-10 bg-panel font-bold text-paper shadow-[0_-1px_3px_rgba(0,0,0,.06)]"
+                  : "bg-panel-2 font-medium text-muted"
               }`}
             >
               {s}
@@ -95,14 +103,14 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
           );
         })}
       </div>
-      <div className={`flex-none gap-1 pb-1 pl-1 ${desborda ? "flex" : "hidden"}`}>
+      <div className={`flex-none gap-1 pb-0.5 pl-1.5 ${desborda ? "flex" : "hidden"}`}>
         <button type="button" aria-label="Pestaña anterior" onClick={() => desplazar(-1)}
-          className="grid h-9 w-9 place-items-center rounded-[8px] bg-panel-2 text-muted transition-transform active:scale-95">
-          <ChevronLeft size={16} strokeWidth={2.6} />
+          className="grid h-8 w-8 place-items-center rounded-sm bg-panel-2 text-muted transition-transform active:scale-95">
+          <ChevronLeft size={15} strokeWidth={2.6} />
         </button>
         <button type="button" aria-label="Pestaña siguiente" onClick={() => desplazar(1)}
-          className="grid h-9 w-9 place-items-center rounded-[8px] bg-panel-2 text-muted transition-transform active:scale-95">
-          <ChevronRight size={16} strokeWidth={2.6} />
+          className="grid h-8 w-8 place-items-center rounded-sm bg-panel-2 text-muted transition-transform active:scale-95">
+          <ChevronRight size={15} strokeWidth={2.6} />
         </button>
       </div>
     </div>
@@ -134,12 +142,11 @@ export function MarcoMantenimiento({
     <div className="flex min-h-0 flex-1 flex-col">
       <Pestanas pestanas={pestanas} pestana={pestana} onPestana={onPestana} />
 
-      {/* ── Cuerpo: una CAJA BLANCA con borde con la que se funde la pestaña (y
-          la subpestaña) activa. La pestaña activa «abre» el borde superior de la
-          caja (`-mb-px` + `border-b-panel`). Las subpestañas viven DENTRO de la
-          caja, arriba, como las lengüetas de una carpeta. `min-w-0` evita que una
-          tabla ancha empuje el layout. */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col border-x border-t border-line bg-panel">
+      {/* ── Cuerpo: CAJA BLANCA a ras. La lengüeta activa (relleno blanco) se
+          funde con ella sin costura; las inactivas quedan en gris detrás. Las
+          subpestañas viven DENTRO, arriba, como lengüetas. `min-w-0` evita que
+          una tabla ancha empuje el layout. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel">
         {haySub && (
           <SubPestanas subpestanas={subpestanas} subpestana={subpestana} onSubpestana={onSubpestana} />
         )}
