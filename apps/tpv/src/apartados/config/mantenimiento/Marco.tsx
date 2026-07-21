@@ -30,20 +30,20 @@ export function Pestanas({ pestanas, pestana, onPestana }: Readonly<{
   pestanas: readonly string[]; pestana: string; onPestana: (p: string) => void;
 }>) {
   return (
-    <div role="tablist" className="flex flex-none items-end bg-background px-3 pt-2">
+    <div role="tablist" className="flex flex-none items-end bg-background px-3 pt-1.5">
       {pestanas.map((p, i) => {
         const on = p === pestana;
         return (
           <button
             key={p} type="button" role="tab" aria-selected={on} onClick={() => onPestana(p)}
             // Lengüeta con esquinas redondeadas y borde; se solapan un poco (`-ml`)
-            // y la activa va delante (`z-10`), abre el borde de la caja
-            // (`border-b-panel`) y lleva una sombra ARRIBA para despegarse.
-            className={`-mb-px flex min-h-9 items-center rounded-t-[10px] border px-6 text-[13.5px] transition-transform active:scale-[.98] ${
+            // y la activa va delante (`z-10`), SIN borde abajo (`border-b-0`) para
+            // que no parezca que la corta, y con una sombra ARRIBA para despegarse.
+            className={`-mb-px flex min-h-8 items-center rounded-t-[10px] border px-6 text-[13.5px] transition-transform active:scale-[.98] ${
               i > 0 ? "-ml-1.5" : ""
             } ${
               on
-                ? "relative z-10 border-line border-b-panel bg-panel font-semibold text-paper shadow-[0_-3px_8px_rgba(0,0,0,.09)]"
+                ? "relative z-10 border-line border-b-0 bg-panel font-semibold text-paper shadow-[0_-3px_8px_rgba(0,0,0,.09)]"
                 : "border-line/70 bg-panel-2 font-medium text-muted"
             }`}
           >
@@ -93,7 +93,7 @@ export function SubPestanas({ subpestanas, subpestana, onSubpestana }: Readonly<
                 i > 0 ? "-ml-1.5" : ""
               } ${
                 on
-                  ? "relative z-10 border-line border-b-panel bg-panel font-bold text-paper shadow-[0_-2px_6px_rgba(0,0,0,.08)]"
+                  ? "relative z-10 border-line border-b-0 bg-panel font-bold text-paper shadow-[0_-2px_6px_rgba(0,0,0,.08)]"
                   : "border-line/70 bg-panel-2 font-medium text-muted"
               }`}
             >
