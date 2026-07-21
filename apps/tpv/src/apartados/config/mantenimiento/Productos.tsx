@@ -954,11 +954,11 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
                     <div className="w-32">
                       <BotonProducto comoPrevia nombre={art.nombre || "Sin nombre"}
                         precio={art.formatos[0]?.precio ?? 0}
-                        color={art.color ?? colorDeFamilia(art.familia)} foto={art.foto} icono={art.icono} />
+                        color={art.color ?? colorDeFamilia(art.familia)} foto={art.foto} />
                     </div>
                     <button type="button" disabled={ro} onClick={() => abrirVentana("aspecto")}
                       className="flex min-h-10 items-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
-                      <Camera size={15} /> Foto, color e icono
+                      <Camera size={15} /> Foto y color
                     </button>
                   </div>
                   {/* Como en Glop: TODO el comportamiento del artículo vive en su
@@ -1206,7 +1206,7 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
         <AspectoArticulo
           nombre={art.nombre} precio={art.formatos[0]?.precio ?? 0}
           colorFamilia={colorDeFamilia(art.familia)}
-          foto={art.foto} color={art.color} icono={art.icono}
+          foto={art.foto} color={art.color}
           onCambiar={(campo, valor) => set(campo, valor)}
           onCerrar={cerrarVentana}
         />

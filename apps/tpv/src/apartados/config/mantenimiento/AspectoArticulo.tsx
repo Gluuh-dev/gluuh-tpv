@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { Camera, Trash2, Ban } from "lucide-react";
+import { Camera, Trash2 } from "lucide-react";
 import { PanelLateral } from "../../../ui";
-import { NOMBRES_ICONOS, ICONOS } from "../../../lib/iconos";
 import { fotoReducida } from "../../../lib/imagen";
 import { galeriaProductos } from "../../../lib/galeria";
 import { GaleriaImagenes } from "./GaleriaImagenes";
@@ -26,7 +25,7 @@ const PALETA = [
 ];
 
 export function AspectoArticulo({
-  nombre, precio, colorFamilia, foto, color, icono, onCambiar, onCerrar,
+  nombre, precio, colorFamilia, foto, color, onCambiar, onCerrar,
 }: Readonly<{
   nombre: string;
   precio: number;
@@ -34,8 +33,7 @@ export function AspectoArticulo({
   colorFamilia: string;
   foto?: string;
   color?: string;
-  icono?: string;
-  onCambiar: (campo: "foto" | "color" | "icono", valor: string | undefined) => void;
+  onCambiar: (campo: "foto" | "color", valor: string | undefined) => void;
   onCerrar: () => void;
 }>) {
   const fichero = useRef<HTMLInputElement>(null);
@@ -55,13 +53,13 @@ export function AspectoArticulo({
   return (
     <PanelLateral titulo="Aspecto en el TPV" onCerrar={onCerrar}>
       <div className="flex min-h-0 flex-1 gap-4 p-4">
-        {/* ── Controles (izquierda): muestra, foto propia, color e icono ── */}
+        {/* ── Controles (izquierda): muestra, foto propia y color ── */}
         <div className="no-scrollbar flex w-56 flex-none flex-col gap-3 overflow-y-auto">
           <div>
             <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">Así se verá</p>
             <div className="rounded-[6px] border border-line bg-background p-2.5">
               <BotonProducto comoPrevia nombre={nombre || "Sin nombre"} precio={precio}
-                color={color ?? colorFamilia} foto={foto} icono={icono} />
+                color={color ?? colorFamilia} foto={foto} />
             </div>
           </div>
 
@@ -98,34 +96,6 @@ export function AspectoArticulo({
                   }`}
                   style={{ background: c }} />
               ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
-              Icono {foto && <span className="normal-case text-muted/80">— tapado por la foto</span>}
-            </p>
-            <div className={`flex flex-wrap gap-1.5 ${foto ? "opacity-40" : ""}`}>
-              <button type="button" onClick={() => onCambiar("icono", undefined)}
-                aria-label="Sin icono" aria-pressed={!icono}
-                className={`grid h-9 w-9 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
-                  icono ? "border-line text-muted" : "border-brand-lit bg-accent-soft text-brand-lit"
-                }`}>
-                <Ban size={16} />
-              </button>
-              {NOMBRES_ICONOS.map((n) => {
-                const Icono = ICONOS[n]!;
-                const on = icono === n;
-                return (
-                  <button key={n} type="button" onClick={() => onCambiar("icono", n)}
-                    aria-label={n} aria-pressed={on}
-                    className={`grid h-9 w-9 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
-                      on ? "border-brand-lit bg-accent-soft text-brand-lit" : "border-line text-paper/70"
-                    }`}>
-                    <Icono size={17} />
-                  </button>
-                );
-              })}
             </div>
           </div>
         </div>

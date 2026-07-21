@@ -502,8 +502,8 @@ export function Familias({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
       {aspecto && editando && fam && (
         <AspectoClasificacion titulo="Aspecto de la familia" nombre={fam.nombre} color={fam.color}
-          foto={fam.fotoUrl} icono="" conIcono={false}
-          onCambiar={(campo, val) => { if (campo === "color") set("color", val); else if (campo === "foto") set("fotoUrl", val); }}
+          foto={fam.fotoUrl}
+          onCambiar={(campo, val) => { if (campo === "color") set("color", val); else set("fotoUrl", val); }}
           onCerrar={() => setAspecto(false)} />
       )}
 

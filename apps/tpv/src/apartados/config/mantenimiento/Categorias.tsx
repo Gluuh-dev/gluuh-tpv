@@ -239,10 +239,10 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
                   <div className="flex flex-col gap-2">
                     <span className="text-[11.5px] font-medium text-muted">Aspecto en el TPV</span>
                     <PreviaClasificacion nombre={cat.nombre} color={cat.color}
-                      foto={cat.fotoUrl || undefined} icono={cat.icono || undefined} />
+                      foto={cat.fotoUrl || undefined} />
                     <button type="button" disabled={ro} onClick={() => setAspecto(true)}
                       className="flex min-h-11 items-center justify-center gap-2 rounded-[5px] border border-mint/40 bg-mint/10 px-3 text-[12.5px] font-semibold text-mint transition-transform active:scale-95 disabled:opacity-35">
-                      <Camera size={15} /> Foto, color e icono
+                      <Camera size={15} /> Foto y color
                     </button>
                   </div>
                 </div>
@@ -274,8 +274,8 @@ export function Categorias({ onSalir }: Readonly<{ onSalir: () => void }>) {
 
       {aspecto && editando && cat && (
         <AspectoClasificacion titulo="Aspecto de la categoría" nombre={cat.nombre} color={cat.color}
-          foto={cat.fotoUrl} icono={cat.icono} conIcono
-          onCambiar={(campo, val) => { if (campo === "color") set("color", val); else if (campo === "foto") set("fotoUrl", val); else set("icono", val); }}
+          foto={cat.fotoUrl}
+          onCambiar={(campo, val) => { if (campo === "color") set("color", val); else set("fotoUrl", val); }}
           onCerrar={() => setAspecto(false)} />
       )}
 

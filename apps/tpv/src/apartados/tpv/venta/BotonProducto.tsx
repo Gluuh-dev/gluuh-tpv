@@ -1,5 +1,4 @@
 import { eur } from "../../../lib/dinero";
-import { iconoPorNombre } from "../../../lib/iconos";
 import { urlFoto } from "../../../lib/galeria";
 
 // EL tile de artículo del TPV. Vive aparte porque lo pintan DOS sitios: la
@@ -7,20 +6,17 @@ import { urlFoto } from "../../../lib/galeria";
 // marcado era garantizar que la previa acabara mintiendo sobre lo que verá el
 // camarero — que es justo lo único que la previa tiene que hacer bien.
 export function BotonProducto({
-  nombre, precio, color, foto, icono, onClick, comoPrevia = false,
+  nombre, precio, color, foto, onClick, comoPrevia = false,
 }: Readonly<{
   nombre: string;
   precio: number;
   /** Color propio del artículo; si no tiene, el de su familia. */
   color: string;
   foto?: string | null;
-  /** Nombre de icono (ver `lib/iconos`). */
-  icono?: string | null;
   onClick?: () => void;
   /** En la ficha es una MUESTRA, no un botón: ni se pulsa ni entra al tabulador. */
   comoPrevia?: boolean;
 }>) {
-  const Icono = iconoPorNombre(icono);
   // `foto` puede ser una referencia a la galería (`galeria:…`), una URL subida
   // al nodo o un data URL: `urlFoto` lo resuelve a algo pintable (o nada).
   const src = urlFoto(foto);
@@ -41,9 +37,6 @@ export function BotonProducto({
           <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
         </>
       )}
-      {/* El icono solo SIN foto: encima de una foto es ruido sobre ruido. */}
-      {Icono && !src && <Icono size={26} strokeWidth={1.6} className="absolute right-1.5 top-1.5 opacity-30" />}
-
       {/* Nombre a la izquierda y PRECIO a la derecha, abajo y SIEMPRE visibles:
           el precio con su propia sombra para que no se pierda sobre una foto. */}
       <div className="relative flex items-end justify-between gap-1.5">

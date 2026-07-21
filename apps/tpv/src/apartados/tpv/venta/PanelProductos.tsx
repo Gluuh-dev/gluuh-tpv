@@ -58,7 +58,7 @@ export function PanelProductos() {
         style={{ gridTemplateColumns: "repeat(auto-fill,minmax(118px,1fr))" }}>
         {productos.map((p) => (
           <BotonProducto key={p.id} nombre={p.nombre} precio={p.precio}
-            color={p.color ?? colorCategoria(p.categoria)} foto={p.foto} icono={p.icono}
+            color={p.color ?? colorCategoria(p.categoria)} foto={p.foto}
             onClick={() => addProd(p.id)} />
         ))}
         {!buscando && (

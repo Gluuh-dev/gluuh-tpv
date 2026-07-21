@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { Camera, Trash2, Ban } from "lucide-react";
+import { Camera, Trash2 } from "lucide-react";
 import { PanelLateral } from "../../../ui";
-import { NOMBRES_ICONOS, ICONOS, iconoPorNombre } from "../../../lib/iconos";
 import { fotoReducida } from "../../../lib/imagen";
 import { urlFoto, galeriaCategorias } from "../../../lib/galeria";
 import { GaleriaImagenes } from "./GaleriaImagenes";
@@ -17,13 +16,12 @@ import { PALETA } from "./ClasificacionUI";
 
 /**
  * El tile tal cual se verá en la botonera: color de fondo, foto a pantalla con
- * su velo, icono (solo sin foto) y el nombre. Sin precio, a diferencia del
- * artículo. Mismo marcado que `BotonProducto` para que la previa no mienta.
+ * su velo y el nombre. Sin precio, a diferencia del artículo. Mismo marcado que
+ * `BotonProducto` para que la previa no mienta.
  */
-export function PreviaClasificacion({ nombre, color, foto, icono }: Readonly<{
-  nombre: string; color: string; foto?: string; icono?: string;
+export function PreviaClasificacion({ nombre, color, foto }: Readonly<{
+  nombre: string; color: string; foto?: string;
 }>) {
-  const Icono = iconoPorNombre(icono);
   const src = urlFoto(foto);
   return (
     <div aria-hidden
@@ -35,7 +33,6 @@ export function PreviaClasificacion({ nombre, color, foto, icono }: Readonly<{
           <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/5" />
         </>
       )}
-      {Icono && !src && <Icono size={26} strokeWidth={1.6} className="absolute right-1.5 top-1.5 opacity-30" />}
       <span className="relative text-[11px] font-bold uppercase leading-tight [text-shadow:0_1px_2px_rgba(0,0,0,.45)]">
         {nombre || "Sin nombre"}
       </span>
@@ -44,18 +41,14 @@ export function PreviaClasificacion({ nombre, color, foto, icono }: Readonly<{
 }
 
 export function AspectoClasificacion({
-  titulo, nombre, color, foto, icono, conIcono, onCambiar, onCerrar,
+  titulo, nombre, color, foto, onCambiar, onCerrar,
 }: Readonly<{
   titulo: string;
   nombre: string;
   color: string;
   /** URL o data URL; vacío = sin foto. */
   foto: string;
-  /** Nombre de icono; vacío = ninguno. Se ignora si `conIcono` es false. */
-  icono: string;
-  /** La familia no tiene icono; la categoría sí. */
-  conIcono: boolean;
-  onCambiar: (campo: "foto" | "color" | "icono", valor: string) => void;
+  onCambiar: (campo: "foto" | "color", valor: string) => void;
   onCerrar: () => void;
 }>) {
   const fichero = useRef<HTMLInputElement>(null);
@@ -74,13 +67,12 @@ export function AspectoClasificacion({
   return (
     <PanelLateral titulo={titulo} onCerrar={onCerrar}>
       <div className="flex min-h-0 flex-1 gap-4 p-4">
-        {/* ── Controles (izquierda): muestra, foto propia, color e icono ── */}
+        {/* ── Controles (izquierda): muestra, foto propia y color ── */}
         <div className="no-scrollbar flex w-56 flex-none flex-col gap-3 overflow-y-auto">
           <div>
             <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">Así se verá</p>
             <div className="rounded-[6px] border border-line bg-background p-2.5">
-              <PreviaClasificacion nombre={nombre} color={color} foto={foto || undefined}
-                icono={conIcono ? icono || undefined : undefined} />
+              <PreviaClasificacion nombre={nombre} color={color} foto={foto || undefined} />
             </div>
           </div>
 
@@ -112,35 +104,6 @@ export function AspectoClasificacion({
             </div>
           </div>
 
-          {conIcono && (
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
-                Icono {foto && <span className="normal-case text-muted/80">— tapado por la foto</span>}
-              </p>
-              <div className={`flex flex-wrap gap-1.5 ${foto ? "opacity-40" : ""}`}>
-                <button type="button" onClick={() => onCambiar("icono", "")}
-                  aria-label="Sin icono" aria-pressed={!icono}
-                  className={`grid h-9 w-9 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
-                    icono ? "border-line text-muted" : "border-brand-lit bg-accent-soft text-brand-lit"
-                  }`}>
-                  <Ban size={16} />
-                </button>
-                {NOMBRES_ICONOS.map((n) => {
-                  const Icono = ICONOS[n]!;
-                  const on = icono === n;
-                  return (
-                    <button key={n} type="button" onClick={() => onCambiar("icono", n)}
-                      aria-label={n} aria-pressed={on}
-                      className={`grid h-9 w-9 place-items-center rounded-[5px] border transition-transform active:scale-90 ${
-                        on ? "border-brand-lit bg-accent-soft text-brand-lit" : "border-line text-paper/70"
-                      }`}>
-                      <Icono size={17} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── Galería (derecha): elegir una de las fotos que trae la app ── */}
