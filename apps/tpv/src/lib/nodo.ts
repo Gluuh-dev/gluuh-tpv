@@ -11,34 +11,51 @@
 // Nunca datos fingidos vendidos como reales.
 // ============================================================================
 
-const SESION = "gluuh_sesion_dispositivo"; // { access_token, device_id? }
+const SESION = "gluuh_sesion_dispositivo"; // { access_token, device_id?, device_nombre? }
 
-// MISMO ORIGEN, siempre. En producción lo sirve el nodo; en dev el proxy de Vite
-// (ver `vite.config.ts`) reenvía `/rest` `/auth` `/storage` al nodo. Así no hay
-// CORS ni un caso especial para dev. `VITE_NODO` sigue como override por si
-// alguien apunta a otro nodo a mano.
-export const BASE: string = import.meta.env.VITE_NODO ?? "";
+// DESTINO de los datos: el NODO (por defecto) o la NUBE (Supabase). Sirve para
+// DISEÑAR conectado a datos reales mientras el nodo se termina, y cambiar sin
+// tocar la app (ver `vite.config.ts`). En producción queda "nodo".
+const DESTINO = (import.meta.env.VITE_DESTINO as string | undefined) || "nodo";
 
-export function token(): string | null {
+// BASE: nodo = MISMO ORIGEN (en dev el proxy de Vite reenvía `/rest` `/auth`
+// `/storage` al gateway; en producción lo sirve el propio nodo, sin CORS). Nube =
+// la URL de Supabase (cross-origin, con CORS + `apikey`). `VITE_NODO` sigue como
+// override para apuntar a otro nodo a mano.
+export const BASE: string =
+  DESTINO === "nube"
+    ? ((import.meta.env.VITE_SUPABASE_URL as string | undefined) || "")
+    : ((import.meta.env.VITE_NODO as string | undefined) || "");
+
+// La anon key SOLO en modo nube: Supabase exige `apikey` además del Bearer.
+const ANON = (import.meta.env.VITE_SUPABASE_ANON as string | undefined) || "";
+
+interface Sesion { access_token?: string; device_id?: string; device_nombre?: string }
+
+// La sesión: la de localStorage (emparejado real) o, SOLO en dev, la que firma e
+// inyecta `vite.config.ts` (`VITE_DEV_SESION`) para no pegarla a mano cada vez.
+// En build de producción `VITE_DEV_SESION` es "" (vacío): manda el emparejado.
+function sesion(): Sesion | null {
   try {
     const s = localStorage.getItem(SESION);
-    return s ? ((JSON.parse(s) as { access_token?: string }).access_token ?? null) : null;
-  } catch {
-    return null;
-  }
+    if (s) return JSON.parse(s) as Sesion;
+  } catch { /* localStorage inaccesible */ }
+  const dev = import.meta.env.VITE_DEV_SESION as string | undefined;
+  if (dev) { try { return JSON.parse(dev) as Sesion; } catch { /* mal formado */ } }
+  return null;
 }
 
-/** ¿Hay terminal emparejado? Si no, la pantalla va en modo demo. */
+export function token(): string | null {
+  return sesion()?.access_token ?? null;
+}
+
+/** ¿Hay terminal emparejado (o sesión de dev)? Si no, la pantalla va en demo. */
 export const haySesion = (): boolean => token() !== null;
 
-/** Datos del terminal emparejado (para la auditoría: quién hizo la acción). */
+/** Datos del terminal (para la auditoría: quién hizo la acción). */
 export function sesionDispositivo(): { device_id?: string; device_nombre?: string } {
-  try {
-    const s = localStorage.getItem(SESION);
-    return s ? (JSON.parse(s) as { device_id?: string; device_nombre?: string }) : {};
-  } catch {
-    return {};
-  }
+  const s = sesion();
+  return s ? { device_id: s.device_id, device_nombre: s.device_nombre } : {};
 }
 
 /**
@@ -64,7 +81,13 @@ export function tenantId(): string | null {
 }
 
 function cabeceras(t: string, extra: Record<string, string> = {}): Record<string, string> {
-  return { "content-type": "application/json", authorization: `Bearer ${t}`, ...extra };
+  return {
+    "content-type": "application/json",
+    authorization: `Bearer ${t}`,
+    // Supabase (modo nube) exige `apikey`; el nodo lo ignora, así que no estorba.
+    ...(ANON ? { apikey: ANON } : {}),
+    ...extra,
+  };
 }
 
 /** Llama a una función de la BD. `null` = sin sesión, sin nodo o error. */

@@ -1,4 +1,4 @@
-import { leer, haySesion } from "../../lib/nodo";
+import { leer, haySesion, sesionDispositivo } from "../../lib/nodo";
 import { eur } from "../../lib/dinero";
 
 // ============================================================================
@@ -19,14 +19,9 @@ const n = (v: number | string | null | undefined): number => {
   return typeof x === "number" && Number.isFinite(x) ? x : 0;
 };
 
-/** El device de este terminal, sacado de la sesión guardada. */
+/** El device de este terminal, sacado de la sesión (localStorage o dev). */
 function nombreTerminal(): string {
-  try {
-    const s = localStorage.getItem("gluuh_sesion_dispositivo");
-    return s ? ((JSON.parse(s) as { device_nombre?: string }).device_nombre ?? "Terminal") : "Terminal";
-  } catch {
-    return "Terminal";
-  }
+  return sesionDispositivo().device_nombre ?? "Terminal";
 }
 
 /** Los datos del Inicio, o `null` si el terminal no está emparejado. */
