@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRuta, navegar, useVentana, abrirVentana, cerrarVentana } from "../../../lib/rutas";
 import {
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ChevronUp, ChevronDown,
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   PlusCircle, Pencil, MinusCircle, CheckCircle2, XCircle, LogOut,
   Search, Camera, Plus, X, Check, Info, SlidersHorizontal, Keyboard, Copy, Undo2, Printer,
 } from "lucide-react";
@@ -132,16 +132,17 @@ const GRUPOS_PARAMETROS: { titulo: string; campos: { clave: keyof ParametrosArti
 ];
 
 /**
- * Casilla de sí/no de la lista: un CHECKBOX pintado (cuadro verde con ✓), no un
- * icono suelto. Se lee como lo que es —algo marcado— y en una tabla de 1.200
- * filas la mancha verde salta a la vista; el apagado es un cuadro tenue y vacío,
- * que se distingue del puesto sin tener que leer nada.
+ * Casilla de sí/no de la lista: un CHECKBOX pintado (cuadro oscuro con ✓), no un
+ * icono suelto. Se lee como lo que es —algo marcado— y en la tabla el cuadro
+ * lleno salta a la vista; el apagado es un cuadro tenue y vacío, que se distingue
+ * del puesto sin tener que leer nada. En NEGRO (no verde) para no pisar el acento
+ * de marca sobre el gris neutro de la config.
  */
 function Casilla({ si }: Readonly<{ si: boolean }>) {
   return (
     <td className="px-2.5 py-2 text-center">
       <span className={`inline-grid h-5 w-5 place-items-center rounded-[4px] border ${
-        si ? "border-mint bg-mint text-white" : "border-line bg-transparent"
+        si ? "border-paper bg-paper text-panel" : "border-line bg-transparent"
       }`}>
         {si && <Check size={13} strokeWidth={3.4} />}
       </span>
@@ -662,6 +663,12 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
   } else if (pestana === "Lista") {
     pie = (
       <>
+        {/* Moverse por las FILAS de la tabla (marca y trae a la vista). */}
+        <BotonPie Icono={ChevronsLeft} onClick={() => seleccionar(0)} disabled={idxEnLista <= 0}>Inicio</BotonPie>
+        <BotonPie Icono={ChevronLeft} onClick={() => seleccionar(idxEnLista - 1)} disabled={idxEnLista <= 0}>Anterior</BotonPie>
+        <BotonPie Icono={ChevronRight} onClick={() => seleccionar(idxEnLista + 1)} disabled={idxEnLista < 0 || idxEnLista >= listaOrd.length - 1}>Siguiente</BotonPie>
+        <BotonPie Icono={ChevronsRight} onClick={() => seleccionar(listaOrd.length - 1)} disabled={idxEnLista < 0 || idxEnLista >= listaOrd.length - 1}>Fin</BotonPie>
+        <SepPie />
         <BotonPie Icono={PlusCircle} tono="ok" onClick={crear}>Nuevo</BotonPie>
         {/* Duplicar va junto a Nuevo porque ES un alta: la de quien da de alta
             ocho vinos que solo cambian en el nombre y el precio. */}
@@ -708,35 +715,20 @@ export function Productos({ onSalir }: Readonly<{ onSalir: () => void }>) {
       >
         {pestana === "Lista" && (
           <Caja crecer>
-            <div className="flex flex-none items-center gap-2 border-b border-line p-2.5">
-              {/* Buscador más chico, con «✕» para limpiar. */}
-              <div className="relative w-full max-w-md">
-                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <div className="flex flex-none items-center border-b border-line p-2.5">
+              {/* Buscador pequeño, con «✕» para limpiar. Moverse por las filas es
+                  con las flechas del pie (Inicio/Anterior/Siguiente/Fin). */}
+              <div className="relative w-full max-w-xs">
+                <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
                 <input value={q} onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar descripción, código o familia…"
-                  className={claseEntrada(false, "h-10 w-full pl-9 pr-9 text-[13px]")} />
+                  placeholder="Buscar artículo…"
+                  className="h-8 w-full rounded-[5px] border border-line bg-background pl-8 pr-8 text-[12.5px] font-medium text-paper outline-none transition-colors placeholder:text-muted focus:border-brand-lit" />
                 {q && (
                   <button type="button" onClick={() => setQ("")} aria-label="Limpiar búsqueda"
-                    className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted transition-transform active:scale-90">
-                    <X size={14} />
+                    className="absolute right-1.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted transition-transform active:scale-90">
+                    <X size={13} />
                   </button>
                 )}
-              </div>
-              <span className="flex-1" />
-              {/* Sin barras de scroll: para moverse por la tabla, flechas ↑/↓ que
-                  mueven la fila marcada y la traen a la vista. */}
-              <div className="flex flex-none items-center gap-1">
-                <button type="button" onClick={() => seleccionar(idxEnLista - 1)} disabled={idxEnLista <= 0}
-                  aria-label="Fila anterior"
-                  className="grid h-10 w-10 place-items-center rounded-[6px] border border-line bg-panel text-muted transition-transform active:scale-95 disabled:opacity-35">
-                  <ChevronUp size={18} strokeWidth={2.4} />
-                </button>
-                <button type="button" onClick={() => seleccionar(idxEnLista + 1)}
-                  disabled={idxEnLista < 0 || idxEnLista >= listaOrd.length - 1}
-                  aria-label="Fila siguiente"
-                  className="grid h-10 w-10 place-items-center rounded-[6px] border border-line bg-panel text-muted transition-transform active:scale-95 disabled:opacity-35">
-                  <ChevronDown size={18} strokeWidth={2.4} />
-                </button>
               </div>
             </div>
             <Desplazable eje="ambos">
